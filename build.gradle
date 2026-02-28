@@ -1,0 +1,42 @@
+plugins {
+    id 'java'
+}
+
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+
+static def getEnv(key, defaultValue) {
+    return System.getenv(key) ?: defaultValue
+}
+
+subprojects {
+    repositories {
+        mavenCentral()
+        mavenLocal()
+    }
+
+    ext {
+        mapstructVersion = "1.5.5.Final"
+        libVers = [
+                org_postgresql          : getEnv('VERSION_ORG_POSTGRESQL', VERSION_ORG_POSTGRESQL),
+                liquibase               : getEnv('VERSION_ORG_LIQUIBASE', VERSION_ORG_LIQUIBASE),
+                lombok                  : getEnv('VERSION_LOMBOK', VERSION_LOMBOK),
+                mapstruct               : getEnv('VERSION_MAPSTRUCT', VERSION_MAPSTRUCT),
+                junit_jupiter           : '5.14.3',
+        ]
+    }
+}
