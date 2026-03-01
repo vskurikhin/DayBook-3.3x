@@ -33,6 +33,7 @@
 
 # OSX
 .DS_Store
+.DS_Store?
 
 .apt_generated
 .certs/
@@ -94,3 +95,40 @@ test.keystore
 test.truststore
 yarn-debug.log*
 yarn-error.log*
+
+# GoLang template
+#
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+go-cp
+go-envdir
+go-telnet
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+### User defined
+.idea/
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.bak
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+auth/cmd/server/auth-server
