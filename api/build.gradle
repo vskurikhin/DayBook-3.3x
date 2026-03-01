@@ -22,6 +22,7 @@ dependencies {
     implementation 'io.quarkus:quarkus-container-image-docker'
     implementation 'io.quarkus:quarkus-rest-jackson'
     implementation 'io.quarkiverse.mapstruct:quarkus-mapstruct:1.1.0'
+    implementation "org.mapstruct:mapstruct:$libVers.mapstruct"
     // TODO remove quarkus-openapi-generator-server in release
     implementation 'io.quarkus:quarkus-smallrye-openapi'
     // TODO remove quarkus-openapi-generator-server in release
@@ -31,7 +32,6 @@ dependencies {
     implementation 'org.apache.camel.quarkus:camel-quarkus-pgevent'
      */
     implementation 'io.quarkus:quarkus-cache'
-    implementation 'org.apache.camel.quarkus:camel-quarkus-pgevent'
     implementation 'io.quarkus:quarkus-arc'
 
     compileOnly "org.projectlombok:lombok:$libVers.lombok"
@@ -44,6 +44,7 @@ dependencies {
 
     testImplementation 'io.quarkus:quarkus-junit'
     testImplementation 'io.rest-assured:rest-assured'
+    testAnnotationProcessor "org.mapstruct:mapstruct-processor:$libVers.mapstruct"
 }
 
 group = 'su.svn'
