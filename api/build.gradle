@@ -1,0 +1,83 @@
+plugins {
+    id 'java'
+    id 'io.quarkus'
+    id 'idea'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation project(':lib')
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:quarkus-camel-bom:${quarkusPlatformVersion}")
+    implementation 'io.quarkus:quarkus-grpc'
+    implementation 'io.quarkus:quarkus-rest'
+    /* TODO add quarkus-quinoa
+    implementation 'io.quarkiverse.quinoa:quarkus-quinoa:2.7.2'
+     */
+    implementation 'io.quarkus:quarkus-hibernate-reactive-panache'
+    implementation 'io.quarkus:quarkus-container-image-docker'
+    implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkiverse.mapstruct:quarkus-mapstruct:1.1.0'
+    // TODO remove quarkus-openapi-generator-server in release
+    implementation 'io.quarkus:quarkus-smallrye-openapi'
+    // TODO remove quarkus-openapi-generator-server in release
+    implementation 'io.quarkiverse.openapi.generator:quarkus-openapi-generator-server:2.14.0-lts'
+    implementation 'io.quarkus:quarkus-reactive-pg-client'
+    /* TODO add camel-quarkus-pgevent
+    implementation 'org.apache.camel.quarkus:camel-quarkus-pgevent'
+     */
+    implementation 'io.quarkus:quarkus-cache'
+    implementation 'org.apache.camel.quarkus:camel-quarkus-pgevent'
+    implementation 'io.quarkus:quarkus-arc'
+
+    compileOnly "org.projectlombok:lombok:$libVers.lombok"
+
+    annotationProcessor "org.mapstruct:mapstruct-processor:$libVers.mapstruct"
+    annotationProcessor "org.projectlombok:lombok-mapstruct-binding:0.2.0"
+    annotationProcessor "org.projectlombok:lombok:$libVers.lombok"
+    annotationProcessor project(":spi-mapstruct")
+    annotationProcessor project(":lib")
+
+    testImplementation 'io.quarkus:quarkus-junit'
+    testImplementation 'io.rest-assured:rest-assured'
+}
+
+group = 'su.svn'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir "$buildDir/classes/java/quarkus-generated-sources/grpc"
+        }
+    }
+}
+
+tasks.register('printSourceSets') {
+    doLast {
+        sourceSets.each {
+            println "projectDir: ${projectDir}"
+            println it
+            it.java.srcDirs.each { println "-> ${projectDir.relativePath(it)}" }
+            println ""
+        }
+    }
+}
