@@ -1,0 +1,49 @@
+plugins {
+	id 'java'
+	id 'org.liquibase.gradle' version '2.2.0' // Use the latest version
+}
+
+group = 'su.svn'
+version = '0.0.1-SNAPSHOT'
+description = 'Library project for Spring Boot'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+	mavenLocal()
+}
+
+dependencies {
+	// Liquibase runtime dependencies for the plugin
+	liquibaseRuntime "org.liquibase:liquibase-core:$libVers.liquibase"
+	liquibaseRuntime "org.liquibase:liquibase-gradle-plugin:3.0.2"
+	liquibaseRuntime "org.postgresql:postgresql:$libVers.org_postgresql"
+
+	compileOnly "org.projectlombok:lombok:$libVers.lombok"
+
+	annotationProcessor "org.mapstruct:mapstruct-processor:$libVers.mapstruct"
+	annotationProcessor "org.projectlombok:lombok-mapstruct-binding:0.2.0"
+	annotationProcessor "org.projectlombok:lombok:$libVers.lombok"
+	annotationProcessor project(":spi-mapstruct")
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
+	testImplementation "org.junit.jupiter:junit-jupiter:$libVers.junit_jupiter"
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
