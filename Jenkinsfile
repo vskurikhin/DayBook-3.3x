@@ -4,6 +4,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
+                sh 'cd auth ; touch .env ; make ; cd -'
                 // Ensure the gradlew script has executable permissions
                 sh 'chmod +x gradlew'
                 // Run the 'build' task using the Gradle wrapper
