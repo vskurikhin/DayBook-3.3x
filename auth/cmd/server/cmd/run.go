@@ -6,6 +6,21 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 )
 
+//go:generate mockgen -destination=run_mock_config_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd Config
+type Config interface {
+	Values() config.Values
+}
+
+//go:generate mockgen -destination=run_mock_server_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
+type Server interface {
+	Run()
+}
+
+var (
+	newConfig     = func(cmd *cobra.Command) config.Config { return config.NewConfig(cmd) }
+	newAuthServer = func(cfg config.Config) server.Server { return server.NewAuthServer(cfg) }
+)
+
 // runCmd represents the base command when called without any subcommands
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -20,7 +35,8 @@ using the obtained configuration.`,
 		setSlogDebug(cmd)
 		mergeCobraAndViper(cmd)
 		slogInfoVerbose(cmd)
-		cfg := config.MakeConfig(cmd)
-		server.Run(cfg)
+		cfg := newConfig(cmd)
+		srv := newAuthServer(cfg)
+		srv.Run()
 	},
 }

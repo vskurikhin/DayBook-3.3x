@@ -32,6 +32,9 @@ MAKEFLAGS += --silent
 ## run: Compile and run server and agent
 run: go-compile
 
+## coverage: Calculate coverage
+coverage: go-coverage
+
 ## start: Start in development mode. Auto-starts when code changes.
 start: start-auth
 
@@ -66,6 +69,15 @@ go-build-auth:
 go-generate:
 	@echo "  >  Generating dependency files..."
 	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go generate $(generate)
+
+# 1. Generate the list of packages to include, excluding 'mocks'
+# go list ./... lists all packages; grep -v excludes lines containing 'mocks'
+go-coverage:
+	CVPKG=$(go list ./... | grep -v '/mocks' | tr '\n' ',')
+	# 2. Run tests with coverage analysis applied only to the specified packages
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go test -coverpkg=$(CVPKG) -coverprofile=coverage.out ./...
+	# 3. (Optional) Generate the HTML report
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go tool cover -html=coverage.out
 
 go-get:
 	@echo "  >  Checking if there is any missing dependencies..."
