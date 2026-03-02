@@ -10,6 +10,7 @@
 package cmd
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -40,13 +41,13 @@ func (m *MockServer) EXPECT() *MockServerMockRecorder {
 }
 
 // Run mocks base method.
-func (m *MockServer) Run() {
+func (m *MockServer) Run(ctx context.Context) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Run")
+	m.ctrl.Call(m, "Run", ctx)
 }
 
 // Run indicates an expected call of Run.
-func (mr *MockServerMockRecorder) Run() *gomock.Call {
+func (mr *MockServerMockRecorder) Run(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockServer)(nil).Run))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockServer)(nil).Run), ctx)
 }

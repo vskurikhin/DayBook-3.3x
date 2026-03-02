@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -24,7 +25,7 @@ func TestRunCmd_ShouldCallServerRun(t *testing.T) {
 	mockServer := NewMockServer(ctrl)
 
 	mockConfig.EXPECT().Values().Times(0)
-	mockServer.EXPECT().Run().Return().Times(1)
+	mockServer.EXPECT().Run(context.Background()).Return().Times(1)
 
 	// arrange
 	cmd := newTestCommand()

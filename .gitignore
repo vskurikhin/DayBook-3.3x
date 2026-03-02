@@ -132,3 +132,6 @@ Thumbs.db
 # Go workspace file
 go.work
 auth/cmd/server/auth-server
+auth/PR*.diff
+auth/vendor/
+auth/coverage.*

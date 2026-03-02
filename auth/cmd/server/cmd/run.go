@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
@@ -14,7 +16,7 @@ type Config interface {
 
 //go:generate mockgen -destination=run_mock_server_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
 type Server interface {
-	Run()
+	Run(ctx context.Context)
 }
 
 var (
@@ -38,6 +40,6 @@ using the obtained configuration.`,
 		slogInfoVerbose(cmd)
 		cfg := newConfig(cmd)
 		srv := newAuthServer(cfg)
-		srv.Run()
+		srv.Run(context.Background())
 	},
 }
