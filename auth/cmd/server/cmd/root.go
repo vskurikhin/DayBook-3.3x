@@ -1,8 +1,8 @@
 package cmd
 
 import (
+	"context"
 	"log/slog"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -11,7 +11,10 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
-var cfgFile string
+var (
+	cfgFile    string
+	executeCmd = rootCmd.Execute
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -39,7 +42,7 @@ All commands support standard flags such as --debug, --verbose, and --config.`,
 		setSlogDebug(cmd)
 		mergeCobraAndViper(cmd)
 		slogInfoVerbose(cmd)
-		config.MakeConfig(cmd)
+		_ = config.NewConfig(cmd)
 	},
 }
 
@@ -53,9 +56,25 @@ func slogInfoVerbose(cmd *cobra.Command) {
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
+func Execute(ctx context.Context) int {
+	var err error
+	done := make(chan struct{})
+	go func() {
+		err = executeCmd()
+		close(done)
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Error("ctx.Done", "err", ctx.Err())
+			return 2
+		case <-done:
+			if err != nil {
+				slog.Error("App Error", "err", err)
+				return 1
+			}
+			slog.Info("App Done")
+			return 0
+		}
 	}
 }

@@ -22,6 +22,7 @@ func newTestCommand() *cobra.Command {
 
 	cmd.Flags().Bool("debug", false, "")
 	cmd.Flags().Bool("enabled", false, "")
+	cmd.Flags().Bool("verbose", false, "")
 	cmd.Flags().Int("port", 8080, "")
 	cmd.Flags().String("name", "default", "")
 
