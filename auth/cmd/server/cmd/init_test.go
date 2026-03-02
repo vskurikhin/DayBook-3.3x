@@ -92,7 +92,7 @@ func TestInitConfig_UsesHomeDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
-	configPath := filepath.Join(tmpDir, ".auth.yaml")
+	configPath := filepath.Join(tmpDir, ".auth-server.yaml")
 	err := os.WriteFile(configPath, []byte("debug: true\n"), 0644)
 	if err != nil {
 		t.Fatal(err)

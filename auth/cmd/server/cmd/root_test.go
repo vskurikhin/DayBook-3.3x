@@ -59,7 +59,7 @@ func TestSlogInfoVerbose_VerboseTrue(t *testing.T) {
 	slogInfoVerbose(cmd) // отсутствие panic
 }
 
-// Execute — успешное завершение (код 0)
+// Execute — успешное завершение (код ExitCodeOK)
 func TestExecute_ShouldReturnZeroOnSuccess(t *testing.T) {
 	orig := executeCmd
 	defer func() { executeCmd = orig }()
@@ -71,12 +71,12 @@ func TestExecute_ShouldReturnZeroOnSuccess(t *testing.T) {
 	ctx := context.Background()
 	code := Execute(ctx)
 
-	if code != 0 {
-		t.Fatalf("expected 0, got %d", code)
+	if code != ExitCodeOK {
+		t.Fatalf("expected %d, got %d", ExitCodeOK, code)
 	}
 }
 
-// Execute — ошибка команды (код 1)
+// Execute — ошибка команды (код ExitCodeError)
 func TestExecute_ShouldReturnOneOnError(t *testing.T) {
 	orig := executeCmd
 	defer func() { executeCmd = orig }()
@@ -88,12 +88,12 @@ func TestExecute_ShouldReturnOneOnError(t *testing.T) {
 	ctx := context.Background()
 	code := Execute(ctx)
 
-	if code != 1 {
-		t.Fatalf("expected 1, got %d", code)
+	if code != ExitCodeError {
+		t.Fatalf("expected %d, got %d", ExitCodeError, code)
 	}
 }
 
-// Execute — отмена через context (код 2)
+// Execute — отмена через context (код ExitCodeContextDone)
 func TestExecute_ShouldReturnTwoOnContextCancel(t *testing.T) {
 	orig := executeCmd
 	defer func() { executeCmd = orig }()
@@ -119,8 +119,8 @@ func TestExecute_ShouldReturnTwoOnContextCancel(t *testing.T) {
 
 	wg.Wait()
 
-	if result != 2 {
-		t.Fatalf("expected 2, got %d", result)
+	if result != ExitCodeContextDone {
+		t.Fatalf("expected %d, got %d", ExitCodeContextDone, result)
 	}
 }
 
@@ -151,8 +151,8 @@ func TestExecute_ShouldReturnOneOnContextCancel(t *testing.T) {
 
 	wg.Wait()
 
-	if result != 2 {
-		t.Fatalf("expected exit code 1, got %d", result)
+	if result != ExitCodeContextDone {
+		t.Fatalf("expected exit code %d, got %d", ExitCodeContextDone, result)
 	}
 }
 
@@ -168,7 +168,7 @@ func TestExecute_ShouldReturnOneWhenCommandReturnsError(t *testing.T) {
 	ctx := context.Background()
 	code := Execute(ctx)
 
-	if code != 1 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	if code != ExitCodeError {
+		t.Fatalf("expected exit code %d, got %d", ExitCodeError, code)
 	}
 }
