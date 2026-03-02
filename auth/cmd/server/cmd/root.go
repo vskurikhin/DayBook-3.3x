@@ -11,6 +11,12 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
+const (
+	ExitCodeOK int = iota * 100
+	ExitCodeContextDone
+	ExitCodeError
+)
+
 var (
 	cfgFile    string
 	executeCmd = rootCmd.Execute
@@ -67,14 +73,14 @@ func Execute(ctx context.Context) int {
 		select {
 		case <-ctx.Done():
 			slog.Error("ctx.Done", "err", ctx.Err())
-			return 2
+			return ExitCodeContextDone
 		case <-done:
 			if err != nil {
 				slog.Error("App Error", "err", err)
-				return 1
+				return ExitCodeError
 			}
 			slog.Info("App Done")
-			return 0
+			return ExitCodeOK
 		}
 	}
 }

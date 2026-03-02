@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 )
@@ -18,7 +19,7 @@ type Server interface {
 
 var (
 	newConfig     = func(cmd *cobra.Command) config.Config { return config.NewConfig(cmd) }
-	newAuthServer = func(cfg config.Config) server.Server { return server.NewAuthServer(cfg) }
+	newAuthServer = func(cfg config.Config) server.Server { return wire.InitializeServer(cfg) }
 )
 
 // runCmd represents the base command when called without any subcommands

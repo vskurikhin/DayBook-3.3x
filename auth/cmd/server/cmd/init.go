@@ -85,7 +85,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug")
 	rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose")
 
-	runCmd.Flags().String(FlagAddress, "", "Address as host:port")
+	runCmd.Flags().String(FlagAddress, "127.0.0.1:8080", "Address as host:port")
 	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
 
 	rootCmd.AddCommand(runCmd)
@@ -104,7 +104,7 @@ func initConfig() {
 		// Search Config in home directory with name ".auth" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".auth")
+		viper.SetConfigName(".auth-server")
 	}
 	viper.AutomaticEnv() // read in environment variables that match
 

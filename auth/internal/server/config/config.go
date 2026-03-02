@@ -141,6 +141,10 @@ func NewConfig(cmd *cobra.Command) *ValuesConfig {
 	return cfg
 }
 
+func GetConfig() *ValuesConfig {
+	return cfg
+}
+
 // Ssl returns the value of the internal ssl field.
 //
 // This indicates whether SSL/TLS is enabled for the configuration.
