@@ -7,12 +7,14 @@ import (
 	"github.com/google/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler"
 )
 
 var (
 	serverSet = wire.NewSet(
 		config.GetConfig,
 		server.NewAuthServer,
+		handler.NewRouter,
 	)
 )
 
