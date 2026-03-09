@@ -3,6 +3,7 @@ module github.com/vskurikhin/DayBook-3.3x/auth/v2
 go 1.26.0
 
 require (
+	github.com/caarlos0/env/v11 v11.4.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/wire v0.7.0
 	github.com/rs/cors v1.11.1

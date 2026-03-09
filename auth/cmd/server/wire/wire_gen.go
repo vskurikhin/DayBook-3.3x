@@ -10,19 +10,20 @@ import (
 	"github.com/google/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler"
 )
 
 // Injectors from di.go:
 
-func InitializeServer(cfg config.Config) *server.AuthServer {
-	handler := handler.NewRouter(cfg)
-	authServer := server.NewAuthServer(cfg, handler)
+func InitializeServer(cfg config.Config, environments env.Environments) *server.AuthServer {
+	httpHandler := handler.NewRouter(cfg, environments)
+	authServer := server.NewAuthServer(cfg, environments, httpHandler)
 	return authServer
 }
 
 // di.go:
 
 var (
-	serverSet = wire.NewSet(config.GetConfig, server.NewAuthServer, handler.NewRouter)
+	serverSet = wire.NewSet(config.GetConfig, env.EnvironmentsLoad, server.NewAuthServer, handler.NewRouter)
 )

@@ -23,18 +23,18 @@
 package handler
 
 import (
-	"net/http"
-	"time"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/cors"
+	"net/http"
+
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
 // NewRouter creates and configures an HTTP router with
 // middleware and application routes using the provided configuration.
-func NewRouter(cfg config.Config) http.Handler {
+func NewRouter(cfg config.Config, env env.Environments) http.Handler {
 	r := chi.NewRouter()
 
 	debug := cfg.Values().Debug
@@ -54,7 +54,7 @@ func NewRouter(cfg config.Config) http.Handler {
 	// Set a timeout value on the request context (ctx), that will signal
 	// through ctx.Done() that the request has timed out and further
 	// processing should be stopped.
-	r.Use(middleware.Timeout(2 * time.Second))
+	r.Use(middleware.Timeout(env.Values().Timeout))
 
 	r.Get("/api/v1/ok", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("ok"))
