@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
-	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -65,15 +64,6 @@ func TestAuthServer_Run_ListenError_ExitsProcess(t *testing.T) {
 func TestAuthServer_Interface(t *testing.T) {
 	var s Server = &AuthServer{}
 	_ = s
-}
-
-func freeAddr(t *testing.T) string {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer l.Close()
-	return l.Addr().String()
 }
 
 var _ config.Config = (*testValuesConfig)(nil)
