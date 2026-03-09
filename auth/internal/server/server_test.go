@@ -2,12 +2,32 @@ package server
 
 import (
 	"context"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+	"net"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 )
+
+//
+// ---- Mock Environments ----
+//
+
+type mockEnv struct {
+	values env.Values
+}
+
+func (m mockEnv) Values() env.Values {
+	return m.values
+}
+
+var environments = mockEnv{
+	values: env.Values{
+		Timeout: 5 * time.Second,
+	},
+}
 
 // Тестируем создание нового AuthServer
 func TestNewAuthServer(t *testing.T) {
@@ -17,10 +37,10 @@ func TestNewAuthServer(t *testing.T) {
 	}
 	handler := http.NewServeMux()
 
-	srv := NewAuthServer(newTestConfig(), handler)
+	srv := NewAuthServer(newTestConfig(), environments, handler)
 
-	if srv.values.Address != cfg.Address {
-		t.Errorf("expected address %s, got %s", cfg.Address, srv.values.Address)
+	if srv.config.Address != cfg.Address {
+		t.Errorf("expected address %s, got %s", cfg.Address, srv.config.Address)
 	}
 
 	if srv.handler != handler {
@@ -31,7 +51,7 @@ func TestNewAuthServer(t *testing.T) {
 func TestAuthServer_Run_ListenError_ExitsProcess(t *testing.T) {
 	cfg := newTestConfig() // вызовет ошибку ListenAndServe
 	handler := http.NewServeMux()
-	srv := NewAuthServer(cfg, handler)
+	srv := NewAuthServer(cfg, environments, handler)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 	go func() {
@@ -45,6 +65,15 @@ func TestAuthServer_Run_ListenError_ExitsProcess(t *testing.T) {
 func TestAuthServer_Interface(t *testing.T) {
 	var s Server = &AuthServer{}
 	_ = s
+}
+
+func freeAddr(t *testing.T) string {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	return l.Addr().String()
 }
 
 var _ config.Config = (*testValuesConfig)(nil)

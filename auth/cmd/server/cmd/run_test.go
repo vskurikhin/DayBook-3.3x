@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -32,7 +33,7 @@ func TestRunCmd_ShouldCallServerRun(t *testing.T) {
 	newConfig = func(cmd *cobra.Command) config.Config {
 		return mockConfig
 	}
-	newAuthServer = func(cfg config.Config) server.Server {
+	newAuthServer = func(_ config.Config, _ env.Environments) server.Server {
 		return mockServer
 	}
 

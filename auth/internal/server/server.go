@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
 const (
@@ -24,17 +25,18 @@ type Server interface {
 var _ Server = (*AuthServer)(nil)
 
 type AuthServer struct {
-	handler http.Handler
-	values  config.Values
+	handler      http.Handler
+	config       config.Values
+	environments env.Environments
 }
 
-func NewAuthServer(cfg config.Config, handler http.Handler) *AuthServer {
-	return &AuthServer{handler: handler, values: cfg.Values()}
+func NewAuthServer(cfg config.Config, env env.Environments, handler http.Handler) *AuthServer {
+	return &AuthServer{handler: handler, config: cfg.Values(), environments: env}
 }
 
 func (a AuthServer) Run(ctx context.Context) {
 	server := &http.Server{
-		Addr:    a.values.Address,
+		Addr:    a.config.Address,
 		Handler: a.handler,
 	}
 	var err error
@@ -46,7 +48,7 @@ func (a AuthServer) Run(ctx context.Context) {
 	signal.Notify(sigQuit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	go func() {
 		// Start the HTTP server on port 8080 by default
-		fmt.Printf("HTTPServer starting on %s...\n", a.values.Address)
+		fmt.Printf("HTTPServer starting on %s...\n", a.config.Address)
 		err = server.ListenAndServe()
 		close(sigQuit)
 	}()
