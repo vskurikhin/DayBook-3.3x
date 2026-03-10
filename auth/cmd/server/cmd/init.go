@@ -13,7 +13,7 @@
 // The application resolves configuration in the following order:
 //
 //  1. Explicit config file passed via --config flag
-//  2. Default config file in $HOME directory named ".auth.yaml"
+//  2. Default config file in $HOME directory named ".auth-server.yaml"
 //  3. Environment variables (via Viper AutomaticEnv)
 //  4. Command-line flags
 //
@@ -57,7 +57,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -101,7 +101,7 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search Config in home directory with name ".auth" (without extension).
+		// Search Config in home directory with name ".auth-server" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".auth-server")
@@ -110,6 +110,6 @@ func initConfig() {
 
 	// If a Config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		_, _ = fmt.Fprintln(os.Stderr, "Using Config file:", viper.ConfigFileUsed())
+		slog.Info("Using Config", slog.String("file", viper.ConfigFileUsed()))
 	}
 }

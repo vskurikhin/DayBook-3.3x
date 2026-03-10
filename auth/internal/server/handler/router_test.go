@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"github.com/go-chi/chi/v5"
+	"go.uber.org/mock/gomock"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -48,13 +50,31 @@ var environments = mockEnv{
 	},
 }
 
+// Empty Router
+
+var emptyRouter = func() chi.Router {
+	r := chi.NewRouter()
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {})
+	return r
+}()
+
 //
 // ---- Tests ----
 //
 
 func TestNewRouter_ReturnsHandler(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockApiHandlers := NewMockApiHandlers(ctrl)
 	cfg := newMockConfig(false)
-	router := NewRouter(cfg, environments)
+
+	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
+		return emptyRouter
+	}()).Times(1)
+	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
+		return emptyRouter
+	}()).Times(1)
+	router := NewRouter(cfg, environments, mockApiHandlers)
 
 	if router == nil {
 		t.Fatal("expected router, got nil")
@@ -62,8 +82,23 @@ func TestNewRouter_ReturnsHandler(t *testing.T) {
 }
 
 func TestNewRouter_HiEndpoint_Returns200(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockApiHandlers := NewMockApiHandlers(ctrl)
 	cfg := newMockConfig(false)
-	router := NewRouter(cfg, environments)
+
+	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
+		r := chi.NewRouter()
+		r.Get(OK, func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("ok"))
+		})
+		return r
+	}()).Times(1)
+	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
+		return emptyRouter
+	}()).Times(1)
+
+	router := NewRouter(cfg, environments, mockApiHandlers)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/ok", nil)
 	rr := httptest.NewRecorder()
@@ -80,8 +115,22 @@ func TestNewRouter_HiEndpoint_Returns200(t *testing.T) {
 }
 
 func TestNewRouter_HiEndpoint_MethodNotAllowed(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockApiHandlers := NewMockApiHandlers(ctrl)
 	cfg := newMockConfig(false)
-	router := NewRouter(cfg, environments)
+
+	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
+		r := chi.NewRouter()
+		r.Get(OK, func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("ok"))
+		})
+		return r
+	}()).Times(1)
+	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
+		return emptyRouter
+	}()).Times(1)
+	router := NewRouter(cfg, environments, mockApiHandlers)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/ok", nil)
 	rr := httptest.NewRecorder()
@@ -94,8 +143,18 @@ func TestNewRouter_HiEndpoint_MethodNotAllowed(t *testing.T) {
 }
 
 func TestNewRouter_NotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockApiHandlers := NewMockApiHandlers(ctrl)
 	cfg := newMockConfig(false)
-	router := NewRouter(cfg, environments)
+
+	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
+		return emptyRouter
+	}()).Times(1)
+	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
+		return emptyRouter
+	}()).Times(1)
+	router := NewRouter(cfg, environments, mockApiHandlers)
 
 	req := httptest.NewRequest(http.MethodGet, "/unknown", nil)
 	rr := httptest.NewRecorder()
@@ -108,8 +167,22 @@ func TestNewRouter_NotFound(t *testing.T) {
 }
 
 func TestNewRouter_CORSHeaders(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockApiHandlers := NewMockApiHandlers(ctrl)
 	cfg := newMockConfig(false)
-	router := NewRouter(cfg, environments)
+
+	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
+		r := chi.NewRouter()
+		r.Get(OK, func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("ok"))
+		})
+		return r
+	}()).Times(1)
+	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
+		return emptyRouter
+	}()).Times(1)
+	router := NewRouter(cfg, environments, mockApiHandlers)
 
 	req := httptest.NewRequest(http.MethodOptions, "/api/v1/ok", nil)
 	req.Header.Set("Origin", "http://localhost")

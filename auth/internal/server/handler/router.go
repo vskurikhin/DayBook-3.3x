@@ -32,9 +32,16 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
+const (
+	BaseURL = "/api"
+	V1      = "/v1"
+	V2      = "/v2"
+	OK      = "/ok"
+)
+
 // NewRouter creates and configures an HTTP router with
 // middleware and application routes using the provided configuration.
-func NewRouter(cfg config.Config, env env.Environments) http.Handler {
+func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) http.Handler {
 	r := chi.NewRouter()
 
 	debug := cfg.Values().Debug
@@ -56,9 +63,8 @@ func NewRouter(cfg config.Config, env env.Environments) http.Handler {
 	// processing should be stopped.
 	r.Use(middleware.Timeout(env.Values().Timeout))
 
-	r.Get("/api/v1/ok", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("ok"))
-	})
+	r.Mount(BaseURL+V1, handlers.apiV1())
+	r.Mount(BaseURL+V2, handlers.apiV2())
 
 	return r
 }

@@ -1,11 +1,14 @@
 package config
 
 import (
-	"sync"
-	"testing"
-
+	"context"
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
+	"sync"
+	"syscall"
+	"testing"
 )
 
 // 🔧 Вспомогательная функция сброса глобального состояния
@@ -192,6 +195,13 @@ func TestNewConfig_ShouldBeSingleton(t *testing.T) {
 	if config2.Values().Address != "first" {
 		t.Error("expected address to remain 'first' due to singleton behavior")
 	}
+
+	config3 := GetConfig()
+
+	if config1 != config3 {
+		t.Error("expected same instance due to sync.Once singleton")
+	}
+
 }
 
 func TestValuesMethod_ReturnsCorrectValues(t *testing.T) {
@@ -220,5 +230,54 @@ func TestSsl_DefaultValueIsFalse(t *testing.T) {
 
 	if values.Ssl() {
 		t.Error("expected default ssl to be false")
+	}
+}
+
+func TestLoopSigHup_ContextDone(t *testing.T) {
+	// Запускаем loopSigHup с контекстом, который сразу отменяется
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // сразу отменяем
+
+	// Функция должна завершиться сразу, не блокируя тест
+	loopSigHup(ctx)
+}
+
+func TestLoopSigHup_ConfigReload(t *testing.T) {
+	// Подготовка временного файла viper
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("test")
+
+	go loopSigHup(context.Background())
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = p.Signal(syscall.SIGHUP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Если функция завершилась без паники — тест пройден
+}
+
+func TestConfigChange_Success(t *testing.T) {
+	// Подготовка временного cfg
+	cfg = &ValuesConfig{
+		values: Values{
+			Address: "old-address",
+			Debug:   false,
+		},
+		mu: sync.RWMutex{},
+	}
+
+	// Сброс viper
+	v := viper.New()
+	v.Set("address", "new-address")
+	viper.Set("address", "new-address") // глобально, чтобы Unmarshal работал
+
+	configChange(fsnotify.Event{})
+
+	cfgValues := cfg.Values()
+	if cfgValues.Address != "new-address" {
+		t.Fatalf("expected Address 'new-address', got '%s'", cfgValues.Address)
 	}
 }
