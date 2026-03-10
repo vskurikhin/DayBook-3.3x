@@ -52,12 +52,16 @@
 package config
 
 import (
+	"context"
 	"fmt"
-	"log/slog"
-	"sync"
-
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"log/slog"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
@@ -79,6 +83,7 @@ var _ Config = (*ValuesConfig)(nil)
 
 type ValuesConfig struct {
 	values Values
+	mu     sync.RWMutex
 }
 
 // Values returns the configuration values stored in the Config instance.
@@ -95,7 +100,9 @@ type ValuesConfig struct {
 //	if values.Debug {
 //	    fmt.Println("Debug mode enabled")
 //	}
-func (v ValuesConfig) Values() Values {
+func (v *ValuesConfig) Values() Values {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return v.values
 }
 
@@ -127,22 +134,29 @@ var (
 func NewConfig(cmd *cobra.Command) *ValuesConfig {
 	var v, values Values
 	err := viper.Unmarshal(&v)
-	if err != nil && tool.IsDebug(cmd) {
+	if err != nil && cmd != nil && tool.IsDebug(cmd) {
 		slog.Error("Error binding flag", "error", err)
 	} else {
 		values = v
 	}
-	if tool.IsDebug(cmd) {
+	if cmd != nil && tool.IsDebug(cmd) {
 		slog.Debug("variable:", "ValuesConfig", fmt.Sprintf("%+v", values))
 	}
+	vc := ValuesConfig{}
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
 	once.Do(func() {
-		cfg = &ValuesConfig{values: values}
+		vc.values = values
+		cfg = &vc
+		go loopSigHup(context.Background())
+		viper.WatchConfig()
+		viper.OnConfigChange(configChange)
 	})
 	return cfg
 }
 
 func GetConfig() *ValuesConfig {
-	return cfg
+	return NewConfig(nil)
 }
 
 // Ssl returns the value of the internal ssl field.
@@ -151,4 +165,40 @@ func GetConfig() *ValuesConfig {
 // It is a read-only accessor.
 func (c Values) Ssl() bool {
 	return c.ssl
+}
+
+func configChange(_ fsnotify.Event) {
+	slog.Info("Config file changed, reloading...")
+	var newConfig Values
+	if err := viper.Unmarshal(&newConfig); err != nil {
+		slog.Error("Error unmarshaling config", "error", err)
+		return
+	}
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+	cfg.values = newConfig
+}
+
+func loopSigHup(ctx context.Context) {
+	sigHup := make(chan os.Signal, 1)
+	signal.Notify(sigHup, syscall.SIGHUP)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-sigHup:
+			// If a Config file is found, read it in.
+			if err := viper.ReadInConfig(); err == nil {
+				slog.Info("Config file changed, reloading...", slog.String("file", viper.ConfigFileUsed()))
+				var newConfig Values
+				if err := viper.Unmarshal(&newConfig); err != nil {
+					slog.Error("Error unmarshaling config", "error", err)
+					continue
+				}
+				cfg.mu.Lock()
+				cfg.values = newConfig
+				cfg.mu.Unlock()
+			}
+		}
+	}
 }

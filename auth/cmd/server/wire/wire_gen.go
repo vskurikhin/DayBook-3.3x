@@ -12,12 +12,18 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
 )
 
 // Injectors from di.go:
 
 func InitializeServer(cfg config.Config, environments env.Environments) *server.AuthServer {
-	httpHandler := handler.NewRouter(cfg, environments)
+	v1 := resources.NewV1(cfg)
+	apiV1 := handler.NewApiV1(v1)
+	v2 := resources.NewV2(cfg)
+	apiV2 := handler.NewApiV2(v2)
+	handlers := handler.NewHandlers(apiV1, apiV2)
+	httpHandler := handler.NewRouter(cfg, environments, handlers)
 	authServer := server.NewAuthServer(cfg, environments, httpHandler)
 	return authServer
 }
@@ -25,5 +31,5 @@ func InitializeServer(cfg config.Config, environments env.Environments) *server.
 // di.go:
 
 var (
-	serverSet = wire.NewSet(config.GetConfig, env.EnvironmentsLoad, server.NewAuthServer, handler.NewRouter)
+	serverSet = wire.NewSet(config.GetConfig, env.EnvironmentsLoad, handler.NewApiV1, handler.NewApiV2, wire.Bind(new(handler.ApiHandlers), new(*handler.Handlers)), wire.Bind(new(resources.ResourceV1), new(*resources.V1)), wire.Bind(new(resources.ResourceV2), new(*resources.V2)), handler.NewHandlers, handler.NewRouter, server.NewAuthServer, resources.NewV1, resources.NewV2)
 )
