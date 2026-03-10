@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"bytes"
 	"net/http"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
@@ -18,19 +19,17 @@ type V1 struct {
 
 func (v V1) Ok(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	done := make(chan struct{})
-	go func() {
-		if v.cfg.Values().Debug {
-			_, _ = w.Write([]byte("DEBUG "))
-		}
-		_, _ = w.Write([]byte("V1"))
-		close(done)
-	}()
-	select {
-	case <-done:
-		return
-	case <-ctx.Done():
+	var body bytes.Buffer
+	if v.cfg.Values().Debug {
+		body.WriteString("DEBUG ")
 	}
+	body.WriteString("V1")
+	select {
+	case <-ctx.Done():
+		return
+	}
+	//goland:noinspection ALL
+	w.Write(body.Bytes())
 }
 
 // NewV1 creates and returns a new V1 resource instance that implements
