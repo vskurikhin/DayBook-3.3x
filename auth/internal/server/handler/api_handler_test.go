@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Success case: handler returns nil
@@ -62,13 +63,14 @@ func TestAPIHandler_ReturnsError(t *testing.T) {
 // Context canceled before execution
 func TestAPIHandler_ContextCanceled(t *testing.T) {
 
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
 	handler := APIHandler(func(w http.ResponseWriter, r *http.Request) error {
+		time.Sleep(1 * time.Second)
 		t.Fatal("handler should not be called when context is canceled")
 		return nil
 	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil).WithContext(ctx)
 	rec := httptest.NewRecorder()

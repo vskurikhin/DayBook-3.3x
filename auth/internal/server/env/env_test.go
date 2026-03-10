@@ -1,6 +1,8 @@
 package env
 
 import (
+	"errors"
+	"github.com/caarlos0/env/v11"
 	"testing"
 	"time"
 )
@@ -8,7 +10,10 @@ import (
 func TestEnvironmentsLoad_DefaultValue(t *testing.T) {
 	t.Setenv("SERVER_TIMEOUT", "")
 
-	environments := EnvironmentsLoad()
+	environments, err := EnvironmentsLoad()
+	if err != nil {
+		t.Fatal(err)
+	}
 	values := environments.Values()
 
 	expected := 10 * time.Second
@@ -20,7 +25,10 @@ func TestEnvironmentsLoad_DefaultValue(t *testing.T) {
 func TestEnvironmentsLoad_FromEnv(t *testing.T) {
 	t.Setenv("SERVER_TIMEOUT", "30s")
 
-	environments := EnvironmentsLoad()
+	environments, err := EnvironmentsLoad()
+	if err != nil {
+		t.Fatal(err)
+	}
 	values := environments.Values()
 
 	expected := 30 * time.Second
@@ -45,5 +53,12 @@ func TestValues_Method(t *testing.T) {
 
 func TestEnvironmentsLoad_InvalidDuration(t *testing.T) {
 	t.Setenv("SERVER_TIMEOUT", "invalid")
-	EnvironmentsLoad()
+	_, err := EnvironmentsLoad()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var aggregateError env.AggregateError
+	if !errors.As(err, &aggregateError) {
+		t.Fatal("expected env.AggregateError")
+	}
 }

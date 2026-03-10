@@ -85,7 +85,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug")
 	rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose")
 
-	runCmd.Flags().String(FlagAddress, "127.0.0.1:8080", "Address as host:port")
+	runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
 	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
 
 	rootCmd.AddCommand(runCmd)

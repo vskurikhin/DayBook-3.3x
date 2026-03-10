@@ -1,0 +1,68 @@
+basePath: /auth/api
+definitions:
+  APIResponse:
+    properties:
+      success:
+        type: boolean
+    type: object
+host: localhost:64148
+info:
+  contact: {}
+  description: API for authentication in DayBook
+  title: DayBook Auth API
+  version: 0.0.1
+paths:
+  /v1/ok:
+    get:
+      deprecated: true
+      description: Ok - Описание (v1)
+      operationId: ResourceV1-ok
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: успешно!
+          schema:
+            type: string
+      summary: Ok Краткое содержание
+      tags:
+      - ok
+  /v2/ok:
+    get:
+      description: Ok - Описание (v2)
+      operationId: ResourceV2-ok
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: успешно
+          schema:
+            allOf:
+            - $ref: '#/definitions/APIResponse'
+            - properties:
+                data:
+                  items:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: 'ошибка сервера "success": false'
+          schema:
+            allOf:
+            - $ref: '#/definitions/APIResponse'
+            - properties:
+                error:
+                  type: string
+                success:
+                  type: boolean
+              type: object
+        "504":
+          description: Gateway Timeout
+      summary: Ok Краткое содержание
+      tags:
+      - ok
+schemes:
+- http
+swagger: "2.0"
