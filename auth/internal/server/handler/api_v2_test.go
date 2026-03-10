@@ -11,10 +11,11 @@ type mockResourceV2 struct {
 	called bool
 }
 
-func (m *mockResourceV2) Ok(w http.ResponseWriter, _ *http.Request) {
+func (m *mockResourceV2) Ok(w http.ResponseWriter, _ *http.Request) error {
 	m.called = true
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
+	return nil
 }
 
 func TestNewApiV2_OKRoute(t *testing.T) {

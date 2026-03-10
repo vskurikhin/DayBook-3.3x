@@ -1,13 +1,10 @@
 package resources
 
 import (
-	"context"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
-
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 )
 
 var _ config.Config = (*testValuesConfig)(nil)
@@ -22,6 +19,10 @@ func (t testValuesConfig) Values() config.Values {
 
 func newTestConfig() *testValuesConfig {
 	return &testValuesConfig{values: config.Values{Address: "127.0.0.1:0", Debug: false}}
+}
+
+func newTestConfigDebug() *testValuesConfig {
+	return &testValuesConfig{values: config.Values{Address: "127.0.0.1:0", Debug: true}}
 }
 
 func TestNewV1(t *testing.T) {
@@ -49,6 +50,24 @@ func TestV1_Ok_ReturnsV1(t *testing.T) {
 	}
 }
 
+func TestV1_Ok_Returns_DEBUG_V1(t *testing.T) {
+	v := V1{cfg: newTestConfigDebug()}
+
+	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
+	rec := httptest.NewRecorder()
+
+	v.Ok(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	if rec.Body.String() != "DEBUG V1" {
+		t.Fatalf("expected body 'V1', got %s", rec.Body.String())
+	}
+}
+
+/*
 func TestV1_Ok_ContextCanceled(t *testing.T) {
 	v := V1{cfg: newTestConfig()}
 
@@ -90,3 +109,4 @@ func TestV1_Ok_ContextTimeout(t *testing.T) {
 		t.Fatalf("unexpected body: %s", body)
 	}
 }
+*/

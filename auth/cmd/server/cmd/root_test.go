@@ -32,7 +32,10 @@ func TestRootCmd_Run_ShouldNotPanic(t *testing.T) {
 	cmd.Flags().Bool("verbose", false, "")
 	cmd.Flags().Bool("debug", false, "")
 
-	rootCmd.Run(cmd, []string{})
+	err := rootCmd.RunE(cmd, []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // slogInfoVerbose — verbose=false

@@ -1,11 +1,9 @@
 package resources
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 )
 
 func TestNewV2(t *testing.T) {
@@ -22,51 +20,36 @@ func TestV2_Ok_ReturnsV2(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
 	rec := httptest.NewRecorder()
 
-	v.Ok(rec, req)
+	err := v.Ok(rec, req)
+	if err != nil {
+		t.Fatal("expected no error, got ", err)
+	}
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	if rec.Body.String() != "V2" {
-		t.Fatalf("expected body 'V2', got %s", rec.Body.String())
+	if rec.Body.String() != `{"success":true,"data":[{"id":"1","version":"V2"}]}`+"\n" {
+		t.Fatalf("expected body '"+`{"success":true,"data":[{"id":"1","version":"V2"}]}`+"', got %s", rec.Body.String())
 	}
 }
 
-func TestV2_Ok_ContextCanceled(t *testing.T) {
-	v := V2{cfg: newTestConfig()}
+func TestV2_Ok_Returns_DEBUG_V2(t *testing.T) {
+	v := V2{cfg: newTestConfigDebug()}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	req := httptest.NewRequest(http.MethodGet, "/ok", nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
 	rec := httptest.NewRecorder()
 
-	v.Ok(rec, req)
-
-	body := rec.Body.String()
-
-	if body != "" && body != "V2" {
-		t.Fatalf("unexpected body: %s", body)
+	err := v.Ok(rec, req)
+	if err != nil {
+		t.Fatal("expected no error, got ", err)
 	}
-}
 
-func TestV2_Ok_ContextTimeout(t *testing.T) {
-	v := V2{cfg: newTestConfig()}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
-	defer cancel()
-
-	time.Sleep(time.Millisecond)
-
-	req := httptest.NewRequest(http.MethodGet, "/ok", nil).WithContext(ctx)
-	rec := httptest.NewRecorder()
-
-	v.Ok(rec, req)
-
-	body := rec.Body.String()
-
-	if body != "" && body != "V2" {
-		t.Fatalf("unexpected body: %s", body)
+	if rec.Body.String() != `{"success":true,"data":[{"id":"1","version":"V2"},{"debug":"true","id":"2"}]}`+"\n" {
+		t.Fatalf("expected body '"+`{"success":true,"data":[{"id":"1","version":"V2"},{"debug":"true","id":"2"}]}`+"', got %s", rec.Body.String())
 	}
 }

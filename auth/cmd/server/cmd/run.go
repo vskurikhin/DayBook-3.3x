@@ -21,7 +21,7 @@ type Server interface {
 }
 
 var (
-	newConfig     = func(cmd *cobra.Command) config.Config { return config.NewConfig(cmd) }
+	newConfig     = func(cmd *cobra.Command) (config.Config, error) { return config.NewConfig(cmd) }
 	envLoad       = func() env.Environments { return env.EnvironmentsLoad() }
 	newAuthServer = func(cfg config.Config, env env.Environments) server.Server { return wire.InitializeServer(cfg, env) }
 )
@@ -36,13 +36,17 @@ or environment variables, sets the logging level, and starts the main server
 using the obtained configuration.`,
 	// The following line your bare application
 	// has an action associated with it:
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		setSlogDebug(cmd)
 		mergeCobraAndViper(cmd)
 		slogInfoVerbose(cmd)
-		cfg := newConfig(cmd)
+		cfg, err := newConfig(cmd)
+		if err != nil {
+			return err
+		}
 		env := envLoad()
 		srv := newAuthServer(cfg, env)
 		srv.Run(context.Background())
+		return nil
 	},
 }

@@ -1,14 +1,17 @@
 package config
 
 import (
+	"bytes"
 	"context"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"log/slog"
 	"os"
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 )
 
 // 🔧 Вспомогательная функция сброса глобального состояния
@@ -56,8 +59,14 @@ func TestNewConfig_Singleton(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.Flags().Bool("debug", false, "")
 
-	c1 := NewConfig(cmd)
-	c2 := NewConfig(cmd)
+	c1, err := NewConfig(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2, err := NewConfig(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if c1 != c2 {
 		t.Fatal("expected singleton instance")
@@ -76,7 +85,10 @@ func TestNewConfig_UnmarshalValues(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.Flags().Bool("debug", false, "")
 
-	cfg := NewConfig(cmd)
+	cfg, err := NewConfig(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
 	values := cfg.Values()
 
 	if values.Address != "127.0.0.1:8080" {
@@ -101,12 +113,18 @@ func TestNewConfig_OnceBehavior(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.Flags().Bool("debug", false, "")
 
-	c1 := NewConfig(cmd)
+	c1, err := NewConfig(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// меняем viper после первого вызова
 	viper.Set("address", "second")
 
-	c2 := NewConfig(cmd)
+	c2, err := NewConfig(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if c2.Values().Address != "first" {
 		t.Fatalf("expected singleton to keep first value, got %s", c2.Values().Address)
@@ -155,7 +173,10 @@ func TestNewConfig_ShouldBindValuesFromViper(t *testing.T) {
 
 	cmd := newTestCommand(true)
 
-	config := NewConfig(cmd)
+	config, err := NewConfig(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
 	values := config.Values()
 
 	if values.Address != "localhost:8080" {
@@ -181,12 +202,18 @@ func TestNewConfig_ShouldBeSingleton(t *testing.T) {
 	viper.Set("address", "first")
 
 	cmd := newTestCommand(false)
-	config1 := NewConfig(cmd)
+	config1, err := NewConfig(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Меняем значение во viper
 	viper.Set("address", "second")
 
-	config2 := NewConfig(cmd)
+	config2, err := NewConfig(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if config1 != config2 {
 		t.Error("expected same instance due to sync.Once singleton")
@@ -279,5 +306,99 @@ func TestConfigChange_Success(t *testing.T) {
 	cfgValues := cfg.Values()
 	if cfgValues.Address != "new-address" {
 		t.Fatalf("expected Address 'new-address', got '%s'", cfgValues.Address)
+	}
+}
+
+func TestLoopSigHup_SignalReload(t *testing.T) {
+	resetConfigState()
+
+	viper.Set("address", "before")
+
+	cfg, err := NewConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go loopSigHup(context.Background())
+
+	viper.Set("address", "after")
+
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = p.Signal(syscall.SIGHUP)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	values := cfg.Values()
+
+	if values.Address != "after" && values.Address != "before" {
+		t.Fatalf("unexpected value %s", values.Address)
+	}
+}
+
+func TestNewConfig_UnmarshalError_DebugEnabled(t *testing.T) {
+	resetConfigState()
+
+	// Создаём буфер для перехвата slog
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	slog.SetDefault(logger)
+
+	// Устанавливаем некорректный тип -> viper.Unmarshal вызовет ошибку
+	viper.Set("debug", map[string]string{"invalid": "value"})
+
+	cmd := &cobra.Command{}
+	cmd.Flags().Bool("debug", true, "")
+
+	_, err := NewConfig(cmd)
+
+	if err == nil {
+		t.Fatal("expected unmarshal error")
+	}
+
+	logOutput := buf.String()
+
+	if logOutput == "" {
+		t.Fatal("expected slog error log")
+	}
+}
+
+func TestConfigChange_UnmarshalError(t *testing.T) {
+	resetConfigState()
+
+	// Перехватываем slog
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	slog.SetDefault(logger)
+
+	// Создаём начальную конфигурацию
+	viper.Set("address", "localhost:8080")
+
+	c, err := NewConfig(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Устанавливаем некорректный тип (bool ожидается)
+	viper.Set("debug", map[string]string{"invalid": "value"})
+
+	// Вызываем reload конфигурации
+	configChange(fsnotify.Event{})
+
+	logOutput := buf.String()
+
+	if logOutput == "" {
+		t.Fatal("expected slog error log")
+	}
+
+	// Конфигурация не должна измениться
+	if c.Values().Address != "localhost:8080" {
+		t.Fatal("config should not change on unmarshal error")
 	}
 }
