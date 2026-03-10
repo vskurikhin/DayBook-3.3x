@@ -2,9 +2,10 @@ package env
 
 import (
 	"errors"
-	"github.com/caarlos0/env/v11"
 	"testing"
 	"time"
+
+	"github.com/caarlos0/env/v11"
 )
 
 func TestEnvironmentsLoad_DefaultValue(t *testing.T) {

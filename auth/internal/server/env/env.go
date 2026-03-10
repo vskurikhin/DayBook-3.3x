@@ -15,8 +15,10 @@
 //
 // Typical usage:
 //
-//	cfg := env.EnvironmentsLoad()
-//	timeout := cfg.Values().Timeout
+//	cfg, err := env.EnvironmentsLoad()
+//	if err == nil {
+//		timeout := cfg.Values().Timeout
+//	}
 //
 // Environment variables:
 //

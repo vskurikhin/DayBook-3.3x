@@ -13,7 +13,6 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/swaggo/swag v1.16.6
 	go.uber.org/mock v0.6.0
 )
 

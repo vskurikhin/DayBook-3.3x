@@ -2,8 +2,9 @@ package resources
 
 import (
 	"encoding/json"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"net/http"
+
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 )
 
 type ResourceV2 interface {

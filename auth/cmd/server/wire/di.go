@@ -30,7 +30,7 @@ var (
 	)
 )
 
-func InitializeServer(cfg config.Config, environments env.Environments) *server.AuthServer {
+func InitializeServer(cfg config.Config, environments env.Environments) (*server.AuthServer, error) {
 	wire.Build(serverSet)
-	return &server.AuthServer{}
+	return &server.AuthServer{}, nil
 }
