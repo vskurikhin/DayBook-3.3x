@@ -41,27 +41,30 @@
 //
 // Example Usage
 //
-//	cmd := &cobra.Command{}
-//	cmd.Flags().Bool("debug", false, "enable debug mode")
+//		cmd := &cobra.Command{}
+//		cmd.Flags().Bool("debug", false, "enable debug mode")
 //
-//	cfg := config.NewConfig(cmd)
-//	fmt.Println(cfg.Values().Address)
-//	if cfg.Values().Ssl() {
-//		fmt.Println("SSL enabled")
-//	}
+//		cfg, err := config.NewConfig(cmd)
+//	 if err == nil {
+//			fmt.Println(cfg.Values().Address)
+//			if cfg.Values().Ssl() {
+//				fmt.Println("SSL enabled")
+//			}
+//	 }
 package config
 
 import (
 	"context"
 	"fmt"
-	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
@@ -94,12 +97,14 @@ type ValuesConfig struct {
 //
 // Example:
 //
-//	cfg := config.NewConfig(cmd)
-//	values := cfg.Values()
-//	fmt.Println(values.Address)
-//	if values.Debug {
-//	    fmt.Println("Debug mode enabled")
-//	}
+//		cfg, err := config.NewConfig(cmd)
+//	 if err == nil {
+//			values := cfg.Values()
+//			fmt.Println(values.Address)
+//			if values.Debug {
+//		    	fmt.Println("Debug mode enabled")
+//			}
+//	 }
 func (v *ValuesConfig) Values() Values {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
@@ -126,11 +131,12 @@ var (
 //
 // Example usage:
 //
-//	cmd := &cobra.Command{}
-//	cmd.Flags().Bool("debug", false, "enable debug mode")
-//
-//	cfg := config.NewConfig(cmd)
-//	fmt.Println(cfg.Values().Address)
+//		cmd := &cobra.Command{}
+//		cmd.Flags().Bool("debug", false, "enable debug mode")
+//		cfg, err := config.NewConfig(cmd)
+//	 if err == nil {
+//			fmt.Println(cfg.Values().Address)
+//	 }
 func NewConfig(cmd *cobra.Command) (*ValuesConfig, error) {
 	var v, values Values
 	err := viper.Unmarshal(&v)
@@ -202,6 +208,12 @@ func loopSigHup(ctx context.Context) {
 				cfg.mu.Lock()
 				cfg.values = newConfig
 				cfg.mu.Unlock()
+			} else {
+				slog.Info(
+					"Config file changed, reload fail",
+					slog.String("file", viper.ConfigFileUsed()),
+					slog.String("error", err.Error()),
+				)
 			}
 		}
 	}

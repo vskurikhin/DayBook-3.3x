@@ -16,10 +16,9 @@ type APIHandler func(w http.ResponseWriter, r *http.Request) error
 // This allows APIHandler to be used as a standard handler
 func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	select {
-	case <-ctx.Done():
-		return
-	default:
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
 		w.Header().Set("Content-Type", "application/json")
 
 		// Call the actual handler
@@ -38,5 +37,11 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
+	}()
+	select {
+	case <-ctx.Done():
+		return
+	case <-done:
+		return
 	}
 }

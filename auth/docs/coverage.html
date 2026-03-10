@@ -1,0 +1,1338 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cmd: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd/init.go (100.0%)</option>
+				
+				<option value="file1">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd/merge.go (100.0%)</option>
+				
+				<option value="file2">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd/root.go (100.0%)</option>
+				
+				<option value="file3">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd/run.go (86.7%)</option>
+				
+				<option value="file4">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/main.go (100.0%)</option>
+				
+				<option value="file5">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire/wire_gen.go (0.0%)</option>
+				
+				<option value="file6">github.com/vskurikhin/DayBook-3.3x/auth/v2/docs/docs.go (0.0%)</option>
+				
+				<option value="file7">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config/config.go (95.8%)</option>
+				
+				<option value="file8">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env/env.go (100.0%)</option>
+				
+				<option value="file9">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_handler.go (93.3%)</option>
+				
+				<option value="file10">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_v1.go (100.0%)</option>
+				
+				<option value="file11">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_v2.go (100.0%)</option>
+				
+				<option value="file12">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/handlers.go (100.0%)</option>
+				
+				<option value="file13">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/router.go (100.0%)</option>
+				
+				<option value="file14">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources/resource_v1.go (100.0%)</option>
+				
+				<option value="file15">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources/resource_v2.go (100.0%)</option>
+				
+				<option value="file16">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/server.go (73.7%)</option>
+				
+				<option value="file17">github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool/cobra_command_predicats.go (100.0%)</option>
+				
+				<option value="file18">github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool/kebab_snake_case.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Package cmd provides the CLI entry point and command configuration
+// for the application.
+//
+// The package is built on top of Cobra and Viper and is responsible for:
+//
+//   - Defining root and run - subcommands
+//   - Registering CLI flags
+//   - Binding flags to configuration values
+//   - Loading configuration from file and environment variables
+//
+// # Configuration Resolution Order
+//
+// The application resolves configuration in the following order:
+//
+//  1. Explicit config file passed via --config flag
+//  2. Default config file in $HOME directory named ".auth-server.yaml"
+//  3. Environment variables (via Viper AutomaticEnv)
+//  4. Command-line flags
+//
+// # Persistent Flags
+//
+// The root command defines the following persistent flags:
+//
+//        --debug, -d
+//            Enables debug mode.
+//
+//        --verbose, -v
+//            Enables verbose output.
+//
+//        --config
+//            Path to a custom configuration file.
+//
+// Local Flags (run command)
+//
+// The run command defines:
+//
+//        --address
+//            Server address in host:port format.
+//
+//        --insecure-skip-verify
+//            Disables TLS certificate verification.
+//
+// # Configuration Loading
+//
+// During initialization, initConfig is automatically executed using
+// cobra.OnInitialize. It:
+//
+//   - Loads the configuration file if present
+//   - Enables environment variable binding
+//   - Prints the active config file path to stderr
+//
+// This package relies on global Cobra and Viper instances and performs
+// initialization in init(), which means command wiring happens at import time.
+//
+// For advanced use cases (testing or embedding), consider refactoring
+// into a constructor-based command builder instead of using global state.
+package cmd
+
+import (
+        "log/slog"
+        "os"
+
+        "github.com/spf13/cobra"
+        "github.com/spf13/viper"
+)
+
+const (
+        FlagAddress            = "address"
+        FlagDebug              = "debug"
+        FlagInsecureSkipVerify = "insecure-skip-verify"
+        FlagVerbose            = "verbose"
+)
+
+func init() <span class="cov8" title="1">{
+        cobra.OnInitialize(initConfig)
+
+        // Here you will define your flags and configuration settings.
+        // Cobra supports persistent flags, which, if defined here,
+        // will be global for your application.
+
+        rootCmd.PersistentFlags().StringVar(&amp;cfgFile, "config", "", "Config file (default is $HOME/.auth-server.yaml)")
+
+        // Cobra also supports local flags, which will only run
+        // when this action is called directly.
+        rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug")
+        rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose")
+
+        runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
+        runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
+
+        rootCmd.AddCommand(runCmd)
+}</span>
+
+// initConfig reads in Config file and ENV variables if set.
+func initConfig() <span class="cov8" title="1">{
+        if cfgFile != "" </span><span class="cov8" title="1">{
+                // Use Config file from the flag.
+                viper.SetConfigFile(cfgFile)
+        }</span> else<span class="cov8" title="1"> {
+                // Find home directory.
+                home, err := os.UserHomeDir()
+                cobra.CheckErr(err)
+
+                // Search Config in home directory with name ".auth-server" (without extension).
+                viper.AddConfigPath(home)
+                viper.SetConfigType("yaml")
+                viper.SetConfigName(".auth-server")
+        }</span>
+        <span class="cov8" title="1">viper.AutomaticEnv() // read in environment variables that match
+
+        // If a Config file is found, read it in.
+        if err := viper.ReadInConfig(); err == nil </span><span class="cov8" title="1">{
+                slog.Info("Using Config", slog.String("file", viper.ConfigFileUsed()))
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package cmd
+
+import (
+        "fmt"
+        "log/slog"
+        "strconv"
+
+        "github.com/spf13/cobra"
+        "github.com/spf13/pflag"
+        "github.com/spf13/viper"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+)
+
+func mergeCobraAndViper(cmd *cobra.Command) <span class="cov8" title="1">{
+        for key, _ := range viper.GetViper().AllSettings() </span><span class="cov8" title="1">{
+                viperBindPFlag(key, tool.SnakeCaseToKebabCase(key), cmd)
+        }</span>
+        <span class="cov8" title="1">cmd.Flags().VisitAll(mergeCobraAndViperFunc(cmd))</span>
+}
+
+func mergeCobraAndViperFunc(cmd *cobra.Command) func(f *pflag.Flag) <span class="cov8" title="1">{
+        return func(f *pflag.Flag) </span><span class="cov8" title="1">{
+                if tool.IsDebug(cmd) </span><span class="cov8" title="1">{
+                        slog.Debug(
+                                "variable:", "flag",
+                                fmt.Sprintf("FLAG: (Type: %s, Changed: %v) --%s=%q",
+                                        f.Value.Type(), f.Changed, f.Name, f.Value.String(),
+                                ))
+                }</span>
+                <span class="cov8" title="1">if f.Changed || viper.Get(tool.KebabCaseToSnakeCase(f.Name)) == nil </span><span class="cov8" title="1">{
+                        switch f.Value.Type() </span>{
+                        case "bool":<span class="cov8" title="1">
+                                viper.Set(tool.KebabCaseToSnakeCase(f.Name), f.Value.String() == "true")</span>
+                        case "int":<span class="cov8" title="1">
+                                value, _ := strconv.Atoi(f.Value.String())
+                                if value &gt; 0 </span><span class="cov8" title="1">{
+                                        viper.Set(tool.KebabCaseToSnakeCase(f.Name), value)
+                                }</span> else<span class="cov8" title="1"> {
+                                        value, _ = strconv.Atoi(f.DefValue)
+                                        viper.Set(tool.KebabCaseToSnakeCase(f.Name), value)
+                                }</span>
+                        case "string":<span class="cov8" title="1">
+                                viper.Set(tool.KebabCaseToSnakeCase(f.Name), f.Value.String())</span>
+                        }
+                }
+        }
+}
+
+func viperBindPFlag(key, flag string, cmd *cobra.Command) <span class="cov8" title="1">{
+        err := viper.BindPFlag(key, cmd.Flags().Lookup(flag))
+        if err != nil &amp;&amp; tool.IsDebug(cmd) </span><span class="cov8" title="1">{
+                slog.Error("Error binding flag", "error", err)
+        }</span>
+}
+
+func setSlogDebug(cmd *cobra.Command) <span class="cov8" title="1">{
+        if tool.IsDebug(cmd) </span><span class="cov8" title="1">{
+                slog.SetLogLoggerLevel(slog.LevelDebug)
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package cmd
+
+import (
+        "context"
+        "github.com/spf13/cobra"
+        "github.com/spf13/viper"
+        "log/slog"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+)
+
+const (
+        ExitCodeOK int = iota * 100
+        ExitCodeContextDone
+        ExitCodeError
+)
+
+var (
+        cfgFile    string
+        executeCmd = rootCmd.Execute
+)
+
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &amp;cobra.Command{
+        Use:   "auth-server",
+        Short: "Authentication server for DayBook application",
+        Long: `The "auth-server" command is the entry point for the authentication service
+of the DayBook application.
+
+It provides subcommands to run the server, manage configuration, and
+perform administrative tasks. Configuration can be supplied via CLI flags,
+a configuration file, or environment variables.
+
+Typical usage:
+
+  # Run the server with default configuration
+  auth-server run
+
+  # Run the server with custom config file
+  auth-server --config /path/to/config.yaml run
+
+All commands support standard flags such as --debug, --verbose, and --config.`,
+        // Uncomment the following line if your bare application
+        // has an action associated with it:
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov8" title="1">{
+                setSlogDebug(cmd)
+                mergeCobraAndViper(cmd)
+                slogInfoVerbose(cmd)
+                _, err := config.NewConfig(cmd)
+                return err
+        }</span>,
+}
+
+func slogInfoVerbose(cmd *cobra.Command) <span class="cov8" title="1">{
+        if tool.IsVerbose(cmd) </span><span class="cov8" title="1">{
+                for key, value := range viper.GetViper().AllSettings() </span><span class="cov8" title="1">{
+                        slog.Info("variable:", key, value)
+                }</span>
+        }
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute(ctx context.Context) int <span class="cov8" title="1">{
+        var err error
+        done := make(chan struct{})
+        go func() </span><span class="cov8" title="1">{
+                err = executeCmd()
+                close(done)
+        }</span>()
+        <span class="cov8" title="1">for </span><span class="cov8" title="1">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        slog.Error("ctx.Done", "err", ctx.Err())
+                        return ExitCodeContextDone</span>
+                case &lt;-done:<span class="cov8" title="1">
+                        if err != nil </span><span class="cov8" title="1">{
+                                slog.Error("App Error", slog.String("error", err.Error()))
+                                return ExitCodeError
+                        }</span>
+                        <span class="cov8" title="1">slog.Info("App Done")
+                        return ExitCodeOK</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package cmd
+
+import (
+        "context"
+        "github.com/spf13/cobra"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+)
+
+//go:generate mockgen -destination=run_mock_config_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd Config
+type Config interface {
+        Values() config.Values
+}
+
+//go:generate mockgen -destination=run_mock_server_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
+type Server interface {
+        Run(ctx context.Context)
+}
+
+var (
+        newConfig     = func(cmd *cobra.Command) (config.Config, error) <span class="cov0" title="0">{ return config.NewConfig(cmd) }</span>
+        envLoad       = func() (env.Environments, error) <span class="cov8" title="1">{ return env.EnvironmentsLoad() }</span>
+        newAuthServer = func(cfg config.Config, env env.Environments) server.Server <span class="cov0" title="0">{ return wire.InitializeServer(cfg, env) }</span>
+)
+
+// runCmd represents the base command when called without any subcommands
+var runCmd = &amp;cobra.Command{
+        Use:   "run",
+        Short: "Starts the authentication server",
+        Long: `The "run" command launches the authentication server of the application.
+It initializes the configuration by reading values from CLI flags, a configuration file,
+or environment variables, sets the logging level, and starts the main server
+using the obtained configuration.`,
+        // The following line your bare application
+        // has an action associated with it:
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov8" title="1">{
+                setSlogDebug(cmd)
+                mergeCobraAndViper(cmd)
+                slogInfoVerbose(cmd)
+                cfg, errConfig := newConfig(cmd)
+                if errConfig != nil </span><span class="cov8" title="1">{
+                        return errConfig
+                }</span>
+                <span class="cov8" title="1">env, errEnvLoad := envLoad()
+                if errEnvLoad != nil </span><span class="cov8" title="1">{
+                        return errEnvLoad
+                }</span>
+                <span class="cov8" title="1">srv := newAuthServer(cfg, env)
+                srv.Run(context.Background())
+                return nil</span>
+        },
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package main
+
+import (
+        "context"
+        "os"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd"
+
+        _ "github.com/vskurikhin/DayBook-3.3x/auth/v2/docs"
+)
+
+// @title           DayBook Auth API
+// @version         0.0.1
+// @description     API for authentication in DayBook
+
+// @host           &lt;your_ip&gt;:8089
+// @BasePath       /auth/api
+// @schemes         http
+func main() <span class="cov8" title="1">{
+        os.Exit(cmd.Execute(context.Background()))
+}</span>
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">// Code generated by Wire. DO NOT EDIT.
+
+//go:generate go run -mod=mod github.com/google/wire/cmd/wire
+//go:build !wireinject
+// +build !wireinject
+
+package wire
+
+import (
+        "github.com/google/wire"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
+)
+
+// Injectors from di.go:
+
+func InitializeServer(cfg config.Config, environments env.Environments) *server.AuthServer <span class="cov0" title="0">{
+        v1 := resources.NewV1(cfg)
+        apiV1 := handler.NewApiV1(v1)
+        v2 := resources.NewV2(cfg)
+        apiV2 := handler.NewApiV2(v2)
+        handlers := handler.NewHandlers(apiV1, apiV2)
+        httpHandler := handler.NewRouter(cfg, environments, handlers)
+        authServer := server.NewAuthServer(cfg, environments, httpHandler)
+        return authServer
+}</span>
+
+// di.go:
+
+var (
+        serverSet = wire.NewSet(config.GetConfig, env.EnvironmentsLoad, handler.NewApiV1, handler.NewApiV2, wire.Bind(new(handler.ApiHandlers), new(*handler.Handlers)), wire.Bind(new(resources.ResourceV1), new(*resources.V1)), wire.Bind(new(resources.ResourceV2), new(*resources.V2)), handler.NewHandlers, handler.NewRouter, server.NewAuthServer, resources.NewV1, resources.NewV2)
+)
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">// Package docs Code generated by swaggo/swag. DO NOT EDIT
+package docs
+
+import "github.com/swaggo/swag"
+
+const docTemplate = `{
+    "schemes": {{ marshal .Schemes }},
+    "swagger": "2.0",
+    "info": {
+        "description": "{{escape .Description}}",
+        "title": "{{.Title}}",
+        "contact": {},
+        "version": "{{.Version}}"
+    },
+    "host": "{{.Host}}",
+    "basePath": "{{.BasePath}}",
+    "paths": {
+        "/v1/ok": {
+            "get": {
+                "description": "Ok - Описание (v1)",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "ok"
+                ],
+                "summary": "Ok Краткое содержание",
+                "operationId": "ResourceV1-ok",
+                "deprecated": true,
+                "responses": {
+                    "200": {
+                        "description": "успешно",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/ok": {
+            "get": {
+                "description": "Ok - Описание (v2)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ok"
+                ],
+                "summary": "Ok Краткое содержание",
+                "operationId": "ResourceV2-ok",
+                "responses": {
+                    "200": {
+                        "description": "успешно",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/resources.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "ошибка \u003cp\u003e\u003cli\u003e\"success\": false\u003c/li\u003e\u003c/p\u003e",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/resources.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        },
+                                        "success": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "504": {
+                        "description": "Gateway Timeout"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "resources.APIResponse": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        }
+    }
+}`
+
+// SwaggerInfo holds exported Swagger Info so clients can modify it
+var SwaggerInfo = &amp;swag.Spec{
+        Version:          "0.0.1",
+        Host:             "&lt;your_ip&gt;:8089",
+        BasePath:         "/auth/api",
+        Schemes:          []string{"http"},
+        Title:            "DayBook Auth API",
+        Description:      "API for authentication in DayBook",
+        InfoInstanceName: "swagger",
+        SwaggerTemplate:  docTemplate,
+        LeftDelim:        "{{",
+        RightDelim:       "}}",
+}
+
+func init() <span class="cov0" title="0">{
+        swag.Register(SwaggerInfo.InstanceName(), SwaggerInfo)
+}</span>
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">// Package config provides functionality for configuring the DayBook
+// authentication server.
+//
+// Configuration can be loaded from CLI flags, a configuration file,
+// or environment variables using the Viper library. The package
+// implements a singleton pattern for storing the global application
+// configuration and provides a Config interface to access configuration
+// values.
+//
+// Types and Functions
+//
+//        Config
+//                Interface providing access to configuration values.
+//                Methods:
+//                        - Values() Values — returns a Values struct with configuration settings.
+//
+//        Values
+//                Struct containing the main configuration fields:
+//                        - Address: server address in host:port format
+//                        - Debug: enables debug mode
+//                        - InsecureSkipVerify: skips server certificate verification
+//                        - Verbose: enables verbose logging
+//                        - ssl: internal field indicating SSL usage
+//                Methods:
+//                        - Ssl() bool — returns the value of the ssl field
+//
+//        ValuesConfig
+//                Struct implementing the Config interface, containing Values.
+//
+//        NewConfig(cmd *cobra.Command) *ValuesConfig
+//                Creates and returns the singleton ValuesConfig instance.
+//                Reads configuration from Viper and CLI commands. If the debug
+//                flag is enabled, logs errors and configuration values.
+//
+// # Features
+//
+// - Uses [sync.Once] to enforce the singleton pattern.
+// - Supports debug logging via tool.IsDebug(cmd).
+// - Configuration values are loaded via viper.Unmarshal.
+// - The ssl field is unexported and accessible only via the Ssl() method.
+//
+// Example Usage
+//
+//        cmd := &amp;cobra.Command{}
+//        cmd.Flags().Bool("debug", false, "enable debug mode")
+//
+//        cfg := config.NewConfig(cmd)
+//        fmt.Println(cfg.Values().Address)
+//        if cfg.Values().Ssl() {
+//                fmt.Println("SSL enabled")
+//        }
+package config
+
+import (
+        "context"
+        "fmt"
+        "github.com/fsnotify/fsnotify"
+        "github.com/spf13/cobra"
+        "github.com/spf13/viper"
+        "log/slog"
+        "os"
+        "os/signal"
+        "sync"
+        "syscall"
+        "time"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+)
+
+//go:generate mockgen -destination=config_mock_test.go -package=config github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config Config
+type Config interface {
+        Values() Values
+}
+
+type Values struct {
+        Address            string        `mapstructure:"address"`
+        Debug              bool          `mapstructure:"debug"`
+        InsecureSkipVerify bool          `mapstructure:"insecure_skip_verify"`
+        Verbose            bool          `mapstructure:"verbose"`
+        Timeout            time.Duration `mapstructure:"timeout"`
+        ssl                bool
+}
+
+var _ Config = (*ValuesConfig)(nil)
+
+type ValuesConfig struct {
+        values Values
+        mu     sync.RWMutex
+}
+
+// Values returns the configuration values stored in the Config instance.
+//
+// This method provides read-only access to the underlying Values struct,
+// which contains all the application configuration fields such as Address,
+// Debug, InsecureSkipVerify, and Verbose.
+//
+// Example:
+//
+//        cfg := config.NewConfig(cmd)
+//        values := cfg.Values()
+//        fmt.Println(values.Address)
+//        if values.Debug {
+//            fmt.Println("Debug mode enabled")
+//        }
+func (v *ValuesConfig) Values() Values <span class="cov8" title="1">{
+        v.mu.RLock()
+        defer v.mu.RUnlock()
+        return v.values
+}</span>
+
+var (
+        cfg  *ValuesConfig
+        once = new(sync.Once)
+)
+
+// NewConfig creates and returns a singleton instance of ValuesConfig.
+//
+// It reads configuration values from Viper and the provided Cobra command.
+// If the "debug" flag is enabled on the command, any errors encountered
+// during unmarshalling will be logged, and the loaded configuration will
+// also be printed for debugging purposes.
+//
+// The returned ValuesConfig implements the Config interface and provides
+// access to the configuration via the Values() method.
+//
+// This function uses sync.Once to ensure that only one instance of
+// ValuesConfig is created (singleton pattern).
+//
+// Example usage:
+//
+//        cmd := &amp;cobra.Command{}
+//        cmd.Flags().Bool("debug", false, "enable debug mode")
+//
+//        cfg := config.NewConfig(cmd)
+//        fmt.Println(cfg.Values().Address)
+func NewConfig(cmd *cobra.Command) (*ValuesConfig, error) <span class="cov8" title="1">{
+        var v, values Values
+        err := viper.Unmarshal(&amp;v)
+        if err != nil </span><span class="cov8" title="1">{
+                if cmd != nil &amp;&amp; tool.IsDebug(cmd) </span><span class="cov8" title="1">{
+                        slog.Error("Error binding flag", "error", err)
+                }</span>
+                <span class="cov8" title="1">return nil, err</span>
+        } else<span class="cov8" title="1"> {
+                values = v
+        }</span>
+        <span class="cov8" title="1">if cmd != nil &amp;&amp; tool.IsDebug(cmd) </span><span class="cov8" title="1">{
+                slog.Debug("variable:", "ValuesConfig", fmt.Sprintf("%+v", values))
+        }</span>
+        <span class="cov8" title="1">vc := ValuesConfig{}
+        vc.mu.Lock()
+        defer vc.mu.Unlock()
+        once.Do(func() </span><span class="cov8" title="1">{
+                vc.values = values
+                cfg = &amp;vc
+                go loopSigHup(context.Background())
+                viper.WatchConfig()
+                viper.OnConfigChange(configChange)
+        }</span>)
+        <span class="cov8" title="1">return cfg, err</span>
+}
+
+func GetConfig() *ValuesConfig <span class="cov8" title="1">{
+        c, _ := NewConfig(nil)
+        return c
+}</span>
+
+// Ssl returns the value of the internal ssl field.
+//
+// This indicates whether SSL/TLS is enabled for the configuration.
+// It is a read-only accessor.
+func (c Values) Ssl() bool <span class="cov8" title="1">{
+        return c.ssl
+}</span>
+
+func configChange(_ fsnotify.Event) <span class="cov8" title="1">{
+        slog.Info("Config file changed, reloading...")
+        var newConfig Values
+        if err := viper.Unmarshal(&amp;newConfig); err != nil </span><span class="cov8" title="1">{
+                slog.Error("Error unmarshaling config", "error", err)
+                return
+        }</span>
+        <span class="cov8" title="1">cfg.mu.Lock()
+        defer cfg.mu.Unlock()
+        cfg.values = newConfig</span>
+}
+
+func loopSigHup(ctx context.Context) <span class="cov8" title="1">{
+        sigHup := make(chan os.Signal, 1)
+        signal.Notify(sigHup, syscall.SIGHUP)
+        for </span><span class="cov8" title="1">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        return</span>
+                case &lt;-sigHup:<span class="cov8" title="1">
+                        // If a Config file is found, read it in.
+                        if err := viper.ReadInConfig(); err == nil </span><span class="cov8" title="1">{
+                                slog.Info("Config file changed, reloading...", slog.String("file", viper.ConfigFileUsed()))
+                                var newConfig Values
+                                if err := viper.Unmarshal(&amp;newConfig); err != nil </span><span class="cov0" title="0">{
+                                        slog.Error("Error unmarshaling config", "error", err)
+                                        continue</span>
+                                }
+                                <span class="cov8" title="1">cfg.mu.Lock()
+                                cfg.values = newConfig
+                                cfg.mu.Unlock()</span>
+                        } else<span class="cov8" title="1"> {
+                                slog.Info(
+                                        "Config file changed, reload fail",
+                                        slog.String("file", viper.ConfigFileUsed()),
+                                        slog.String("error", err.Error()),
+                                )
+                        }</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">// Package env provides loading and access to application configuration
+// defined via environment variables.
+//
+// The package is responsible for reading environment variables at startup
+// and converting them into a strongly typed configuration structure.
+//
+// Configuration values are parsed using the
+// github.com/caarlos0/env/v11 library, which maps environment variables
+// to struct fields using struct tags.
+//
+// The package exposes the Environments interface that allows other
+// components of the application to access configuration values without
+// depending on the concrete implementation. This makes the configuration
+// layer easy to mock in unit tests.
+//
+// Typical usage:
+//
+//        cfg := env.EnvironmentsLoad()
+//        timeout := cfg.Values().Timeout
+//
+// Environment variables:
+//
+//        SERVER_TIMEOUT   HTTP server request timeout (default: 10s)
+//
+// If parsing of environment variables fails, the error is logged using
+// slog and an empty configuration is returned.
+//
+// The package also supports mock generation via go:generate for testing
+// components that depend on the Environments interface.
+package env
+
+import (
+        "time"
+
+        "github.com/caarlos0/env/v11"
+)
+
+//go:generate mockgen -destination=env_mock_test.go -package=env github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env Environments
+type Environments interface {
+        Values() Values
+}
+
+var _ Environments = (*Config)(nil)
+
+type Config struct {
+        values Values
+}
+
+// Values returns the environment configuration values stored in Config.
+func (c Config) Values() Values <span class="cov8" title="1">{
+        return c.values
+}</span>
+
+// Values статичная конфигурация из переменных окружения.
+type Values struct {
+        Timeout time.Duration `env:"SERVER_TIMEOUT" envDefault:"10s"`
+}
+
+// EnvironmentsLoad parses environment variables into a Config structure
+// and returns it as an Environments implementation. If parsing fails,
+// the error is logged and an empty configuration is returned.
+func EnvironmentsLoad() (*Config, error) <span class="cov8" title="1">{
+        values := Values{}
+
+        if err := env.Parse(&amp;values); err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return &amp;Config{values: values}, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package handler
+
+import (
+        "encoding/json"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
+        "log/slog"
+        "net/http"
+)
+
+// APIHandler wraps handlers to provide consistent error handling
+// This pattern reduces boilerplate in route handlers
+type APIHandler func(w http.ResponseWriter, r *http.Request) error
+
+// ServeHTTP implements http.Handler for APIHandler
+// This allows APIHandler to be used as a standard handler
+func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx := r.Context()
+        done := make(chan struct{})
+        go func() </span><span class="cov8" title="1">{
+                defer close(done)
+                w.Header().Set("Content-Type", "application/json")
+
+                // Call the actual handler
+                if err := fn(w, r); err != nil </span><span class="cov8" title="1">{
+                        // Log the error for debugging
+                        slog.Error("API", "error", err.Error())
+
+                        // Send error response
+                        w.WriteHeader(http.StatusInternalServerError)
+                        encodeErr := json.NewEncoder(w).Encode(resources.APIResponse{
+                                Success: false,
+                                Error:   err.Error(),
+                        })
+                        if encodeErr != nil </span><span class="cov0" title="0">{
+                                slog.Error("API", "error", err.Error())
+                        }</span>
+                        <span class="cov8" title="1">return</span>
+                }
+        }()
+        <span class="cov8" title="1">select </span>{
+        case &lt;-ctx.Done():<span class="cov8" title="1">
+                return</span>
+        case &lt;-done:<span class="cov8" title="1">
+                return</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package handler
+
+import (
+        "github.com/go-chi/chi/v5"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
+)
+
+type ApiV1 interface {
+        chi.Router
+}
+
+// NewApiV1 creates and configures a chi router for version 1 of the API.
+// It registers HTTP routes that delegate request handling to the provided
+// ResourceV1 implementation.
+func NewApiV1(v1 resources.ResourceV1) ApiV1 <span class="cov8" title="1">{
+        r := chi.NewRouter()
+        r.Get(OK, v1.Ok)
+        return r
+}</span>
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">package handler
+
+import (
+        "github.com/go-chi/chi/v5"
+        "net/http"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
+)
+
+type ApiV2 interface {
+        chi.Router
+}
+
+// NewApiV2 creates and configures a chi router for version 2 of the API.
+// It registers HTTP routes that delegate request handling to the provided
+// ResourceV2 implementation.
+func NewApiV2(v2 resources.ResourceV2) ApiV2 <span class="cov8" title="1">{
+        r := chi.NewRouter()
+        r.Method(http.MethodGet, OK, APIHandler(v2.Ok))
+        return r
+}</span>
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">package handler
+
+import (
+        "github.com/go-chi/chi/v5"
+)
+
+//go:generate mockgen -destination=api_handlers_mock_test.go -package=handler github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler ApiHandlers
+type ApiHandlers interface {
+        apiV1() chi.Router
+        apiV2() chi.Router
+}
+
+var _ ApiHandlers = (*Handlers)(nil)
+
+type Handlers struct {
+        handlerV1 chi.Router
+        handlerV2 chi.Router
+}
+
+func (h Handlers) apiV1() chi.Router <span class="cov8" title="1">{
+        return h.handlerV1
+}</span>
+
+func (h Handlers) apiV2() chi.Router <span class="cov8" title="1">{
+        return h.handlerV2
+}</span>
+
+// NewHandlers creates a Handlers instance that aggregates routers for API
+// versions v1 and v2. The provided v1 and v2 routers are stored internally
+// and later returned by the corresponding apiV1() and apiV2() methods.
+func NewHandlers(v1 ApiV1, v2 ApiV2) *Handlers <span class="cov8" title="1">{
+        return &amp;Handlers{
+                handlerV1: v1,
+                handlerV2: v2,
+        }
+}</span>
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">// Package handler provides HTTP routing and middleware configuration
+// for the auth server.
+//
+// The package defines the HTTP layer of the application using the chi router.
+// It is responsible for:
+//
+//   - Creating and configuring the HTTP router
+//   - Registering global middleware (CORS, logging, recovery, timeout, etc.)
+//   - Defining API endpoints
+//
+// The router is created via the NewRouter function, which accepts a
+// config.Config instance. Configuration values (such as Debug mode)
+// influence middleware behavior (for example, CORS debug logging).
+//
+// Middleware stack includes:
+//
+//   - CORS support (github.com/rs/cors)
+//   - Request ID injection
+//   - Real IP detection
+//   - Structured logging
+//   - Panic recovery
+//   - Request timeout handling
+package handler
+
+import (
+        "github.com/go-chi/chi/v5"
+        "github.com/go-chi/chi/v5/middleware"
+        "github.com/rs/cors"
+        "net/http"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+)
+
+const (
+        BaseURL = "/api"
+        V1      = "/v1"
+        V2      = "/v2"
+        OK      = "/ok"
+)
+
+// NewRouter creates and configures an HTTP router with
+// middleware and application routes using the provided configuration.
+func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) http.Handler <span class="cov8" title="1">{
+        r := chi.NewRouter()
+
+        debug := cfg.Values().Debug
+
+        c := cors.New(cors.Options{
+                AllowedOrigins: []string{"*"},                                       // All origins
+                AllowedMethods: []string{"POST", "GET", "PUT", "DELETE", "OPTIONS"}, // Allowing only get, just an example
+                Debug:          debug,
+        })
+
+        r.Use(c.Handler)
+        r.Use(middleware.RequestID)
+        r.Use(middleware.RealIP)
+        r.Use(middleware.Logger)
+        r.Use(middleware.Recoverer)
+
+        // Set a timeout value on the request context (ctx), that will signal
+        // through ctx.Done() that the request has timed out and further
+        // processing should be stopped.
+        r.Use(middleware.Timeout(env.Values().Timeout))
+
+        r.Mount(BaseURL+V1, handlers.apiV1())
+        r.Mount(BaseURL+V2, handlers.apiV2())
+
+        return r
+}</span>
+</pre>
+		
+		<pre class="file" id="file14" style="display: none">package resources
+
+import (
+        "bytes"
+        "net/http"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+)
+
+type ResourceV1 interface {
+        Ok(w http.ResponseWriter, r *http.Request)
+}
+
+var _ ResourceV1 = (*V1)(nil)
+
+type V1 struct {
+        cfg config.Config
+}
+
+// @Deprecated
+// @Summary Ok Краткое содержание
+// @Description Ok - Описание (v1)
+// @ID ResourceV1-ok
+// @Tags ok
+// @Produce plain
+// @Success 200 {object} string "успешно"
+// @Router /v1/ok [get]
+func (v V1) Ok(w http.ResponseWriter, _ *http.Request) <span class="cov8" title="1">{
+        var body bytes.Buffer
+        if v.cfg.Values().Debug </span><span class="cov8" title="1">{
+                body.WriteString("DEBUG ")
+        }</span>
+        <span class="cov8" title="1">body.WriteString("V1")
+        //goland:noinspection ALL
+        w.Write(body.Bytes())</span>
+}
+
+// NewV1 creates and returns a new V1 resource instance that implements
+// the ResourceV1 interface.
+func NewV1(cfg config.Config) *V1 <span class="cov8" title="1">{
+        return &amp;V1{cfg: cfg}
+}</span>
+</pre>
+		
+		<pre class="file" id="file15" style="display: none">package resources
+
+import (
+        "encoding/json"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+        "net/http"
+)
+
+type ResourceV2 interface {
+        Ok(w http.ResponseWriter, r *http.Request) error
+}
+
+var _ ResourceV2 = (*V2)(nil)
+
+type V2 struct {
+        cfg config.Config
+}
+
+// @Summary Ok Краткое содержание
+// @Description Ok - Описание (v2)
+// @ID ResourceV2-ok
+// @Tags ok
+// @Produce json
+// @Success 200 {object} APIResponse{data=[]map[string]string} "успешно"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера &lt;p&gt;&lt;li&gt;"success": false&lt;/li&gt;&lt;/p&gt;"
+// @Failure 504
+// @Router /v2/ok [get]
+func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error <span class="cov8" title="1">{
+        users := []map[string]string{
+                {"id": "1", "version": "V2"},
+        }
+        if v.cfg.Values().Debug </span><span class="cov8" title="1">{
+                users = append(users, map[string]string{"id": "2", "debug": "true"})
+        }</span>
+        <span class="cov8" title="1">return json.NewEncoder(w).Encode(APIResponse{
+                Success: true,
+                Data:    users,
+        })</span>
+}
+
+// NewV2 creates and returns a new V2 resource instance that implements
+// the ResourceV2 interface.
+func NewV2(cfg config.Config) *V2 <span class="cov8" title="1">{
+        return &amp;V2{cfg: cfg}
+}</span>
+</pre>
+		
+		<pre class="file" id="file16" style="display: none">package server
+
+import (
+        "context"
+        "fmt"
+        "log/slog"
+        "net/http"
+        "os"
+        "os/signal"
+        "syscall"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+)
+
+const (
+        ExitCodeStartHTTPServerError = 4
+)
+
+//go:generate mockgen -destination=../../mocks/server/mocks/server.go -package=mocks github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
+type Server interface {
+        Run(ctx context.Context)
+}
+
+var _ Server = (*AuthServer)(nil)
+
+type AuthServer struct {
+        handler      http.Handler
+        config       config.Values
+        environments env.Environments
+}
+
+func NewAuthServer(cfg config.Config, env env.Environments, handler http.Handler) *AuthServer <span class="cov8" title="1">{
+        return &amp;AuthServer{handler: handler, config: cfg.Values(), environments: env}
+}</span>
+
+func (a AuthServer) Run(ctx context.Context) <span class="cov8" title="1">{
+        server := &amp;http.Server{
+                Addr:    a.config.Address,
+                Handler: a.handler,
+        }
+        var err error
+        // канал для перенаправления прерываний
+        // поскольку нужно отловить всего одно прерывание,
+        // ёмкости 1 для канала будет достаточно
+        sigQuit := make(chan os.Signal, 1)
+        // регистрируем перенаправление прерываний
+        signal.Notify(sigQuit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+        go func() </span><span class="cov8" title="1">{
+                // Start the HTTP server on port 8089 by default
+                fmt.Printf("HTTPServer starting on %s...\n", a.config.Address)
+                err = server.ListenAndServe()
+                close(sigQuit)
+        }</span>()
+        <span class="cov8" title="1">for </span><span class="cov8" title="1">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        slog.Info("ctx.Done", "msg", ctx.Err())
+                        _ = server.Shutdown(ctx)
+                        return</span>
+                case &lt;-sigQuit:<span class="cov0" title="0">
+                        if err != nil </span><span class="cov0" title="0">{
+                                slog.Error("HTTPServer Error", "err", err)
+                                os.Exit(ExitCodeStartHTTPServerError)
+                        }</span>
+                        <span class="cov0" title="0">slog.Info("HTTPServer Done")
+                        return</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file17" style="display: none">package tool
+
+import "github.com/spf13/cobra"
+
+func IsDebug(cmd *cobra.Command) bool <span class="cov8" title="1">{
+        return cmd.Flag("debug").Value.String() == "true"
+}</span>
+
+func IsVerbose(cmd *cobra.Command) bool <span class="cov8" title="1">{
+        return cmd.Flag("verbose").Value.String() == "true"
+}</span>
+</pre>
+		
+		<pre class="file" id="file18" style="display: none">package tool
+
+import "strings"
+
+func KebabCaseToSnakeCase(s string) string <span class="cov8" title="1">{
+        result := strings.ReplaceAll(s, "-", "_")
+        return strings.ToLower(result)
+}</span>
+
+func SnakeCaseToKebabCase(s string) string <span class="cov8" title="1">{
+        result := strings.ReplaceAll(s, "_", "-")
+        return strings.ToLower(result)
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

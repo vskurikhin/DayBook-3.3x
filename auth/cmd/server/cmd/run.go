@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-
 	"github.com/spf13/cobra"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
@@ -22,7 +21,7 @@ type Server interface {
 
 var (
 	newConfig     = func(cmd *cobra.Command) (config.Config, error) { return config.NewConfig(cmd) }
-	envLoad       = func() env.Environments { return env.EnvironmentsLoad() }
+	envLoad       = func() (env.Environments, error) { return env.EnvironmentsLoad() }
 	newAuthServer = func(cfg config.Config, env env.Environments) server.Server { return wire.InitializeServer(cfg, env) }
 )
 
@@ -40,11 +39,14 @@ using the obtained configuration.`,
 		setSlogDebug(cmd)
 		mergeCobraAndViper(cmd)
 		slogInfoVerbose(cmd)
-		cfg, err := newConfig(cmd)
-		if err != nil {
-			return err
+		cfg, errConfig := newConfig(cmd)
+		if errConfig != nil {
+			return errConfig
 		}
-		env := envLoad()
+		env, errEnvLoad := envLoad()
+		if errEnvLoad != nil {
+			return errEnvLoad
+		}
 		srv := newAuthServer(cfg, env)
 		srv.Run(context.Background())
 		return nil

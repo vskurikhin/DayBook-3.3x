@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	BaseURL = "/api"
+	BaseURL = "/auth/api"
 	V1      = "/v1"
 	V2      = "/v2"
 	OK      = "/ok"

@@ -23,7 +23,7 @@ ACCRUAL_PORT=$(RND2)
 ADDRESS=localhost:$(AUTH_PORT)
 TEMP_FILE=$(shell mktemp)
 DOCS_DIR=./docs
-DOCS_GO=$(DOCS_DIR)/docs.go
+DOCS_GO=$(DOCS_DIR)/swagger.yaml
 MAIN_GO=./$(CMD_SERVER)/main.go
 
 # Make is verbose in Linux. Make it silent.
@@ -75,9 +75,10 @@ go-generate:
 go-coverage:
 	CVPKG=$(go list ./... | grep -v '/mocks' | tr '\n' ',')
 	# 2. Run tests with coverage analysis applied only to the specified packages
-	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go test -coverpkg=$(CVPKG) -coverprofile=coverage.out ./...
+	# @GOPATH=$(GOPATH) GOBIN=$(GOBIN) go test -coverpkg=$(CVPKG) -coverprofile=coverage.out ./...
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go test -coverprofile=coverage.out ./...
 	# 3. (Optional) Generate the HTML report
-	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go tool cover -html=coverage.out
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go tool cover -html=coverage.out -o docs/coverage.html
 
 go-get:
 	@echo "  >  Checking if there is any missing dependencies..."
@@ -98,9 +99,8 @@ go-install:
 	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go install $(GOFILES)
 
 go-swag:
-	swag init -g $(MAIN_GO) --output $(DOCS_DIR)
-	sed -i 's/"localhost:8080",/env.GetConfig().Address(),/' $(DOCS_GO)
-	goimports -w $(DOCS_GO)
+	swag init --parseInternal --st -ot yaml -g $(MAIN_GO) --output $(DOCS_DIR)
+	gsed -i 's/host: localhost:8089/host: $(ADDRESS)/' $(DOCS_GO)
 
 go-clean:
 	@echo "  >  Cleaning build cache"
