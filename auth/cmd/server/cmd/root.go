@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"context"
+	"log/slog"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"log/slog"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
@@ -72,7 +73,7 @@ func Execute(ctx context.Context) int {
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Error("ctx.Done", "err", ctx.Err())
+			slog.Error("App ctx.Done", "error", ctx.Err())
 			return ExitCodeContextDone
 		case <-done:
 			if err != nil {

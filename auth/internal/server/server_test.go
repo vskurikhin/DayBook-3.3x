@@ -36,7 +36,10 @@ func TestNewAuthServer(t *testing.T) {
 	}
 	handler := http.NewServeMux()
 
-	srv := NewAuthServer(newTestConfig(), environments, handler)
+	srv, err := NewAuthServer(newTestConfig(), environments, handler)
+	if err != nil {
+		t.Errorf("NewAuthServer() error = %v", err)
+	}
 
 	if srv.config.Address != cfg.Address {
 		t.Errorf("expected address %s, got %s", cfg.Address, srv.config.Address)
@@ -50,14 +53,20 @@ func TestNewAuthServer(t *testing.T) {
 func TestAuthServer_Run_ListenError_ExitsProcess(t *testing.T) {
 	cfg := newTestConfig() // вызовет ошибку ListenAndServe
 	handler := http.NewServeMux()
-	srv := NewAuthServer(cfg, environments, handler)
+	srv, err := NewAuthServer(cfg, environments, handler)
+	if err != nil {
+		t.Errorf("NewAuthServer() error = %v", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 	go func() {
 		time.Sleep(time.Millisecond * 100)
 		cancel()
 	}()
-	srv.Run(ctx)
+	err = srv.Run(ctx)
+	if err != nil {
+		t.Errorf("Run() error = %v", err)
+	}
 }
 
 // Тестируем интерфейс Server

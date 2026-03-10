@@ -24,7 +24,7 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Call the actual handler
 		if err := fn(w, r); err != nil {
 			// Log the error for debugging
-			slog.Error("API", "error", err.Error())
+			slog.Error("API", slog.String("error", err.Error()))
 
 			// Send error response
 			w.WriteHeader(http.StatusInternalServerError)
@@ -33,7 +33,7 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Error:   err.Error(),
 			})
 			if encodeErr != nil {
-				slog.Error("API", "error", err.Error())
+				slog.Error("API", slog.String("error", encodeErr.Error()))
 			}
 			return
 		}

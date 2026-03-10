@@ -1,8 +1,9 @@
 package handler
 
 import (
-	"github.com/go-chi/chi/v5"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
 )

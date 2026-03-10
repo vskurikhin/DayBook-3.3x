@@ -41,9 +41,11 @@ func (m *MockServer) EXPECT() *MockServerMockRecorder {
 }
 
 // Run mocks base method.
-func (m *MockServer) Run(ctx context.Context) {
+func (m *MockServer) Run(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Run", ctx)
+	ret := m.ctrl.Call(m, "Run", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Run indicates an expected call of Run.

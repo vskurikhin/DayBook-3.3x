@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,13 +12,9 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
-const (
-	ExitCodeStartHTTPServerError = 4
-)
-
-//go:generate mockgen -destination=../../mocks/server/mocks/server.go -package=mocks github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
+//go:generate mockgen -destination=server_mock_test.go -package=mocks github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
 type Server interface {
-	Run(ctx context.Context)
+	Run(ctx context.Context) error
 }
 
 var _ Server = (*AuthServer)(nil)
@@ -30,16 +25,17 @@ type AuthServer struct {
 	environments env.Environments
 }
 
-func NewAuthServer(cfg config.Config, env env.Environments, handler http.Handler) *AuthServer {
-	return &AuthServer{handler: handler, config: cfg.Values(), environments: env}
+func NewAuthServer(cfg config.Config, env env.Environments, handler http.Handler) (*AuthServer, error) {
+	return &AuthServer{handler: handler, config: cfg.Values(), environments: env}, nil
 }
 
-func (a AuthServer) Run(ctx context.Context) {
+func (a AuthServer) Run(ctx context.Context) error {
 	server := &http.Server{
 		Addr:    a.config.Address,
 		Handler: a.handler,
 	}
-	var err error
+	var errHTTPServe error
+	httpExit := make(chan struct{}, 1)
 	// канал для перенаправления прерываний
 	// поскольку нужно отловить всего одно прерывание,
 	// ёмкости 1 для канала будет достаточно
@@ -49,22 +45,21 @@ func (a AuthServer) Run(ctx context.Context) {
 	go func() {
 		// Start the HTTP server on port 8089 by default
 		fmt.Printf("HTTPServer starting on %s...\n", a.config.Address)
-		err = server.ListenAndServe()
-		close(sigQuit)
+		errHTTPServe = server.ListenAndServe()
+		close(httpExit)
 	}()
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("ctx.Done", "msg", ctx.Err())
-			_ = server.Shutdown(ctx)
-			return
-		case <-sigQuit:
-			if err != nil {
-				slog.Error("HTTPServer Error", "err", err)
-				os.Exit(ExitCodeStartHTTPServerError)
+			errShutdown := server.Shutdown(ctx)
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
-			slog.Info("HTTPServer Done")
-			return
+			return errShutdown
+		case <-httpExit:
+			return errHTTPServe
+		case <-sigQuit:
+			return server.Shutdown(ctx)
 		}
 	}
 }

@@ -1,12 +1,13 @@
 package handler
 
 import (
-	"github.com/go-chi/chi/v5"
-	"go.uber.org/mock/gomock"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"go.uber.org/mock/gomock"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
@@ -100,7 +101,8 @@ func TestNewRouter_HiEndpoint_Returns200(t *testing.T) {
 
 	router := NewRouter(cfg, environments, mockApiHandlers)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/ok", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/api/v1/ok", nil)
+	req.Host = "localhost"
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -132,7 +134,8 @@ func TestNewRouter_HiEndpoint_MethodNotAllowed(t *testing.T) {
 	}()).Times(1)
 	router := NewRouter(cfg, environments, mockApiHandlers)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/ok", nil)
+	req := httptest.NewRequest(http.MethodPost, "/auth/api/v1/ok", nil)
+	req.Host = "localhost"
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -157,6 +160,7 @@ func TestNewRouter_NotFound(t *testing.T) {
 	router := NewRouter(cfg, environments, mockApiHandlers)
 
 	req := httptest.NewRequest(http.MethodGet, "/unknown", nil)
+	req.Host = "localhost"
 	rr := httptest.NewRecorder()
 
 	router.ServeHTTP(rr, req)
@@ -184,7 +188,7 @@ func TestNewRouter_CORSHeaders(t *testing.T) {
 	}()).Times(1)
 	router := NewRouter(cfg, environments, mockApiHandlers)
 
-	req := httptest.NewRequest(http.MethodOptions, "/api/v1/ok", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/auth/api/v1/ok", nil)
 	req.Header.Set("Origin", "http://localhost")
 	req.Header.Set("Access-Control-Request-Method", "GET")
 
