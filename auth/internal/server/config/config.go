@@ -131,11 +131,14 @@ var (
 //
 //	cfg := config.NewConfig(cmd)
 //	fmt.Println(cfg.Values().Address)
-func NewConfig(cmd *cobra.Command) *ValuesConfig {
+func NewConfig(cmd *cobra.Command) (*ValuesConfig, error) {
 	var v, values Values
 	err := viper.Unmarshal(&v)
-	if err != nil && cmd != nil && tool.IsDebug(cmd) {
-		slog.Error("Error binding flag", "error", err)
+	if err != nil {
+		if cmd != nil && tool.IsDebug(cmd) {
+			slog.Error("Error binding flag", "error", err)
+		}
+		return nil, err
 	} else {
 		values = v
 	}
@@ -152,11 +155,12 @@ func NewConfig(cmd *cobra.Command) *ValuesConfig {
 		viper.WatchConfig()
 		viper.OnConfigChange(configChange)
 	})
-	return cfg
+	return cfg, err
 }
 
 func GetConfig() *ValuesConfig {
-	return NewConfig(nil)
+	c, _ := NewConfig(nil)
+	return c
 }
 
 // Ssl returns the value of the internal ssl field.

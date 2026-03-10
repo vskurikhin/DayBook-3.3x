@@ -44,11 +44,12 @@ Typical usage:
 All commands support standard flags such as --debug, --verbose, and --config.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		setSlogDebug(cmd)
 		mergeCobraAndViper(cmd)
 		slogInfoVerbose(cmd)
-		_ = config.NewConfig(cmd)
+		_, err := config.NewConfig(cmd)
+		return err
 	},
 }
 

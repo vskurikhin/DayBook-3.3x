@@ -29,6 +29,20 @@ func newTestCommand() *cobra.Command {
 	return cmd
 }
 
+func newTestCommandDebug() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "test",
+	}
+
+	cmd.Flags().Bool("debug", true, "")
+	cmd.Flags().Bool("enabled", false, "")
+	cmd.Flags().Bool("verbose", false, "")
+	cmd.Flags().Int("port", 8080, "")
+	cmd.Flags().String("name", "default", "")
+
+	return cmd
+}
+
 func TestMergeCobraAndViper(t *testing.T) {
 	type (
 		args struct {

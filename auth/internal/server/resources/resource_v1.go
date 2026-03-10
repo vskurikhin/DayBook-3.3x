@@ -17,17 +17,12 @@ type V1 struct {
 	cfg config.Config
 }
 
-func (v V1) Ok(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (v V1) Ok(w http.ResponseWriter, _ *http.Request) {
 	var body bytes.Buffer
 	if v.cfg.Values().Debug {
 		body.WriteString("DEBUG ")
 	}
 	body.WriteString("V1")
-	select {
-	case <-ctx.Done():
-		return
-	}
 	//goland:noinspection ALL
 	w.Write(body.Bytes())
 }
