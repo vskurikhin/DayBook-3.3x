@@ -17,15 +17,18 @@ import (
 
 // Injectors from di.go:
 
-func InitializeServer(cfg config.Config, environments env.Environments) *server.AuthServer {
+func InitializeServer(cfg config.Config, environments env.Environments) (*server.AuthServer, error) {
 	v1 := resources.NewV1(cfg)
 	apiV1 := handler.NewApiV1(v1)
 	v2 := resources.NewV2(cfg)
 	apiV2 := handler.NewApiV2(v2)
 	handlers := handler.NewHandlers(apiV1, apiV2)
 	httpHandler := handler.NewRouter(cfg, environments, handlers)
-	authServer := server.NewAuthServer(cfg, environments, httpHandler)
-	return authServer
+	authServer, err := server.NewAuthServer(cfg, environments, httpHandler)
+	if err != nil {
+		return nil, err
+	}
+	return authServer, nil
 }
 
 // di.go:

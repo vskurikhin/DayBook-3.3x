@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"context"
+
 	"github.com/spf13/cobra"
+
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
@@ -14,15 +16,22 @@ type Config interface {
 	Values() config.Values
 }
 
+//go:generate mockgen -destination=run_mock_environments_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd Environments
+type Environments interface {
+	Values() env.Values
+}
+
 //go:generate mockgen -destination=run_mock_server_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
 type Server interface {
-	Run(ctx context.Context)
+	Run(ctx context.Context) error
 }
 
 var (
 	newConfig     = func(cmd *cobra.Command) (config.Config, error) { return config.NewConfig(cmd) }
 	envLoad       = func() (env.Environments, error) { return env.EnvironmentsLoad() }
-	newAuthServer = func(cfg config.Config, env env.Environments) server.Server { return wire.InitializeServer(cfg, env) }
+	newAuthServer = func(cfg config.Config, env env.Environments) (server.Server, error) {
+		return wire.InitializeServer(cfg, env)
+	}
 )
 
 // runCmd represents the base command when called without any subcommands
@@ -47,8 +56,10 @@ using the obtained configuration.`,
 		if errEnvLoad != nil {
 			return errEnvLoad
 		}
-		srv := newAuthServer(cfg, env)
-		srv.Run(context.Background())
-		return nil
+		srv, err := newAuthServer(cfg, env)
+		if err != nil {
+			return err
+		}
+		return srv.Run(context.Background())
 	},
 }

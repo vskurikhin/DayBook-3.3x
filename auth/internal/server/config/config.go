@@ -41,15 +41,15 @@
 //
 // Example Usage
 //
-//		cmd := &cobra.Command{}
-//		cmd.Flags().Bool("debug", false, "enable debug mode")
+//	 cmd := &cobra.Command{}
+//	 cmd.Flags().Bool("debug", false, "enable debug mode")
 //
-//		cfg, err := config.NewConfig(cmd)
+//	 cfg, err := config.NewConfig(cmd)
 //	 if err == nil {
-//			fmt.Println(cfg.Values().Address)
-//			if cfg.Values().Ssl() {
-//				fmt.Println("SSL enabled")
-//			}
+//		fmt.Println(cfg.Values().Address)
+//		if cfg.Values().Ssl() {
+//			fmt.Println("SSL enabled")
+//		}
 //	 }
 package config
 
@@ -97,14 +97,14 @@ type ValuesConfig struct {
 //
 // Example:
 //
-//		cfg, err := config.NewConfig(cmd)
-//	 if err == nil {
-//			values := cfg.Values()
-//			fmt.Println(values.Address)
-//			if values.Debug {
-//		    	fmt.Println("Debug mode enabled")
-//			}
-//	 }
+//	cfg, err := config.NewConfig(cmd)
+//	if err == nil {
+//		values := cfg.Values()
+//		fmt.Println(values.Address)
+//		if values.Debug {
+//			fmt.Println("Debug mode enabled")
+//		}
+//	}
 func (v *ValuesConfig) Values() Values {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
@@ -131,11 +131,11 @@ var (
 //
 // Example usage:
 //
-//		cmd := &cobra.Command{}
-//		cmd.Flags().Bool("debug", false, "enable debug mode")
-//		cfg, err := config.NewConfig(cmd)
+//	 cmd := &cobra.Command{}
+//	 cmd.Flags().Bool("debug", false, "enable debug mode")
+//	 cfg, err := config.NewConfig(cmd)
 //	 if err == nil {
-//			fmt.Println(cfg.Values().Address)
+//		fmt.Println(cfg.Values().Address)
 //	 }
 func NewConfig(cmd *cobra.Command) (*ValuesConfig, error) {
 	var v, values Values
