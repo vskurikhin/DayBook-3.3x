@@ -32,7 +32,7 @@ func TestValuesConfig_ImplementsConfig(t *testing.T) {
 // 2️⃣ Test: Values() возвращает правильные данные
 func TestValuesConfig_Values(t *testing.T) {
 	values := Values{
-		Address: "localhost:8080",
+		Address: "localhost:8089",
 		Debug:   true,
 		Verbose: true,
 	}
@@ -77,7 +77,7 @@ func TestNewConfig_Singleton(t *testing.T) {
 func TestNewConfig_UnmarshalValues(t *testing.T) {
 	resetConfigState()
 
-	viper.Set("address", "127.0.0.1:8080")
+	viper.Set("address", "127.0.0.1:8089")
 	viper.Set("debug", true)
 	viper.Set("verbose", true)
 	viper.Set("insecure_skip_verify", true)
@@ -91,8 +91,8 @@ func TestNewConfig_UnmarshalValues(t *testing.T) {
 	}
 	values := cfg.Values()
 
-	if values.Address != "127.0.0.1:8080" {
-		t.Fatalf("expected address 127.0.0.1:8080, got %s", values.Address)
+	if values.Address != "127.0.0.1:8089" {
+		t.Fatalf("expected address 127.0.0.1:8089, got %s", values.Address)
 	}
 	if !values.Debug {
 		t.Fatal("expected debug true")
@@ -166,7 +166,7 @@ func newTestCommand(debug bool) *cobra.Command {
 func TestNewConfig_ShouldBindValuesFromViper(t *testing.T) {
 	resetConfigState()
 
-	viper.Set("address", "localhost:8080")
+	viper.Set("address", "localhost:8089")
 	viper.Set("debug", true)
 	viper.Set("verbose", true)
 	viper.Set("insecure_skip_verify", true)
@@ -179,8 +179,8 @@ func TestNewConfig_ShouldBindValuesFromViper(t *testing.T) {
 	}
 	values := config.Values()
 
-	if values.Address != "localhost:8080" {
-		t.Errorf("expected address 'localhost:8080', got '%s'", values.Address)
+	if values.Address != "localhost:8089" {
+		t.Errorf("expected address 'localhost:8089', got '%s'", values.Address)
 	}
 
 	if !values.Debug {
@@ -271,8 +271,9 @@ func TestLoopSigHup_ContextDone(t *testing.T) {
 
 func TestLoopSigHup_ConfigReload(t *testing.T) {
 	// Подготовка временного файла viper
+	viper.AddConfigPath(".")
 	viper.SetConfigType("yaml")
-	viper.SetConfigName("test")
+	viper.SetConfigName("test.yaml")
 
 	go loopSigHup(context.Background())
 	p, err := os.FindProcess(os.Getpid())
@@ -378,7 +379,7 @@ func TestConfigChange_UnmarshalError(t *testing.T) {
 	slog.SetDefault(logger)
 
 	// Создаём начальную конфигурацию
-	viper.Set("address", "localhost:8080")
+	viper.Set("address", "localhost:8089")
 
 	c, err := NewConfig(nil)
 	if err != nil {
@@ -398,7 +399,7 @@ func TestConfigChange_UnmarshalError(t *testing.T) {
 	}
 
 	// Конфигурация не должна измениться
-	if c.Values().Address != "localhost:8080" {
+	if c.Values().Address != "localhost:8089" {
 		t.Fatal("config should not change on unmarshal error")
 	}
 }

@@ -2,9 +2,8 @@ package resources
 
 import (
 	"encoding/json"
-	"net/http"
-
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"net/http"
 )
 
 type ResourceV2 interface {
@@ -17,6 +16,16 @@ type V2 struct {
 	cfg config.Config
 }
 
+// Ok route
+// @Summary Ok Краткое содержание
+// @Description Ok - Описание (v2)
+// @ID ResourceV2-ok
+// @Tags ok
+// @Produce json
+// @Success 200 {object} APIResponse{data=[]map[string]string} "успешно"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
+// @Failure 504
+// @Router /v2/ok [get]
 func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error {
 	users := []map[string]string{
 		{"id": "1", "version": "V2"},

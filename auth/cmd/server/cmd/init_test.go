@@ -67,7 +67,7 @@ func TestInitConfig_WithExplicitFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "test.yaml")
 
-	err := os.WriteFile(configPath, []byte("address: localhost:8080\n"), 0644)
+	err := os.WriteFile(configPath, []byte("address: localhost:8089\n"), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestInitConfig_WithExplicitFile(t *testing.T) {
 			configPath, viper.ConfigFileUsed())
 	}
 
-	if viper.GetString("address") != "localhost:8080" {
+	if viper.GetString("address") != "localhost:8089" {
 		t.Errorf("expected address from config file")
 	}
 }

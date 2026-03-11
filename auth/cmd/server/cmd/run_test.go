@@ -82,3 +82,42 @@ func TestRunCmd_ShouldReturnTestError(t *testing.T) {
 		t.Fatalf("expected error: '%s', got '%s'", testError.Error(), err.Error())
 	}
 }
+
+func TestRunCmd_EnvLoad_ShouldReturnTestError(t *testing.T) {
+	// backup originals
+	origNewConfig := newConfig
+	origEnvLoad := envLoad
+	origNewServer := newAuthServer
+	defer func() {
+		newConfig = origNewConfig
+		envLoad = origEnvLoad
+		newAuthServer = origNewServer
+	}()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConfig := NewMockConfig(ctrl)
+	mockServer := NewMockServer(ctrl)
+
+	mockConfig.EXPECT().Values().Times(0)
+	mockServer.EXPECT().Run(context.Background()).Return().Times(0)
+
+	// arrange
+	cmd := newTestCommandDebug()
+	newConfig = func(cmd *cobra.Command) (config.Config, error) {
+		return mockConfig, nil
+	}
+	envLoad = func() (env.Environments, error) { return nil, testError }
+	newAuthServer = func(_ config.Config, _ env.Environments) server.Server {
+		return mockServer
+	}
+
+	// act
+	err := runCmd.RunE(cmd, []string{})
+	if err == nil {
+		t.Fatalf("expected error: '%s', got none", testError)
+	}
+	if err.Error() != testError.Error() {
+		t.Fatalf("expected error: '%s', got '%s'", testError.Error(), err.Error())
+	}
+}

@@ -47,7 +47,7 @@ func (a AuthServer) Run(ctx context.Context) {
 	// регистрируем перенаправление прерываний
 	signal.Notify(sigQuit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	go func() {
-		// Start the HTTP server on port 8080 by default
+		// Start the HTTP server on port 8089 by default
 		fmt.Printf("HTTPServer starting on %s...\n", a.config.Address)
 		err = server.ListenAndServe()
 		close(sigQuit)

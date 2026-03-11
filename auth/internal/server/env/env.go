@@ -30,7 +30,6 @@
 package env
 
 import (
-	"log/slog"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -60,12 +59,11 @@ type Values struct {
 // EnvironmentsLoad parses environment variables into a Config structure
 // and returns it as an Environments implementation. If parsing fails,
 // the error is logged and an empty configuration is returned.
-func EnvironmentsLoad() *Config {
+func EnvironmentsLoad() (*Config, error) {
 	values := Values{}
 
 	if err := env.Parse(&values); err != nil {
-		slog.Error("Error parsing env", "error", err)
-		return &Config{}
+		return nil, err
 	}
-	return &Config{values: values}
+	return &Config{values: values}, nil
 }

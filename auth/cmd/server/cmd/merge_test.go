@@ -23,7 +23,7 @@ func newTestCommand() *cobra.Command {
 	cmd.Flags().Bool("debug", false, "")
 	cmd.Flags().Bool("enabled", false, "")
 	cmd.Flags().Bool("verbose", false, "")
-	cmd.Flags().Int("port", 8080, "")
+	cmd.Flags().Int("port", 8089, "")
 	cmd.Flags().String("name", "default", "")
 
 	return cmd
@@ -37,7 +37,7 @@ func newTestCommandDebug() *cobra.Command {
 	cmd.Flags().Bool("debug", true, "")
 	cmd.Flags().Bool("enabled", false, "")
 	cmd.Flags().Bool("verbose", false, "")
-	cmd.Flags().Int("port", 8080, "")
+	cmd.Flags().Int("port", 8089, "")
 	cmd.Flags().String("name", "default", "")
 
 	return cmd
@@ -87,7 +87,7 @@ func TestMergeCobraAndViper(t *testing.T) {
 			result: func(name string) any {
 				return viper.GetInt(name)
 			},
-			want: 8080,
+			want: 8089,
 		},
 		{
 			name: "positive #3: String flag",
