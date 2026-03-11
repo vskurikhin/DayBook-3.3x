@@ -24,6 +24,7 @@ package handler
 
 import (
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -67,5 +68,22 @@ func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) ht
 	r.Mount(BaseURL+V1, handlers.apiV1())
 	r.Mount(BaseURL+V2, handlers.apiV2())
 
+	if debug {
+		// Or mount the entire pprof handler set
+		r.Route("/debug", func(r chi.Router) {
+			r.HandleFunc("/", pprof.Index)
+			r.HandleFunc("/cmdline", pprof.Cmdline)
+			r.HandleFunc("/profile", pprof.Profile)
+			r.HandleFunc("/symbol", pprof.Symbol)
+			r.HandleFunc("/trace", pprof.Trace)
+			r.Handle("/allocs", pprof.Handler("allocs"))
+			r.Handle("/block", pprof.Handler("block"))
+			r.Handle("/mutex", pprof.Handler("mutex"))
+			r.Handle("/heap", pprof.Handler("heap"))
+			r.Handle("/goroutine", pprof.Handler("goroutine"))
+			r.Handle("/goroutineleak", pprof.Handler("goroutineleak"))
+			r.Handle("/threadcreate", pprof.Handler("threadcreate"))
+		})
+	}
 	return r
 }
