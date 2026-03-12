@@ -34,11 +34,31 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
+//goland:noinspection SpellCheckingInspection
 const (
-	BaseURL = "/auth/api"
-	V1      = "/v1"
-	V2      = "/v2"
-	OK      = "/ok"
+	Allocs           = "allocs"
+	AllocsURL        = "/" + Allocs
+	BaseURL          = "/auth/api"
+	Block            = "block"
+	BlockURL         = "/" + Block
+	CmdLineURL       = "/cmdline"
+	DebugURL         = "/debug"
+	GoRoutine        = "goroutine"
+	GoRoutineLeak    = "goroutineleak"
+	GoRoutineLeakURL = "/" + GoRoutineLeak
+	GoRoutineURL     = "/" + GoRoutine
+	Heap             = "heap"
+	HeapURL          = "/" + Heap
+	Mutex            = "mutex"
+	MutexURL         = "/" + Mutex
+	OK               = "/ok"
+	ProfileURL       = "/profile"
+	SymbolURL        = "/symbol"
+	ThreadCreate     = "threadcreate"
+	ThreadCreateURL  = "/" + ThreadCreate
+	Trace            = "/trace"
+	V1               = "/v1"
+	V2               = "/v2"
 )
 
 // NewRouter creates and configures an HTTP router with
@@ -46,12 +66,10 @@ const (
 func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) http.Handler {
 	r := chi.NewRouter()
 
-	debug := cfg.Values().Debug
-
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},                                       // All origins
 		AllowedMethods: []string{"POST", "GET", "PUT", "DELETE", "OPTIONS"}, // Allowing only get, just an example
-		Debug:          debug,
+		Debug:          cfg.Values().Debug,
 	})
 
 	r.Use(c.Handler)
@@ -68,21 +86,21 @@ func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) ht
 	r.Mount(BaseURL+V1, handlers.apiV1())
 	r.Mount(BaseURL+V2, handlers.apiV2())
 
-	if debug {
+	if env.Values().DebugPprof {
 		// Or mount the entire pprof handler set
-		r.Route("/debug", func(r chi.Router) {
+		r.Route(DebugURL, func(r chi.Router) {
 			r.HandleFunc("/", pprof.Index)
-			r.HandleFunc("/cmdline", pprof.Cmdline)
-			r.HandleFunc("/profile", pprof.Profile)
-			r.HandleFunc("/symbol", pprof.Symbol)
-			r.HandleFunc("/trace", pprof.Trace)
-			r.Handle("/allocs", pprof.Handler("allocs"))
-			r.Handle("/block", pprof.Handler("block"))
-			r.Handle("/mutex", pprof.Handler("mutex"))
-			r.Handle("/heap", pprof.Handler("heap"))
-			r.Handle("/goroutine", pprof.Handler("goroutine"))
-			r.Handle("/goroutineleak", pprof.Handler("goroutineleak"))
-			r.Handle("/threadcreate", pprof.Handler("threadcreate"))
+			r.HandleFunc(CmdLineURL, pprof.Cmdline)
+			r.HandleFunc(ProfileURL, pprof.Profile)
+			r.HandleFunc(SymbolURL, pprof.Symbol)
+			r.HandleFunc(Trace, pprof.Trace)
+			r.Handle(AllocsURL, pprof.Handler(Allocs))
+			r.Handle(BlockURL, pprof.Handler(Block))
+			r.Handle(GoRoutineLeakURL, pprof.Handler(GoRoutineLeak))
+			r.Handle(GoRoutineURL, pprof.Handler(GoRoutine))
+			r.Handle(HeapURL, pprof.Handler(Heap))
+			r.Handle(MutexURL, pprof.Handler(Mutex))
+			r.Handle(ThreadCreateURL, pprof.Handler(ThreadCreate))
 		})
 	}
 	return r

@@ -60,12 +60,12 @@ func TestAuthServer_Run_ListenError_ExitsProcess(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 	go func() {
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 101)
 		cancel()
 	}()
 	err = srv.Run(ctx)
 	if err != nil && err.Error() != context.DeadlineExceeded.Error() {
-		t.Errorf("expected %v, got %v", context.Canceled.Error(), err)
+		t.Errorf("expected %v, got %v", context.DeadlineExceeded.Error(), err)
 	}
 }
 

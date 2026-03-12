@@ -55,7 +55,8 @@ func (c Config) Values() Values {
 
 // Values статичная конфигурация из переменных окружения.
 type Values struct {
-	Timeout time.Duration `env:"SERVER_TIMEOUT" envDefault:"10s"`
+	Timeout    time.Duration `env:"SERVER_TIMEOUT" envDefault:"10s"`
+	DebugPprof bool          `env:"SERVER_DEBUG_PPROF_API" envDefault:"false"`
 }
 
 // EnvironmentsLoad parses environment variables into a Config structure

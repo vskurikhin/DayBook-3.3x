@@ -27,8 +27,8 @@ type Server interface {
 }
 
 var (
-	newConfig     = func(cmd *cobra.Command) (config.Config, error) { return config.NewConfig(cmd) }
 	envLoad       = func() (env.Environments, error) { return env.EnvironmentsLoad() }
+	newConfig     = func(cmd *cobra.Command) (config.Config, error) { return config.NewConfig(cmd) }
 	newAuthServer = func(cfg config.Config, env env.Environments) (server.Server, error) {
 		return wire.InitializeServer(cfg, env)
 	}
