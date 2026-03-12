@@ -67,7 +67,7 @@ func TestExecute_ShouldReturnZeroOnSuccess(t *testing.T) {
 	orig := executeCmd
 	defer func() { executeCmd = orig }()
 
-	executeCmd = func() error {
+	executeCmd = func(ctx context.Context) error {
 		return nil
 	}
 
@@ -84,7 +84,7 @@ func TestExecute_ShouldReturnOneOnError(t *testing.T) {
 	orig := executeCmd
 	defer func() { executeCmd = orig }()
 
-	executeCmd = func() error {
+	executeCmd = func(ctx context.Context) error {
 		return errors.New("boom")
 	}
 
@@ -101,7 +101,7 @@ func TestExecute_ShouldReturnTwoOnContextCancel(t *testing.T) {
 	orig := executeCmd
 	defer func() { executeCmd = orig }()
 
-	executeCmd = func() error {
+	executeCmd = func(ctx context.Context) error {
 		time.Sleep(200 * time.Millisecond)
 		return nil
 	}
@@ -133,7 +133,7 @@ func TestExecute_ShouldReturnOneOnContextCancel(t *testing.T) {
 	defer func() { executeCmd = origExec }()
 
 	// Имитируем долгую команду
-	executeCmd = func() error {
+	executeCmd = func(ctx context.Context) error {
 		time.Sleep(200 * time.Millisecond)
 		return nil
 	}
@@ -164,7 +164,7 @@ func TestExecute_ShouldReturnOneWhenCommandReturnsError(t *testing.T) {
 	origExec := executeCmd
 	defer func() { executeCmd = origExec }()
 
-	executeCmd = func() error {
+	executeCmd = func(ctx context.Context) error {
 		return errors.New("some error")
 	}
 

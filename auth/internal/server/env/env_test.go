@@ -24,7 +24,7 @@ func TestEnvironmentsLoad_DefaultValue(t *testing.T) {
 }
 
 func TestEnvironmentsLoad_FromEnv(t *testing.T) {
-	t.Setenv("SERVER_TIMEOUT", "30s")
+	t.Setenv("AUTH_SERVER_TIMEOUT", "30s")
 
 	environments, err := EnvironmentsLoad()
 	if err != nil {
@@ -53,7 +53,7 @@ func TestValues_Method(t *testing.T) {
 }
 
 func TestEnvironmentsLoad_InvalidDuration(t *testing.T) {
-	t.Setenv("SERVER_TIMEOUT", "invalid")
+	t.Setenv("AUTH_SERVER_TIMEOUT", "invalid")
 	_, err := EnvironmentsLoad()
 	if err == nil {
 		t.Fatal("expected error")

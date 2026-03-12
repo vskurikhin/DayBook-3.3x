@@ -20,18 +20,18 @@ type Server interface {
 var _ Server = (*AuthServer)(nil)
 
 type AuthServer struct {
+	cfg          config.Config
 	handler      http.Handler
-	config       config.Values
 	environments env.Environments
 }
 
 func NewAuthServer(cfg config.Config, env env.Environments, handler http.Handler) (*AuthServer, error) {
-	return &AuthServer{handler: handler, config: cfg.Values(), environments: env}, nil
+	return &AuthServer{cfg: cfg, handler: handler, environments: env}, nil
 }
 
 func (a AuthServer) Run(ctx context.Context) error {
 	server := &http.Server{
-		Addr:    a.config.Address,
+		Addr:    a.cfg.Values().Address,
 		Handler: a.handler,
 	}
 	var errHTTPServe error
@@ -44,7 +44,7 @@ func (a AuthServer) Run(ctx context.Context) error {
 	signal.Notify(sigQuit, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	go func() {
 		// Start the HTTP server on port 8089 by default
-		fmt.Printf("HTTPServer starting on %s...\n", a.config.Address)
+		fmt.Printf("HTTPServer starting on %s...\n", a.cfg.Values().Address)
 		errHTTPServe = server.ListenAndServe()
 		close(httpExit)
 	}()

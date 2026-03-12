@@ -8,6 +8,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
@@ -27,10 +28,13 @@ type Server interface {
 }
 
 var (
-	envLoad       = func() (env.Environments, error) { return env.EnvironmentsLoad() }
-	newConfig     = func(cmd *cobra.Command) (config.Config, error) { return config.NewConfig(cmd) }
-	newAuthServer = func(cfg config.Config, env env.Environments) (server.Server, error) {
-		return wire.InitializeServer(cfg, env)
+	envLoad   = func() (env.Environments, error) { return env.EnvironmentsLoad() }
+	newConfig = func(cmd *cobra.Command) (config.Config, error) { return config.NewConfig(cmd) }
+	newDB     = func(ctx context.Context, cfg config.Config, env env.Environments) (db.DB, error) {
+		return db.NewDB(ctx, cfg, env)
+	}
+	newAuthServer = func(cfg config.Config, env env.Environments, dbp db.DB) (server.Server, error) {
+		return wire.InitializeServer(cfg, env, dbp)
 	}
 )
 
@@ -48,18 +52,26 @@ using the obtained configuration.`,
 		setSlogDebug(cmd)
 		mergeCobraAndViper(cmd)
 		slogInfoVerbose(cmd)
+
 		cfg, errConfig := newConfig(cmd)
 		if errConfig != nil {
 			return errConfig
 		}
+
 		env, errEnvLoad := envLoad()
 		if errEnvLoad != nil {
 			return errEnvLoad
 		}
-		srv, err := newAuthServer(cfg, env)
+
+		dbp, err := newDB(cmd.Context(), cfg, env)
 		if err != nil {
 			return err
 		}
-		return srv.Run(context.Background())
+
+		srv, err := newAuthServer(cfg, env, dbp)
+		if err != nil {
+			return err
+		}
+		return srv.Run(cmd.Context())
 	},
 }

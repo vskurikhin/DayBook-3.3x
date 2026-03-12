@@ -19,7 +19,7 @@ const (
 
 var (
 	cfgFile    string
-	executeCmd = rootCmd.Execute
+	executeCmd = rootCmd.ExecuteContext
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -67,7 +67,7 @@ func Execute(ctx context.Context) int {
 	var err error
 	done := make(chan struct{})
 	go func() {
-		err = executeCmd()
+		err = executeCmd(ctx)
 		close(done)
 	}()
 	for {

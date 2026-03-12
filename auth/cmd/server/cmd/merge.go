@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -13,7 +14,7 @@ import (
 )
 
 func mergeCobraAndViper(cmd *cobra.Command) {
-	for key, _ := range viper.GetViper().AllSettings() {
+	for key := range viper.GetViper().AllSettings() {
 		viperBindPFlag(key, tool.SnakeCaseToKebabCase(key), cmd)
 	}
 	cmd.Flags().VisitAll(mergeCobraAndViperFunc(cmd))
@@ -32,7 +33,12 @@ func mergeCobraAndViperFunc(cmd *cobra.Command) func(f *pflag.Flag) {
 			switch f.Value.Type() {
 			case "bool":
 				viper.Set(tool.KebabCaseToSnakeCase(f.Name), f.Value.String() == "true")
-			case "int":
+			case "duration":
+				value, err := time.ParseDuration(f.Value.String())
+				if err == nil {
+					viper.Set(tool.KebabCaseToSnakeCase(f.Name), value)
+				}
+			case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
 				value, _ := strconv.Atoi(f.Value.String())
 				if value > 0 {
 					viper.Set(tool.KebabCaseToSnakeCase(f.Name), value)
