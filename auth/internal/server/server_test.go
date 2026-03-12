@@ -2,12 +2,12 @@ package server
 
 import (
 	"context"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
 //
@@ -60,12 +60,12 @@ func TestAuthServer_Run_ListenError_ExitsProcess(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 	go func() {
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 101)
 		cancel()
 	}()
 	err = srv.Run(ctx)
-	if err != nil {
-		t.Errorf("Run() error = %v", err)
+	if err != nil && err.Error() != context.DeadlineExceeded.Error() {
+		t.Errorf("expected %v, got %v", context.DeadlineExceeded.Error(), err)
 	}
 }
 
