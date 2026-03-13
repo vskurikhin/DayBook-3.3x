@@ -83,7 +83,12 @@ func (p *PgxPool) QueryRow(ctx context.Context, sql string, optionsAndArgs ...in
 	return conn.QueryRow(ctx, sql, optionsAndArgs...), nil
 }
 
-func IsNotEqual(a *pgxpool.Pool, p *PgxPool) bool {
+// IsNotEqual reports whether the provided pgxpool.Pool instance differs
+// from the pool stored inside the given PgxPool.
+//
+// It returns false if either argument is nil or if the internal pool
+// cannot be asserted to *pgxpool.Pool.
+func (p *PgxPool) IsNotEqual(a *pgxpool.Pool) bool {
 	if a == nil || p == nil {
 		return false
 	}

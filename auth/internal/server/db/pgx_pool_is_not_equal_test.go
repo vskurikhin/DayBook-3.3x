@@ -13,7 +13,7 @@ func TestIsNotEqual_NilA(t *testing.T) {
 		mu:      sync.RWMutex{},
 	}
 
-	if IsNotEqual(nil, p) {
+	if p.IsNotEqual(nil) {
 		t.Fatal("expected false when a is nil")
 	}
 }
@@ -21,7 +21,7 @@ func TestIsNotEqual_NilA(t *testing.T) {
 func TestIsNotEqual_NilP(t *testing.T) {
 	a := &pgxpool.Pool{}
 
-	if IsNotEqual(a, nil) {
+	if (*PgxPool)(nil).IsNotEqual(a) {
 		t.Fatal("expected false when p is nil")
 	}
 }
@@ -34,7 +34,7 @@ func TestIsNotEqual_InvalidPoolType(t *testing.T) {
 		mu:      sync.RWMutex{},
 	}
 
-	if IsNotEqual(a, p) {
+	if p.IsNotEqual(a) {
 		t.Fatal("expected false when pool type assertion fails")
 	}
 }
@@ -47,7 +47,7 @@ func TestIsNotEqual_SamePool(t *testing.T) {
 		mu:      sync.RWMutex{},
 	}
 
-	if IsNotEqual(a, p) {
+	if p.IsNotEqual(a) {
 		t.Fatal("expected false when pools are equal")
 	}
 }
@@ -61,7 +61,7 @@ func TestIsNotEqual_DifferentPools(t *testing.T) {
 		mu:      sync.RWMutex{},
 	}
 
-	if !IsNotEqual(a, p) {
+	if !p.IsNotEqual(a) {
 		t.Fatal("expected true when pools are different")
 	}
 }

@@ -303,7 +303,7 @@ func loopSigHup(ctx context.Context, cfg config.Config, environments env.Environ
 				slog.Info("Pgx DB pool, reload fail", slog.String("error", err.Error()))
 				continue
 			}
-			if IsNotEqual(pgxp, pgxPool) {
+			if pgxPool.IsNotEqual(pgxp) {
 				slog.Info("Pgx DB pool, reloading...")
 				slog.Debug(
 					"Reloading pgx DB pool",
