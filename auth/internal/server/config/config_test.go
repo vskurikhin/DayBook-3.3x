@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 	"log/slog"
 	"os"
+	"os/signal"
 	"sync"
 	"syscall"
 	"testing"
@@ -311,6 +312,56 @@ func TestConfigChange_Success(t *testing.T) {
 }
 
 func TestLoopSigHup_SignalReload(t *testing.T) {
+	sig := make(chan os.Signal, 1)
+
+	signal.Notify(sig, syscall.SIGHUP)
+	resetConfigState()
+
+	viper.Set("address", "before")
+
+	cfg, err := NewConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go loopSigHup(context.Background())
+
+	viper.AddConfigPath(".")
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("test.yaml")
+
+	viper.Set("address", "after")
+
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = p.Signal(syscall.SIGHUP)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	values := cfg.Values()
+
+	select {
+	case <-sig:
+		// OK
+	case <-time.After(time.Second):
+		t.Fatal("signal not received")
+	}
+
+	if values.Address != "after" && values.Address != "before" {
+		t.Fatalf("unexpected value %s", values.Address)
+	}
+}
+
+func TestLoopSigHup_SignalReload_ReadInConfigError(t *testing.T) {
+	sig := make(chan os.Signal, 1)
+
+	signal.Notify(sig, syscall.SIGHUP)
 	resetConfigState()
 
 	viper.Set("address", "before")
@@ -334,9 +385,16 @@ func TestLoopSigHup_SignalReload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	values := cfg.Values()
+
+	select {
+	case <-sig:
+		// OK
+	case <-time.After(time.Second):
+		t.Fatal("signal not received")
+	}
 
 	if values.Address != "after" && values.Address != "before" {
 		t.Fatalf("unexpected value %s", values.Address)

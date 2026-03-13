@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"testing"
 
@@ -25,6 +26,7 @@ func newTestCommand() *cobra.Command {
 	cmd.Flags().Bool("verbose", false, "")
 	cmd.Flags().Int("port", 8089, "")
 	cmd.Flags().String("name", "default", "")
+	cmd.SetContext(context.Background())
 
 	return cmd
 }
@@ -39,6 +41,7 @@ func newTestCommandDebug() *cobra.Command {
 	cmd.Flags().Bool("verbose", false, "")
 	cmd.Flags().Int("port", 8089, "")
 	cmd.Flags().String("name", "default", "")
+	cmd.SetContext(context.Background())
 
 	return cmd
 }

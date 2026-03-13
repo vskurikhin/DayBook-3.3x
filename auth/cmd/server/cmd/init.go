@@ -59,16 +59,28 @@ package cmd
 import (
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 const (
-	FlagAddress            = "address"
-	FlagDebug              = "debug"
-	FlagInsecureSkipVerify = "insecure-skip-verify"
-	FlagVerbose            = "verbose"
+	FlagAddress                 = "address"
+	FlagDBHost                  = "dbhost"
+	FlagDBName                  = "dbname"
+	FlagDBOptions               = "dboptions"
+	FlagDBPassword              = "dbpassword"
+	FlagDBPoolHealthCheckPeriod = "db-pool-health-check-period"
+	FlagDBPoolMaxConnIdleTime   = "db-pool-max-conn-idle-time"
+	FlagDBPoolMaxConnLifeTime   = "db-pool-max-conn-lifetime"
+	FlagDBPoolMaxConns          = "db-pool-max-conns"
+	FlagDBPoolMinConns          = "db-pool-min-conns"
+	FlagDBPort                  = "dbport"
+	FlagDBUser                  = "dbuser"
+	FlagDebug                   = "debug"
+	FlagInsecureSkipVerify      = "insecure-skip-verify"
+	FlagVerbose                 = "verbose"
 )
 
 func init() {
@@ -82,10 +94,21 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug")
-	rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose")
+	rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug.")
+	rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose.")
 
 	runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
+	runCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
+	runCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")
+	runCmd.Flags().String(FlagDBOptions, "application_name=auth", "Pgx pool DB options.")
+	runCmd.Flags().String(FlagDBPassword, "password", "Pgx pool DB user password.")
+	runCmd.Flags().Duration(FlagDBPoolHealthCheckPeriod, time.Minute, "Pgx DB pool health check period.")
+	runCmd.Flags().Duration(FlagDBPoolMaxConnIdleTime, 30*time.Minute, "Pgx DB pool max connection idle time.")
+	runCmd.Flags().Duration(FlagDBPoolMaxConnLifeTime, time.Hour, "Pgx DB pool max connection lifetime.")
+	runCmd.Flags().Uint8(FlagDBPoolMaxConns, 4, "Pgx DB pool max connections.")
+	runCmd.Flags().Uint8(FlagDBPoolMinConns, 0, "Pgx DB pool min connections.")
+	runCmd.Flags().Uint16(FlagDBPort, 5432, "Pgx pool DB port.")
+	runCmd.Flags().String(FlagDBUser, "dbuser", "Pgx pool DB username.")
 	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
 
 	rootCmd.AddCommand(runCmd)

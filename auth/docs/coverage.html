@@ -61,37 +61,41 @@
 				
 				<option value="file2">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd/root.go (100.0%)</option>
 				
-				<option value="file3">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd/run.go (86.7%)</option>
+				<option value="file3">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd/run.go (87.5%)</option>
 				
 				<option value="file4">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/main.go (100.0%)</option>
 				
 				<option value="file5">github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire/wire_gen.go (0.0%)</option>
 				
-				<option value="file6">github.com/vskurikhin/DayBook-3.3x/auth/v2/docs/docs.go (0.0%)</option>
+				<option value="file6">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config/config.go (95.8%)</option>
 				
-				<option value="file7">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config/config.go (95.8%)</option>
+				<option value="file7">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db/cs_builder.go (100.0%)</option>
 				
-				<option value="file8">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env/env.go (100.0%)</option>
+				<option value="file8">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db/db.go (97.6%)</option>
 				
-				<option value="file9">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_handler.go (93.3%)</option>
+				<option value="file9">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db/pgx_pool.go (75.0%)</option>
 				
-				<option value="file10">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_v1.go (100.0%)</option>
+				<option value="file10">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env/env.go (100.0%)</option>
 				
-				<option value="file11">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_v2.go (100.0%)</option>
+				<option value="file11">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_handler.go (91.7%)</option>
 				
-				<option value="file12">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/handlers.go (100.0%)</option>
+				<option value="file12">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_v1.go (100.0%)</option>
 				
-				<option value="file13">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/router.go (100.0%)</option>
+				<option value="file13">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/api_v2.go (100.0%)</option>
 				
-				<option value="file14">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources/resource_v1.go (100.0%)</option>
+				<option value="file14">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/handlers.go (100.0%)</option>
 				
-				<option value="file15">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources/resource_v2.go (100.0%)</option>
+				<option value="file15">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler/router.go (100.0%)</option>
 				
-				<option value="file16">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/server.go (73.7%)</option>
+				<option value="file16">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources/resource_v1.go (100.0%)</option>
 				
-				<option value="file17">github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool/cobra_command_predicats.go (100.0%)</option>
+				<option value="file17">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources/resource_v2.go (100.0%)</option>
 				
-				<option value="file18">github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool/kebab_snake_case.go (100.0%)</option>
+				<option value="file18">github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/server.go (83.3%)</option>
+				
+				<option value="file19">github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool/cobra_command_predicats.go (100.0%)</option>
+				
+				<option value="file20">github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool/kebab_snake_case.go (100.0%)</option>
 				
 				</select>
 			</div>
@@ -166,16 +170,28 @@ package cmd
 import (
         "log/slog"
         "os"
+        "time"
 
         "github.com/spf13/cobra"
         "github.com/spf13/viper"
 )
 
 const (
-        FlagAddress            = "address"
-        FlagDebug              = "debug"
-        FlagInsecureSkipVerify = "insecure-skip-verify"
-        FlagVerbose            = "verbose"
+        FlagAddress                 = "address"
+        FlagDBHost                  = "dbhost"
+        FlagDBName                  = "dbname"
+        FlagDBOptions               = "dboptions"
+        FlagDBPassword              = "dbpassword"
+        FlagDBPoolHealthCheckPeriod = "db-pool-health-check-period"
+        FlagDBPoolMaxConnIdleTime   = "db-pool-max-conn-idle-time"
+        FlagDBPoolMaxConnLifeTime   = "db-pool-max-conn-lifetime"
+        FlagDBPoolMaxConns          = "db-pool-max-conns"
+        FlagDBPoolMinConns          = "db-pool-min-conns"
+        FlagDBPort                  = "dbport"
+        FlagDBUser                  = "dbuser"
+        FlagDebug                   = "debug"
+        FlagInsecureSkipVerify      = "insecure-skip-verify"
+        FlagVerbose                 = "verbose"
 )
 
 func init() <span class="cov8" title="1">{
@@ -189,10 +205,21 @@ func init() <span class="cov8" title="1">{
 
         // Cobra also supports local flags, which will only run
         // when this action is called directly.
-        rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug")
-        rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose")
+        rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug.")
+        rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose.")
 
         runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
+        runCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
+        runCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")
+        runCmd.Flags().String(FlagDBOptions, "application_name=auth", "Pgx pool DB options.")
+        runCmd.Flags().String(FlagDBPassword, "password", "Pgx pool DB user password.")
+        runCmd.Flags().Duration(FlagDBPoolHealthCheckPeriod, time.Minute, "Pgx DB pool health check period.")
+        runCmd.Flags().Duration(FlagDBPoolMaxConnIdleTime, 30*time.Minute, "Pgx DB pool max connection idle time.")
+        runCmd.Flags().Duration(FlagDBPoolMaxConnLifeTime, time.Hour, "Pgx DB pool max connection lifetime.")
+        runCmd.Flags().Uint8(FlagDBPoolMaxConns, 4, "Pgx DB pool max connections.")
+        runCmd.Flags().Uint8(FlagDBPoolMinConns, 0, "Pgx DB pool min connections.")
+        runCmd.Flags().Uint16(FlagDBPort, 5432, "Pgx pool DB port.")
+        runCmd.Flags().String(FlagDBUser, "dbuser", "Pgx pool DB username.")
         runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
 
         rootCmd.AddCommand(runCmd)
@@ -289,9 +316,10 @@ func setSlogDebug(cmd *cobra.Command) <span class="cov8" title="1">{
 
 import (
         "context"
+        "log/slog"
+
         "github.com/spf13/cobra"
         "github.com/spf13/viper"
-        "log/slog"
 
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
@@ -359,7 +387,7 @@ func Execute(ctx context.Context) int <span class="cov8" title="1">{
         <span class="cov8" title="1">for </span><span class="cov8" title="1">{
                 select </span>{
                 case &lt;-ctx.Done():<span class="cov8" title="1">
-                        slog.Error("ctx.Done", "err", ctx.Err())
+                        slog.Error("App ctx.Done", "error", ctx.Err())
                         return ExitCodeContextDone</span>
                 case &lt;-done:<span class="cov8" title="1">
                         if err != nil </span><span class="cov8" title="1">{
@@ -377,7 +405,9 @@ func Execute(ctx context.Context) int <span class="cov8" title="1">{
 
 import (
         "context"
+
         "github.com/spf13/cobra"
+
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
@@ -389,15 +419,22 @@ type Config interface {
         Values() config.Values
 }
 
+//go:generate mockgen -destination=run_mock_environments_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd Environments
+type Environments interface {
+        Values() env.Values
+}
+
 //go:generate mockgen -destination=run_mock_server_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
 type Server interface {
-        Run(ctx context.Context)
+        Run(ctx context.Context) error
 }
 
 var (
-        newConfig     = func(cmd *cobra.Command) (config.Config, error) <span class="cov0" title="0">{ return config.NewConfig(cmd) }</span>
         envLoad       = func() (env.Environments, error) <span class="cov8" title="1">{ return env.EnvironmentsLoad() }</span>
-        newAuthServer = func(cfg config.Config, env env.Environments) server.Server <span class="cov0" title="0">{ return wire.InitializeServer(cfg, env) }</span>
+        newConfig     = func(cmd *cobra.Command) (config.Config, error) <span class="cov0" title="0">{ return config.NewConfig(cmd) }</span>
+        newAuthServer = func(cfg config.Config, env env.Environments) (server.Server, error) <span class="cov0" title="0">{
+                return wire.InitializeServer(cfg, env)
+        }</span>
 )
 
 // runCmd represents the base command when called without any subcommands
@@ -422,9 +459,11 @@ using the obtained configuration.`,
                 if errEnvLoad != nil </span><span class="cov8" title="1">{
                         return errEnvLoad
                 }</span>
-                <span class="cov8" title="1">srv := newAuthServer(cfg, env)
-                srv.Run(context.Background())
-                return nil</span>
+                <span class="cov8" title="1">srv, err := newAuthServer(cfg, env)
+                if err != nil </span><span class="cov8" title="1">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">return srv.Run(context.Background())</span>
         },
 }
 </pre>
@@ -436,17 +475,15 @@ import (
         "os"
 
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd"
-
-        _ "github.com/vskurikhin/DayBook-3.3x/auth/v2/docs"
 )
 
-// @title           DayBook Auth API
-// @version         0.0.1
-// @description     API for authentication in DayBook
+// @title                        DayBook Auth API
+// @version                        0.0.1
+// @description                API for authentication in DayBook
 
-// @host           &lt;your_ip&gt;:8089
-// @BasePath       /auth/api
-// @schemes         http
+// @host                        localhost:8089
+// @BasePath                /auth/api
+// @schemes                        http
 func main() <span class="cov8" title="1">{
         os.Exit(cmd.Execute(context.Background()))
 }</span>
@@ -471,159 +508,30 @@ import (
 
 // Injectors from di.go:
 
-func InitializeServer(cfg config.Config, environments env.Environments) *server.AuthServer <span class="cov0" title="0">{
+func InitializeServer(cfg config.Config, environments env.Environments) (*server.AuthServer, error) <span class="cov0" title="0">{
         v1 := resources.NewV1(cfg)
         apiV1 := handler.NewApiV1(v1)
         v2 := resources.NewV2(cfg)
         apiV2 := handler.NewApiV2(v2)
         handlers := handler.NewHandlers(apiV1, apiV2)
         httpHandler := handler.NewRouter(cfg, environments, handlers)
-        authServer := server.NewAuthServer(cfg, environments, httpHandler)
-        return authServer
-}</span>
+        authServer, err := server.NewAuthServer(cfg, environments, httpHandler)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return authServer, nil</span>
+}
 
 // di.go:
 
 var (
-        serverSet = wire.NewSet(config.GetConfig, env.EnvironmentsLoad, handler.NewApiV1, handler.NewApiV2, wire.Bind(new(handler.ApiHandlers), new(*handler.Handlers)), wire.Bind(new(resources.ResourceV1), new(*resources.V1)), wire.Bind(new(resources.ResourceV2), new(*resources.V2)), handler.NewHandlers, handler.NewRouter, server.NewAuthServer, resources.NewV1, resources.NewV2)
+        serverSet   = wire.NewSet(config.GetConfig, env.EnvironmentsLoad, server.NewAuthServer)
+        handlerSet  = wire.NewSet(handler.NewApiV1, handler.NewApiV2, wire.Bind(new(handler.ApiHandlers), new(*handler.Handlers)), handler.NewHandlers, handler.NewRouter)
+        resourceSet = wire.NewSet(wire.Bind(new(resources.ResourceV1), new(*resources.V1)), wire.Bind(new(resources.ResourceV2), new(*resources.V2)), resources.NewV1, resources.NewV2)
 )
 </pre>
 		
-		<pre class="file" id="file6" style="display: none">// Package docs Code generated by swaggo/swag. DO NOT EDIT
-package docs
-
-import "github.com/swaggo/swag"
-
-const docTemplate = `{
-    "schemes": {{ marshal .Schemes }},
-    "swagger": "2.0",
-    "info": {
-        "description": "{{escape .Description}}",
-        "title": "{{.Title}}",
-        "contact": {},
-        "version": "{{.Version}}"
-    },
-    "host": "{{.Host}}",
-    "basePath": "{{.BasePath}}",
-    "paths": {
-        "/v1/ok": {
-            "get": {
-                "description": "Ok - Описание (v1)",
-                "produces": [
-                    "text/plain"
-                ],
-                "tags": [
-                    "ok"
-                ],
-                "summary": "Ok Краткое содержание",
-                "operationId": "ResourceV1-ok",
-                "deprecated": true,
-                "responses": {
-                    "200": {
-                        "description": "успешно",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/ok": {
-            "get": {
-                "description": "Ok - Описание (v2)",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ok"
-                ],
-                "summary": "Ok Краткое содержание",
-                "operationId": "ResourceV2-ok",
-                "responses": {
-                    "200": {
-                        "description": "успешно",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/resources.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "additionalProperties": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "ошибка \u003cp\u003e\u003cli\u003e\"success\": false\u003c/li\u003e\u003c/p\u003e",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/resources.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "error": {
-                                            "type": "string"
-                                        },
-                                        "success": {
-                                            "type": "boolean"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "504": {
-                        "description": "Gateway Timeout"
-                    }
-                }
-            }
-        }
-    },
-    "definitions": {
-        "resources.APIResponse": {
-            "type": "object",
-            "properties": {
-                "success": {
-                    "type": "boolean"
-                }
-            }
-        }
-    }
-}`
-
-// SwaggerInfo holds exported Swagger Info so clients can modify it
-var SwaggerInfo = &amp;swag.Spec{
-        Version:          "0.0.1",
-        Host:             "&lt;your_ip&gt;:8089",
-        BasePath:         "/auth/api",
-        Schemes:          []string{"http"},
-        Title:            "DayBook Auth API",
-        Description:      "API for authentication in DayBook",
-        InfoInstanceName: "swagger",
-        SwaggerTemplate:  docTemplate,
-        LeftDelim:        "{{",
-        RightDelim:       "}}",
-}
-
-func init() <span class="cov0" title="0">{
-        swag.Register(SwaggerInfo.InstanceName(), SwaggerInfo)
-}</span>
-</pre>
-		
-		<pre class="file" id="file7" style="display: none">// Package config provides functionality for configuring the DayBook
+		<pre class="file" id="file6" style="display: none">// Package config provides functionality for configuring the DayBook
 // authentication server.
 //
 // Configuration can be loaded from CLI flags, a configuration file,
@@ -666,28 +574,31 @@ func init() <span class="cov0" title="0">{
 //
 // Example Usage
 //
-//        cmd := &amp;cobra.Command{}
-//        cmd.Flags().Bool("debug", false, "enable debug mode")
+//         cmd := &amp;cobra.Command{}
+//         cmd.Flags().Bool("debug", false, "enable debug mode")
 //
-//        cfg := config.NewConfig(cmd)
-//        fmt.Println(cfg.Values().Address)
-//        if cfg.Values().Ssl() {
-//                fmt.Println("SSL enabled")
-//        }
+//         cfg, err := config.NewConfig(cmd)
+//         if err == nil {
+//                fmt.Println(cfg.Values().Address)
+//                if cfg.Values().Ssl() {
+//                        fmt.Println("SSL enabled")
+//                }
+//         }
 package config
 
 import (
         "context"
         "fmt"
-        "github.com/fsnotify/fsnotify"
-        "github.com/spf13/cobra"
-        "github.com/spf13/viper"
         "log/slog"
         "os"
         "os/signal"
         "sync"
         "syscall"
         "time"
+
+        "github.com/fsnotify/fsnotify"
+        "github.com/spf13/cobra"
+        "github.com/spf13/viper"
 
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
@@ -698,11 +609,24 @@ type Config interface {
 }
 
 type Values struct {
-        Address            string        `mapstructure:"address"`
-        Debug              bool          `mapstructure:"debug"`
-        InsecureSkipVerify bool          `mapstructure:"insecure_skip_verify"`
-        Verbose            bool          `mapstructure:"verbose"`
-        Timeout            time.Duration `mapstructure:"timeout"`
+        Address string `mapstructure:"address"`
+
+        DBHost     string `mapstructure:"dbhost"`
+        DBName     string `mapstructure:"dbname"`
+        DBOptions  string `mapstructure:"dboptions"`
+        DBPassword string `mapstructure:"dbpassword"`
+        DBPort     uint16 `mapstructure:"dbport"`
+        DBUser     string `mapstructure:"dbuser"`
+
+        DBPoolMaxConns          int           `mapstructure:"db_pool_max_conns"`
+        DBPoolMinConns          int           `mapstructure:"db_pool_min_conns"`
+        DBPoolMaxConnLifeTime   time.Duration `mapstructure:"db_pool_max_conn_lifetime"`
+        DBPoolMaxConnIdleTime   time.Duration `mapstructure:"db_pool_max_conn_idle_time"`
+        DBPoolHealthCheckPeriod time.Duration `mapstructure:"db_pool_health_check_period"`
+
+        Debug              bool `mapstructure:"debug"`
+        InsecureSkipVerify bool `mapstructure:"insecure_skip_verify"`
+        Verbose            bool `mapstructure:"verbose"`
         ssl                bool
 }
 
@@ -721,11 +645,13 @@ type ValuesConfig struct {
 //
 // Example:
 //
-//        cfg := config.NewConfig(cmd)
-//        values := cfg.Values()
-//        fmt.Println(values.Address)
-//        if values.Debug {
-//            fmt.Println("Debug mode enabled")
+//        cfg, err := config.NewConfig(cmd)
+//        if err == nil {
+//                values := cfg.Values()
+//                fmt.Println(values.Address)
+//                if values.Debug {
+//                        fmt.Println("Debug mode enabled")
+//                }
 //        }
 func (v *ValuesConfig) Values() Values <span class="cov8" title="1">{
         v.mu.RLock()
@@ -753,11 +679,12 @@ var (
 //
 // Example usage:
 //
-//        cmd := &amp;cobra.Command{}
-//        cmd.Flags().Bool("debug", false, "enable debug mode")
-//
-//        cfg := config.NewConfig(cmd)
-//        fmt.Println(cfg.Values().Address)
+//         cmd := &amp;cobra.Command{}
+//         cmd.Flags().Bool("debug", false, "enable debug mode")
+//         cfg, err := config.NewConfig(cmd)
+//         if err == nil {
+//                fmt.Println(cfg.Values().Address)
+//         }
 func NewConfig(cmd *cobra.Command) (*ValuesConfig, error) <span class="cov8" title="1">{
         var v, values Values
         err := viper.Unmarshal(&amp;v)
@@ -841,7 +768,519 @@ func loopSigHup(ctx context.Context) <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file8" style="display: none">// Package env provides loading and access to application configuration
+		<pre class="file" id="file7" style="display: none">package db
+
+import (
+        "errors"
+        "fmt"
+        "time"
+)
+
+type ConnectionStringBuilder struct {
+        dbHost     string
+        dbName     string
+        dbPassword string
+        dbPort     string
+        dbUser     string
+        separator  string
+        tail       string
+}
+
+func (b ConnectionStringBuilder) WithDBOptions(options string) ConnectionStringBuilder <span class="cov8" title="1">{
+        f := b
+        if options != "" </span><span class="cov8" title="1">{
+                f.tail += f.separator + options
+                f.separator = "&amp;"
+        }</span>
+        <span class="cov8" title="1">return f</span>
+}
+
+func (b ConnectionStringBuilder) WithDBPoolMaxConns(poolMaxConns int) ConnectionStringBuilder <span class="cov8" title="1">{
+        f := b
+        if poolMaxConns &gt; 0 </span><span class="cov8" title="1">{
+                f.tail += fmt.Sprintf("%spool_max_conns=%d", f.separator, poolMaxConns)
+                f.separator = "&amp;"
+        }</span>
+        <span class="cov8" title="1">return f</span>
+}
+
+func (b ConnectionStringBuilder) WithDBPoolMinConns(poolMinConns int) ConnectionStringBuilder <span class="cov8" title="1">{
+        f := b
+        if poolMinConns &gt; -1 </span><span class="cov8" title="1">{
+                f.tail += fmt.Sprintf("%spool_min_conns=%d", f.separator, poolMinConns)
+                f.separator = "&amp;"
+        }</span>
+        <span class="cov8" title="1">return f</span>
+}
+
+func (b ConnectionStringBuilder) WithDBPoolMaxConnLifeTime(poolMaxConnLifeTime time.Duration) ConnectionStringBuilder <span class="cov8" title="1">{
+        f := b
+        if poolMaxConnLifeTime &gt; 100*time.Millisecond </span><span class="cov8" title="1">{
+                f.tail += fmt.Sprintf("%spool_max_conn_lifetime=%v", f.separator, poolMaxConnLifeTime)
+                f.separator = "&amp;"
+        }</span>
+        <span class="cov8" title="1">return f</span>
+}
+
+func (b ConnectionStringBuilder) WithDBPoolMaxConnIdleTime(poolMaxConnIdleTime time.Duration) ConnectionStringBuilder <span class="cov8" title="1">{
+        f := b
+        if poolMaxConnIdleTime &gt; 100*time.Millisecond </span><span class="cov8" title="1">{
+                f.tail += fmt.Sprintf("%spool_max_conn_idle_time=%v", f.separator, poolMaxConnIdleTime)
+                f.separator = "&amp;"
+        }</span>
+        <span class="cov8" title="1">return f</span>
+}
+
+func (b ConnectionStringBuilder) WithDBPoolHealthCheckPeriod(poolHealthCheckPeriod time.Duration) ConnectionStringBuilder <span class="cov8" title="1">{
+        f := b
+        if poolHealthCheckPeriod &gt; 100*time.Millisecond </span><span class="cov8" title="1">{
+                f.tail += fmt.Sprintf("%spool_health_check_period=%v", f.separator, poolHealthCheckPeriod)
+                f.separator = "&amp;"
+        }</span>
+        <span class="cov8" title="1">return f</span>
+}
+
+var (
+        ErrNotReady = errors.New("pgx DB pool connection string not ready")
+)
+
+func (b ConnectionStringBuilder) Build() (string, error) <span class="cov8" title="1">{
+        if b.dbUser == "" </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("dbuser empty, error: %w", ErrNotReady)
+        }</span>
+        <span class="cov8" title="1">if b.dbPassword == "" </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("dbpassword empty, error: %w", ErrNotReady)
+        }</span>
+        <span class="cov8" title="1">if b.dbHost == "" </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("dbhost empty, error: %w", ErrNotReady)
+        }</span>
+        <span class="cov8" title="1">if b.dbPort == "" </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("dbport empty, error: %w", ErrNotReady)
+        }</span>
+        <span class="cov8" title="1">if b.dbName == "" </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("dbname empty, error: %w", ErrNotReady)
+        }</span>
+        <span class="cov8" title="1">connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", b.dbUser, b.dbPassword, b.dbHost, b.dbPort, b.dbName)
+        if b.tail != "" </span><span class="cov8" title="1">{
+                connString += b.tail
+        }</span>
+        <span class="cov8" title="1">return connString, nil</span>
+}
+
+func ConstructConnectionStringBuilder(opts ...func(*ConnectionStringBuilder)) ConnectionStringBuilder <span class="cov8" title="1">{
+        var f = new(ConnectionStringBuilder)
+        for _, opt := range opts </span><span class="cov8" title="1">{
+                opt(f)
+        }</span>
+        <span class="cov8" title="1">return *f</span>
+}
+
+func WithDBHost(host string) func(*ConnectionStringBuilder) <span class="cov8" title="1">{
+        return func(f *ConnectionStringBuilder) </span><span class="cov8" title="1">{
+                if host != "" </span><span class="cov8" title="1">{
+                        f.dbHost = host
+                }</span>
+        }
+}
+
+func WithDBName(name string) func(*ConnectionStringBuilder) <span class="cov8" title="1">{
+        return func(f *ConnectionStringBuilder) </span><span class="cov8" title="1">{
+                if name != "" </span><span class="cov8" title="1">{
+                        f.dbName = name
+                }</span>
+        }
+}
+
+func WithDBPassword(password string) func(*ConnectionStringBuilder) <span class="cov8" title="1">{
+        return func(f *ConnectionStringBuilder) </span><span class="cov8" title="1">{
+                if password != "" </span><span class="cov8" title="1">{
+                        f.dbPassword = password
+                }</span>
+        }
+}
+
+func WithDBPort(port string) func(*ConnectionStringBuilder) <span class="cov8" title="1">{
+        return func(f *ConnectionStringBuilder) </span><span class="cov8" title="1">{
+                if port != "" </span><span class="cov8" title="1">{
+                        f.dbPort = port
+                }</span>
+        }
+}
+
+func WithDBUser(user string) func(*ConnectionStringBuilder) <span class="cov8" title="1">{
+        return func(f *ConnectionStringBuilder) </span><span class="cov8" title="1">{
+                if user != "" </span><span class="cov8" title="1">{
+                        f.dbUser = user
+                }</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">// Package db provides a database abstraction layer for working with a
+// PostgreSQL connection pool using the pgx driver.
+//
+// The package is responsible for initializing, managing, and providing
+// access to a shared pgx-based connection pool used by the DayBook
+// authentication server.
+//
+// # Overview
+//
+// The db package encapsulates configuration and lifecycle management
+// of a PostgreSQL connection pool built on top of github.com/jackc/pgx/v5/pgxpool.
+// It exposes a minimal database interface that supports common operations:
+//
+//   - Begin    — start a database transaction
+//   - Exec     — execute SQL statements
+//   - Query    — execute queries returning multiple rows
+//   - QueryRow — execute queries returning a single row
+//
+// The package manages a singleton instance of the database pool that can
+// be safely shared across multiple goroutines.
+//
+// # Architecture
+//
+// The main components of this package are:
+//
+//        DB interface
+//          Defines a minimal abstraction over database operations used by
+//          the application. It mirrors the common methods provided by pgx.
+//
+//        PgxPool
+//          A wrapper around pgxpool.Pool implementing the DB interface.
+//          It provides thread-safe access to the connection pool.
+//
+//        Connection Builder
+//          A fluent connection string builder is used to construct a PostgreSQL
+//          connection string from application configuration.
+//
+//        Global Pool
+//          A singleton instance of the connection pool is created using sync.Once
+//          and stored in the package-level variable pgxPool.
+//
+// # Initialization
+//
+// The database pool is initialized using NewDB:
+//
+//        db, err := db.NewDB(ctx, cfg)
+//        if err != nil {
+//            log.Fatal(err)
+//        }
+//
+// This function:
+//
+//  1. Builds a PostgreSQL connection string using configuration values.
+//  2. Parses the connection string into pgxpool.Config.
+//  3. Creates a new pgxpool.Pool instance.
+//  4. Stores the pool in a singleton wrapper (PgxPool).
+//
+// Only the first call to NewDB creates the pool. Subsequent calls return
+// the already initialized instance.
+//
+// # Accessing the Pool
+//
+// The shared pool can be accessed using GetDB:
+//
+//        db, err := db.GetDB()
+//        if err != nil {
+//            log.Fatal(err)
+//        }
+//
+// If the pool has not been initialized, GetDB returns ErrDBPoolIsNil.
+//
+// # Automatic Pool Reload (SIGHUP)
+//
+// The package supports dynamic reloading of the database pool when the
+// process receives a SIGHUP signal.
+//
+// When SIGHUP is received:
+//
+//  1. A new connection pool is created using the current configuration.
+//  2. If initialization succeeds, the existing pool reference is replaced.
+//  3. If initialization fails, the previous pool remains active.
+//
+// This mechanism allows runtime configuration reloads without restarting
+// the application.
+//
+// # Concurrency
+//
+// Access to the internal pgx pool is protected using a mutex inside PgxPool.
+// This ensures safe concurrent access when the pool reference is updated
+// during reload operations.
+//
+// The pool itself (pgxpool.Pool) is designed for concurrent usage and
+// manages internal connection pooling.
+//
+// # Configuration
+//
+// Database settings are obtained from the server configuration package:
+//
+//        github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config
+//
+// Configuration values include:
+//
+//   - DBUser
+//   - DBPassword
+//   - DBHost
+//   - DBPort
+//   - DBName
+//   - DBOptions
+//   - connection pool parameters
+//
+// These values are used to construct the PostgreSQL connection string.
+//
+// # Logging
+//
+// The package uses structured logging via log/slog. Debug logs include
+// connection information and pool initialization events when debug mode
+// is enabled in the configuration.
+//
+// # Error Handling
+//
+// Errors may occur during:
+//
+//   - connection string construction
+//   - configuration parsing
+//   - connection pool initialization
+//
+// Such errors are returned to the caller of NewDB.
+//
+// The package also defines:
+//
+//        ErrDBPoolIsNil
+//
+// which is returned when attempting to access the database pool before
+// it has been initialized.
+//
+// # Testing
+//
+// The package is designed to support unit testing by allowing the
+// pgxpool constructor to be overridden via the newWithConfig variable.
+// This enables injecting mock pools during tests without connecting
+// to a real database.
+//
+// # Example
+//
+// Basic usage:
+//
+//        ctx := context.Background()
+//
+//        db, err := db.NewDB(ctx, cfg)
+//        if err != nil {
+//            log.Fatal(err)
+//        }
+//
+//        rows, err := db.Query(ctx, "SELECT id, name FROM users")
+//        if err != nil {
+//            log.Fatal(err)
+//        }
+//        defer rows.Close()
+//
+// # Design Goals
+//
+// The db package aims to:
+//
+//   - provide a thin abstraction over pgxpool
+//   - centralize database initialization
+//   - support runtime pool reloading
+//   - simplify testing of database-dependent components
+//   - maintain high concurrency safety
+//
+// It intentionally avoids reimplementing database logic already provided
+// by pgx and instead focuses on lifecycle management and integration
+// with application configuration.
+package db
+
+import (
+        "context"
+        "errors"
+        "log/slog"
+        "os"
+        "os/signal"
+        "strconv"
+        "sync"
+        "syscall"
+        "time"
+
+        "github.com/jackc/pgx/v5"
+        "github.com/jackc/pgx/v5/pgconn"
+        "github.com/jackc/pgx/v5/pgxpool"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+)
+
+type DB interface {
+        Begin(ctx context.Context) (pgx.Tx, error)
+        Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+        Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
+        QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Row, error)
+}
+
+var _ DB = (*PgxPool)(nil)
+
+var (
+        ErrDBPoolIsNil = errors.New("db pool is nil")
+        pgxPool        *PgxPool
+        once           = new(sync.Once)
+        newWithConfig  = func(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) <span class="cov0" title="0">{
+                return pgxpool.NewWithConfig(ctx, config)
+        }</span>
+)
+
+// NewDB initializes and returns a singleton instance of PgxPool.
+//
+// The function creates a PostgreSQL connection pool using configuration
+// values provided by cfg. The pool is created only once using sync.Once;
+// subsequent calls return the already initialized instance.
+//
+// During initialization the function:
+//
+//   - Builds a PostgreSQL connection string from configuration values
+//   - Parses the connection string into pgxpool.Config
+//   - Creates a pgx connection pool
+//   - Stores the pool in a shared PgxPool instance
+//
+// A background goroutine is also started to listen for SIGHUP signals.
+// When such a signal is received, the database pool is reloaded using
+// the current configuration.
+//
+// If pool creation fails, an error is returned and the pool is not initialized.
+func NewDB(ctx context.Context, cfg config.Config) (*PgxPool, error) <span class="cov8" title="1">{
+        pgxp, err := newDB(ctx, cfg)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">once.Do(func() </span><span class="cov8" title="1">{
+                pgxPool = &amp;PgxPool{}
+                pgxPool.mu.Lock()
+                defer pgxPool.mu.Unlock()
+                pgxPool.pgxPool = pgxp
+                go loopSigHup(ctx, cfg)
+        }</span>)
+        <span class="cov8" title="1">return pgxPool, nil</span>
+}
+
+// GetDB provider a singleton instance of PgxPool.
+func GetDB() (*PgxPool, error) <span class="cov8" title="1">{
+        if pgxPool == nil </span><span class="cov8" title="1">{
+                return nil, ErrDBPoolIsNil
+        }</span>
+        <span class="cov8" title="1">pgxPool.mu.Lock()
+        defer pgxPool.mu.Unlock()
+        return pgxPool, nil</span>
+}
+
+func newDB(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) <span class="cov8" title="1">{
+        builder := ConstructConnectionStringBuilder(
+                WithDBUser(cfg.Values().DBUser),
+                WithDBPassword(cfg.Values().DBPassword),
+                WithDBHost(cfg.Values().DBHost),
+                WithDBPort(strconv.Itoa(int(cfg.Values().DBPort))),
+                WithDBName(cfg.Values().DBName),
+        ).WithDBOptions(cfg.Values().DBOptions).
+                WithDBPoolMaxConns(cfg.Values().DBPoolMaxConns).
+                WithDBPoolMinConns(cfg.Values().DBPoolMinConns).
+                WithDBPoolMaxConnLifeTime(cfg.Values().DBPoolMaxConnLifeTime).
+                WithDBPoolMaxConnIdleTime(cfg.Values().DBPoolMaxConnIdleTime).
+                WithDBPoolHealthCheckPeriod(cfg.Values().DBPoolHealthCheckPeriod)
+        connString, errBuild := builder.Build()
+        if errBuild != nil </span><span class="cov8" title="1">{
+                return nil, errBuild
+        }</span>
+        <span class="cov8" title="1">pgxPoolConfig, errParseConfig := pgxpool.ParseConfig(connString)
+        if errParseConfig != nil </span><span class="cov8" title="1">{
+                return nil, errParseConfig
+        }</span>
+        <span class="cov8" title="1">if cfg.Values().Debug </span><span class="cov8" title="1">{
+                slog.Debug("Connecting to database using pgx DB pool", slog.String("URL", connString))
+        }</span>
+        <span class="cov8" title="1">pgxp, err := newWithConfig(ctx, pgxPoolConfig)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return pgxp, nil</span>
+}
+
+const TIMEOUT = 500 * time.Millisecond
+
+func loopSigHup(ctx context.Context, cfg config.Config) <span class="cov8" title="1">{
+        sigHup := make(chan os.Signal, 1)
+        signal.Notify(sigHup, syscall.SIGHUP)
+        for </span><span class="cov8" title="1">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        return</span>
+                case &lt;-sigHup:<span class="cov8" title="1">
+                        if pgxp, err := newDB(ctx, cfg); err == nil </span><span class="cov8" title="1">{
+                                slog.Info("Pgx DB pool, reloading...")
+                                time.Sleep(TIMEOUT)
+                                pgxPool.mu.Lock()
+                                pgxPool.pgxPool = pgxp
+                                pgxPool.mu.Unlock()
+                        }</span> else<span class="cov8" title="1"> {
+                                slog.Info(
+                                        "Pgx DB pool, reload fail",
+                                        slog.String("error", err.Error()),
+                                )
+                        }</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package db
+
+import (
+        "context"
+        "sync"
+
+        "github.com/jackc/pgx/v5"
+        "github.com/jackc/pgx/v5/pgconn"
+        "github.com/jackc/pgx/v5/pgxpool"
+)
+
+type Pool interface {
+        Acquire(ctx context.Context) (c *pgxpool.Conn, err error)
+}
+
+type PgxPool struct {
+        pgxPool Pool
+        mu      sync.RWMutex
+}
+
+func (p *PgxPool) Begin(ctx context.Context) (pgx.Tx, error) <span class="cov8" title="1">{
+        conn, err := p.pgxPool.Acquire(ctx)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return conn.Begin(ctx)</span>
+}
+
+func (p *PgxPool) Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error) <span class="cov8" title="1">{
+        conn, err := p.pgxPool.Acquire(ctx)
+        if err != nil </span><span class="cov8" title="1">{
+                return pgconn.CommandTag{}, err
+        }</span>
+        <span class="cov0" title="0">return conn.Exec(ctx, sql, arguments...)</span>
+}
+
+func (p *PgxPool) Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error) <span class="cov8" title="1">{
+        conn, err := p.pgxPool.Acquire(ctx)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return conn.Query(ctx, sql, optionsAndArgs...)</span>
+}
+
+func (p *PgxPool) QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Row, error) <span class="cov8" title="1">{
+        conn, err := p.pgxPool.Acquire(ctx)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return conn.QueryRow(ctx, sql, optionsAndArgs...), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">// Package env provides loading and access to application configuration
 // defined via environment variables.
 //
 // The package is responsible for reading environment variables at startup
@@ -858,8 +1297,10 @@ func loopSigHup(ctx context.Context) <span class="cov8" title="1">{
 //
 // Typical usage:
 //
-//        cfg := env.EnvironmentsLoad()
-//        timeout := cfg.Values().Timeout
+//        cfg, err := env.EnvironmentsLoad()
+//        if err == nil {
+//                timeout := cfg.Values().Timeout
+//        }
 //
 // Environment variables:
 //
@@ -896,7 +1337,8 @@ func (c Config) Values() Values <span class="cov8" title="1">{
 
 // Values статичная конфигурация из переменных окружения.
 type Values struct {
-        Timeout time.Duration `env:"SERVER_TIMEOUT" envDefault:"10s"`
+        Timeout    time.Duration `env:"SERVER_TIMEOUT" envDefault:"10s"`
+        DebugPprof bool          `env:"SERVER_DEBUG_PPROF_API" envDefault:"false"`
 }
 
 // EnvironmentsLoad parses environment variables into a Config structure
@@ -912,13 +1354,14 @@ func EnvironmentsLoad() (*Config, error) <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file9" style="display: none">package handler
+		<pre class="file" id="file11" style="display: none">package handler
 
 import (
         "encoding/json"
-        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
         "log/slog"
         "net/http"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
 )
 
 // APIHandler wraps handlers to provide consistent error handling
@@ -937,7 +1380,7 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) <span cla
                 // Call the actual handler
                 if err := fn(w, r); err != nil </span><span class="cov8" title="1">{
                         // Log the error for debugging
-                        slog.Error("API", "error", err.Error())
+                        slog.Error("API", slog.String("error", err.Error()))
 
                         // Send error response
                         w.WriteHeader(http.StatusInternalServerError)
@@ -946,9 +1389,8 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) <span cla
                                 Error:   err.Error(),
                         })
                         if encodeErr != nil </span><span class="cov0" title="0">{
-                                slog.Error("API", "error", err.Error())
+                                slog.Error("API", slog.String("error", encodeErr.Error()))
                         }</span>
-                        <span class="cov8" title="1">return</span>
                 }
         }()
         <span class="cov8" title="1">select </span>{
@@ -958,9 +1400,41 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) <span cla
                 return</span>
         }
 }
+
+// APISyncHandler wraps handlers to provide consistent error handling
+// This pattern reduces boilerplate in route handlers
+type APISyncHandler func(w http.ResponseWriter, r *http.Request) error
+
+// ServeHTTP implements http.Handler for APISyncHandler
+// This allows APISyncHandler to be used as a standard handler
+func (fn APISyncHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        ctx := r.Context()
+        select </span>{
+        case &lt;-ctx.Done():<span class="cov8" title="1">
+                return</span>
+        default:<span class="cov8" title="1">
+                w.Header().Set("Content-Type", "application/json")
+
+                // Call the actual handler
+                if err := fn(w, r); err != nil </span><span class="cov8" title="1">{
+                        // Log the error for debugging
+                        slog.Error("API", slog.String("error", err.Error()))
+
+                        // Send error response
+                        w.WriteHeader(http.StatusInternalServerError)
+                        encodeErr := json.NewEncoder(w).Encode(resources.APIResponse{
+                                Success: false,
+                                Error:   err.Error(),
+                        })
+                        if encodeErr != nil </span><span class="cov0" title="0">{
+                                slog.Error("API", slog.String("error", encodeErr.Error()))
+                        }</span>
+                }
+        }
+}
 </pre>
 		
-		<pre class="file" id="file10" style="display: none">package handler
+		<pre class="file" id="file12" style="display: none">package handler
 
 import (
         "github.com/go-chi/chi/v5"
@@ -982,11 +1456,12 @@ func NewApiV1(v1 resources.ResourceV1) ApiV1 <span class="cov8" title="1">{
 }</span>
 </pre>
 		
-		<pre class="file" id="file11" style="display: none">package handler
+		<pre class="file" id="file13" style="display: none">package handler
 
 import (
-        "github.com/go-chi/chi/v5"
         "net/http"
+
+        "github.com/go-chi/chi/v5"
 
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
 )
@@ -1005,7 +1480,7 @@ func NewApiV2(v2 resources.ResourceV2) ApiV2 <span class="cov8" title="1">{
 }</span>
 </pre>
 		
-		<pre class="file" id="file12" style="display: none">package handler
+		<pre class="file" id="file14" style="display: none">package handler
 
 import (
         "github.com/go-chi/chi/v5"
@@ -1043,7 +1518,7 @@ func NewHandlers(v1 ApiV1, v2 ApiV2) *Handlers <span class="cov8" title="1">{
 }</span>
 </pre>
 		
-		<pre class="file" id="file13" style="display: none">// Package handler provides HTTP routing and middleware configuration
+		<pre class="file" id="file15" style="display: none">// Package handler provides HTTP routing and middleware configuration
 // for the auth server.
 //
 // The package defines the HTTP layer of the application using the chi router.
@@ -1068,20 +1543,42 @@ func NewHandlers(v1 ApiV1, v2 ApiV2) *Handlers <span class="cov8" title="1">{
 package handler
 
 import (
+        "net/http"
+        "net/http/pprof"
+
         "github.com/go-chi/chi/v5"
         "github.com/go-chi/chi/v5/middleware"
         "github.com/rs/cors"
-        "net/http"
 
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
+//goland:noinspection SpellCheckingInspection
 const (
-        BaseURL = "/api"
-        V1      = "/v1"
-        V2      = "/v2"
-        OK      = "/ok"
+        Allocs           = "allocs"
+        AllocsURL        = "/" + Allocs
+        BaseURL          = "/auth/api"
+        Block            = "block"
+        BlockURL         = "/" + Block
+        CmdLineURL       = "/cmdline"
+        DebugURL         = "/debug"
+        GoRoutine        = "goroutine"
+        GoRoutineLeak    = "goroutineleak"
+        GoRoutineLeakURL = "/" + GoRoutineLeak
+        GoRoutineURL     = "/" + GoRoutine
+        Heap             = "heap"
+        HeapURL          = "/" + Heap
+        Mutex            = "mutex"
+        MutexURL         = "/" + Mutex
+        OK               = "/ok"
+        ProfileURL       = "/profile"
+        SymbolURL        = "/symbol"
+        ThreadCreate     = "threadcreate"
+        ThreadCreateURL  = "/" + ThreadCreate
+        Trace            = "/trace"
+        V1               = "/v1"
+        V2               = "/v2"
 )
 
 // NewRouter creates and configures an HTTP router with
@@ -1089,12 +1586,10 @@ const (
 func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) http.Handler <span class="cov8" title="1">{
         r := chi.NewRouter()
 
-        debug := cfg.Values().Debug
-
         c := cors.New(cors.Options{
                 AllowedOrigins: []string{"*"},                                       // All origins
                 AllowedMethods: []string{"POST", "GET", "PUT", "DELETE", "OPTIONS"}, // Allowing only get, just an example
-                Debug:          debug,
+                Debug:          cfg.Values().Debug,
         })
 
         r.Use(c.Handler)
@@ -1111,11 +1606,28 @@ func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) ht
         r.Mount(BaseURL+V1, handlers.apiV1())
         r.Mount(BaseURL+V2, handlers.apiV2())
 
-        return r
-}</span>
+        if env.Values().DebugPprof </span><span class="cov8" title="1">{
+                // Or mount the entire pprof handler set
+                r.Route(DebugURL, func(r chi.Router) </span><span class="cov8" title="1">{
+                        r.HandleFunc("/", pprof.Index)
+                        r.HandleFunc(CmdLineURL, pprof.Cmdline)
+                        r.HandleFunc(ProfileURL, pprof.Profile)
+                        r.HandleFunc(SymbolURL, pprof.Symbol)
+                        r.HandleFunc(Trace, pprof.Trace)
+                        r.Handle(AllocsURL, pprof.Handler(Allocs))
+                        r.Handle(BlockURL, pprof.Handler(Block))
+                        r.Handle(GoRoutineLeakURL, pprof.Handler(GoRoutineLeak))
+                        r.Handle(GoRoutineURL, pprof.Handler(GoRoutine))
+                        r.Handle(HeapURL, pprof.Handler(Heap))
+                        r.Handle(MutexURL, pprof.Handler(Mutex))
+                        r.Handle(ThreadCreateURL, pprof.Handler(ThreadCreate))
+                }</span>)
+        }
+        <span class="cov8" title="1">return r</span>
+}
 </pre>
 		
-		<pre class="file" id="file14" style="display: none">package resources
+		<pre class="file" id="file16" style="display: none">package resources
 
 import (
         "bytes"
@@ -1134,13 +1646,14 @@ type V1 struct {
         cfg config.Config
 }
 
+// Ok route
 // @Deprecated
 // @Summary Ok Краткое содержание
 // @Description Ok - Описание (v1)
 // @ID ResourceV1-ok
 // @Tags ok
 // @Produce plain
-// @Success 200 {object} string "успешно"
+// @Success 200 {object} string "успешно!"
 // @Router /v1/ok [get]
 func (v V1) Ok(w http.ResponseWriter, _ *http.Request) <span class="cov8" title="1">{
         var body bytes.Buffer
@@ -1159,12 +1672,13 @@ func NewV1(cfg config.Config) *V1 <span class="cov8" title="1">{
 }</span>
 </pre>
 		
-		<pre class="file" id="file15" style="display: none">package resources
+		<pre class="file" id="file17" style="display: none">package resources
 
 import (
         "encoding/json"
-        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
         "net/http"
+
+        "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 )
 
 type ResourceV2 interface {
@@ -1177,13 +1691,14 @@ type V2 struct {
         cfg config.Config
 }
 
+// Ok route
 // @Summary Ok Краткое содержание
 // @Description Ok - Описание (v2)
 // @ID ResourceV2-ok
 // @Tags ok
 // @Produce json
 // @Success 200 {object} APIResponse{data=[]map[string]string} "успешно"
-// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера &lt;p&gt;&lt;li&gt;"success": false&lt;/li&gt;&lt;/p&gt;"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
 // @Failure 504
 // @Router /v2/ok [get]
 func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error <span class="cov8" title="1">{
@@ -1206,12 +1721,11 @@ func NewV2(cfg config.Config) *V2 <span class="cov8" title="1">{
 }</span>
 </pre>
 		
-		<pre class="file" id="file16" style="display: none">package server
+		<pre class="file" id="file18" style="display: none">package server
 
 import (
         "context"
         "fmt"
-        "log/slog"
         "net/http"
         "os"
         "os/signal"
@@ -1221,13 +1735,9 @@ import (
         "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
-const (
-        ExitCodeStartHTTPServerError = 4
-)
-
-//go:generate mockgen -destination=../../mocks/server/mocks/server.go -package=mocks github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
+//go:generate mockgen -destination=server_mock_test.go -package=mocks github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
 type Server interface {
-        Run(ctx context.Context)
+        Run(ctx context.Context) error
 }
 
 var _ Server = (*AuthServer)(nil)
@@ -1238,16 +1748,17 @@ type AuthServer struct {
         environments env.Environments
 }
 
-func NewAuthServer(cfg config.Config, env env.Environments, handler http.Handler) *AuthServer <span class="cov8" title="1">{
-        return &amp;AuthServer{handler: handler, config: cfg.Values(), environments: env}
+func NewAuthServer(cfg config.Config, env env.Environments, handler http.Handler) (*AuthServer, error) <span class="cov8" title="1">{
+        return &amp;AuthServer{handler: handler, config: cfg.Values(), environments: env}, nil
 }</span>
 
-func (a AuthServer) Run(ctx context.Context) <span class="cov8" title="1">{
+func (a AuthServer) Run(ctx context.Context) error <span class="cov8" title="1">{
         server := &amp;http.Server{
                 Addr:    a.config.Address,
                 Handler: a.handler,
         }
-        var err error
+        var errHTTPServe error
+        httpExit := make(chan struct{}, 1)
         // канал для перенаправления прерываний
         // поскольку нужно отловить всего одно прерывание,
         // ёмкости 1 для канала будет достаточно
@@ -1257,28 +1768,27 @@ func (a AuthServer) Run(ctx context.Context) <span class="cov8" title="1">{
         go func() </span><span class="cov8" title="1">{
                 // Start the HTTP server on port 8089 by default
                 fmt.Printf("HTTPServer starting on %s...\n", a.config.Address)
-                err = server.ListenAndServe()
-                close(sigQuit)
+                errHTTPServe = server.ListenAndServe()
+                close(httpExit)
         }</span>()
         <span class="cov8" title="1">for </span><span class="cov8" title="1">{
                 select </span>{
                 case &lt;-ctx.Done():<span class="cov8" title="1">
-                        slog.Info("ctx.Done", "msg", ctx.Err())
-                        _ = server.Shutdown(ctx)
-                        return</span>
-                case &lt;-sigQuit:<span class="cov0" title="0">
-                        if err != nil </span><span class="cov0" title="0">{
-                                slog.Error("HTTPServer Error", "err", err)
-                                os.Exit(ExitCodeStartHTTPServerError)
+                        errShutdown := server.Shutdown(ctx)
+                        if ctx.Err() != nil </span><span class="cov8" title="1">{
+                                return ctx.Err()
                         }</span>
-                        <span class="cov0" title="0">slog.Info("HTTPServer Done")
-                        return</span>
+                        <span class="cov0" title="0">return errShutdown</span>
+                case &lt;-httpExit:<span class="cov0" title="0">
+                        return errHTTPServe</span>
+                case &lt;-sigQuit:<span class="cov0" title="0">
+                        return server.Shutdown(ctx)</span>
                 }
         }
 }
 </pre>
 		
-		<pre class="file" id="file17" style="display: none">package tool
+		<pre class="file" id="file19" style="display: none">package tool
 
 import "github.com/spf13/cobra"
 
@@ -1291,7 +1801,7 @@ func IsVerbose(cmd *cobra.Command) bool <span class="cov8" title="1">{
 }</span>
 </pre>
 		
-		<pre class="file" id="file18" style="display: none">package tool
+		<pre class="file" id="file20" style="display: none">package tool
 
 import "strings"
 

@@ -61,6 +61,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
@@ -75,10 +76,24 @@ type Config interface {
 }
 
 type Values struct {
-	Address            string `mapstructure:"address"`
-	Debug              bool   `mapstructure:"debug"`
-	InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
-	Verbose            bool   `mapstructure:"verbose"`
+	Address string `mapstructure:"address"`
+
+	DBHost     string `mapstructure:"dbhost"`
+	DBName     string `mapstructure:"dbname"`
+	DBOptions  string `mapstructure:"dboptions"`
+	DBPassword string `mapstructure:"dbpassword"`
+	DBPort     uint16 `mapstructure:"dbport"`
+	DBUser     string `mapstructure:"dbuser"`
+
+	DBPoolMaxConns          int           `mapstructure:"db_pool_max_conns"`
+	DBPoolMinConns          int           `mapstructure:"db_pool_min_conns"`
+	DBPoolMaxConnLifeTime   time.Duration `mapstructure:"db_pool_max_conn_lifetime"`
+	DBPoolMaxConnIdleTime   time.Duration `mapstructure:"db_pool_max_conn_idle_time"`
+	DBPoolHealthCheckPeriod time.Duration `mapstructure:"db_pool_health_check_period"`
+
+	Debug              bool `mapstructure:"debug"`
+	InsecureSkipVerify bool `mapstructure:"insecure_skip_verify"`
+	Verbose            bool `mapstructure:"verbose"`
 	ssl                bool
 }
 

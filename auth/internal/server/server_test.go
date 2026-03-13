@@ -41,8 +41,8 @@ func TestNewAuthServer(t *testing.T) {
 		t.Errorf("NewAuthServer() error = %v", err)
 	}
 
-	if srv.config.Address != cfg.Address {
-		t.Errorf("expected address %s, got %s", cfg.Address, srv.config.Address)
+	if srv.cfg.Values().Address != cfg.Address {
+		t.Errorf("expected address %s, got %s", cfg.Address, srv.cfg.Values().Address)
 	}
 
 	if srv.handler != handler {
@@ -60,7 +60,7 @@ func TestAuthServer_Run_ListenError_ExitsProcess(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 	go func() {
-		time.Sleep(time.Millisecond * 101)
+		time.Sleep(time.Millisecond * 111)
 		cancel()
 	}()
 	err = srv.Run(ctx)

@@ -55,8 +55,10 @@ func (c Config) Values() Values {
 
 // Values статичная конфигурация из переменных окружения.
 type Values struct {
-	Timeout    time.Duration `env:"SERVER_TIMEOUT" envDefault:"10s"`
-	DebugPprof bool          `env:"SERVER_DEBUG_PPROF_API" envDefault:"false"`
+	DebugPprof             bool          `env:"AUTH_SERVER_DEBUG_PPROF_API" envDefault:"false"`
+	OldPgxPoolCloseTimeout time.Duration `env:"AUTH_SERVER_OLD_PGX_POOL_CLOSE_TIMEOUT" envDefault:"1m"`
+	PgxPoolReloadTimeout   time.Duration `env:"AUTH_SERVER_PGX_POOL_RELOAD_TIMEOUT" envDefault:"500ms"`
+	Timeout                time.Duration `env:"AUTH_SERVER_TIMEOUT" envDefault:"10s"`
 }
 
 // EnvironmentsLoad parses environment variables into a Config structure
