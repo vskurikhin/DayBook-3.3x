@@ -238,7 +238,7 @@ func TestGetDB_PoolIsNil(t *testing.T) {
 func TestGetDB_Success(t *testing.T) {
 	resetSingleton()
 	expected := &PgxPool{
-		mu: sync.Mutex{},
+		mu: sync.RWMutex{},
 	}
 
 	pgxPool = expected

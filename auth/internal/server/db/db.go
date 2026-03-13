@@ -252,8 +252,8 @@ func GetDB() (*PgxPool, error) {
 	if pgxPool == nil {
 		return nil, ErrDBPoolIsNil
 	}
-	pgxPool.mu.Lock()
-	defer pgxPool.mu.Unlock()
+	pgxPool.mu.RLock()
+	defer pgxPool.mu.RUnlock()
 	return pgxPool, nil
 }
 
@@ -288,8 +288,6 @@ func newDB(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	return pgxp, nil
 }
 
-const ServerPgxPoolReloadTimeout = 500 * time.Millisecond
-
 func loopSigHup(ctx context.Context, cfg config.Config, environments env.Environments) {
 	sigHup := make(chan os.Signal, 1)
 	signal.Notify(sigHup, syscall.SIGHUP)
@@ -300,7 +298,12 @@ func loopSigHup(ctx context.Context, cfg config.Config, environments env.Environ
 		case <-sigHup:
 			slog.Info("Pgx DB pool, reload signal received")
 			time.Sleep(environments.Values().PgxPoolReloadTimeout)
-			if pgxp, err := newDB(ctx, cfg); err == nil && pgxp != pgxPool.pgxPool {
+			pgxp, err := newDB(ctx, cfg)
+			if err != nil {
+				slog.Info("Pgx DB pool, reload fail", slog.String("error", err.Error()))
+				continue
+			}
+			if IsNotEqual(pgxp, pgxPool) {
 				slog.Info("Pgx DB pool, reloading...")
 				slog.Debug(
 					"Reloading pgx DB pool",
@@ -316,11 +319,6 @@ func loopSigHup(ctx context.Context, cfg config.Config, environments env.Environ
 					oldPgxPool.Close()
 				}()
 				slog.Info("Pgx DB pool, reload")
-			} else {
-				slog.Info(
-					"Pgx DB pool, reload fail",
-					slog.String("error", err.Error()),
-				)
 			}
 		}
 	}

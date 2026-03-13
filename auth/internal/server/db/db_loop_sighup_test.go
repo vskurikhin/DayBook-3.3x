@@ -11,6 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
 func TestLoopSigHup_SignalReload(t *testing.T) {
@@ -36,7 +38,7 @@ func TestLoopSigHup_SignalReload(t *testing.T) {
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		_ = syscall.Kill(syscall.Getpid(), syscall.SIGHUP)
-		time.Sleep((ServerPgxPoolReloadTimeout + 100) * time.Millisecond)
+		time.Sleep((env.PgxPoolReloadTimeout + 100) * time.Millisecond)
 	}()
 
 	select {
@@ -45,7 +47,7 @@ func TestLoopSigHup_SignalReload(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("signal not received")
 	}
-	time.Sleep(ServerPgxPoolReloadTimeout + 200*time.Millisecond)
+	time.Sleep(env.PgxPoolReloadTimeout + 200*time.Millisecond)
 	if &db.pgxPool == &before {
 		t.Fatal("db returned before before")
 	}
@@ -81,7 +83,7 @@ func TestLoopSigHup_SignalReload_WithError(t *testing.T) {
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		_ = syscall.Kill(syscall.Getpid(), syscall.SIGHUP)
-		time.Sleep((ServerPgxPoolReloadTimeout + 100) * time.Millisecond)
+		time.Sleep((env.PgxPoolReloadTimeout + 100) * time.Millisecond)
 	}()
 
 	select {
@@ -90,7 +92,7 @@ func TestLoopSigHup_SignalReload_WithError(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("signal not received")
 	}
-	time.Sleep(ServerPgxPoolReloadTimeout + 200*time.Millisecond)
+	time.Sleep(env.PgxPoolReloadTimeout + 200*time.Millisecond)
 	if &db.pgxPool == &before {
 		t.Fatal("db returned before before")
 	}

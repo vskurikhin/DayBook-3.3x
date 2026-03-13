@@ -53,6 +53,8 @@ func (c Config) Values() Values {
 	return c.values
 }
 
+const PgxPoolReloadTimeout = 500 * time.Millisecond
+
 // Values статичная конфигурация из переменных окружения.
 type Values struct {
 	DebugPprof             bool          `env:"AUTH_SERVER_DEBUG_PPROF_API" envDefault:"false"`
