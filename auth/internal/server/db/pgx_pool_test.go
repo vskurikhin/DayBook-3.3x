@@ -24,6 +24,14 @@ func (m *mockPool) Close() {
 	return
 }
 
+func (m *mockPool) Ping(_ context.Context) error {
+	return nil
+}
+
+func (m *mockPool) Stat() *pgxpool.Stat {
+	return &pgxpool.Stat{}
+}
+
 func TestBegin_AcquireError(t *testing.T) {
 	pool := &PgxPool{
 		pgxPool: &mockPool{
