@@ -5,6 +5,27 @@ definitions:
       success:
         type: boolean
     type: object
+  CreatedUser:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      user_name:
+        type: string
+    type: object
+  Login:
+    properties:
+      password:
+        type: string
+      user_name:
+        type: string
+    type: object
+  Token:
+    properties:
+      token:
+        type: string
+    type: object
 host: localhost:64148
 info:
   contact: {}
@@ -27,6 +48,47 @@ paths:
       summary: Ok Краткое содержание
       tags:
       - ok
+  /v2/auth:
+    post:
+      consumes:
+      - application/json
+      description: Auth - Описание (v2)
+      operationId: ResourceV2-auth
+      parameters:
+      - description: Request of auth
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/Login'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: успешно
+          schema:
+            allOf:
+            - $ref: '#/definitions/APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/Token'
+              type: object
+        "500":
+          description: 'ошибка сервера "success": false'
+          schema:
+            allOf:
+            - $ref: '#/definitions/APIResponse'
+            - properties:
+                error:
+                  type: string
+                success:
+                  type: boolean
+              type: object
+        "504":
+          description: Gateway Timeout
+      summary: Auth Краткое содержание
+      tags:
+      - auth
   /v2/ok:
     get:
       description: Ok - Описание (v2)
@@ -63,6 +125,47 @@ paths:
       summary: Ok Краткое содержание
       tags:
       - ok
+  /v2/register:
+    post:
+      consumes:
+      - application/json
+      description: Register - Описание (v2)
+      operationId: ResourceV2-register
+      parameters:
+      - description: Request of register
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/Login'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: успешно
+          schema:
+            allOf:
+            - $ref: '#/definitions/APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/CreatedUser'
+              type: object
+        "500":
+          description: 'ошибка сервера "success": false'
+          schema:
+            allOf:
+            - $ref: '#/definitions/APIResponse'
+            - properties:
+                error:
+                  type: string
+                success:
+                  type: boolean
+              type: object
+        "504":
+          description: Gateway Timeout
+      summary: Register Краткое содержание
+      tags:
+      - register
 schemes:
 - http
 swagger: "2.0"
