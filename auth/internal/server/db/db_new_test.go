@@ -213,9 +213,6 @@ func TestNewDB_NewWithConfigParseConfigError(t *testing.T) {
 
 	_, err := NewDB(context.Background(), invalidConfig(), nil)
 
-	//if err == nil {
-	//	t.Fatal("expected error")
-	//}
 	var e *pgconn.ParseConfigError
 	if !errors.As(err, &e) {
 		t.Fatal("expected pgconn.ParseConfigError")

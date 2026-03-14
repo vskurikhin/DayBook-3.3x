@@ -1,7 +1,7 @@
 address: 127.0.0.1:65080
 dbhost: 127.0.0.1
 dbname: db
-dboptions: application_name=auth
+dboptions: application_name=auth&search_path=auth
 dbpassword: password
 dbport: 65432
 dbuser: dbuser

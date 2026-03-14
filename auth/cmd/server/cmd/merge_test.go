@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -26,6 +27,7 @@ func newTestCommand() *cobra.Command {
 	cmd.Flags().Bool("verbose", false, "")
 	cmd.Flags().Int("port", 8089, "")
 	cmd.Flags().String("name", "default", "")
+	cmd.Flags().Duration("timeout", time.Duration(0), "")
 	cmd.SetContext(context.Background())
 
 	return cmd
@@ -41,6 +43,7 @@ func newTestCommandDebug() *cobra.Command {
 	cmd.Flags().Bool("verbose", false, "")
 	cmd.Flags().Int("port", 8089, "")
 	cmd.Flags().String("name", "default", "")
+	cmd.Flags().Duration("timeout", time.Duration(0), "")
 	cmd.SetContext(context.Background())
 
 	return cmd
