@@ -57,6 +57,10 @@
 package cmd
 
 import (
+	"context"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"log/slog"
 	"os"
 	"time"
@@ -83,6 +87,14 @@ const (
 	FlagVerbose                 = "verbose"
 )
 
+var (
+	envLoad   = func() (env.Environments, error) { return env.EnvironmentsLoad() }
+	newConfig = func(cmd *cobra.Command) (config.Config, error) { return config.NewConfig(cmd) }
+	newDB     = func(ctx context.Context, cfg config.Config, env env.Environments) (db.DB, error) {
+		return db.NewDB(ctx, cfg, env)
+	}
+)
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -100,7 +112,7 @@ func init() {
 	runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
 	runCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
 	runCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")
-	runCmd.Flags().String(FlagDBOptions, "application_name=auth", "Pgx pool DB options.")
+	runCmd.Flags().String(FlagDBOptions, "application_name=auth&search_path=auth", "Pgx pool DB options.")
 	runCmd.Flags().String(FlagDBPassword, "password", "Pgx pool DB user password.")
 	runCmd.Flags().Duration(FlagDBPoolHealthCheckPeriod, time.Minute, "Pgx DB pool health check period.")
 	runCmd.Flags().Duration(FlagDBPoolMaxConnIdleTime, 30*time.Minute, "Pgx DB pool max connection idle time.")
@@ -111,7 +123,15 @@ func init() {
 	runCmd.Flags().String(FlagDBUser, "dbuser", "Pgx pool DB username.")
 	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
 
+	migrateCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
+	migrateCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")
+	migrateCmd.Flags().String(FlagDBOptions, "application_name=auth&search_path=auth", "Pgx pool DB options.")
+	migrateCmd.Flags().String(FlagDBPassword, "password", "Pgx pool DB user password.")
+	migrateCmd.Flags().Uint16(FlagDBPort, 5432, "Pgx pool DB port.")
+	migrateCmd.Flags().String(FlagDBUser, "dbuser", "Pgx pool DB username.")
+
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(migrateCmd)
 }
 
 // initConfig reads in Config file and ENV variables if set.

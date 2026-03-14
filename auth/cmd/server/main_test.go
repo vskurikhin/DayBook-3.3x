@@ -28,7 +28,7 @@ func TestWithAddressArgs(t *testing.T) {
 	defer func() {
 		if err := recover(); err != nil {
 			if fmt.Sprintf("%s", err) != "unexpected call to os.Exit(0) during test" {
-				t.Fail()
+				t.Fatal("expected call to os.Exit(0) during test but error:", err)
 			}
 		}
 	}()

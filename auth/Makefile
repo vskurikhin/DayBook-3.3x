@@ -70,6 +70,10 @@ go-generate:
 	@echo "  >  Generating dependency files..."
 	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go generate $(generate)
 
+go-generate-wire:
+	@echo "  >  Generating files by Wire...."
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) cd ./cmd/server/wire && ( go run -mod=mod github.com/google/wire/cmd/wire; cd - )
+
 # 1. Generate the list of packages to include, excluding 'mocks'
 # go list ./... lists all packages; grep -v excludes lines containing 'mocks'
 go-coverage:
@@ -105,6 +109,23 @@ go-swag:
 go-clean:
 	@echo "  >  Cleaning build cache"
 	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) go clean
+
+goose-status:
+	@echo "  >  Goose migrations status"
+	cd ./cmd/server/cmd/migrations/ && goose postgres "postgres://dbuser:password@localhost:5432/db?application_name=auth&search_path=auth" status
+
+
+sqlc-generate:
+	@echo "  >  Generating files by sqlc...."
+	sqlc generate -f sqlc_role.yaml
+	sqlc generate -f sqlc_users.yaml
+
+sqlc-user-view-table:
+	@echo "  >  Generating schema_user_view.sql...."
+	@echo "  >  Cleaning build cache"
+	echo "CREATE TABLE user_view_table AS SELECT * FROM user_view WHERE user_name IS NULL" | psql -h localhost -U dbuser db
+	pg_dump --schema-only --no-comments --no-policies --no-privileges --no-owner --table=user_view_table -h localhost -U dbuser db > internal/server/sqlc/schema_user_view.sql
+	echo "DROP TABLE IF EXISTS user_view_table" | psql -h localhost -U dbuser db
 
 .PHONY: help
 all: help

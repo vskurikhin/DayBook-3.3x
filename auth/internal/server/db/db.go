@@ -196,7 +196,7 @@ type DB interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Row, error)
+	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
 }
 
 var _ DB = (*PgxPool)(nil)
