@@ -17,6 +17,8 @@ type ApiV2 interface {
 // ResourceV2 implementation.
 func NewApiV2(v2 resources.ResourceV2) ApiV2 {
 	r := chi.NewRouter()
+	r.Method(http.MethodPost, Auth, APISyncHandler(v2.Auth))
 	r.Method(http.MethodGet, OK, APIHandler(v2.Ok))
+	r.Method(http.MethodPost, Register, APISyncHandler(v2.Register))
 	return r
 }

@@ -58,19 +58,21 @@ package cmd
 
 import (
 	"context"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"log/slog"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
 const (
 	FlagAddress                 = "address"
+	FlagAuthCost                = "auth-cost"
 	FlagDBHost                  = "dbhost"
 	FlagDBName                  = "dbname"
 	FlagDBOptions               = "dboptions"
@@ -110,6 +112,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose.")
 
 	runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
+	runCmd.Flags().Uint8(FlagAuthCost, 14, "The minimum allowable cost as passed in")
 	runCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
 	runCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")
 	runCmd.Flags().String(FlagDBOptions, "application_name=auth&search_path=auth", "Pgx pool DB options.")
