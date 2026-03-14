@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewV2(t *testing.T) {
-	v := NewV2(newTestConfig())
+	v := NewV2(newTestConfig(), nil)
 
 	if v == nil {
 		t.Fatal("expected V2 instance, got nil")
