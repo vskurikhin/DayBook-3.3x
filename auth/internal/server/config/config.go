@@ -76,7 +76,8 @@ type Config interface {
 }
 
 type Values struct {
-	Address string `mapstructure:"address"`
+	Address  string `mapstructure:"address"`
+	AuthCost uint8  `mapstructure:"auth_cost"`
 
 	DBHost     string `mapstructure:"dbhost"`
 	DBName     string `mapstructure:"dbname"`
