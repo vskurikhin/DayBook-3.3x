@@ -13,6 +13,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_name"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
@@ -28,9 +29,10 @@ func InitializeServer(cfg config.Config, environments env.Environments) (*server
 	if err != nil {
 		return nil, err
 	}
-	queries := user_name.New(pgxPool)
+	queries := user_attrs.New(pgxPool)
+	user_nameQueries := user_name.New(pgxPool)
 	user_viewQueries := user_view.New(pgxPool)
-	authBaseService := services.NewAuthBaseService(cfg, queries, user_viewQueries)
+	authBaseService := services.NewAuthBaseService(cfg, pgxPool, queries, user_nameQueries, user_viewQueries)
 	v2 := resources.NewV2(cfg, authBaseService)
 	apiV2 := handler.NewApiV2(v2)
 	handlers := handler.NewHandlers(apiV1, apiV2)
@@ -49,5 +51,5 @@ var (
 	handlerSet    = wire.NewSet(handler.NewApiV1, handler.NewApiV2, wire.Bind(new(handler.ApiHandlers), new(*handler.Handlers)), handler.NewHandlers, handler.NewRouter)
 	resourceSet   = wire.NewSet(wire.Bind(new(resources.ResourceV1), new(*resources.V1)), wire.Bind(new(resources.ResourceV2), new(*resources.V2)), resources.NewV1, resources.NewV2)
 	serviceSet    = wire.NewSet(wire.Bind(new(services.BaseService), new(*services.AuthBaseService)), services.NewAuthBaseService)
-	repositorySet = wire.NewSet(wire.Bind(new(user_name.Repo), new(*user_name.Queries)), wire.Bind(new(user_name.DBTX), new(*db.PgxPool)), wire.Bind(new(user_view.Repo), new(*user_view.Queries)), wire.Bind(new(user_view.DBTX), new(*db.PgxPool)), db.GetDB, user_name.New, user_view.New)
+	repositorySet = wire.NewSet(wire.Bind(new(db.DB), new(*db.PgxPool)), wire.Bind(new(user_attrs.Repo), new(*user_attrs.Queries)), wire.Bind(new(user_attrs.DBTX), new(*db.PgxPool)), wire.Bind(new(user_name.Repo), new(*user_name.Queries)), wire.Bind(new(user_name.DBTX), new(*db.PgxPool)), wire.Bind(new(user_view.Repo), new(*user_view.Queries)), wire.Bind(new(user_view.DBTX), new(*db.PgxPool)), db.GetDB, user_attrs.New, user_name.New, user_view.New)
 )

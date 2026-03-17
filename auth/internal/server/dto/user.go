@@ -1,9 +1,18 @@
 package dto
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+type CreateUser struct {
+	Name            string `json:"name"`
+	UserName        string `json:"user_name"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	ConfirmPassword string `json:"confirm_password"`
+}
 
 type CreatedUser struct {
 	ID        uuid.UUID `json:"id"`
@@ -21,15 +30,10 @@ type Login struct {
 }
 
 type User struct {
-	UserName string `json:"user_name"`
-	Visible  bool   `json:"visible,omitempty" swaggerignore:"true"`
-	Flags    int32  `json:"flags,omitempty"  swaggerignore:"true"`
-}
-
-func (l Login) ToUser() User {
-	return User{
-		UserName: l.UserName,
-		Visible:  l.Visible,
-		Flags:    l.Flags,
-	}
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Email    string    `json:"email"`
+	UserName string    `json:"user_name"`
+	Visible  bool      `json:"visible,omitempty" swaggerignore:"true"`
+	Flags    int32     `json:"flags,omitempty"  swaggerignore:"true"`
 }

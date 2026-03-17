@@ -73,7 +73,7 @@ var (
 	// Ok Router
 	okRouter = func() chi.Router {
 		r := chi.NewRouter()
-		r.Get(OK, func(w http.ResponseWriter, r *http.Request) {
+		r.Get(OkURL, func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("ok"))
 		})
 		return r
@@ -111,7 +111,7 @@ func TestNewRouter_CORSHeaders(t *testing.T) {
 
 	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
 		r := chi.NewRouter()
-		r.Get(OK, func(w http.ResponseWriter, r *http.Request) {
+		r.Get(OkURL, func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("ok"))
 		})
 		return r

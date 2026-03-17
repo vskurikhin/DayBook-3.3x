@@ -2,7 +2,9 @@ package resources
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
@@ -13,6 +15,7 @@ import (
 type ResourceV2 interface {
 	Auth(w http.ResponseWriter, r *http.Request) error
 	Ok(w http.ResponseWriter, r *http.Request) error
+	Refresh(w http.ResponseWriter, r *http.Request) error
 	Register(w http.ResponseWriter, r *http.Request) error
 }
 
@@ -65,13 +68,52 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 	if errDecode != nil {
 		return errDecode
 	}
-	token, err := v.service.Auth(r.Context(), services.UserFromDto(login))
+	creds, err := v.service.Auth(r.Context(), services.LoginFromDto(login))
+	if err != nil {
+		return err
+	}
+	cookie := creds.RefreshTokenCookie()
+	// Set the cookie in the response writer
+	http.SetCookie(w, &cookie)
+
+	return json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Data:    creds.AccessToken().ToDto(),
+	})
+}
+
+// Refresh route
+// @Summary Register Краткое содержание
+// @Description Register - Описание (v2)
+// @ID ResourceV2-refresh
+// @Tags    refresh
+// @Accept  json
+// @Produce json
+// @Param   request body dto.Login true "Request of refresh"
+// @Success 200 {object} APIResponse{data=dto.CreatedUser} "успешно"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
+// @Failure 504
+// @Router /v2/refresh [post]
+func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
+
+	cookie, err := r.Cookie("refresh")
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "Cookie found: %s = %s\n", cookie.Name, cookie.Value)
+	decoder := json.NewDecoder(r.Body)
+	var login dto.Login
+	errDecode := decoder.Decode(&login)
+	if errDecode != nil {
+		return errDecode
+	}
+	creds, err := v.service.Refresh(r.Context(), cookie.Value)
 	if err != nil {
 		return err
 	}
 	return json.NewEncoder(w).Encode(APIResponse{
 		Success: true,
-		Data:    token.ToDto(),
+		Data:    creds.AccessToken().ToDto(),
 	})
 }
 
@@ -83,24 +125,27 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 // @Accept  json
 // @Produce json
 // @Param   request body dto.Login true "Request of register"
-// @Success 200 {object} APIResponse{data=dto.CreatedUser} "успешно"
+// @Success 200 {object} APIResponse{data=dto.Token} "успешно"
 // @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
 // @Failure 504
 // @Router /v2/register [post]
 func (v V2) Register(w http.ResponseWriter, r *http.Request) error {
 	decoder := json.NewDecoder(r.Body)
-	var login dto.Login
-	errDecode := decoder.Decode(&login)
+	var u dto.CreateUser
+	errDecode := decoder.Decode(&u)
 	if errDecode != nil {
 		return errDecode
 	}
-	user, err := v.service.Register(r.Context(), services.UserFromDto(login))
+	creds, err := v.service.Register(r.Context(), services.CreateUserFromDto(u))
 	if err != nil {
 		return err
 	}
+	cookie := creds.RefreshTokenCookie()
+	// Set the cookie in the response writer
+	http.SetCookie(w, &cookie)
 	return json.NewEncoder(w).Encode(APIResponse{
 		Success: true,
-		Data:    user.ToDto(),
+		Data:    creds.AccessToken().ToDto(),
 	})
 }
 

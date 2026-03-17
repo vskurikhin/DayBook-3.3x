@@ -22,13 +22,13 @@ func TestApiV2(t *testing.T) {
 	}
 	tests := []testType{
 		{
-			name: "positive #1 ApiV2 route: " + OK,
+			name: "positive #1 ApiV2 route: " + OkURL,
 			newFunc: func() (ApiV2, *mockResourceV2Ok) {
 				mock := &mockResourceV2Ok{}
 				return NewApiV2(mock), mock
 			},
 			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
-				req := httptest.NewRequest(http.MethodGet, OK, nil)
+				req := httptest.NewRequest(http.MethodGet, OkURL, nil)
 				return testServeHTTP(router, req)
 			},
 			want: wantType{
@@ -37,13 +37,13 @@ func TestApiV2(t *testing.T) {
 			},
 		},
 		{
-			name: "positive #2 route: " + Auth,
+			name: "positive #2 route: " + AuthURL,
 			newFunc: func() (ApiV2, *mockResourceV2Ok) {
 				mock := &mockResourceV2Ok{}
 				return NewApiV2(mock), mock
 			},
 			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
-				req := httptest.NewRequest(http.MethodPost, Auth, nil)
+				req := httptest.NewRequest(http.MethodPost, AuthURL, nil)
 				return testServeHTTP(router, req)
 			},
 			want: wantType{
@@ -52,13 +52,28 @@ func TestApiV2(t *testing.T) {
 			},
 		},
 		{
-			name: "positive #2 route: " + Register,
+			name: "positive #3 route: " + RefreshURL,
 			newFunc: func() (ApiV2, *mockResourceV2Ok) {
 				mock := &mockResourceV2Ok{}
 				return NewApiV2(mock), mock
 			},
 			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
-				req := httptest.NewRequest(http.MethodPost, Register, nil)
+				req := httptest.NewRequest(http.MethodPost, RefreshURL, nil)
+				return testServeHTTP(router, req)
+			},
+			want: wantType{
+				code: http.StatusOK,
+				body: "refresh",
+			},
+		},
+		{
+			name: "positive #4 route: " + RegisterURL,
+			newFunc: func() (ApiV2, *mockResourceV2Ok) {
+				mock := &mockResourceV2Ok{}
+				return NewApiV2(mock), mock
+			},
+			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
+				req := httptest.NewRequest(http.MethodPost, RegisterURL, nil)
 				return testServeHTTP(router, req)
 			},
 			want: wantType{
@@ -104,7 +119,14 @@ func (m *mockResourceV2Ok) Auth(w http.ResponseWriter, _ *http.Request) error {
 	return nil
 }
 
-func (m *mockResourceV2Ok) Register(w http.ResponseWriter, r *http.Request) error {
+func (m *mockResourceV2Ok) Refresh(w http.ResponseWriter, _ *http.Request) error {
+	m.called = true
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("refresh"))
+	return nil
+}
+
+func (m *mockResourceV2Ok) Register(w http.ResponseWriter, _ *http.Request) error {
 	m.called = true
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("register"))

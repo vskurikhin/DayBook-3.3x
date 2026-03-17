@@ -2,10 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
 )
 
 // APIHandler wraps handlers to provide consistent error handling
@@ -22,12 +24,20 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		// Call the actual handler
+		//goland:noinspection ALL
 		if err := fn(w, r); err != nil {
 			// Log the error for debugging
 			slog.Error("API", slog.String("error", err.Error()))
+			switch {
+			case errors.Is(err, services.ErrLogout):
+				w.WriteHeader(http.StatusNoContent)
+			case errors.Is(err, services.ErrInvalidPassword), errors.Is(err, services.ErrPasswordNotValid):
+				w.WriteHeader(http.StatusUnauthorized)
+			default:
+				w.WriteHeader(http.StatusInternalServerError)
+			}
 
 			// Send error response
-			w.WriteHeader(http.StatusInternalServerError)
 			encodeErr := json.NewEncoder(w).Encode(resources.APIResponse{
 				Success: false,
 				Error:   err.Error(),
@@ -60,12 +70,20 @@ func (fn APISyncHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		// Call the actual handler
+		//goland:noinspection ALL
 		if err := fn(w, r); err != nil {
 			// Log the error for debugging
 			slog.Error("API", slog.String("error", err.Error()))
+			switch {
+			case errors.Is(err, services.ErrLogout):
+				w.WriteHeader(http.StatusNoContent)
+			case errors.Is(err, services.ErrInvalidPassword), errors.Is(err, services.ErrPasswordNotValid):
+				w.WriteHeader(http.StatusUnauthorized)
+			default:
+				w.WriteHeader(http.StatusInternalServerError)
+			}
 
 			// Send error response
-			w.WriteHeader(http.StatusInternalServerError)
 			encodeErr := json.NewEncoder(w).Encode(resources.APIResponse{
 				Success: false,
 				Error:   err.Error(),
