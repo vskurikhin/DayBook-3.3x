@@ -12,7 +12,7 @@ import (
 )
 
 const getUserName = `-- name: GetUserName :one
-SELECT user_name, id, password, create_time, update_time, enabled, local_change, visible, flags, roles FROM user_view
+SELECT user_name, id, password, create_time, update_time, enabled, local_change, visible, flags, name, attrs, roles FROM user_view
 WHERE user_name = $1 LIMIT 1
 `
 
@@ -29,13 +29,15 @@ func (q *Queries) GetUserName(ctx context.Context, userName pgtype.Text) (UserVi
 		&i.LocalChange,
 		&i.Visible,
 		&i.Flags,
+		&i.Name,
+		&i.Attrs,
 		&i.Roles,
 	)
 	return i, err
 }
 
 const listUserNames = `-- name: ListUserNames :many
-SELECT user_name, id, password, create_time, update_time, enabled, local_change, visible, flags, roles FROM user_view
+SELECT user_name, id, password, create_time, update_time, enabled, local_change, visible, flags, name, attrs, roles FROM user_view
 ORDER BY user_name
 `
 
@@ -58,6 +60,8 @@ func (q *Queries) ListUserNames(ctx context.Context) ([]UserView, error) {
 			&i.LocalChange,
 			&i.Visible,
 			&i.Flags,
+			&i.Name,
+			&i.Attrs,
 			&i.Roles,
 		); err != nil {
 			return nil, err

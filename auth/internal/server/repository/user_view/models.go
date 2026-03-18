@@ -18,5 +18,7 @@ type UserView struct {
 	LocalChange pgtype.Bool      `json:"local_change"`
 	Visible     pgtype.Bool      `json:"visible"`
 	Flags       pgtype.Int4      `json:"flags"`
+	Name        pgtype.Text      `json:"name"`
+	Attrs       []byte           `json:"attrs"`
 	Roles       []string         `json:"roles"`
 }

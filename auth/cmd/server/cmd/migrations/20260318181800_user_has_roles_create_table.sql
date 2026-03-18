@@ -1,5 +1,5 @@
 -- +goose Up
-SELECT 'up SQL query';
+SELECT 'up SQL query user_has_roles create table';
 CREATE SEQUENCE IF NOT EXISTS user_has_roles_seq START 1;
 
 CREATE TABLE IF NOT EXISTS user_has_roles
@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS user_has_roles
     flags           INT                         NOT NULL DEFAULT 0
     );
 
+
 -- +goose Down
-SELECT 'down SQL query';
+SELECT 'down SQL query user_has_roles table drop';
 DROP TABLE IF EXISTS user_has_roles;
 DROP SEQUENCE IF EXISTS user_has_roles_seq;

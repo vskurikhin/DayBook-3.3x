@@ -1,5 +1,5 @@
 -- +goose Up
-SELECT 'up SQL query';
+SELECT 'up SQL query user_name create table';
 CREATE TABLE IF NOT EXISTS user_name
 (
     user_name       VARCHAR(64) PRIMARY KEY     NOT NULL,
@@ -18,6 +18,6 @@ CREATE INDEX IF NOT EXISTS IDX_auth_user_name_id
     ON user_name (id);
 
 -- +goose Down
-SELECT 'down SQL query';
+SELECT 'down SQL query user_name table drop';
 DROP INDEX IF EXISTS IDX_auth_user_name_id;
 DROP TABLE IF EXISTS user_name;

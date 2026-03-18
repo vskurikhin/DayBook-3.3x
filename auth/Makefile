@@ -119,6 +119,7 @@ sqlc-generate:
 	@echo "  >  Generating files by sqlc...."
 	sqlc generate -f sqlc_role.yaml
 	sqlc generate -f sqlc_users.yaml
+	sqlc generate -f sqlc_session.yaml
 
 sqlc-user-view-table:
 	@echo "  >  Generating schema_user_view.sql...."
