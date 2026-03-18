@@ -41,7 +41,9 @@ func (m *mockRows) Scan(dest ...any) error {
 	*(dest[6].(*pgtype.Bool)) = r.LocalChange
 	*(dest[7].(*pgtype.Bool)) = r.Visible
 	*(dest[8].(*pgtype.Int4)) = r.Flags
-	*(dest[9].(*[]string)) = r.Roles
+	*(dest[9].(*pgtype.Text)) = r.Name
+	*(dest[10].(*[]byte)) = r.Attrs
+	*(dest[11].(*[]string)) = r.Roles
 
 	return nil
 }
@@ -78,7 +80,7 @@ func TestGetUserName(t *testing.T) {
 			return mockRow{
 				scan: func(dest ...any) error {
 					*(dest[0].(*pgtype.Text)) = pgtype.Text{String: "alice", Valid: true}
-					*(dest[9].(*[]string)) = []string{"admin", "user"}
+					*(dest[11].(*[]string)) = []string{"admin", "user"}
 					return nil
 				},
 			}

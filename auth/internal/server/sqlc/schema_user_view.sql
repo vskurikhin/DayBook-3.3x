@@ -1,5 +1,5 @@
 --
--- Name: user_view; Type: TABLE; Schema: public; Owner: dbuser
+-- Name: user_view_table; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE user_view (
@@ -12,5 +12,7 @@ CREATE TABLE user_view (
     local_change boolean,
     visible boolean,
     flags integer,
+    name character varying(1024),
+    attrs jsonb,
     roles text[]
 );

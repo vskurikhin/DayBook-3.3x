@@ -1,5 +1,5 @@
 -- +goose Up
-SELECT 'up SQL query';
+SELECT 'up SQL query user_name create triggers';
 DROP TRIGGER IF EXISTS update_create_time_auth_user_name ON auth.user_name;
 CREATE TRIGGER update_create_time_auth_user_name
     BEFORE INSERT
@@ -15,6 +15,6 @@ CREATE TRIGGER update_update_time_auth_user_name
     EXECUTE FUNCTION auth.update_update_time();
 
 -- +goose Down
-SELECT 'down SQL query';
+SELECT 'down SQL query user_name triggers drop';
 DROP TRIGGER IF EXISTS update_update_time_auth_user_name ON auth.user_name;
 DROP TRIGGER IF EXISTS update_create_time_auth_user_name ON auth.user_name;

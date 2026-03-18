@@ -2,7 +2,7 @@
 SELECT 'up SQL query';
 DROP VIEW IF EXISTS user_view;
 CREATE OR REPLACE VIEW user_view AS
-SELECT Usrn.*, RolesOfUser.roles
+SELECT Usrn.*, Usra.name, Usra.attrs, RolesOfUser.roles
 FROM user_name Usrn
          LEFT JOIN LATERAL
     (SELECT u1.user_name,
@@ -13,7 +13,8 @@ FROM user_name Usrn
               LEFT JOIN role Role
                         ON uhr.role = Role.role
      GROUP BY u1.user_name)
-        RolesOfUser ON Usrn.user_name = RolesOfUser.user_name;
+        RolesOfUser ON Usrn.user_name = RolesOfUser.user_name
+    LEFT JOIN user_attrs Usra ON Usrn.user_name = Usra.user_name;
 
 -- +goose Down
 SELECT 'down SQL query';
