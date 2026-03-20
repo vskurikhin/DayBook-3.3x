@@ -58,19 +58,21 @@ package cmd
 
 import (
 	"context"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"log/slog"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
 const (
 	FlagAddress                 = "address"
+	FlagAuthCost                = "auth-cost"
 	FlagDBHost                  = "dbhost"
 	FlagDBName                  = "dbname"
 	FlagDBOptions               = "dboptions"
@@ -83,7 +85,11 @@ const (
 	FlagDBPort                  = "dbport"
 	FlagDBUser                  = "dbuser"
 	FlagDebug                   = "debug"
+	FlagHostname                = "hostname"
 	FlagInsecureSkipVerify      = "insecure-skip-verify"
+	FlagJWThs256SignKey         = "jwt-hs256-sign-key"
+	FlagValidPeriodAccessToken  = "valid-period-access-token"
+	FlagValidPeriodRefreshToken = "valid-period-refresh-token"
 	FlagVerbose                 = "verbose"
 )
 
@@ -110,6 +116,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose.")
 
 	runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
+	runCmd.Flags().Uint8(FlagAuthCost, 14, "The minimum allowable cost as passed in")
 	runCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
 	runCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")
 	runCmd.Flags().String(FlagDBOptions, "application_name=auth&search_path=auth", "Pgx pool DB options.")
@@ -121,7 +128,11 @@ func init() {
 	runCmd.Flags().Uint8(FlagDBPoolMinConns, 0, "Pgx DB pool min connections.")
 	runCmd.Flags().Uint16(FlagDBPort, 5432, "Pgx pool DB port.")
 	runCmd.Flags().String(FlagDBUser, "dbuser", "Pgx pool DB username.")
+	runCmd.Flags().String(FlagHostname, "localhost", "Hostname.")
 	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
+	runCmd.Flags().String(FlagJWThs256SignKey, "", "JWT HS256 signing key.")
+	runCmd.Flags().Duration(FlagValidPeriodAccessToken, 15*time.Second, "Valid period access token.")
+	runCmd.Flags().Duration(FlagValidPeriodRefreshToken, 45*time.Minute, "Valid period refresh token.")
 
 	migrateCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
 	migrateCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")

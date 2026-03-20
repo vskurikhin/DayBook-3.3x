@@ -22,7 +22,7 @@ func TestNewApiV1_OKRoute(t *testing.T) {
 
 	router := NewApiV1(mock)
 
-	req := httptest.NewRequest(http.MethodGet, OK, nil)
+	req := httptest.NewRequest(http.MethodGet, OkURL, nil)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)

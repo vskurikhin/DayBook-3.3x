@@ -28,10 +28,7 @@ type V1 struct {
 // @Router /v1/ok [get]
 func (v V1) Ok(w http.ResponseWriter, _ *http.Request) {
 	var body bytes.Buffer
-	if v.cfg.Values().Debug {
-		body.WriteString("DEBUG ")
-	}
-	body.WriteString("V1")
+	body.WriteString("ok")
 	//goland:noinspection ALL
 	w.Write(body.Bytes())
 }

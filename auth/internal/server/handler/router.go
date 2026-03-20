@@ -38,6 +38,7 @@ import (
 const (
 	Allocs           = "allocs"
 	AllocsURL        = "/" + Allocs
+	AuthURL          = "/auth"
 	BaseURL          = "/auth/api"
 	Block            = "block"
 	BlockURL         = "/" + Block
@@ -49,10 +50,13 @@ const (
 	GoRoutineURL     = "/" + GoRoutine
 	Heap             = "heap"
 	HeapURL          = "/" + Heap
+	LogoutURL        = "/logout"
 	Mutex            = "mutex"
 	MutexURL         = "/" + Mutex
-	OK               = "/ok"
+	OkURL            = "/ok"
 	ProfileURL       = "/profile"
+	RefreshURL       = "/refresh"
+	RegisterURL      = "/register"
 	SymbolURL        = "/symbol"
 	ThreadCreate     = "threadcreate"
 	ThreadCreateURL  = "/" + ThreadCreate

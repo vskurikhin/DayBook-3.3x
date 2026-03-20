@@ -22,6 +22,6 @@ UPDATE session
       enabled = $6
 WHERE iss = $1 AND jti = $2 AND sub = $3;
 
--- name: DeleteUserAttrs :exec
+-- name: DeleteSession :exec
 DELETE FROM session
 WHERE iss = $1 AND jti = $2 AND sub = $3;

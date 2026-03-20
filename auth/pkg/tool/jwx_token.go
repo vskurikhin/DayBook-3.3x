@@ -1,0 +1,32 @@
+package tool
+
+import (
+	"errors"
+
+	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
+)
+
+func JwxTokenSubject(bearerToken jwt.Token) (string, error) {
+	sub, ok := bearerToken.Subject()
+	if !ok {
+		return "", errors.New(xerror.InvalidToken)
+	}
+	return sub, nil
+}
+
+func JwxTokenJTI(bearerToken jwt.Token) (string, error) {
+	jti, ok := bearerToken.JwtID()
+	if !ok {
+		return "", errors.New(xerror.InvalidToken)
+	}
+	return jti, nil
+}
+
+func JwxTokenIssuer(bearerToken jwt.Token) (string, error) {
+	iss, ok := bearerToken.Issuer()
+	if !ok {
+		return "", errors.New(xerror.InvalidToken)
+	}
+	return iss, nil
+}
