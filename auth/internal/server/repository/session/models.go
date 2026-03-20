@@ -14,7 +14,7 @@ type Session struct {
 	Sub         pgtype.UUID
 	UserName    pgtype.Text
 	Roles       []string
-	ValidTime   pgtype.Timestamp
+	ValidTime   pgtype.Timestamptz
 	CreateTime  pgtype.Timestamp
 	UpdateTime  pgtype.Timestamp
 	Enabled     pgtype.Bool

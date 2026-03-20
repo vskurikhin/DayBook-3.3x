@@ -50,6 +50,7 @@ const (
 	GoRoutineURL     = "/" + GoRoutine
 	Heap             = "heap"
 	HeapURL          = "/" + Heap
+	LogoutURL        = "/logout"
 	Mutex            = "mutex"
 	MutexURL         = "/" + Mutex
 	OkURL            = "/ok"

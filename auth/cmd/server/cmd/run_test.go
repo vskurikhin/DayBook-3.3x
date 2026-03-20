@@ -160,6 +160,7 @@ func TestRunCmd_newAuthServer_ShouldReturnTestError(t *testing.T) {
 	mockServer := NewMockServer(ctrl)
 	mockEnvironments := NewMockEnvironments(ctrl)
 
+	mockEnvironments.EXPECT().Values().Return(env.Values{}).AnyTimes()
 	mockConfig.EXPECT().Values().Return(testDefaultConfigValues).AnyTimes()
 	mockServer.EXPECT().Run(context.Background()).Return(nil).Times(0)
 
@@ -202,6 +203,7 @@ func TestRunCmd_newAuthServer_NewDBShouldReturnTestError(t *testing.T) {
 	mockServer := NewMockServer(ctrl)
 	mockEnvironments := NewMockEnvironments(ctrl)
 
+	mockEnvironments.EXPECT().Values().Return(env.Values{}).AnyTimes()
 	mockConfig.EXPECT().Values().Return(testDefaultConfigValues).AnyTimes()
 	mockServer.EXPECT().Run(context.Background()).Return(nil).Times(0)
 
@@ -244,6 +246,7 @@ func TestRunCmd_newAuthServer_NewDBShouldReturnNilError(t *testing.T) {
 	mockServer := NewMockServer(ctrl)
 	mockEnvironments := NewMockEnvironments(ctrl)
 
+	mockEnvironments.EXPECT().Values().Return(env.Values{}).AnyTimes()
 	mockConfig.EXPECT().Values().Return(testDefaultConfigValues).AnyTimes()
 	mockServer.EXPECT().Run(context.Background()).Return(nil).Times(0)
 

@@ -22,6 +22,8 @@ func (m mockConfig) Values() config.Values {
 	return m.values
 }
 
+func (t mockConfig) JWThs256SignKey(_ string) {}
+
 func validConfig() config.Config {
 	return mockConfig{
 		values: config.Values{

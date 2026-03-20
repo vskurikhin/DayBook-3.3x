@@ -14,6 +14,7 @@ import (
 
 //go:generate mockgen -destination=run_mock_config_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd Config
 type Config interface {
+	JWThs256SignKey(string)
 	Values() config.Values
 }
 
@@ -58,6 +59,7 @@ using the obtained configuration.`,
 		if errEnvLoad != nil {
 			return errEnvLoad
 		}
+		mergeConfigAndEnv(cfg, env)
 
 		dbp, errNewDB := newDB(cmd.Context(), cfg, env)
 		if errNewDB != nil {

@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
 )
 
 // APIHandler wraps handlers to provide consistent error handling
@@ -27,12 +29,19 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		//goland:noinspection ALL
 		if err := fn(w, r); err != nil {
 			// Log the error for debugging
-			slog.Error("API", slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "API", slog.String("error", err.Error()))
 			switch {
-			case errors.Is(err, services.ErrLogout):
+			case isStatusNoContent(err):
 				w.WriteHeader(http.StatusNoContent)
-			case errors.Is(err, services.ErrInvalidPassword), errors.Is(err, services.ErrPasswordNotValid):
+				return
+			case isStatusUnauthorized(err):
 				w.WriteHeader(http.StatusUnauthorized)
+			case isStatusForbidden(err):
+				w.WriteHeader(http.StatusForbidden)
+			case isStatusConflict(err):
+				w.WriteHeader(http.StatusConflict)
+			case isStatusServiceUnavailable(err):
+				w.WriteHeader(http.StatusServiceUnavailable)
 			default:
 				w.WriteHeader(http.StatusInternalServerError)
 			}
@@ -43,7 +52,7 @@ func (fn APIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Error:   err.Error(),
 			})
 			if encodeErr != nil {
-				slog.Error("API", slog.String("error", encodeErr.Error()))
+				slog.ErrorContext(ctx, "API", slog.String("error", encodeErr.Error()))
 			}
 		}
 	}()
@@ -73,12 +82,19 @@ func (fn APISyncHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		//goland:noinspection ALL
 		if err := fn(w, r); err != nil {
 			// Log the error for debugging
-			slog.Error("API", slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "API", slog.String("error", err.Error()))
 			switch {
-			case errors.Is(err, services.ErrLogout):
+			case isStatusNoContent(err):
 				w.WriteHeader(http.StatusNoContent)
-			case errors.Is(err, services.ErrInvalidPassword), errors.Is(err, services.ErrPasswordNotValid):
+				return
+			case isStatusUnauthorized(err):
 				w.WriteHeader(http.StatusUnauthorized)
+			case isStatusForbidden(err):
+				w.WriteHeader(http.StatusForbidden)
+			case isStatusConflict(err):
+				w.WriteHeader(http.StatusConflict)
+			case isStatusServiceUnavailable(err):
+				w.WriteHeader(http.StatusServiceUnavailable)
 			default:
 				w.WriteHeader(http.StatusInternalServerError)
 			}
@@ -89,8 +105,41 @@ func (fn APISyncHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				Error:   err.Error(),
 			})
 			if encodeErr != nil {
-				slog.Error("API", slog.String("error", encodeErr.Error()))
+				slog.ErrorContext(ctx, "API", slog.String("error", encodeErr.Error()))
 			}
 		}
 	}
+}
+
+func isStatusNoContent(err error) bool {
+	return errors.Is(err, jwt.ErrTokenExpired) ||
+		errors.Is(err, xerror.ErrInvalidToken) ||
+		errors.Is(err, xerror.ErrJInvalidUserName) ||
+		errors.Is(err, xerror.ErrLogout) ||
+		errors.Is(err, xerror.ErrSessionTimeExpired)
+}
+
+func isStatusUnauthorized(err error) bool {
+	return errors.Is(err, jwt.ErrTokenExpired) ||
+		errors.Is(err, xerror.ErrInvalidPassword) ||
+		errors.Is(err, xerror.ErrInvalidToken) ||
+		errors.Is(err, xerror.ErrUserExists)
+}
+
+func isStatusForbidden(err error) bool {
+	return errors.Is(err, jwt.ErrTokenExpired) ||
+		errors.Is(err, xerror.ErrForbidden) ||
+		errors.Is(err, xerror.ErrInvalidPassword) ||
+		errors.Is(err, xerror.ErrInvalidToken) ||
+		errors.Is(err, xerror.ErrUserExists)
+}
+
+func isStatusConflict(err error) bool {
+	return errors.Is(err, xerror.ErrUserExists)
+}
+
+func isStatusServiceUnavailable(err error) bool {
+	return errors.Is(err, xerror.ErrUndefinedColumn) ||
+		errors.Is(err, xerror.ErrUndefinedFunction) ||
+		errors.Is(err, xerror.ErrUndefinedTable)
 }

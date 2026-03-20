@@ -1,10 +1,11 @@
 package resources
 
 import (
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 )
 
 var _ config.Config = (*testValuesConfig)(nil)
@@ -12,6 +13,8 @@ var _ config.Config = (*testValuesConfig)(nil)
 type testValuesConfig struct {
 	values config.Values
 }
+
+func (t testValuesConfig) JWThs256SignKey(_ string) {}
 
 func (t testValuesConfig) Values() config.Values {
 	return t.values

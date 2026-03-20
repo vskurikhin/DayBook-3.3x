@@ -15,5 +15,6 @@ services:
       POSTGRES_DB: db
       POSTGRES_USER: dbuser
       POSTGRES_PASSWORD: password
+      TZ: Europe/Moscow
     ports:
       - 5432:5432

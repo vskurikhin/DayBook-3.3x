@@ -34,7 +34,7 @@ function App() {
 
       const { user, token, expires_at } = response.data.data;
 
-      if (response.status === 204) {
+      if (response.status === 204 || response.status === 401) {
         console.log("logout: " + logout)
         logout();
       } else {

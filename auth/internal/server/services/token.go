@@ -13,17 +13,17 @@ type Token struct {
 	user      User
 }
 
-type Creds struct {
+type CredsV2 struct {
 	accessToken        Token
 	refreshTokenCookie http.Cookie
 	expiresAt          time.Time
 }
 
-func (c Creds) AccessToken() Token {
+func (c CredsV2) AccessToken() Token {
 	return c.accessToken
 }
 
-func (c Creds) RefreshTokenCookie() http.Cookie {
+func (c CredsV2) RefreshTokenCookie() http.Cookie {
 	return c.refreshTokenCookie
 }
 

@@ -26,7 +26,7 @@ type CreateSessionParams struct {
 	Sub       pgtype.UUID
 	UserName  pgtype.Text
 	Roles     []string
-	ValidTime pgtype.Timestamp
+	ValidTime pgtype.Timestamptz
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
@@ -56,19 +56,19 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 	return i, err
 }
 
-const deleteUserAttrs = `-- name: DeleteUserAttrs :exec
+const deleteSession = `-- name: DeleteSession :exec
 DELETE FROM session
 WHERE iss = $1 AND jti = $2 AND sub = $3
 `
 
-type DeleteUserAttrsParams struct {
+type DeleteSessionParams struct {
 	Iss pgtype.UUID
 	Jti pgtype.UUID
 	Sub pgtype.UUID
 }
 
-func (q *Queries) DeleteUserAttrs(ctx context.Context, arg DeleteUserAttrsParams) error {
-	_, err := q.db.Exec(ctx, deleteUserAttrs, arg.Iss, arg.Jti, arg.Sub)
+func (q *Queries) DeleteSession(ctx context.Context, arg DeleteSessionParams) error {
+	_, err := q.db.Exec(ctx, deleteSession, arg.Iss, arg.Jti, arg.Sub)
 	return err
 }
 
@@ -155,7 +155,7 @@ type UpdateSessionParams struct {
 	Jti       pgtype.UUID
 	Sub       pgtype.UUID
 	Roles     []string
-	ValidTime pgtype.Timestamp
+	ValidTime pgtype.Timestamptz
 	Enabled   pgtype.Bool
 }
 

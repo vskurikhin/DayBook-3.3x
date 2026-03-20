@@ -72,6 +72,7 @@ import (
 
 //go:generate mockgen -destination=config_mock_test.go -package=config github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config Config
 type Config interface {
+	JWThs256SignKey(string)
 	Values() Values
 }
 
@@ -92,10 +93,14 @@ type Values struct {
 	DBPoolMaxConnIdleTime   time.Duration `mapstructure:"db_pool_max_conn_idle_time"`
 	DBPoolHealthCheckPeriod time.Duration `mapstructure:"db_pool_health_check_period"`
 
-	Debug              bool `mapstructure:"debug"`
-	InsecureSkipVerify bool `mapstructure:"insecure_skip_verify"`
-	Verbose            bool `mapstructure:"verbose"`
-	ssl                bool
+	Debug                   bool          `mapstructure:"debug"`
+	Hostname                string        `mapstructure:"hostname"`
+	InsecureSkipVerify      bool          `mapstructure:"insecure_skip_verify"`
+	JWThs256SignKey         []byte        `mapstructure:"jwt_hs256_sign_key"`
+	ValidPeriodAccessToken  time.Duration `mapstructure:"valid_period_access_token"`
+	ValidPeriodRefreshToken time.Duration `mapstructure:"valid_period_refresh_token"`
+	Verbose                 bool          `mapstructure:"verbose"`
+	ssl                     bool
 }
 
 var _ Config = (*ValuesConfig)(nil)
@@ -103,6 +108,12 @@ var _ Config = (*ValuesConfig)(nil)
 type ValuesConfig struct {
 	values Values
 	mu     sync.RWMutex
+}
+
+func (v *ValuesConfig) JWThs256SignKey(s string) {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	v.values.JWThs256SignKey = []byte(s)
 }
 
 // Values returns the configuration values stored in the Config instance.

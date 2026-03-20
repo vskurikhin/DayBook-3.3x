@@ -12,7 +12,7 @@ const Navbar = () => {
   const logOutHandler = async () => {
     try {
       await axios.post(
-        "/api/auth/logout",
+        "/auth/api/v2/logout",
         {},
         {
           headers: {

@@ -11,6 +11,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_name"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
@@ -43,6 +44,8 @@ var (
 	)
 	repositorySet = wire.NewSet(
 		wire.Bind(new(db.DB), new(*db.PgxPool)),
+		wire.Bind(new(session.Repo), new(*session.Queries)),
+		wire.Bind(new(session.DBTX), new(*db.PgxPool)),
 		wire.Bind(new(user_attrs.Repo), new(*user_attrs.Queries)),
 		wire.Bind(new(user_attrs.DBTX), new(*db.PgxPool)),
 		wire.Bind(new(user_name.Repo), new(*user_name.Queries)),
@@ -50,6 +53,7 @@ var (
 		wire.Bind(new(user_view.Repo), new(*user_view.Queries)),
 		wire.Bind(new(user_view.DBTX), new(*db.PgxPool)),
 		db.GetDB,
+		session.New,
 		user_attrs.New,
 		user_name.New,
 		user_view.New,

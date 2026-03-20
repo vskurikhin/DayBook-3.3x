@@ -85,7 +85,11 @@ const (
 	FlagDBPort                  = "dbport"
 	FlagDBUser                  = "dbuser"
 	FlagDebug                   = "debug"
+	FlagHostname                = "hostname"
 	FlagInsecureSkipVerify      = "insecure-skip-verify"
+	FlagJWThs256SignKey         = "jwt-hs256-sign-key"
+	FlagValidPeriodAccessToken  = "valid-period-access-token"
+	FlagValidPeriodRefreshToken = "valid-period-refresh-token"
 	FlagVerbose                 = "verbose"
 )
 
@@ -108,7 +112,7 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug.")
+	rootCmd.PersistentFlags().BoolP(FlagDebug, "d", true, "Help message for debug.")
 	rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose.")
 
 	runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
@@ -124,7 +128,11 @@ func init() {
 	runCmd.Flags().Uint8(FlagDBPoolMinConns, 0, "Pgx DB pool min connections.")
 	runCmd.Flags().Uint16(FlagDBPort, 5432, "Pgx pool DB port.")
 	runCmd.Flags().String(FlagDBUser, "dbuser", "Pgx pool DB username.")
+	runCmd.Flags().String(FlagHostname, "localhost", "Hostname.")
 	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
+	runCmd.Flags().String(FlagJWThs256SignKey, "", "JWT HS256 signing key.")
+	runCmd.Flags().Duration(FlagValidPeriodAccessToken, 15*time.Second, "Valid period access token.")
+	runCmd.Flags().Duration(FlagValidPeriodRefreshToken, 45*time.Minute, "Valid period refresh token.")
 
 	migrateCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
 	migrateCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")

@@ -7,14 +7,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_name"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 )
 
 type CreateUser struct {
+	id              pgtype.UUID
 	confirmPassword string
 	email           string
 	name            string
@@ -31,6 +32,7 @@ func (u CreateUser) ToModelCreateUserNameParams() user_name.CreateUserNameParams
 
 func (u CreateUser) ToModelCreateUserAttrsParams() user_attrs.CreateUserAttrsParams {
 	a := userAttrs{
+		ID:       u.id.Bytes,
 		Email:    u.email,
 		Name:     u.name,
 		UserName: u.userName,
@@ -145,8 +147,24 @@ func UserFromModelUserName(user user_name.UserName) User {
 	}
 }
 
+func UserFromModelUserAttr(user user_attrs.UserAttr) User {
+	bb := bytes.NewBuffer(user.Attrs)
+	decoder := json.NewDecoder(bb)
+	var a userAttrs
+	_ = decoder.Decode(&a)
+	return User{
+		id:       a.ID,
+		name:     a.Name,
+		userName: a.UserName,
+		email:    a.Email,
+		visible:  user.Visible,
+		flags:    user.Flags,
+	}
+}
+
 type userAttrs struct {
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	UserName string `json:"user_name"`
+	ID       uuid.UUID `json:"id"`
+	Email    string    `json:"email"`
+	Name     string    `json:"name"`
+	UserName string    `json:"user_name"`
 }

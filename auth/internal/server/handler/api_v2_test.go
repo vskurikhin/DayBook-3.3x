@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"go.uber.org/mock/gomock"
 )
 
 func TestApiV2(t *testing.T) {
@@ -16,16 +18,21 @@ func TestApiV2(t *testing.T) {
 	type testType struct {
 		name     string
 		disable  bool
-		newFunc  func() (ApiV2, *mockResourceV2Ok)
+		newFunc  func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller)
 		testFunc func(t *testing.T, router ApiV2) *httptest.ResponseRecorder
 		want     wantType
 	}
 	tests := []testType{
 		{
 			name: "positive #1 ApiV2 route: " + OkURL,
-			newFunc: func() (ApiV2, *mockResourceV2Ok) {
+			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
+				ctrl := gomock.NewController(t)
+				cfgMock := NewMockConfig(ctrl)
 				mock := &mockResourceV2Ok{}
-				return NewApiV2(mock), mock
+
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
+
+				return NewApiV2(cfgMock, mock), mock, ctrl
 			},
 			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
 				req := httptest.NewRequest(http.MethodGet, OkURL, nil)
@@ -38,9 +45,14 @@ func TestApiV2(t *testing.T) {
 		},
 		{
 			name: "positive #2 route: " + AuthURL,
-			newFunc: func() (ApiV2, *mockResourceV2Ok) {
+			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
+				ctrl := gomock.NewController(t)
+				cfgMock := NewMockConfig(ctrl)
 				mock := &mockResourceV2Ok{}
-				return NewApiV2(mock), mock
+
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
+
+				return NewApiV2(cfgMock, mock), mock, ctrl
 			},
 			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
 				req := httptest.NewRequest(http.MethodPost, AuthURL, nil)
@@ -53,9 +65,14 @@ func TestApiV2(t *testing.T) {
 		},
 		{
 			name: "positive #3 route: " + RefreshURL,
-			newFunc: func() (ApiV2, *mockResourceV2Ok) {
+			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
+				ctrl := gomock.NewController(t)
+				cfgMock := NewMockConfig(ctrl)
 				mock := &mockResourceV2Ok{}
-				return NewApiV2(mock), mock
+
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
+
+				return NewApiV2(cfgMock, mock), mock, ctrl
 			},
 			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
 				req := httptest.NewRequest(http.MethodPost, RefreshURL, nil)
@@ -68,9 +85,14 @@ func TestApiV2(t *testing.T) {
 		},
 		{
 			name: "positive #4 route: " + RegisterURL,
-			newFunc: func() (ApiV2, *mockResourceV2Ok) {
+			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
+				ctrl := gomock.NewController(t)
+				cfgMock := NewMockConfig(ctrl)
 				mock := &mockResourceV2Ok{}
-				return NewApiV2(mock), mock
+
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
+
+				return NewApiV2(cfgMock, mock), mock, ctrl
 			},
 			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
 				req := httptest.NewRequest(http.MethodPost, RegisterURL, nil)
@@ -85,7 +107,8 @@ func TestApiV2(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if !tt.disable {
-				router, mock := tt.newFunc()
+				router, mock, ctrl := tt.newFunc(t)
+				defer ctrl.Finish()
 				got := tt.testFunc(t, router)
 				assert.Equal(t, tt.want.code, got.Code)
 				assert.Equal(t, tt.want.body, got.Body.String())
@@ -116,6 +139,13 @@ func (m *mockResourceV2Ok) Auth(w http.ResponseWriter, _ *http.Request) error {
 	m.called = true
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("auth"))
+	return nil
+}
+
+func (m *mockResourceV2Ok) Logout(w http.ResponseWriter, r *http.Request) error {
+	m.called = true
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("logout"))
 	return nil
 }
 

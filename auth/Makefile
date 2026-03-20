@@ -114,7 +114,6 @@ goose-status:
 	@echo "  >  Goose migrations status"
 	cd ./cmd/server/cmd/migrations/ && goose postgres "postgres://dbuser:password@localhost:5432/db?application_name=auth&search_path=auth" status
 
-
 sqlc-generate:
 	@echo "  >  Generating files by sqlc...."
 	sqlc generate -f sqlc_role.yaml

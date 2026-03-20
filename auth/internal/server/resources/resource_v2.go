@@ -3,8 +3,8 @@ package resources
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
@@ -14,6 +14,7 @@ import (
 //go:generate mockgen -destination=resource_v2_mock_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources ResourceV2
 type ResourceV2 interface {
 	Auth(w http.ResponseWriter, r *http.Request) error
+	Logout(w http.ResponseWriter, r *http.Request) error
 	Ok(w http.ResponseWriter, r *http.Request) error
 	Refresh(w http.ResponseWriter, r *http.Request) error
 	Register(w http.ResponseWriter, r *http.Request) error
@@ -24,29 +25,6 @@ var _ ResourceV2 = (*V2)(nil)
 type V2 struct {
 	cfg     config.Config
 	service services.BaseService
-}
-
-// Ok route
-// @Summary Ok Краткое содержание
-// @Description Ok - Описание (v2)
-// @ID ResourceV2-ok
-// @Tags ok
-// @Produce json
-// @Success 200 {object} APIResponse{data=[]map[string]string} "успешно"
-// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
-// @Failure 504
-// @Router /v2/ok [get]
-func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error {
-	users := []map[string]string{
-		{"id": "1", "version": "V2"},
-	}
-	if v.cfg.Values().Debug {
-		users = append(users, map[string]string{"id": "2", "debug": "true"})
-	}
-	return json.NewEncoder(w).Encode(APIResponse{
-		Success: true,
-		Data:    users,
-	})
 }
 
 // Auth route
@@ -82,6 +60,39 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
+// Logout route
+// @Summary Logout Краткое содержание
+// @Description Logout - Описание (v2)
+// @ID ResourceV2-logout
+// @Tags ok
+// @Produce json
+// @Success 200 {object} APIResponse{data=[]map[string]string} "успешно"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
+// @Failure 504
+// @Router /v2/ok [get]
+func (v V2) Logout(w http.ResponseWriter, r *http.Request) error {
+	return v.service.Logout(r.Context())
+}
+
+// Ok route
+// @Summary Ok Краткое содержание
+// @Description Ok - Описание (v2)
+// @ID ResourceV2-ok
+// @Tags ok
+// @Produce json
+// @Success 200 {object} APIResponse{data=[]map[string]string} "успешно"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
+// @Failure 504
+// @Router /v2/ok [get]
+func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error {
+	return json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Data: []map[string]string{
+			{"msg": "ok"},
+		},
+	})
+}
+
 // Refresh route
 // @Summary Register Краткое содержание
 // @Description Register - Описание (v2)
@@ -90,17 +101,16 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 // @Accept  json
 // @Produce json
 // @Param   request body dto.Login true "Request of refresh"
-// @Success 200 {object} APIResponse{data=dto.CreatedUser} "успешно"
+// @Success 200 {object} APIResponse{data=dto.Token} "успешно"
 // @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
 // @Failure 504
 // @Router /v2/refresh [post]
 func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
-
 	cookie, err := r.Cookie("refresh")
 	if err != nil {
+		slog.Error("failed to parse cookie", slog.String("error", err.Error()), slog.String("errorType", fmt.Sprintf("%T", err)))
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "Cookie found: %s = %s\n", cookie.Name, cookie.Value)
 	decoder := json.NewDecoder(r.Body)
 	var login dto.Login
 	errDecode := decoder.Decode(&login)
@@ -111,6 +121,9 @@ func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	refreshCookie := creds.RefreshTokenCookie()
+	// Set the cookie in the response writer
+	http.SetCookie(w, &refreshCookie)
 	return json.NewEncoder(w).Encode(APIResponse{
 		Success: true,
 		Data:    creds.AccessToken().ToDto(),
