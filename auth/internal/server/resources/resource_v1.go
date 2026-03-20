@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"net/http"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
 )
+
+//go:generate mockgen -destination=auth_service_v1_mock_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources AuthServiceV1
+type AuthServiceV1 interface {
+	Ok() string
+}
 
 type ResourceV1 interface {
 	Ok(w http.ResponseWriter, r *http.Request)
@@ -14,7 +19,7 @@ type ResourceV1 interface {
 var _ ResourceV1 = (*V1)(nil)
 
 type V1 struct {
-	cfg config.Config
+	service services.AuthServiceV1
 }
 
 // Ok route
@@ -28,13 +33,13 @@ type V1 struct {
 // @Router /v1/ok [get]
 func (v V1) Ok(w http.ResponseWriter, _ *http.Request) {
 	var body bytes.Buffer
-	body.WriteString("ok")
+	body.WriteString(v.service.Ok())
 	//goland:noinspection ALL
 	w.Write(body.Bytes())
 }
 
 // NewV1 creates and returns a new V1 resource instance that implements
 // the ResourceV1 interface.
-func NewV1(cfg config.Config) *V1 {
-	return &V1{cfg: cfg}
+func NewV1(service services.AuthServiceV1) *V1 {
+	return &V1{service: service}
 }

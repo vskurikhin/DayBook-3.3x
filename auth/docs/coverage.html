@@ -3424,7 +3424,6 @@ func (s *AuthBaseService) Logout(ctx context.Context) error <span class="cov0" t
 func (s *AuthBaseService) Refresh(ctx context.Context, token string) (CredsV2, error) <span class="cov0" title="0">{
         parsedToken, err := jwt.ParseWithClaims(token, &amp;tool.CustomClaims{}, func(token *jwt.Token) (interface{}, error) </span><span class="cov0" title="0">{
                 if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok </span><span class="cov0" title="0">{
-                        slog.Info("")
                         return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
                 }</span>
                 <span class="cov0" title="0">return []byte(s.cfg.Values().JWThs256SignKey), nil</span>

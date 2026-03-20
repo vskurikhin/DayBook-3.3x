@@ -38,7 +38,7 @@ Migrations are executed using the migration tool with the configured version tab
 	// has an action associated with it:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		setSlogDebug(cmd)
-		mergeCobraAndViper(cmd)
+		mergeCobraToViper(cmd)
 		slogInfoVerbose(cmd)
 
 		cfg, errConfig := newConfig(cmd)

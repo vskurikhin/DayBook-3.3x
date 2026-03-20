@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"go.uber.org/mock/gomock"
 
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
@@ -67,17 +67,9 @@ var (
 func TestNewRouter_ReturnsHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockApiHandlers := NewMockApiHandlers(ctrl)
 	cfgMock := NewMockConfig(ctrl)
-
-	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
-		return emptyRouter
-	}()).Times(1)
-	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
-		return emptyRouter
-	}()).Times(1)
 	cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
-	router := NewRouter(cfgMock, environments, mockApiHandlers)
+	router := NewRouter(cfgMock, environments, emptyRouter, emptyRouter)
 
 	if router == nil {
 		t.Fatal("expected router, got nil")
@@ -87,22 +79,11 @@ func TestNewRouter_ReturnsHandler(t *testing.T) {
 func TestNewRouter_CORSHeaders(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockApiHandlers := NewMockApiHandlers(ctrl)
-	cfgMock := NewMockConfig(ctrl)
 
-	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
-		r := chi.NewRouter()
-		r.Get(OkURL, func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("ok"))
-		})
-		return r
-	}()).Times(1)
-	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
-		return emptyRouter
-	}()).Times(1)
+	cfgMock := NewMockConfig(ctrl)
 	cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-	router := NewRouter(cfgMock, environments, mockApiHandlers)
+	router := NewRouter(cfgMock, environments, emptyRouter, emptyRouter)
 
 	req := httptest.NewRequest(http.MethodOptions, "/auth/api/v1/ok", nil)
 	req.Header.Set("Origin", "http://localhost")
@@ -137,17 +118,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
-				mockApiHandlers := NewMockApiHandlers(ctrl)
-
-				mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
-					return okRouter
-				}()).Times(1)
-				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
-					return emptyRouter
-				}()).Times(1)
 				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, okRouter, emptyRouter), ctrl
 			},
 			code:     http.StatusOK,
 			endpoint: "/auth/api/v1/ok",
@@ -163,17 +136,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
-				mockApiHandlers := NewMockApiHandlers(ctrl)
-
-				mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
-					return emptyRouter
-				}()).Times(1)
-				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
-					return okRouter
-				}()).Times(1)
 				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, emptyRouter, okRouter), ctrl
 			},
 			code:     http.StatusOK,
 			endpoint: "/auth/api/v2/ok",
@@ -189,17 +154,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
-				mockApiHandlers := NewMockApiHandlers(ctrl)
-
-				mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
-					return emptyRouter
-				}()).Times(1)
-				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
-					return emptyRouter
-				}()).Times(1)
 				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, emptyRouter, emptyRouter), ctrl
 			},
 			code:     http.StatusOK,
 			endpoint: "/debug",
@@ -215,17 +172,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
-				mockApiHandlers := NewMockApiHandlers(ctrl)
-
-				mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
-					return emptyRouter
-				}()).Times(1)
-				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
-					return emptyRouter
-				}()).Times(1)
 				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, emptyRouter, emptyRouter), ctrl
 			},
 			code:     http.StatusNotFound,
 			endpoint: "/unknown",
@@ -241,17 +190,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
-				mockApiHandlers := NewMockApiHandlers(ctrl)
-
-				mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
-					return okRouter
-				}()).Times(1)
-				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
-					return emptyRouter
-				}()).Times(1)
 				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, okRouter, emptyRouter), ctrl
 			},
 			code:     http.StatusMethodNotAllowed,
 			endpoint: "/auth/api/v1/ok",
@@ -297,17 +238,9 @@ func TestNewRouter_DebugPprofEndpoints_Returns200(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
-				mockApiHandlers := NewMockApiHandlers(ctrl)
-
-				mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
-					return emptyRouter
-				}()).Times(1)
-				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
-					return emptyRouter
-				}()).Times(1)
 				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, emptyRouter, emptyRouter), ctrl
 			},
 			code: http.StatusOK,
 		},

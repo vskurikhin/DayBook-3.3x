@@ -50,6 +50,7 @@ const (
 	GoRoutineURL     = "/" + GoRoutine
 	Heap             = "heap"
 	HeapURL          = "/" + Heap
+	ListURL          = "/list"
 	LogoutURL        = "/logout"
 	Mutex            = "mutex"
 	MutexURL         = "/" + Mutex
@@ -65,9 +66,15 @@ const (
 	V2               = "/v2"
 )
 
+//go:generate mockgen -destination=config_mock_test.go -package=handler github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler Config
+type Config interface {
+	JWThs256SignKey(string)
+	Values() config.Values
+}
+
 // NewRouter creates and configures an HTTP router with
 // middleware and application routes using the provided configuration.
-func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) http.Handler {
+func NewRouter(cfg config.Config, env env.Environments, v1 ApiV1, v2 ApiV2) http.Handler {
 	r := chi.NewRouter()
 
 	c := cors.New(cors.Options{
@@ -87,8 +94,8 @@ func NewRouter(cfg config.Config, env env.Environments, handlers ApiHandlers) ht
 	// processing should be stopped.
 	r.Use(middleware.Timeout(env.Values().Timeout))
 
-	r.Mount(BaseURL+V1, handlers.apiV1())
-	r.Mount(BaseURL+V2, handlers.apiV2())
+	r.Mount(BaseURL+V1, v1)
+	r.Mount(BaseURL+V2, v2)
 
 	if env.Values().DebugPprof {
 		// Or mount the entire pprof handler set
