@@ -40,6 +40,18 @@ func (m *MockConfig) EXPECT() *MockConfigMockRecorder {
 	return m.recorder
 }
 
+// JWThs256SignKey mocks base method.
+func (m *MockConfig) JWThs256SignKey(arg0 string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "JWThs256SignKey", arg0)
+}
+
+// JWThs256SignKey indicates an expected call of JWThs256SignKey.
+func (mr *MockConfigMockRecorder) JWThs256SignKey(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JWThs256SignKey", reflect.TypeOf((*MockConfig)(nil).JWThs256SignKey), arg0)
+}
+
 // Values mocks base method.
 func (m *MockConfig) Values() config.Values {
 	m.ctrl.T.Helper()

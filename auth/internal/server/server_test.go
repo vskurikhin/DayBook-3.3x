@@ -85,6 +85,8 @@ func (t testValuesConfig) Values() config.Values {
 	return t.values
 }
 
+func (t testValuesConfig) JWThs256SignKey(_ string) {}
+
 func newTestConfig() *testValuesConfig {
 	return &testValuesConfig{values: config.Values{Address: "127.0.0.1:0", Debug: true}}
 }

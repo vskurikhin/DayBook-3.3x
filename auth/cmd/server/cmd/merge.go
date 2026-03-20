@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
@@ -50,6 +52,18 @@ func mergeCobraAndViperFunc(cmd *cobra.Command) func(f *pflag.Flag) {
 				viper.Set(tool.KebabCaseToSnakeCase(f.Name), f.Value.String())
 			}
 		}
+	}
+}
+
+func mergeConfigAndEnv(cfg config.Config, env env.Environments) {
+	if cfg == nil {
+		return
+	}
+	if env == nil {
+		return
+	}
+	if string(cfg.Values().JWThs256SignKey) == "" && env.Values().JWThs256SignKey != "" {
+		cfg.JWThs256SignKey(env.Values().JWThs256SignKey)
 	}
 }
 

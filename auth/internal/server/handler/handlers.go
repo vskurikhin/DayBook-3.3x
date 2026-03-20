@@ -2,7 +2,14 @@ package handler
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 )
+
+//go:generate mockgen -destination=config_mock_test.go -package=handler github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler Config
+type Config interface {
+	JWThs256SignKey(string)
+	Values() config.Values
+}
 
 //go:generate mockgen -destination=api_handlers_mock_test.go -package=handler github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler ApiHandlers
 type ApiHandlers interface {

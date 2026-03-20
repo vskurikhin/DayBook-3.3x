@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS session (
               REFERENCES user_name (user_name)
               ON DELETE CASCADE ON UPDATE CASCADE,
     roles        TEXT[]                      NOT NULL,
-    valid_time   TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+    valid_time   TIMESTAMP WITH    TIME ZONE NOT NULL DEFAULT now(),
     create_time  TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
     update_time  TIMESTAMP WITHOUT TIME ZONE          DEFAULT now(),
     enabled      BOOLEAN                              DEFAULT false,

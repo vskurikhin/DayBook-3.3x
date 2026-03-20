@@ -58,6 +58,7 @@ const PgxPoolReloadTimeout = 500 * time.Millisecond
 // Values статичная конфигурация из переменных окружения.
 type Values struct {
 	DebugPprof             bool          `env:"AUTH_SERVER_DEBUG_PPROF_API" envDefault:"false"`
+	JWThs256SignKey        string        `env:"AUTH_SERVER_JWT_HS256_SIGN_KEY" envDefault:""`
 	OldPgxPoolCloseTimeout time.Duration `env:"AUTH_SERVER_OLD_PGX_POOL_CLOSE_TIMEOUT" envDefault:"1m"`
 	PgxPoolReloadTimeout   time.Duration `env:"AUTH_SERVER_PGX_POOL_RELOAD_TIMEOUT" envDefault:"500ms"`
 	Timeout                time.Duration `env:"AUTH_SERVER_TIMEOUT" envDefault:"10s"`

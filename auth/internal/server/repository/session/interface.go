@@ -6,14 +6,17 @@ package session
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5"
 )
 
 //go:generate mockgen -destination=db_mock_test.go -package=session github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session DBTX
 
 type Repo interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
-	DeleteUserAttrs(ctx context.Context, arg DeleteUserAttrsParams) error
+	DeleteSession(ctx context.Context, arg DeleteSessionParams) error
 	GetSession(ctx context.Context, arg GetSessionParams) (Session, error)
 	ListSessions(ctx context.Context) ([]Session, error)
 	UpdateSession(ctx context.Context, arg UpdateSessionParams) error
+	WithTx(tx pgx.Tx) *Queries
 }

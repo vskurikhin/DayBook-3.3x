@@ -55,7 +55,7 @@ func TestRunCmd_ShouldCallServerRun(t *testing.T) {
 	newConfig = func(cmd *cobra.Command) (config.Config, error) {
 		return mockConfig, nil
 	}
-	newAuthServer = func(_ config.Config, _ env.Environments, _ db.DB) (server.Server, error) {
+	newAuthServer = func(_ config.Config, _ env.Environments) (server.Server, error) {
 		return mockServer, nil
 	}
 
@@ -90,7 +90,7 @@ func TestRunCmd_ShouldReturnTestError(t *testing.T) {
 	newConfig = func(cmd *cobra.Command) (config.Config, error) {
 		return nil, testError
 	}
-	newAuthServer = func(_ config.Config, _ env.Environments, _ db.DB) (server.Server, error) {
+	newAuthServer = func(_ config.Config, _ env.Environments) (server.Server, error) {
 		return mockServer, nil
 	}
 
@@ -129,7 +129,7 @@ func TestRunCmd_EnvLoad_ShouldReturnTestError(t *testing.T) {
 		return mockConfig, nil
 	}
 	envLoad = func() (env.Environments, error) { return nil, testError }
-	newAuthServer = func(_ config.Config, _ env.Environments, _ db.DB) (server.Server, error) {
+	newAuthServer = func(_ config.Config, _ env.Environments) (server.Server, error) {
 		return mockServer, nil
 	}
 
@@ -160,6 +160,7 @@ func TestRunCmd_newAuthServer_ShouldReturnTestError(t *testing.T) {
 	mockServer := NewMockServer(ctrl)
 	mockEnvironments := NewMockEnvironments(ctrl)
 
+	mockEnvironments.EXPECT().Values().Return(env.Values{}).AnyTimes()
 	mockConfig.EXPECT().Values().Return(testDefaultConfigValues).AnyTimes()
 	mockServer.EXPECT().Run(context.Background()).Return(nil).Times(0)
 
@@ -169,7 +170,7 @@ func TestRunCmd_newAuthServer_ShouldReturnTestError(t *testing.T) {
 		return mockConfig, nil
 	}
 	envLoad = func() (env.Environments, error) { return mockEnvironments, nil }
-	newAuthServer = func(_ config.Config, _ env.Environments, _ db.DB) (server.Server, error) {
+	newAuthServer = func(_ config.Config, _ env.Environments) (server.Server, error) {
 		return nil, testError
 	}
 
@@ -202,6 +203,7 @@ func TestRunCmd_newAuthServer_NewDBShouldReturnTestError(t *testing.T) {
 	mockServer := NewMockServer(ctrl)
 	mockEnvironments := NewMockEnvironments(ctrl)
 
+	mockEnvironments.EXPECT().Values().Return(env.Values{}).AnyTimes()
 	mockConfig.EXPECT().Values().Return(testDefaultConfigValues).AnyTimes()
 	mockServer.EXPECT().Run(context.Background()).Return(nil).Times(0)
 
@@ -221,6 +223,49 @@ func TestRunCmd_newAuthServer_NewDBShouldReturnTestError(t *testing.T) {
 		t.Fatalf("expected error: '%s', got none", testError)
 	}
 	if err.Error() != testError.Error() {
+		t.Fatalf("expected error: '%s', got '%s'", testError.Error(), err.Error())
+	}
+}
+
+func TestRunCmd_newAuthServer_NewDBShouldReturnNilError(t *testing.T) {
+	// backup originals
+	origNewConfig := newConfig
+	origEnvLoad := envLoad
+	origNewServer := newAuthServer
+	origNewDB := newDB
+	defer func() {
+		newConfig = origNewConfig
+		envLoad = origEnvLoad
+		newAuthServer = origNewServer
+		newDB = origNewDB
+	}()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConfig := NewMockConfig(ctrl)
+	mockServer := NewMockServer(ctrl)
+	mockEnvironments := NewMockEnvironments(ctrl)
+
+	mockEnvironments.EXPECT().Values().Return(env.Values{}).AnyTimes()
+	mockConfig.EXPECT().Values().Return(testDefaultConfigValues).AnyTimes()
+	mockServer.EXPECT().Run(context.Background()).Return(nil).Times(0)
+
+	// arrange
+	cmd := newTestCommandDebug()
+	newConfig = func(cmd *cobra.Command) (config.Config, error) {
+		return mockConfig, nil
+	}
+	envLoad = func() (env.Environments, error) { return mockEnvironments, nil }
+	newDB = func(ctx context.Context, cfg config.Config, env env.Environments) (db.DB, error) {
+		return nil, nil
+	}
+
+	// act
+	err := runCmd.RunE(cmd, []string{})
+	if err == nil {
+		t.Fatalf("expected error: '%s', got none", testError)
+	}
+	if err.Error() != ErrDBPoolIsNil.Error() {
 		t.Fatalf("expected error: '%s', got '%s'", testError.Error(), err.Error())
 	}
 }

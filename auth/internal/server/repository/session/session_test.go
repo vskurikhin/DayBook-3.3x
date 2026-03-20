@@ -142,7 +142,7 @@ func TestQueries_DeleteUserAttrs(t *testing.T) {
 			name: "success",
 			mockSetup: func(db *MockDBTX) {
 				db.EXPECT().
-					Exec(gomock.Any(), deleteUserAttrs, gomock.Any(), gomock.Any(), gomock.Any()).
+					Exec(gomock.Any(), deleteSession, gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(pgconn.CommandTag{}, nil)
 			},
 		},
@@ -150,7 +150,7 @@ func TestQueries_DeleteUserAttrs(t *testing.T) {
 			name: "exec error",
 			mockSetup: func(db *MockDBTX) {
 				db.EXPECT().
-					Exec(gomock.Any(), deleteUserAttrs, gomock.Any(), gomock.Any(), gomock.Any()).
+					Exec(gomock.Any(), deleteSession, gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(pgconn.CommandTag{}, errors.New("error"))
 			},
 			wantErr: true,
@@ -164,7 +164,7 @@ func TestQueries_DeleteUserAttrs(t *testing.T) {
 
 			q := New(mockDB)
 
-			err := q.DeleteUserAttrs(context.Background(), DeleteUserAttrsParams{})
+			err := q.DeleteSession(context.Background(), DeleteSessionParams{})
 
 			if tt.wantErr {
 				assert.Error(t, err)

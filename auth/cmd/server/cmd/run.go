@@ -2,18 +2,19 @@ package cmd
 
 import (
 	"context"
+	"errors"
 
 	"github.com/spf13/cobra"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 )
 
 //go:generate mockgen -destination=run_mock_config_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd Config
 type Config interface {
+	JWThs256SignKey(string)
 	Values() config.Values
 }
 
@@ -28,8 +29,9 @@ type Server interface {
 }
 
 var (
-	newAuthServer = func(cfg config.Config, env env.Environments, dbp db.DB) (server.Server, error) {
-		return wire.InitializeServer(cfg, env, dbp)
+	ErrDBPoolIsNil = errors.New("db pool is nil")
+	newAuthServer  = func(cfg config.Config, env env.Environments) (server.Server, error) {
+		return wire.InitializeServer(cfg, env)
 	}
 )
 
@@ -57,13 +59,17 @@ using the obtained configuration.`,
 		if errEnvLoad != nil {
 			return errEnvLoad
 		}
+		mergeConfigAndEnv(cfg, env)
 
-		dbp, err := newDB(cmd.Context(), cfg, env)
-		if err != nil {
-			return err
+		dbp, errNewDB := newDB(cmd.Context(), cfg, env)
+		if errNewDB != nil {
+			return errNewDB
+		}
+		if dbp == nil {
+			return ErrDBPoolIsNil
 		}
 
-		srv, err := newAuthServer(cfg, env, dbp)
+		srv, err := newAuthServer(cfg, env)
 		if err != nil {
 			return err
 		}

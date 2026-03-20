@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewV2(t *testing.T) {
-	v := NewV2(newTestConfig())
+	v := NewV2(newTestConfig(), nil)
 
 	if v == nil {
 		t.Fatal("expected V2 instance, got nil")
@@ -29,8 +29,8 @@ func TestV2_Ok_ReturnsV2(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	if rec.Body.String() != `{"success":true,"data":[{"id":"1","version":"V2"}]}`+"\n" {
-		t.Fatalf("expected body '"+`{"success":true,"data":[{"id":"1","version":"V2"}]}`+"', got %s", rec.Body.String())
+	if rec.Body.String() != `{"success":true,"data":[{"msg":"ok"}]}`+"\n" {
+		t.Fatalf("expected body '"+`{"success":true,"data":[{"msg":"ok"}]}`+"', got %s", rec.Body.String())
 	}
 }
 
@@ -49,7 +49,7 @@ func TestV2_Ok_Returns_DEBUG_V2(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	if rec.Body.String() != `{"success":true,"data":[{"id":"1","version":"V2"},{"debug":"true","id":"2"}]}`+"\n" {
-		t.Fatalf("expected body '"+`{"success":true,"data":[{"id":"1","version":"V2"},{"debug":"true","id":"2"}]}`+"', got %s", rec.Body.String())
+	if rec.Body.String() != `{"success":true,"data":[{"msg":"ok"}]}`+"\n" {
+		t.Fatalf("expected body '"+`{"success":true,"data":[{"msg":"ok"}]}`+"', got %s", rec.Body.String())
 	}
 }

@@ -7,32 +7,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"go.uber.org/mock/gomock"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
-
-//
-// ---- Mock Config ----
-//
-
-type mockConfig struct {
-	values config.Values
-}
-
-func (m *mockConfig) Values() config.Values {
-	return m.values
-}
-
-func newMockConfig(debug bool) config.Config {
-	return &mockConfig{
-		values: config.Values{
-			Debug: debug,
-		},
-	}
-}
 
 //
 // ---- Mock Environments ----
@@ -73,7 +53,7 @@ var (
 	// Ok Router
 	okRouter = func() chi.Router {
 		r := chi.NewRouter()
-		r.Get(OK, func(w http.ResponseWriter, r *http.Request) {
+		r.Get(OkURL, func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("ok"))
 		})
 		return r
@@ -88,7 +68,7 @@ func TestNewRouter_ReturnsHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockApiHandlers := NewMockApiHandlers(ctrl)
-	cfg := newMockConfig(false)
+	cfgMock := NewMockConfig(ctrl)
 
 	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
 		return emptyRouter
@@ -96,7 +76,8 @@ func TestNewRouter_ReturnsHandler(t *testing.T) {
 	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
 		return emptyRouter
 	}()).Times(1)
-	router := NewRouter(cfg, environments, mockApiHandlers)
+	cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
+	router := NewRouter(cfgMock, environments, mockApiHandlers)
 
 	if router == nil {
 		t.Fatal("expected router, got nil")
@@ -107,11 +88,11 @@ func TestNewRouter_CORSHeaders(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockApiHandlers := NewMockApiHandlers(ctrl)
-	cfg := newMockConfig(false)
+	cfgMock := NewMockConfig(ctrl)
 
 	mockApiHandlers.EXPECT().apiV1().Return(func() ApiV1 {
 		r := chi.NewRouter()
-		r.Get(OK, func(w http.ResponseWriter, r *http.Request) {
+		r.Get(OkURL, func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte("ok"))
 		})
 		return r
@@ -119,7 +100,9 @@ func TestNewRouter_CORSHeaders(t *testing.T) {
 	mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
 		return emptyRouter
 	}()).Times(1)
-	router := NewRouter(cfg, environments, mockApiHandlers)
+	cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
+
+	router := NewRouter(cfgMock, environments, mockApiHandlers)
 
 	req := httptest.NewRequest(http.MethodOptions, "/auth/api/v1/ok", nil)
 	req.Header.Set("Origin", "http://localhost")
@@ -152,7 +135,7 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 			},
 			newRouterFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (http.Handler, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
-				cfg := newMockConfig(false)
+				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
 				mockApiHandlers := NewMockApiHandlers(ctrl)
 
@@ -162,8 +145,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
 					return emptyRouter
 				}()).Times(1)
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfg, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
 			},
 			code:     http.StatusOK,
 			endpoint: "/auth/api/v1/ok",
@@ -177,7 +161,7 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 			},
 			newRouterFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (http.Handler, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
-				cfg := newMockConfig(false)
+				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
 				mockApiHandlers := NewMockApiHandlers(ctrl)
 
@@ -187,8 +171,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
 					return okRouter
 				}()).Times(1)
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfg, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
 			},
 			code:     http.StatusOK,
 			endpoint: "/auth/api/v2/ok",
@@ -202,7 +187,7 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 			},
 			newRouterFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (http.Handler, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
-				cfg := newMockConfig(false)
+				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
 				mockApiHandlers := NewMockApiHandlers(ctrl)
 
@@ -212,8 +197,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
 					return emptyRouter
 				}()).Times(1)
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfg, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
 			},
 			code:     http.StatusOK,
 			endpoint: "/debug",
@@ -227,7 +213,7 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 			},
 			newRouterFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (http.Handler, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
-				cfg := newMockConfig(false)
+				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
 				mockApiHandlers := NewMockApiHandlers(ctrl)
 
@@ -237,8 +223,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
 					return emptyRouter
 				}()).Times(1)
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfg, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
 			},
 			code:     http.StatusNotFound,
 			endpoint: "/unknown",
@@ -252,7 +239,7 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 			},
 			newRouterFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (http.Handler, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
-				cfg := newMockConfig(false)
+				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
 				mockApiHandlers := NewMockApiHandlers(ctrl)
 
@@ -262,8 +249,9 @@ func TestNewRouter_GetEndpoints(t *testing.T) {
 				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
 					return emptyRouter
 				}()).Times(1)
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfg, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
 			},
 			code:     http.StatusMethodNotAllowed,
 			endpoint: "/auth/api/v1/ok",
@@ -307,7 +295,7 @@ func TestNewRouter_DebugPprofEndpoints_Returns200(t *testing.T) {
 			},
 			newRouterFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (http.Handler, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
-				cfg := newMockConfig(false)
+				cfgMock := NewMockConfig(ctrl)
 				envNts := newMockEnvironments(1*time.Second, true)
 				mockApiHandlers := NewMockApiHandlers(ctrl)
 
@@ -317,8 +305,9 @@ func TestNewRouter_DebugPprofEndpoints_Returns200(t *testing.T) {
 				mockApiHandlers.EXPECT().apiV2().Return(func() ApiV2 {
 					return emptyRouter
 				}()).Times(1)
+				cfgMock.EXPECT().Values().Return(config.Values{}).AnyTimes()
 
-				return NewRouter(cfg, envNts, mockApiHandlers), ctrl
+				return NewRouter(cfgMock, envNts, mockApiHandlers), ctrl
 			},
 			code: http.StatusOK,
 		},

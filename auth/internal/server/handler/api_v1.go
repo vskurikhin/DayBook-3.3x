@@ -15,6 +15,6 @@ type ApiV1 interface {
 // ResourceV1 implementation.
 func NewApiV1(v1 resources.ResourceV1) ApiV1 {
 	r := chi.NewRouter()
-	r.Get(OK, v1.Ok)
+	r.Get(OkURL, v1.Ok)
 	return r
 }
