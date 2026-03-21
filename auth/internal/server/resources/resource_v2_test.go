@@ -8,9 +8,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
-	"go.uber.org/mock/gomock"
 )
 
 func TestV2_Ok(t *testing.T) {
@@ -31,10 +32,22 @@ func TestV2_Ok(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockSvc := NewMockAuthServiceV2(ctrl)
-			mockSvc.EXPECT().Ok().Return(tt.serviceResp)
+			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
+			mockOkServiceV2.EXPECT().Ok().Return(tt.serviceResp)
+			mockListServiceV2 := NewMockListServiceV2(ctrl)
+			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
+			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
+			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
 
-			v := NewV2(mockSvc)
+			v := NewV2(
+				mockAuthServiceV2,
+				mockListServiceV2,
+				mockLogoutServiceV2,
+				mockOkServiceV2,
+				mockRefreshServiceV2,
+				mockRegisterServiceV2,
+			)
 
 			req := httptest.NewRequest(http.MethodGet, "/v2/ok", nil)
 			rec := httptest.NewRecorder()
@@ -64,7 +77,7 @@ func TestV2_Auth(t *testing.T) {
 			mockSetup:   func(m *MockAuthServiceV2) {},
 			expectError: true,
 		},
-		//{
+		//{ // TODO
 		//	name: "service error",
 		//	body: dto.Login{},
 		//	mockSetup: func(m *MockAuthServiceV2) {
@@ -91,10 +104,22 @@ func TestV2_Auth(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockSvc := NewMockAuthServiceV2(ctrl)
-			tt.mockSetup(mockSvc)
+			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			tt.mockSetup(mockAuthServiceV2)
+			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
+			mockListServiceV2 := NewMockListServiceV2(ctrl)
+			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
+			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
+			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
 
-			v := NewV2(mockSvc)
+			v := NewV2(
+				mockAuthServiceV2,
+				mockListServiceV2,
+				mockLogoutServiceV2,
+				mockOkServiceV2,
+				mockRefreshServiceV2,
+				mockRegisterServiceV2,
+			)
 
 			var bodyBytes []byte
 			switch b := tt.body.(type) {
@@ -123,13 +148,13 @@ func TestV2_Refresh(t *testing.T) {
 	tests := []struct {
 		name        string
 		withCookie  bool
-		mockSetup   func(m *MockAuthServiceV2)
+		mockSetup   func(m *MockRefreshServiceV2)
 		expectError bool
 	}{
 		{
 			name:        "no cookie",
 			withCookie:  false,
-			mockSetup:   func(m *MockAuthServiceV2) {},
+			mockSetup:   func(m *MockRefreshServiceV2) {},
 			expectError: true,
 		},
 		//{
@@ -145,7 +170,7 @@ func TestV2_Refresh(t *testing.T) {
 		{
 			name:       "success",
 			withCookie: true,
-			mockSetup: func(m *MockAuthServiceV2) {
+			mockSetup: func(m *MockRefreshServiceV2) {
 				m.EXPECT().
 					Refresh(gomock.Any(), "token").
 					Return(mockCredentials(), nil)
@@ -159,10 +184,22 @@ func TestV2_Refresh(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockSvc := NewMockAuthServiceV2(ctrl)
-			tt.mockSetup(mockSvc)
+			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
+			mockListServiceV2 := NewMockListServiceV2(ctrl)
+			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
+			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
+			tt.mockSetup(mockRefreshServiceV2)
+			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
 
-			v := NewV2(mockSvc)
+			v := NewV2(
+				mockAuthServiceV2,
+				mockListServiceV2,
+				mockLogoutServiceV2,
+				mockOkServiceV2,
+				mockRefreshServiceV2,
+				mockRegisterServiceV2,
+			)
 
 			req := httptest.NewRequest(http.MethodPost, "/refresh", bytes.NewReader([]byte(`{}`)))
 			if tt.withCookie {
@@ -186,18 +223,18 @@ func TestV2_Refresh(t *testing.T) {
 func TestV2_Logout(t *testing.T) {
 	tests := []struct {
 		name        string
-		mockSetup   func(m *MockAuthServiceV2)
+		mockSetup   func(m *MockLogoutServiceV2)
 		expectError bool
 	}{
 		{
 			name: "success",
-			mockSetup: func(m *MockAuthServiceV2) {
+			mockSetup: func(m *MockLogoutServiceV2) {
 				m.EXPECT().Logout(gomock.Any()).Return(nil)
 			},
 		},
 		{
 			name: "error",
-			mockSetup: func(m *MockAuthServiceV2) {
+			mockSetup: func(m *MockLogoutServiceV2) {
 				m.EXPECT().Logout(gomock.Any()).Return(errors.New("fail"))
 			},
 			expectError: true,
@@ -209,10 +246,22 @@ func TestV2_Logout(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockSvc := NewMockAuthServiceV2(ctrl)
-			tt.mockSetup(mockSvc)
+			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
+			mockListServiceV2 := NewMockListServiceV2(ctrl)
+			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
+			tt.mockSetup(mockLogoutServiceV2)
+			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
+			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
 
-			v := NewV2(mockSvc)
+			v := NewV2(
+				mockAuthServiceV2,
+				mockListServiceV2,
+				mockLogoutServiceV2,
+				mockOkServiceV2,
+				mockRefreshServiceV2,
+				mockRegisterServiceV2,
+			)
 
 			req := httptest.NewRequest(http.MethodPost, "/logout", nil)
 			rec := httptest.NewRecorder()
@@ -230,19 +279,19 @@ func TestV2_Register(t *testing.T) {
 	tests := []struct {
 		name        string
 		body        any
-		mockSetup   func(m *MockAuthServiceV2)
+		mockSetup   func(m *MockRegisterServiceV2)
 		expectError bool
 	}{
 		{
 			name:        "invalid json",
 			body:        "bad",
-			mockSetup:   func(m *MockAuthServiceV2) {},
+			mockSetup:   func(m *MockRegisterServiceV2) {},
 			expectError: true,
 		},
 		{
 			name: "success",
 			body: dto.CreateUser{},
-			mockSetup: func(m *MockAuthServiceV2) {
+			mockSetup: func(m *MockRegisterServiceV2) {
 				m.EXPECT().
 					Register(gomock.Any(), gomock.Any()).
 					Return(mockCredentials(), nil)
@@ -255,10 +304,22 @@ func TestV2_Register(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockSvc := NewMockAuthServiceV2(ctrl)
-			tt.mockSetup(mockSvc)
+			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
+			mockListServiceV2 := NewMockListServiceV2(ctrl)
+			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
+			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
+			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
+			tt.mockSetup(mockRegisterServiceV2)
 
-			v := NewV2(mockSvc)
+			v := NewV2(
+				mockAuthServiceV2,
+				mockListServiceV2,
+				mockLogoutServiceV2,
+				mockOkServiceV2,
+				mockRefreshServiceV2,
+				mockRegisterServiceV2,
+			)
 
 			var bodyBytes []byte
 			switch b := tt.body.(type) {

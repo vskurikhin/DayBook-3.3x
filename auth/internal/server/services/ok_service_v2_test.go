@@ -7,13 +7,13 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestNewAuthServiceV1(t *testing.T) {
+func TestNewOkServiceV2(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	cfg := NewMockConfig(ctrl) // можно использовать пустую конфигурацию
 
-	svc := NewAuthServiceV1(cfg, nil)
+	svc := NewOkServiceV2(cfg, nil)
 
 	require.NotNil(t, svc)
 	require.Equal(t, cfg, svc.cfg)
@@ -21,12 +21,12 @@ func TestNewAuthServiceV1(t *testing.T) {
 	require.NotNil(t, svc.BaseService)
 }
 
-func TestServiceV1_Ok(t *testing.T) {
+func TestOkServiceV2_Ok(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cfg := NewMockConfig(ctrl) // можно использовать пустую конфигурацию
 
-	svc := NewAuthServiceV1(cfg, nil)
+	svc := NewOkServiceV2(cfg, nil)
 
 	result := svc.Ok()
 	require.Equal(t, Ok, result)

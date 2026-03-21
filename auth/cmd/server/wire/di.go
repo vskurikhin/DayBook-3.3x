@@ -37,10 +37,20 @@ var (
 		resources.NewV2,
 	)
 	serviceSet = wire.NewSet(
-		wire.Bind(new(services.AuthServiceV1), new(*services.ServiceV1)),
-		wire.Bind(new(services.AuthServiceV2), new(*services.ServiceV2)),
-		services.NewAuthServiceV1,
+		wire.Bind(new(services.AuthServiceV2), new(*services.AuthServiceImplV2)),
+		wire.Bind(new(services.ListServiceV2), new(*services.ListServiceImplV2)),
+		wire.Bind(new(services.LogoutServiceV2), new(*services.LogoutServiceImplV2)),
+		wire.Bind(new(services.OkServiceV1), new(*services.OkServiceImplV1)),
+		wire.Bind(new(services.OkServiceV2), new(*services.OkServiceImplV2)),
+		wire.Bind(new(services.RefreshServiceV2), new(*services.RefreshServiceImplV2)),
+		wire.Bind(new(services.RegisterServiceV2), new(*services.RegisterServiceImplV2)),
 		services.NewAuthServiceV2,
+		services.NewListServiceV2,
+		services.NewLogoutServiceV2,
+		services.NewOkServiceV1,
+		services.NewOkServiceV2,
+		services.NewRefreshServiceV2,
+		services.NewRegisterServiceV2,
 	)
 	repositorySet = wire.NewSet(
 		wire.Bind(new(db.DB), new(*db.PgxPool)),

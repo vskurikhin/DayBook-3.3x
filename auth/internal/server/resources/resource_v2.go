@@ -12,13 +12,33 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
-//go:generate mockgen -destination=auth_service_v2_mock_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources AuthServiceV2
+//go:generate mockgen -destination=z_mock_auth_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources AuthServiceV2
 type AuthServiceV2 interface {
-	AuthServiceV1
 	Auth(ctx context.Context, login services.Login) (services.Credentials, error)
+}
+
+//go:generate mockgen -destination=z_mock_list_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources ListServiceV2
+type ListServiceV2 interface {
 	List(ctx context.Context) ([]services.User, error)
+}
+
+//go:generate mockgen -destination=z_mock_logout_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources LogoutServiceV2
+type LogoutServiceV2 interface {
 	Logout(ctx context.Context) error
+}
+
+//go:generate mockgen -destination=z_mock_ok_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources OkServiceV2
+type OkServiceV2 interface {
+	Ok() string
+}
+
+//go:generate mockgen -destination=z_mock_refresh_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources RefreshServiceV2
+type RefreshServiceV2 interface {
 	Refresh(ctx context.Context, token string) (services.Credentials, error)
+}
+
+//go:generate mockgen -destination=z_mock_register_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources RegisterServiceV2
+type RegisterServiceV2 interface {
 	Register(ctx context.Context, user services.CreateUser) (services.Credentials, error)
 }
 
@@ -34,7 +54,12 @@ type ResourceV2 interface {
 var _ ResourceV2 = (*V2)(nil)
 
 type V2 struct {
-	service services.AuthServiceV2
+	authService     services.AuthServiceV2
+	listService     services.ListServiceV2
+	logoutService   services.LogoutServiceV2
+	okService       services.OkServiceV2
+	refreshService  services.RefreshServiceV2
+	registerService services.RegisterServiceV2
 }
 
 // Auth route
@@ -57,7 +82,7 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 	if errDecode != nil {
 		return errDecode
 	}
-	creds, err := v.service.Auth(r.Context(), services.LoginFromDto(login))
+	creds, err := v.authService.Auth(r.Context(), services.LoginFromDto(login))
 	if err != nil {
 		return err
 	}
@@ -82,7 +107,7 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 // @Failure 504
 // @Router /v2/list [get]
 func (v V2) List(w http.ResponseWriter, r *http.Request) error {
-	list, err := v.service.List(r.Context())
+	list, err := v.listService.List(r.Context())
 	if err != nil {
 		return err
 	}
@@ -103,7 +128,7 @@ func (v V2) List(w http.ResponseWriter, r *http.Request) error {
 // @Failure 504
 // @Router /v2/logout [post]
 func (v V2) Logout(_ http.ResponseWriter, r *http.Request) error {
-	return v.service.Logout(r.Context())
+	return v.logoutService.Logout(r.Context())
 }
 
 // Ok route
@@ -120,7 +145,7 @@ func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error {
 	return json.NewEncoder(w).Encode(APIResponse{
 		Success: true,
 		Data: []map[string]string{
-			{"msg": v.service.Ok()},
+			{"msg": v.okService.Ok()},
 		},
 	})
 }
@@ -155,7 +180,7 @@ func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
 		return errDecode
 	}
 	_ = login
-	creds, err := v.service.Refresh(r.Context(), cookie.Value)
+	creds, err := v.refreshService.Refresh(r.Context(), cookie.Value)
 	if err != nil {
 		return err
 	}
@@ -188,7 +213,7 @@ func (v V2) Register(w http.ResponseWriter, r *http.Request) error {
 	if errDecode != nil {
 		return errDecode
 	}
-	creds, err := v.service.Register(r.Context(), services.CreateUserFromDto(u))
+	creds, err := v.registerService.Register(r.Context(), services.CreateUserFromDto(u))
 	if err != nil {
 		return err
 	}
@@ -203,6 +228,20 @@ func (v V2) Register(w http.ResponseWriter, r *http.Request) error {
 
 // NewV2 creates and returns a new V2 resource instance that implements
 // the ResourceV2 interface.
-func NewV2(service services.AuthServiceV2) *V2 {
-	return &V2{service: service}
+func NewV2(
+	authService services.AuthServiceV2,
+	listService services.ListServiceV2,
+	logoutService services.LogoutServiceV2,
+	okService services.OkServiceV2,
+	refreshService services.RefreshServiceV2,
+	registerService services.RegisterServiceV2,
+) *V2 {
+	return &V2{
+		authService:     authService,
+		listService:     listService,
+		logoutService:   logoutService,
+		okService:       okService,
+		refreshService:  refreshService,
+		registerService: registerService,
+	}
 }

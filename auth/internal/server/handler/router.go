@@ -66,7 +66,7 @@ const (
 	V2               = "/v2"
 )
 
-//go:generate mockgen -destination=config_mock_test.go -package=handler github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler Config
+//go:generate mockgen -destination=z_mock_config_test.go -package=handler github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/handler Config
 type Config interface {
 	JWThs256SignKey(string)
 	Values() config.Values

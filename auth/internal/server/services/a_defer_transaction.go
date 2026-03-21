@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-//go:generate mockgen -destination=tx_mock_test.go -package=services github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services Tx
+//go:generate mockgen -destination=z_mock_tx_test.go -package=services github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services Tx
 type Tx interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context) error

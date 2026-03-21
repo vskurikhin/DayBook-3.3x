@@ -7,8 +7,8 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
 )
 
-//go:generate mockgen -destination=auth_service_v1_mock_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources AuthServiceV1
-type AuthServiceV1 interface {
+//go:generate mockgen -destination=z_mock_ok_service_v1_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources OkServiceV1
+type OkServiceV1 interface {
 	Ok() string
 }
 
@@ -19,7 +19,7 @@ type ResourceV1 interface {
 var _ ResourceV1 = (*V1)(nil)
 
 type V1 struct {
-	service services.AuthServiceV1
+	service services.OkServiceV1
 }
 
 // Ok route
@@ -40,6 +40,6 @@ func (v V1) Ok(w http.ResponseWriter, _ *http.Request) {
 
 // NewV1 creates and returns a new V1 resource instance that implements
 // the ResourceV1 interface.
-func NewV1(service services.AuthServiceV1) *V1 {
+func NewV1(service services.OkServiceV1) *V1 {
 	return &V1{service: service}
 }
