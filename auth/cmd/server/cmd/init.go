@@ -131,8 +131,8 @@ func init() {
 	runCmd.Flags().String(FlagHostname, "localhost", "Hostname.")
 	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
 	runCmd.Flags().String(FlagJWThs256SignKey, "", "JWT HS256 signing key.")
-	runCmd.Flags().Duration(FlagValidPeriodAccessToken, 15*time.Second, "Valid period access token.")
-	runCmd.Flags().Duration(FlagValidPeriodRefreshToken, 45*time.Minute, "Valid period refresh token.")
+	runCmd.Flags().Duration(FlagValidPeriodAccessToken, 45*time.Second, "Valid period access token.")
+	runCmd.Flags().Duration(FlagValidPeriodRefreshToken, 15*time.Hour, "Valid period refresh token.")
 
 	migrateCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
 	migrateCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")

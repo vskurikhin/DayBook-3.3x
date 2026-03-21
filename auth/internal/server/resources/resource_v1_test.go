@@ -5,67 +5,61 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"go.uber.org/mock/gomock"
 )
 
-var _ config.Config = (*testValuesConfig)(nil)
-
-type testValuesConfig struct {
-	values config.Values
-}
-
-func (t testValuesConfig) JWThs256SignKey(_ string) {}
-
-func (t testValuesConfig) Values() config.Values {
-	return t.values
-}
-
-func newTestConfig() *testValuesConfig {
-	return &testValuesConfig{values: config.Values{Address: "127.0.0.1:0", Debug: false}}
-}
-
-func newTestConfigDebug() *testValuesConfig {
-	return &testValuesConfig{values: config.Values{Address: "127.0.0.1:0", Debug: true}}
-}
-
-func TestNewV1(t *testing.T) {
-	v := NewV1(newTestConfig())
-
-	if v == nil {
-		t.Fatal("expected V1 instance, got nil")
-	}
-}
-
-func TestV1_Ok_ReturnsV1(t *testing.T) {
-	v := V1{cfg: newTestConfig()}
-
-	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
-	rec := httptest.NewRecorder()
-
-	v.Ok(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
+func TestV1_Ok(t *testing.T) {
+	tests := []struct {
+		name           string
+		mockReturn     string
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "success simple response",
+			mockReturn:     "ok",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "ok",
+		},
+		{
+			name:           "empty response",
+			mockReturn:     "",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "",
+		},
+		{
+			name:           "custom message",
+			mockReturn:     "hello world",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "hello world",
+		},
 	}
 
-	if rec.Body.String() != "ok" {
-		t.Fatalf("expected body 'ok', got %s", rec.Body.String())
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-func TestV1_Ok_Returns_DEBUG_V1(t *testing.T) {
-	v := V1{cfg: newTestConfigDebug()}
+			mockService := NewMockAuthServiceV1(ctrl)
+			mockService.EXPECT().
+				Ok().
+				Return(tt.mockReturn).
+				Times(1)
 
-	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
-	rec := httptest.NewRecorder()
+			resource := NewV1(mockService)
 
-	v.Ok(rec, req)
+			req := httptest.NewRequest(http.MethodGet, "/v1/ok", nil)
+			rec := httptest.NewRecorder()
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rec.Code)
-	}
+			resource.Ok(rec, req)
 
-	if rec.Body.String() != "ok" {
-		t.Fatalf("expected body 'ok', got %s", rec.Body.String())
+			if rec.Code != tt.expectedStatus {
+				t.Fatalf("expected status %d, got %d", tt.expectedStatus, rec.Code)
+			}
+
+			if rec.Body.String() != tt.expectedBody {
+				t.Fatalf("expected body %q, got %q", tt.expectedBody, rec.Body.String())
+			}
+		})
 	}
 }

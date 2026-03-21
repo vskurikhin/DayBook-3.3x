@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"go.uber.org/mock/gomock"
@@ -64,7 +65,53 @@ func TestApiV2(t *testing.T) {
 			},
 		},
 		{
-			name: "positive #3 route: " + RefreshURL,
+			name: "positive #3 route: " + ListURL,
+			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
+				ctrl := gomock.NewController(t)
+				cfgMock := NewMockConfig(ctrl)
+				mock := &mockResourceV2Ok{}
+
+				cfgMock.EXPECT().Values().Return(config.Values{JWThs256SignKey: []byte("secret")}).AnyTimes()
+
+				return NewApiV2(cfgMock, mock), mock, ctrl
+			},
+			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
+				req := httptest.NewRequest(http.MethodGet, ListURL, nil)
+				token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{})
+				st, _ := token.SignedString([]byte("secret"))
+				req.Header.Set("Authorization", "Bearer "+string(st))
+				return testServeHTTP(router, req)
+			},
+			want: wantType{
+				code: http.StatusOK,
+				body: "list",
+			},
+		},
+		{
+			name: "positive #4 route: " + LogoutURL,
+			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
+				ctrl := gomock.NewController(t)
+				cfgMock := NewMockConfig(ctrl)
+				mock := &mockResourceV2Ok{}
+
+				cfgMock.EXPECT().Values().Return(config.Values{JWThs256SignKey: []byte("secret")}).AnyTimes()
+
+				return NewApiV2(cfgMock, mock), mock, ctrl
+			},
+			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
+				req := httptest.NewRequest(http.MethodPost, LogoutURL, nil)
+				token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{})
+				st, _ := token.SignedString([]byte("secret"))
+				req.Header.Set("Authorization", "Bearer "+string(st))
+				return testServeHTTP(router, req)
+			},
+			want: wantType{
+				code: http.StatusOK,
+				body: "logout",
+			},
+		},
+		{
+			name: "positive #5 route: " + RefreshURL,
 			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
@@ -84,7 +131,7 @@ func TestApiV2(t *testing.T) {
 			},
 		},
 		{
-			name: "positive #4 route: " + RegisterURL,
+			name: "positive #6 route: " + RegisterURL,
 			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
@@ -142,7 +189,14 @@ func (m *mockResourceV2Ok) Auth(w http.ResponseWriter, _ *http.Request) error {
 	return nil
 }
 
-func (m *mockResourceV2Ok) Logout(w http.ResponseWriter, r *http.Request) error {
+func (m *mockResourceV2Ok) List(w http.ResponseWriter, _ *http.Request) error {
+	m.called = true
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("list"))
+	return nil
+}
+
+func (m *mockResourceV2Ok) Logout(w http.ResponseWriter, _ *http.Request) error {
 	m.called = true
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("logout"))

@@ -15,14 +15,14 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
-func mergeCobraAndViper(cmd *cobra.Command) {
+func mergeCobraToViper(cmd *cobra.Command) {
 	for key := range viper.GetViper().AllSettings() {
 		viperBindPFlag(key, tool.SnakeCaseToKebabCase(key), cmd)
 	}
-	cmd.Flags().VisitAll(mergeCobraAndViperFunc(cmd))
+	cmd.Flags().VisitAll(mergeCobraToViperFunc(cmd))
 }
 
-func mergeCobraAndViperFunc(cmd *cobra.Command) func(f *pflag.Flag) {
+func mergeCobraToViperFunc(cmd *cobra.Command) func(f *pflag.Flag) {
 	return func(f *pflag.Flag) {
 		if tool.IsDebug(cmd) {
 			slog.Debug(
@@ -55,7 +55,7 @@ func mergeCobraAndViperFunc(cmd *cobra.Command) func(f *pflag.Flag) {
 	}
 }
 
-func mergeConfigAndEnv(cfg config.Config, env env.Environments) {
+func mergeEnvToConfig(cfg config.Config, env env.Environments) {
 	if cfg == nil {
 		return
 	}

@@ -28,8 +28,6 @@ var (
 	handlerSet = wire.NewSet(
 		handler.NewApiV1,
 		handler.NewApiV2,
-		wire.Bind(new(handler.ApiHandlers), new(*handler.Handlers)),
-		handler.NewHandlers,
 		handler.NewRouter,
 	)
 	resourceSet = wire.NewSet(
@@ -39,8 +37,10 @@ var (
 		resources.NewV2,
 	)
 	serviceSet = wire.NewSet(
-		wire.Bind(new(services.BaseService), new(*services.AuthBaseService)),
-		services.NewAuthBaseService,
+		wire.Bind(new(services.AuthServiceV1), new(*services.ServiceV1)),
+		wire.Bind(new(services.AuthServiceV2), new(*services.ServiceV2)),
+		services.NewAuthServiceV1,
+		services.NewAuthServiceV2,
 	)
 	repositorySet = wire.NewSet(
 		wire.Bind(new(db.DB), new(*db.PgxPool)),

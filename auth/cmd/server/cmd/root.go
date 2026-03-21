@@ -46,7 +46,7 @@ All commands support standard flags such as --debug, --verbose, and --config.`,
 	// has an action associated with it:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		setSlogDebug(cmd)
-		mergeCobraAndViper(cmd)
+		mergeCobraToViper(cmd)
 		slogInfoVerbose(cmd)
 		_, err := config.NewConfig(cmd)
 		return err

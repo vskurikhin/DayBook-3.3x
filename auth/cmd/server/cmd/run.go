@@ -47,7 +47,7 @@ using the obtained configuration.`,
 	// has an action associated with it:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		setSlogDebug(cmd)
-		mergeCobraAndViper(cmd)
+		mergeCobraToViper(cmd)
 		slogInfoVerbose(cmd)
 
 		cfg, errConfig := newConfig(cmd)
@@ -59,7 +59,7 @@ using the obtained configuration.`,
 		if errEnvLoad != nil {
 			return errEnvLoad
 		}
-		mergeConfigAndEnv(cfg, env)
+		mergeEnvToConfig(cfg, env)
 
 		dbp, errNewDB := newDB(cmd.Context(), cfg, env)
 		if errNewDB != nil {

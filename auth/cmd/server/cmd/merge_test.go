@@ -123,7 +123,7 @@ func TestMergeCobraAndViper(t *testing.T) {
 			resetViper()
 			cmd := newTestCommand()
 			_ = cmd.Flags().Set(tt.args.name, tt.args.value)
-			mergeCobraAndViper(cmd)
+			mergeCobraToViper(cmd)
 			val := tt.result(tt.args.name)
 			assert.Equal(t, tt.want, val)
 		})
