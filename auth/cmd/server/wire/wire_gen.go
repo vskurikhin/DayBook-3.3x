@@ -9,6 +9,7 @@ package wire
 import (
 	"github.com/google/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
@@ -19,6 +20,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
 )
 
 // Injectors from di.go:
@@ -31,16 +33,18 @@ func InitializeServer(cfg config.Config, environments env.Environments) (*server
 	okServiceImplV1 := services.NewOkServiceV1(cfg, pgxPool)
 	v1 := resources.NewV1(okServiceImplV1)
 	apiV1 := handler.NewApiV1(v1)
+	credentialsMethodFactoryV2 := creds.NewCredentialsMethodFactory(cfg)
 	queries := session.New(pgxPool)
+	transactionDelayer := actions.NewTransactionDelayer()
 	user_viewQueries := user_view.New(pgxPool)
-	authServiceImplV2 := services.NewAuthServiceV2(cfg, pgxPool, queries, user_viewQueries)
+	authServiceImplV2 := services.NewAuthServiceV2(cfg, credentialsMethodFactoryV2, pgxPool, queries, transactionDelayer, user_viewQueries)
 	user_attrsQueries := user_attrs.New(pgxPool)
 	listServiceImplV2 := services.NewListServiceV2(cfg, user_attrsQueries)
 	logoutServiceImplV2 := services.NewLogoutServiceV2(cfg, queries)
 	okServiceImplV2 := services.NewOkServiceV2(cfg, pgxPool)
-	refreshServiceImplV2 := services.NewRefreshServiceV2(cfg, queries, user_attrsQueries)
+	refreshServiceImplV2 := services.NewRefreshServiceV2(cfg, credentialsMethodFactoryV2, queries, user_attrsQueries)
 	user_nameQueries := user_name.New(pgxPool)
-	registerServiceImplV2 := services.NewRegisterServiceV2(cfg, queries, user_attrsQueries, user_nameQueries)
+	registerServiceImplV2 := services.NewRegisterServiceV2(cfg, credentialsMethodFactoryV2, pgxPool, queries, transactionDelayer, user_attrsQueries, user_nameQueries)
 	v2 := resources.NewV2(authServiceImplV2, listServiceImplV2, logoutServiceImplV2, okServiceImplV2, refreshServiceImplV2, registerServiceImplV2)
 	apiV2 := handler.NewApiV2(cfg, v2)
 	httpHandler := handler.NewRouter(cfg, environments, apiV1, apiV2)
@@ -57,6 +61,6 @@ var (
 	serverSet     = wire.NewSet(config.GetConfig, env.EnvironmentsLoad, server.NewAuthServer)
 	handlerSet    = wire.NewSet(handler.NewApiV1, handler.NewApiV2, handler.NewRouter)
 	resourceSet   = wire.NewSet(wire.Bind(new(resources.ResourceV1), new(*resources.V1)), wire.Bind(new(resources.ResourceV2), new(*resources.V2)), resources.NewV1, resources.NewV2)
-	serviceSet    = wire.NewSet(wire.Bind(new(services.AuthServiceV2), new(*services.AuthServiceImplV2)), wire.Bind(new(services.ListServiceV2), new(*services.ListServiceImplV2)), wire.Bind(new(services.LogoutServiceV2), new(*services.LogoutServiceImplV2)), wire.Bind(new(services.OkServiceV1), new(*services.OkServiceImplV1)), wire.Bind(new(services.OkServiceV2), new(*services.OkServiceImplV2)), wire.Bind(new(services.RefreshServiceV2), new(*services.RefreshServiceImplV2)), wire.Bind(new(services.RegisterServiceV2), new(*services.RegisterServiceImplV2)), services.NewAuthServiceV2, services.NewListServiceV2, services.NewLogoutServiceV2, services.NewOkServiceV1, services.NewOkServiceV2, services.NewRefreshServiceV2, services.NewRegisterServiceV2)
+	serviceSet    = wire.NewSet(wire.Bind(new(actions.TxDelayer), new(*actions.TransactionDelayer)), wire.Bind(new(creds.CredentialsFactoryV2), new(*creds.CredentialsMethodFactoryV2)), wire.Bind(new(services.AuthServiceV2), new(*services.AuthServiceImplV2)), wire.Bind(new(services.ListServiceV2), new(*services.ListServiceImplV2)), wire.Bind(new(services.LogoutServiceV2), new(*services.LogoutServiceImplV2)), wire.Bind(new(services.OkServiceV1), new(*services.OkServiceImplV1)), wire.Bind(new(services.OkServiceV2), new(*services.OkServiceImplV2)), wire.Bind(new(services.RefreshServiceV2), new(*services.RefreshServiceImplV2)), wire.Bind(new(services.RegisterServiceV2), new(*services.RegisterServiceImplV2)), actions.NewTransactionDelayer, creds.NewCredentialsMethodFactory, services.NewAuthServiceV2, services.NewListServiceV2, services.NewLogoutServiceV2, services.NewOkServiceV1, services.NewOkServiceV2, services.NewRefreshServiceV2, services.NewRegisterServiceV2)
 	repositorySet = wire.NewSet(wire.Bind(new(db.DB), new(*db.PgxPool)), wire.Bind(new(session.Repo), new(*session.Queries)), wire.Bind(new(session.DBTX), new(*db.PgxPool)), wire.Bind(new(user_attrs.Repo), new(*user_attrs.Queries)), wire.Bind(new(user_attrs.DBTX), new(*db.PgxPool)), wire.Bind(new(user_name.Repo), new(*user_name.Queries)), wire.Bind(new(user_name.DBTX), new(*db.PgxPool)), wire.Bind(new(user_view.Repo), new(*user_view.Queries)), wire.Bind(new(user_view.DBTX), new(*db.PgxPool)), db.GetDB, session.New, user_attrs.New, user_name.New, user_view.New)
 )

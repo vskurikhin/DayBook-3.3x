@@ -7,6 +7,7 @@ import (
 	"github.com/google/wire"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
@@ -17,6 +18,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
 )
 
 var (
@@ -37,6 +39,8 @@ var (
 		resources.NewV2,
 	)
 	serviceSet = wire.NewSet(
+		wire.Bind(new(actions.TxDelayer), new(*actions.TransactionDelayer)),
+		wire.Bind(new(creds.CredentialsFactoryV2), new(*creds.CredentialsMethodFactoryV2)),
 		wire.Bind(new(services.AuthServiceV2), new(*services.AuthServiceImplV2)),
 		wire.Bind(new(services.ListServiceV2), new(*services.ListServiceImplV2)),
 		wire.Bind(new(services.LogoutServiceV2), new(*services.LogoutServiceImplV2)),
@@ -44,6 +48,8 @@ var (
 		wire.Bind(new(services.OkServiceV2), new(*services.OkServiceImplV2)),
 		wire.Bind(new(services.RefreshServiceV2), new(*services.RefreshServiceImplV2)),
 		wire.Bind(new(services.RegisterServiceV2), new(*services.RegisterServiceImplV2)),
+		actions.NewTransactionDelayer,
+		creds.NewCredentialsMethodFactory,
 		services.NewAuthServiceV2,
 		services.NewListServiceV2,
 		services.NewLogoutServiceV2,

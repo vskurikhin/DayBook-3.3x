@@ -1,4 +1,4 @@
-package services
+package model
 
 import (
 	"testing"
@@ -36,7 +36,7 @@ func TestMakeValidTimeTokens(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			before := time.Now()
 
-			result := makeValidTimeTokens(tt.accessDuration, tt.refreshDuration)
+			result := MakeValidTimeTokens(tt.accessDuration, tt.refreshDuration)
 
 			after := time.Now()
 

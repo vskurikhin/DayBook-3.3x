@@ -1,4 +1,4 @@
-package services
+package actions
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-//go:generate mockgen -destination=z_mock_tx_test.go -package=services github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services Tx
+//go:generate mockgen -destination=mock_tx_test.go -package=actions github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions Tx
 type Tx interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context) error
@@ -24,7 +24,13 @@ type Tx interface {
 	Conn() *pgx.Conn
 }
 
-func deferTransaction(ctx context.Context, tx pgx.Tx, err error) {
+type TxDelayer interface {
+	Defer(ctx context.Context, tx pgx.Tx, err error)
+}
+
+type TransactionDelayer struct{}
+
+func (d TransactionDelayer) Defer(ctx context.Context, tx pgx.Tx, err error) {
 	if tx == nil {
 		slog.ErrorContext(ctx, "transaction cannot be nil")
 		return
@@ -53,4 +59,8 @@ func deferTransaction(ctx context.Context, tx pgx.Tx, err error) {
 			slog.String("errorType", fmt.Sprintf("%T", err)),
 		)
 	}
+}
+
+func NewTransactionDelayer() *TransactionDelayer {
+	return &TransactionDelayer{}
 }

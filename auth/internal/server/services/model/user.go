@@ -1,4 +1,4 @@
-package services
+package model
 
 import (
 	"bytes"
@@ -23,14 +23,38 @@ type CreateUser struct {
 	userName        string
 }
 
-func (u CreateUser) ToModelCreateUserNameParams() user_name.CreateUserNameParams {
+func (u *CreateUser) Name() string {
+	return u.name
+}
+
+func (u *CreateUser) Email() string {
+	return u.email
+}
+
+func (u *CreateUser) SetId(id pgtype.UUID) {
+	u.id = id
+}
+
+func (u *CreateUser) SetHashedPassword(password string) {
+	u.password = password
+}
+
+func (u *CreateUser) Password() string {
+	return u.password
+}
+
+func (u *CreateUser) UserName() string {
+	return u.userName
+}
+
+func (u *CreateUser) ToModelCreateUserNameParams() user_name.CreateUserNameParams {
 	return user_name.CreateUserNameParams{
 		Password: u.password,
 		UserName: u.userName,
 	}
 }
 
-func (u CreateUser) ToModelCreateUserAttrsParams() user_attrs.CreateUserAttrsParams {
+func (u *CreateUser) ToModelCreateUserAttrsParams() user_attrs.CreateUserAttrsParams {
 	a := userAttrs{
 		ID:       u.id.Bytes,
 		Email:    u.email,
@@ -82,6 +106,14 @@ type Login struct {
 	flags    int32
 }
 
+func (l Login) UserName() string {
+	return l.userName
+}
+
+func (l Login) Password() string {
+	return l.password
+}
+
 func (l Login) UserNamePgTypeText() pgtype.Text {
 	return pgtype.Text{
 		Valid:  true,
@@ -117,6 +149,16 @@ func (u User) ToDto() dto.User {
 		Visible:  u.visible,
 		Flags:    u.flags,
 	}
+}
+
+func (u User) WithName(name string) User {
+	u.name = name
+	return u
+}
+
+func (u User) WithEMail(email string) User {
+	u.email = email
+	return u
 }
 
 func UserFromModelUserView(user user_view.UserView) User {

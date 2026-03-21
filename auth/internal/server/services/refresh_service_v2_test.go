@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
 	"go.uber.org/mock/gomock"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
@@ -60,9 +61,10 @@ func TestRefreshServiceImplV2_Refresh(t *testing.T) {
 			tt.mock()
 
 			s := &RefreshServiceImplV2{
-				BaseService:   &BaseService{cfg: cfg},
-				sessionRepo:   mockSessionRepo,
-				userAttrsRepo: mockUserAttrsRepo,
+				BaseService:        &BaseService{cfg: cfg},
+				credentialsFactory: creds.NewCredentialsMethodFactory(cfg),
+				sessionRepo:        mockSessionRepo,
+				userAttrsRepo:      mockUserAttrsRepo,
 			}
 
 			_, err := s.Refresh(context.Background(), tt.token)
@@ -97,9 +99,9 @@ func TestRefreshServiceImplV2_refresh(t *testing.T) {
 		{
 			name: "session repo error",
 			claims: jwt.MapClaims{
-				"iss": "test",
-				"sub": "test",
-				"jti": "test",
+				"Iss": "test",
+				"Sub": "test",
+				"Jti": "test",
 			},
 			mock: func() {
 				mockSessionRepo.EXPECT().
@@ -116,8 +118,9 @@ func TestRefreshServiceImplV2_refresh(t *testing.T) {
 			tt.mock()
 
 			s := &RefreshServiceImplV2{
-				BaseService: &BaseService{cfg: cfg},
-				sessionRepo: mockSessionRepo,
+				BaseService:        &BaseService{cfg: cfg},
+				credentialsFactory: creds.NewCredentialsMethodFactory(cfg),
+				sessionRepo:        mockSessionRepo,
 			}
 
 			_, err := s.refresh(context.Background(), tt.claims)

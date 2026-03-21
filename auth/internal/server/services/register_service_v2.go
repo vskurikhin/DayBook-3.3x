@@ -7,44 +7,50 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_name"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
 type RegisterServiceV2 interface {
-	Register(ctx context.Context, user CreateUser) (Credentials, error)
+	Register(ctx context.Context, user model.CreateUser) (model.Credentials, error)
 }
 
 var _ RegisterServiceV2 = (*RegisterServiceImplV2)(nil)
 
 type RegisterServiceImplV2 struct {
 	*BaseService
-	dbPool        db.DB
-	sessionRepo   session.Repo
-	userAttrsRepo user_attrs.Repo
-	userNameRepo  user_name.Repo
+	credentialsFactory creds.CredentialsFactoryV2
+	dbPool             db.DB
+	sessionRepo        session.Repo
+	txDelayer          actions.TxDelayer
+	userAttrsRepo      user_attrs.Repo
+	userNameRepo       user_name.Repo
 }
 
-func (s *RegisterServiceImplV2) Register(ctx context.Context, user CreateUser) (Credentials, error) {
-	var err error
-	user.password, err = tool.Hash(user.password, int(s.cfg.Values().AuthCost))
+func (s *RegisterServiceImplV2) Register(ctx context.Context, user model.CreateUser) (model.Credentials, error) {
+	cost := int(s.cfg.Values().AuthCost)
+	password, err := tool.Hash(user.Password(), cost)
 	if err != nil {
 		slog.ErrorContext(ctx,
 			"failed to hash password",
 			slog.String("error", err.Error()),
 			slog.String("errorType", fmt.Sprintf("%T", err)),
 		)
-		return Credentials{}, err
+		return model.Credentials{}, err
 	}
-	return makeCredV2(s.transactionRegister(ctx, user))
+	user.SetHashedPassword(password)
+	return s.credentialsFactory.MakeCredentials(s.transactionRegister(ctx, user))
 }
 
-func (s *RegisterServiceImplV2) transactionRegister(ctx context.Context, user CreateUser) (credValuesV2, error) {
+func (s *RegisterServiceImplV2) transactionRegister(ctx context.Context, user model.CreateUser) (model.CredValuesV2, error) {
 	var errTransaction = xerror.ErrNil
 	tx, errTransaction := s.dbPool.Begin(ctx)
 	if errTransaction != nil {
@@ -53,9 +59,9 @@ func (s *RegisterServiceImplV2) transactionRegister(ctx context.Context, user Cr
 			slog.String("error", errTransaction.Error()),
 			slog.String("errorType", fmt.Sprintf("%T", errTransaction)),
 		)
-		return credValuesV2{}, errTransaction
+		return model.CredValuesV2{}, errTransaction
 	}
-	defer func() { deferTransaction(ctx, tx, errTransaction) }()
+	defer func() { s.txDelayer.Defer(ctx, tx, errTransaction) }()
 
 	sessionRepoTx := s.sessionRepo.WithTx(tx)
 	userAttrsRepoTx := s.userAttrsRepo.WithTx(tx)
@@ -69,53 +75,51 @@ func (s *RegisterServiceImplV2) transactionRegister(ctx context.Context, user Cr
 		default:
 			errTransaction = xerror.ClassingPgError(errTransaction)
 		}
-		return credValuesV2{}, errTransaction
+		return model.CredValuesV2{}, errTransaction
 	}
 	if !userName.ID.Valid {
 		errTransaction = ErrInvalidUserID
-		return credValuesV2{}, errTransaction
+		return model.CredValuesV2{}, errTransaction
 	}
 
-	user.id = userName.ID
+	user.SetId(userName.ID)
 	_, errTransaction = userAttrsRepoTx.CreateUserAttrs(ctx, user.ToModelCreateUserAttrsParams())
 	if errTransaction != nil {
-		return credValuesV2{}, xerror.ClassingPgError(errTransaction)
+		return model.CredValuesV2{}, xerror.ClassingPgError(errTransaction)
 	}
 
 	cfgValues := s.cfg.Values()
-	sid, errTransaction := newSessionID(cfgValues.Hostname, userName.UserName)
+	sid, errTransaction := model.MakeSessionID(cfgValues.Hostname, userName.UserName)
 	if errTransaction != nil {
-		return credValuesV2{}, errTransaction
+		return model.CredValuesV2{}, errTransaction
 	}
 
-	validPeriodAccessToken := makeValidTimeTokens(cfgValues.ValidPeriodAccessToken, cfgValues.ValidPeriodRefreshToken)
-	primaryKey := sid.toModelPrimaryKey()
+	validPeriodAccessToken := model.MakeValidTimeTokens(cfgValues.ValidPeriodAccessToken, cfgValues.ValidPeriodRefreshToken)
+	primaryKey := sid.ToModelPrimaryKey()
 	_, errTransaction = sessionRepoTx.CreateSession(ctx, session.CreateSessionParams{
-		Iss:       primaryKey.iss,
-		Jti:       primaryKey.jti,
-		Sub:       primaryKey.sub,
+		Iss:       primaryKey.Iss,
+		Jti:       primaryKey.Jti,
+		Sub:       primaryKey.Sub,
 		UserName:  pgtype.Text{String: userName.UserName, Valid: true},
 		Roles:     []string{},
-		ValidTime: pgtype.Timestamptz{Time: validPeriodAccessToken.sessionValidTime.Local(), Valid: true},
+		ValidTime: pgtype.Timestamptz{Time: validPeriodAccessToken.SessionValidTime().Local(), Valid: true},
 	})
 	if errTransaction != nil {
-		return credValuesV2{}, xerror.ClassingPgError(errTransaction)
+		return model.CredValuesV2{}, xerror.ClassingPgError(errTransaction)
 	}
-	userResult := UserFromModelUserName(userName)
-	userResult.name = user.name
-	userResult.email = user.email
+	userResult := model.UserFromModelUserName(userName).
+		WithName(user.Name()).
+		WithEMail(user.Email())
 
-	return credValuesV2{
-		secret:     s.cfg.Values().JWThs256SignKey,
-		sessionID:  sid,
-		timeTokens: validPeriodAccessToken,
-		user:       userResult,
-	}, errTransaction
+	return model.MakeCredValuesV2(sid, validPeriodAccessToken, userResult), errTransaction
 }
 
 func NewRegisterServiceV2(
 	cfg config.Config,
+	credentialsFactory creds.CredentialsFactoryV2,
+	dbPool db.DB,
 	sessionRepo session.Repo,
+	txDelayer actions.TxDelayer,
 	userAttrsRepo user_attrs.Repo,
 	userNameRepo user_name.Repo,
 ) *RegisterServiceImplV2 {
@@ -123,8 +127,11 @@ func NewRegisterServiceV2(
 		BaseService: &BaseService{
 			cfg: cfg,
 		},
-		sessionRepo:   sessionRepo,
-		userAttrsRepo: userAttrsRepo,
-		userNameRepo:  userNameRepo,
+		credentialsFactory: credentialsFactory,
+		dbPool:             dbPool,
+		sessionRepo:        sessionRepo,
+		txDelayer:          txDelayer,
+		userAttrsRepo:      userAttrsRepo,
+		userNameRepo:       userNameRepo,
 	}
 }

@@ -10,23 +10,26 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
 type RefreshServiceV2 interface {
-	Refresh(ctx context.Context, token string) (Credentials, error)
+	Refresh(ctx context.Context, token string) (model.Credentials, error)
 }
 
 var _ RefreshServiceV2 = (*RefreshServiceImplV2)(nil)
 
 type RefreshServiceImplV2 struct {
 	*BaseService
-	sessionRepo   session.Repo
-	userAttrsRepo user_attrs.Repo
+	credentialsFactory creds.CredentialsFactoryV2
+	sessionRepo        session.Repo
+	userAttrsRepo      user_attrs.Repo
 }
 
-func (s *RefreshServiceImplV2) Refresh(ctx context.Context, token string) (Credentials, error) {
+func (s *RefreshServiceImplV2) Refresh(ctx context.Context, token string) (model.Credentials, error) {
 	parsedToken, err := jwt.ParseWithClaims(token, &tool.CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -39,39 +42,39 @@ func (s *RefreshServiceImplV2) Refresh(ctx context.Context, token string) (Crede
 			slog.String("error", err.Error()),
 			slog.String("errorType", fmt.Sprintf("%T", err)),
 		)
-		return Credentials{}, err
+		return model.Credentials{}, err
 	}
-	return makeCredV2(s.refresh(ctx, parsedToken.Claims))
+	return s.credentialsFactory.MakeCredentials(s.refresh(ctx, parsedToken.Claims))
 }
 
-func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (credValuesV2, error) {
-	sid, errDecodeSessionID := sessionIDFromClaims(claims)
+func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (model.CredValuesV2, error) {
+	sid, errDecodeSessionID := model.SessionIDFromClaims(claims)
 	if errDecodeSessionID != nil {
 		slog.ErrorContext(ctx,
-			"failed to decode sessionID",
+			"failed to decode SessionID",
 			slog.String("error", errDecodeSessionID.Error()),
 			slog.String("errorType", fmt.Sprintf("%T", errDecodeSessionID)),
 		)
-		return credValuesV2{}, errDecodeSessionID
+		return model.CredValuesV2{}, errDecodeSessionID
 	}
 
-	primaryKey := sid.toModelPrimaryKey()
+	primaryKey := sid.ToModelPrimaryKey()
 	sess, errGetSession := s.sessionRepo.GetSession(ctx, session.GetSessionParams{
-		Iss: primaryKey.iss,
-		Jti: primaryKey.jti,
-		Sub: primaryKey.sub,
+		Iss: primaryKey.Iss,
+		Jti: primaryKey.Jti,
+		Sub: primaryKey.Sub,
 	})
 	if errGetSession != nil {
-		return credValuesV2{}, xerror.ClassingPgError(errGetSession)
+		return model.CredValuesV2{}, xerror.ClassingPgError(errGetSession)
 	}
-	if sess.Jti != primaryKey.jti {
-		return credValuesV2{}, xerror.ErrInvalidToken
+	if sess.Jti != primaryKey.Jti {
+		return model.CredValuesV2{}, xerror.ErrInvalidToken
 	}
 	if !sess.UserName.Valid {
-		return credValuesV2{}, xerror.ErrJInvalidUserName
+		return model.CredValuesV2{}, xerror.ErrJInvalidUserName
 	}
 	if !sess.ValidTime.Valid {
-		return credValuesV2{}, xerror.ErrSessionTimeExpired
+		return model.CredValuesV2{}, xerror.ErrSessionTimeExpired
 	}
 
 	cfgValues := s.cfg.Values()
@@ -82,9 +85,9 @@ func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (
 			slog.String("errorType", fmt.Sprintf("%T", xerror.ErrSessionTimeExpired)),
 		)
 		err := s.sessionRepo.DeleteSession(ctx, session.DeleteSessionParams{
-			Iss: primaryKey.iss,
-			Jti: primaryKey.jti,
-			Sub: primaryKey.sub,
+			Iss: primaryKey.Iss,
+			Jti: primaryKey.Jti,
+			Sub: primaryKey.Sub,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx,
@@ -92,9 +95,9 @@ func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (
 				slog.String("error", err.Error()),
 				slog.String("errorType", fmt.Sprintf("%T", err)),
 			)
-			return credValuesV2{}, xerror.ErrSessionTimeExpired
+			return model.CredValuesV2{}, xerror.ErrSessionTimeExpired
 		}
-		return credValuesV2{}, xerror.ErrSessionTimeExpired
+		return model.CredValuesV2{}, xerror.ErrSessionTimeExpired
 	}
 
 	user, err := s.userAttrsRepo.GetUserAttrs(ctx, sess.UserName.String)
@@ -104,24 +107,23 @@ func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (
 			slog.String("error", err.Error()),
 			slog.String("errorType", fmt.Sprintf("%T", err)),
 		)
-		return credValuesV2{}, err
+		return model.CredValuesV2{}, err
 	}
 	validPeriodAccessToken := cfgValues.ValidPeriodAccessToken
 	if cfgValues.ValidPeriodAccessToken > sess.ValidTime.Time.Sub(time.Now().Add(-time.Second)) {
 		validPeriodAccessToken = sess.ValidTime.Time.Sub(time.Now().Add(-time.Second))
 	}
-	validTimePeriodsTokens := makeValidTimeTokens(validPeriodAccessToken, sess.ValidTime.Time.Sub(time.Now()))
+	validTimePeriodsTokens := model.MakeValidTimeTokens(validPeriodAccessToken, sess.ValidTime.Time.Sub(time.Now()))
 
-	return credValuesV2{
-		secret:     s.cfg.Values().JWThs256SignKey,
-		sessionID:  sid,
-		timeTokens: validTimePeriodsTokens,
-		user:       UserFromModelUserAttr(user),
-	}, nil
+	return model.MakeCredValuesV2(
+		sid, validTimePeriodsTokens,
+		model.UserFromModelUserAttr(user),
+	), nil
 }
 
 func NewRefreshServiceV2(
 	cfg config.Config,
+	credentialsFactory creds.CredentialsFactoryV2,
 	sessionRepo session.Repo,
 	userAttrsRepo user_attrs.Repo,
 ) *RefreshServiceImplV2 {
@@ -129,7 +131,8 @@ func NewRefreshServiceV2(
 		BaseService: &BaseService{
 			cfg: cfg,
 		},
-		sessionRepo:   sessionRepo,
-		userAttrsRepo: userAttrsRepo,
+		credentialsFactory: credentialsFactory,
+		sessionRepo:        sessionRepo,
+		userAttrsRepo:      userAttrsRepo,
 	}
 }
