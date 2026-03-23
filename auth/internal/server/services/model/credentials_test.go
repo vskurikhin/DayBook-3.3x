@@ -73,7 +73,7 @@ func TestMakeCredentials_AndGetters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			creds := MakeCredentials(tt.token, tt.cookie, time.Now())
+			creds := MakeCredentials(tt.token, tt.cookie)
 
 			require.Equal(t, tt.token, creds.AccessToken())
 			require.Equal(t, tt.cookie, creds.RefreshTokenCookie())

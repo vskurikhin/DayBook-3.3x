@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	jwx "github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/require"
+
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
