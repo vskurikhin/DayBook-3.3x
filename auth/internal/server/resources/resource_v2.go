@@ -63,17 +63,18 @@ type V2 struct {
 	registerService services.RegisterServiceV2
 }
 
-// Auth route
-// @Summary Auth Краткое содержание
-// @Description Auth - Описание (v2)
-// @ID ResourceV2-auth
-// @Tags    auth
-// @Accept  json
+// Auth godoc
+// @Summary Authenticate user
+// @Description Authenticates user using login and password. Returns access token and sets refresh token cookie.
+// @Tags auth
+// @Accept json
 // @Produce json
-// @Param   request body dto.Login true "Request of auth"
-// @Success 200 {object} APIResponse{data=dto.Token} "успешно"
-// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
-// @Failure 504
+// @Param request body dto.Login true "User credentials"
+// @Success 200 {object} APIResponse{data=dto.Token}
+// @Failure 400 {object} APIResponse{error=string,success=bool} "bad request"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "server error 'success': false"
+// @Failure 503 {object} APIResponse{error=string,success=bool} "service unavailable"
+// @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
 // @Router /v2/auth [post]
 func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 	body := http.MaxBytesReader(w, r.Body, 1<<20) // TODO introduce config parameter issue #59
@@ -97,15 +98,17 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// List route
-// @Summary List Краткое содержание
-// @Description List - Описание (v2)
-// @ID ResourceV2-list
-// @Tags ok
+// List godoc
+// @Summary Get users list
+// @Description Returns list of users. Requires JWT authentication.
+// @Tags users
+// @Security BearerAuth
 // @Produce json
-// @Success 200 {object} APIResponse{data=[]dto.User} "успешно"
-// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
-// @Failure 504
+// @Success 200 {object} APIResponse{data=[]dto.User}
+// @Failure 401 {object} string "unauthorized"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "server error 'success': false"
+// @Failure 503 {object} APIResponse{error=string,success=bool} "service unavailable"
+// @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
 // @Router /v2/list [get]
 func (v V2) List(w http.ResponseWriter, r *http.Request) error {
 	list, err := v.listService.List(r.Context())
@@ -118,29 +121,28 @@ func (v V2) List(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// Logout route
-// @Summary Logout Краткое содержание
-// @Description Logout - Описание (v2)
-// @ID ResourceV2-logout
-// @Tags ok
+// Logout godoc
+// @Summary Logout user
+// @Description Invalidates user session. Requires JWT authentication.
+// @Tags auth
+// @Security BearerAuth
 // @Produce json
-// @Success 200 {object} APIResponse{data=nil} "успешно"
-// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
-// @Failure 504
+// @Success 200 {object} APIResponse
+// @Failure 401 {object} string "unauthorized"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "server error 'success': false"
+// @Failure 503 {object} APIResponse{error=string,success=bool} "service unavailable"
+// @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
 // @Router /v2/logout [post]
 func (v V2) Logout(_ http.ResponseWriter, r *http.Request) error {
 	return v.logoutService.Logout(r.Context())
 }
 
-// Ok route
-// @Summary Ok Краткое содержание
-// @Description Ok - Описание (v2)
-// @ID ResourceV2-ok
-// @Tags ok
+// Ok godoc
+// @Summary Health check
+// @Description Returns service status.
+// @Tags health
 // @Produce json
-// @Success 200 {object} APIResponse{data=[]map[string]string} "успешно"
-// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
-// @Failure 504
+// @Success 200 {object} APIResponse{data=[]map[string]string}
 // @Router /v2/ok [get]
 func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error {
 	return json.NewEncoder(w).Encode(APIResponse{
@@ -151,17 +153,20 @@ func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error {
 	})
 }
 
-// Refresh route
-// @Summary Register Краткое содержание
-// @Description Register - Описание (v2)
-// @ID ResourceV2-refresh
-// @Tags    refresh
-// @Accept  json
+// Refresh godoc
+// @Summary Refresh tokens
+// @Description Refreshes access token using refresh token from cookie. Sets new refresh cookie.
+// @Tags auth
+// @Accept json
 // @Produce json
-// @Param   request body dto.Login true "Request of refresh"
-// @Success 200 {object} APIResponse{data=dto.Token} "успешно"
-// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
-// @Failure 504
+// @Param request body dto.Login true "User credentials by cookie string"
+// @Success 200 {object} APIResponse{data=dto.Token}
+// @Success 206
+// @Failure 400 {object} APIResponse{error=string,success=bool} "bad request"
+// @Failure 401 {object} string "unauthorized"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "server error 'success': false"
+// @Failure 503 {object} APIResponse{error=string,success=bool} "service unavailable"
+// @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
 // @Router /v2/refresh [post]
 func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
 	cookie, err := r.Cookie("refresh")
@@ -194,17 +199,19 @@ func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// Register route
-// @Summary Register Краткое содержание
-// @Description Register - Описание (v2)
-// @ID ResourceV2-register
-// @Tags    register
-// @Accept  json
+// Register godoc
+// @Summary Register user
+// @Description Registers a new user and returns access token with refresh cookie.
+// @Tags auth
+// @Accept json
 // @Produce json
-// @Param   request body dto.CreateUser true "Request of register"
-// @Success 200 {object} APIResponse{data=dto.Token} "успешно"
-// @Failure 500 {object} APIResponse{error=string,success=bool} "ошибка сервера "success": false"
-// @Failure 504
+// @Param request body dto.CreateUser true "User registration data"
+// @Success 200 {object} APIResponse{data=dto.Token}
+// @Failure 400 {object} APIResponse{error=string,success=bool} "bad request"
+// @Failure 409 {object} APIResponse{error=string,success=bool} "status conflict"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "server error 'success': false"
+// @Failure 503 {object} APIResponse{error=string,success=bool} "service unavailable"
+// @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
 // @Router /v2/register [post]
 func (v V2) Register(w http.ResponseWriter, r *http.Request) error {
 	body := http.MaxBytesReader(w, r.Body, 1<<20) // TODO introduce config parameter issue #59

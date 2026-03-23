@@ -14,6 +14,9 @@ import (
 // @host			localhost:8089
 // @BasePath		/auth/api
 // @schemes			http
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	os.Exit(cmd.Execute(context.Background()))
 }
