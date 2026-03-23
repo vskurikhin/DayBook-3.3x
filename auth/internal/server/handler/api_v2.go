@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
@@ -19,13 +20,14 @@ type ApiV2 interface {
 // ResourceV2 implementation.
 func NewApiV2(cfg config.Config, v2 resources.ResourceV2) ApiV2 {
 	r := chi.NewRouter()
+	r.Use(middleware.AllowContentType("application/json"))
 	r.Method(http.MethodPost, RegisterURL, APISyncHandler(v2.Register))
 	r.Method(http.MethodPost, RefreshURL, APISyncHandler(v2.Refresh))
 	r.Method(http.MethodPost, AuthURL, APISyncHandler(v2.Auth))
 	r.Method(http.MethodGet, OkURL, APIHandler(v2.Ok))
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		tokenAuth := jwtauth.New("HS256", []byte(cfg.Values().JWThs256SignKey), nil)
+		tokenAuth := jwtauth.New("HS256", cfg.Values().JWThs256SignKey, nil)
 		// Seek, verify and validate JWT tokens
 		r.Use(jwtauth.Verifier(tokenAuth))
 		r.Use(jwtauth.Authenticator(tokenAuth))

@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
 )
 
 type LogoutServiceV2 interface {
@@ -32,21 +33,21 @@ func (s *LogoutServiceImplV2) Logout(ctx context.Context) error {
 		return errBearerToken
 	}
 
-	sid, errDecodeSessionID := sessionIDFromJwxToken(bearerToken)
+	sid, errDecodeSessionID := model.SessionIDFromJwxToken(bearerToken)
 	if errDecodeSessionID != nil {
 		slog.ErrorContext(ctx,
-			"failed to decode sessionID",
+			"failed to decode SessionID",
 			slog.String("error", errDecodeSessionID.Error()),
 			slog.String("errorType", fmt.Sprintf("%T", errDecodeSessionID)),
 		)
 		return errDecodeSessionID
 	}
-	primaryKey := sid.toModelPrimaryKey()
+	primaryKey := sid.ToModelPrimaryKey()
 
 	return s.sessionRepo.DeleteSession(ctx, session.DeleteSessionParams{
-		Iss: primaryKey.iss,
-		Jti: primaryKey.jti,
-		Sub: primaryKey.sub,
+		Iss: primaryKey.Iss,
+		Jti: primaryKey.Jti,
+		Sub: primaryKey.Sub,
 	})
 }
 

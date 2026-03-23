@@ -1,4 +1,4 @@
-package services
+package model
 
 import (
 	"github.com/golang-jwt/jwt/v5"
@@ -9,74 +9,86 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
-type sessionPrimaryKey struct {
-	iss pgtype.UUID
-	jti pgtype.UUID
-	sub pgtype.UUID
+type SessionPrimaryKey struct {
+	Iss pgtype.UUID
+	Jti pgtype.UUID
+	Sub pgtype.UUID
 }
 
-type sessionID struct {
+type SessionID struct {
 	issuerUUID     uuid.UUID
 	userNameUUID   uuid.UUID
 	sessionJTIUUID uuid.UUID
 }
 
-func newSessionID(hostname, UserName string) (sessionID, error) {
+func (s SessionID) IssuerUUID() uuid.UUID {
+	return s.issuerUUID
+}
+
+func (s SessionID) UserNameUUID() uuid.UUID {
+	return s.userNameUUID
+}
+
+func (s SessionID) SessionJTIUUID() uuid.UUID {
+	return s.sessionJTIUUID
+}
+
+func MakeSessionID(hostname, UserName string) (SessionID, error) {
 	sessionJTIUUID, err := uuid.NewV7()
 	if err != nil {
-		return sessionID{}, err
+		return SessionID{}, err
 	}
-	return sessionID{
+	return SessionID{
 		issuerUUID:     uuid.NewSHA1(uuid.NameSpaceDNS, []byte(hostname)),
 		userNameUUID:   uuid.NewSHA1(uuid.NameSpaceDNS, []byte(UserName)),
 		sessionJTIUUID: sessionJTIUUID,
 	}, nil
 }
 
-func sessionIDFromClaims(claims jwt.Claims) (sessionID, error) {
+func SessionIDFromClaims(claims jwt.Claims) (SessionID, error) {
 	issuerUUID, errDecodeIssuer := tool.CanClaimUUID(claims.GetIssuer())
 	if errDecodeIssuer != nil {
-		return sessionID{}, errDecodeIssuer
+		return SessionID{}, errDecodeIssuer
 	}
 	userNameUUID, errDecodeSubject := tool.CanClaimUUID(claims.GetSubject())
 	if errDecodeSubject != nil {
-		return sessionID{}, errDecodeSubject
+		return SessionID{}, errDecodeSubject
 	}
 	sessionJTIUUID, errDecodeJTI := tool.CanClaimUUID(tool.ExtractJTI(claims))
 	if errDecodeJTI != nil {
-		return sessionID{}, errDecodeJTI
+		return SessionID{}, errDecodeJTI
 	}
-	return sessionID{
+	return SessionID{
 		issuerUUID:     issuerUUID,
 		userNameUUID:   userNameUUID,
 		sessionJTIUUID: sessionJTIUUID,
 	}, nil
 }
 
-func sessionIDFromJwxToken(bearerToken jwx.Token) (sessionID, error) {
+func SessionIDFromJwxToken(bearerToken jwx.Token) (SessionID, error) {
 	issuerUUID, errDecodeIssuer := tool.CanUUIDParse(tool.JwxTokenIssuer(bearerToken))
 	if errDecodeIssuer != nil {
-		return sessionID{}, errDecodeIssuer
+		return SessionID{}, errDecodeIssuer
 	}
 	userNameUUID, errDecodeSubject := tool.CanUUIDParse(tool.JwxTokenSubject(bearerToken))
 	if errDecodeSubject != nil {
-		return sessionID{}, errDecodeSubject
+		return SessionID{}, errDecodeSubject
 	}
 	sessionJTIUUID, errDecodeJTI := tool.CanUUIDParse(tool.JwxTokenJTI(bearerToken))
 	if errDecodeJTI != nil {
-		return sessionID{}, errDecodeJTI
+		return SessionID{}, errDecodeJTI
 	}
-	return sessionID{
+	return SessionID{
 		issuerUUID:     issuerUUID,
 		userNameUUID:   userNameUUID,
 		sessionJTIUUID: sessionJTIUUID,
 	}, nil
 }
 
-func (s sessionID) toModelPrimaryKey() sessionPrimaryKey {
-	return sessionPrimaryKey{
-		iss: pgtype.UUID{Bytes: s.issuerUUID, Valid: true},
-		jti: pgtype.UUID{Bytes: s.sessionJTIUUID, Valid: true},
-		sub: pgtype.UUID{Bytes: s.userNameUUID, Valid: true},
+func (s SessionID) ToModelPrimaryKey() SessionPrimaryKey {
+	return SessionPrimaryKey{
+		Iss: pgtype.UUID{Bytes: s.issuerUUID, Valid: true},
+		Jti: pgtype.UUID{Bytes: s.sessionJTIUUID, Valid: true},
+		Sub: pgtype.UUID{Bytes: s.userNameUUID, Valid: true},
 	}
 }

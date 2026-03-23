@@ -1,4 +1,4 @@
-package services
+package actions
 
 import (
 	"context"
@@ -13,6 +13,8 @@ func Test_deferTransaction(t *testing.T) {
 	defer ctrl.Finish()
 
 	ctx := context.Background()
+
+	txDelayer := TransactionDelayer{}
 
 	tests := []struct {
 		name        string
@@ -70,7 +72,7 @@ func Test_deferTransaction(t *testing.T) {
 				tt.expectCalls(tx)
 			}
 
-			deferTransaction(ctx, tx, tt.err)
+			txDelayer.Defer(ctx, tx, tt.err)
 		})
 	}
 }

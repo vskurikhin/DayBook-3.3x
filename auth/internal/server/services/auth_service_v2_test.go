@@ -7,13 +7,436 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
 )
 
-func TestAuthServiceImplV2_auth(t *testing.T) {
+func TestAuthService_Auth(t *testing.T) {
+	var (
+		mockCfg             *MockConfig
+		mockDBPool          *MockDB
+		mockDBTXSessionRepo *MockDBTX
+		mockSessionRepo     *MockSessionRepo
+		mockTx              *MockTx
+		mockUserViewRepo    *MockUserViewRepo
+	)
+	tests := []struct {
+		name        string
+		setupMocks  func()
+		expectError bool
+	}{
+		{
+			name: "factory returns error",
+			setupMocks: func() {
+				mockCfg.EXPECT().Values().Return(config.Values{
+					JWThs256SignKey: []byte("secret"),
+				}).Times(1)
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{}, errors.New("err"))
+			},
+			expectError: true,
+		},
+		{
+			name: "password not valid",
+			setupMocks: func() {
+				mockCfg.EXPECT().Values().Return(config.Values{
+					JWThs256SignKey: []byte("secret"),
+				}).Times(1)
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{}, nil)
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid token",
+			setupMocks: func() {
+				mockCfg.EXPECT().Values().Return(config.Values{
+					JWThs256SignKey: []byte("secret"),
+				}).Times(1)
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{Password: pgtype.Text{Valid: true}}, nil)
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid password",
+			setupMocks: func() {
+				mockCfg.EXPECT().Values().Return(config.Values{
+					JWThs256SignKey: []byte("secret"),
+				}).Times(1)
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{UserName: pgtype.Text{Valid: true}, Password: pgtype.Text{Valid: true}}, nil)
+			},
+			expectError: true,
+		},
+		{
+			name: "success",
+			setupMocks: func() {
+				mockCfg.EXPECT().Values().Return(config.Values{
+					JWThs256SignKey: []byte("secret"),
+				}).Times(3)
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{
+						UserName: pgtype.Text{Valid: true},
+						Password: pgtype.Text{String: "$2a$13$skbthyXoVBw24OxT0is4muHSZXEe0QRJo2DFN6iP1EmVsPTkEK8QG", Valid: true},
+					}, nil)
+				mockDBPool.EXPECT().
+					Begin(gomock.Any()).
+					Return(mockTx, nil).
+					Times(1)
+
+				mockRowDBTXSessionRepo := &mockRowSession{data: session.Session{}}
+				mockDBTXSessionRepo.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(mockRowDBTXSessionRepo).
+					Times(1)
+				mockSessionRepo.EXPECT().
+					WithTx(mockTx).
+					Return(session.New(mockDBTXSessionRepo))
+
+				mockTx.EXPECT().
+					Commit(gomock.Any()).
+					Return(nil).
+					Times(1)
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockCfg = NewMockConfig(ctrl)
+			mockSessionRepo = NewMockSessionRepo(ctrl)
+			mockUserViewRepo = NewMockUserViewRepo(ctrl)
+			mockDBPool = NewMockDB(ctrl)
+			mockDBTXSessionRepo = NewMockDBTX(ctrl)
+			mockTx = NewMockTx(ctrl)
+
+			tt.setupMocks()
+
+			service := NewAuthServiceV2(mockCfg,
+				creds.NewCredentialsMethodFactory(mockCfg),
+				mockDBPool, mockSessionRepo,
+				actions.NewTransactionDelayer(),
+				mockUserViewRepo,
+			)
+
+			_, err := service.Auth(context.Background(), model.LoginFromDto(dto.Login{Password: "password"}))
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestAuthService_auth(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+
+	mockUserViewRepo := NewMockUserViewRepo(ctrl)
+
+	mockCfg := NewMockConfig(ctrl)
+	mockCfg.EXPECT().Values().AnyTimes().Return(config.Values{
+		Hostname: "test-host",
+	})
+
+	service := &AuthServiceImplV2{
+		BaseService:  &BaseService{cfg: mockCfg},
+		userViewRepo: mockUserViewRepo,
+	}
+
+	tests := []struct {
+		name        string
+		setupMocks  func()
+		expectError bool
+	}{
+		{
+			name: "GetUserName error",
+			setupMocks: func() {
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{}, errors.New("db error"))
+			},
+			expectError: true,
+		},
+		{
+			name: "password not valid",
+			setupMocks: func() {
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{
+						Password: pgtype.Text{Valid: false},
+					}, nil)
+			},
+			expectError: true,
+		},
+		{
+			name: "username not valid",
+			setupMocks: func() {
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{
+						Password: pgtype.Text{Valid: true, String: "hash"},
+						UserName: pgtype.Text{Valid: false},
+					}, nil)
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid password",
+			setupMocks: func() {
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{
+						Password: pgtype.Text{Valid: true, String: "hash"},
+						UserName: pgtype.Text{Valid: true, String: "user"},
+					}, nil)
+			},
+			expectError: true,
+		},
+		{
+			name: "success (go to transaction)",
+			setupMocks: func() {
+				// ⚠️ тут Verify должен пройти → используем одинаковые строки
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{
+						Password: pgtype.Text{Valid: true, String: "pass"},
+						UserName: pgtype.Text{Valid: true, String: "user"},
+					}, nil)
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMocks()
+
+			_, err := service.auth(ctx, model.Login{})
+
+			if tt.expectError {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestAuthService_transactionAuth(t *testing.T) {
+	var (
+		mockCfg             *MockConfig
+		mockDBPool          *MockDB
+		mockDBTXSessionRepo *MockDBTX
+		mockSessionRepo     *MockSessionRepo
+		mockTx              *MockTx
+		//mockUserViewRepo    *MockUserViewRepo
+		mockTxDelayer *MockTxDelayer
+	)
+
+	sid, _ := model.MakeSessionID("host", "user")
+
+	tests := []struct {
+		name        string
+		setupMocks  func(context.Context)
+		expectError bool
+	}{
+		{
+			name: "begin error",
+			setupMocks: func(ctx context.Context) {
+				mockCfg.EXPECT().Values().AnyTimes().Return(config.Values{
+					ValidPeriodAccessToken:  1,
+					ValidPeriodRefreshToken: 1,
+				})
+				mockDBPool.EXPECT().Begin(ctx).Return(nil, errors.New("db error"))
+			},
+			expectError: true,
+		},
+		{
+			name: "create session error",
+			setupMocks: func(ctx context.Context) {
+				mockCfg.EXPECT().Values().AnyTimes().Return(config.Values{
+					ValidPeriodAccessToken:  1,
+					ValidPeriodRefreshToken: 1,
+				})
+				mockDBPool.EXPECT().Begin(ctx).Return(mockTx, nil)
+
+				mockRowDBTXSessionRepo := &mockRowSessionError{}
+				mockDBTXSessionRepo.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(mockRowDBTXSessionRepo).
+					Times(1)
+				mockSessionRepo.EXPECT().
+					WithTx(mockTx).
+					Return(session.New(mockDBTXSessionRepo)).
+					Times(1)
+
+				mockTxDelayer.EXPECT().Defer(ctx, mockTx, gomock.Any())
+			},
+			expectError: true,
+		},
+		{
+			name: "success",
+			setupMocks: func(ctx context.Context) {
+				mockCfg.EXPECT().Values().AnyTimes().Return(config.Values{
+					ValidPeriodAccessToken:  1,
+					ValidPeriodRefreshToken: 1,
+				})
+				mockDBPool.EXPECT().Begin(ctx).Return(mockTx, nil)
+
+				mockRowDBTXSessionRepo := &mockRowSession{data: session.Session{}}
+				mockDBTXSessionRepo.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(mockRowDBTXSessionRepo).
+					Times(1)
+				mockSessionRepo.EXPECT().
+					WithTx(mockTx).
+					Return(session.New(mockDBTXSessionRepo)).
+					Times(1)
+
+				mockTxDelayer.EXPECT().Defer(ctx, mockTx, gomock.Any())
+			},
+			expectError: false,
+		},
+	}
+
+	user := user_view.UserView{
+		UserName: pgtype.Text{String: "user", Valid: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			ctx := context.Background()
+
+			mockCfg = NewMockConfig(ctrl)
+			mockDBPool = NewMockDB(ctrl)
+			mockDBTXSessionRepo = NewMockDBTX(ctrl)
+			mockTx = NewMockTx(ctrl)
+			mockSessionRepo = NewMockSessionRepo(ctrl)
+			mockTxDelayer = NewMockTxDelayer(ctrl)
+
+			tt.setupMocks(context.Background())
+
+			service := &AuthServiceImplV2{
+				BaseService: &BaseService{cfg: mockCfg},
+				dbPool:      mockDBPool,
+				sessionRepo: mockSessionRepo,
+				txDelayer:   mockTxDelayer,
+			}
+
+			_, err := service.transactionAuth(ctx, sid, user)
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestAuthServiceImplV2_Auth(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+
+	mockSessionRepo := NewMockSessionRepo(ctrl)
+	mockUserViewRepo := NewMockUserViewRepo(ctrl)
+	mockDB := NewMockDB(ctrl)
+
+	mockCfg := NewMockConfig(ctrl)
+	mockCfg.EXPECT().Values().Return(config.Values{}).AnyTimes()
+
+	credentialsFactory := creds.NewCredentialsMethodFactory(mockCfg)
+	txDelayer := actions.TransactionDelayer{}
+
+	service := NewAuthServiceV2(mockCfg, credentialsFactory, mockDB, mockSessionRepo, txDelayer, mockUserViewRepo)
+
+	login := model.LoginFromDto(dto.Login{
+		UserName: "test",
+		Password: "test",
+	})
+
+	tests := []struct {
+		name        string
+		setup       func()
+		expectedErr error
+	}{
+		{
+			name: "user repo error",
+			setup: func() {
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{}, errors.New("db error"))
+			},
+			expectedErr: errors.New("db error"),
+		},
+		{
+			name: "password not valid",
+			setup: func() {
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{
+						Password: pgtype.Text{Valid: false},
+					}, nil)
+			},
+			expectedErr: xerror.ErrPasswordNotValid,
+		},
+		{
+			name: "username not valid",
+			setup: func() {
+				mockUserViewRepo.EXPECT().
+					GetUserName(gomock.Any(), gomock.Any()).
+					Return(user_view.UserView{
+						Password: pgtype.Text{String: "hash", Valid: true},
+						UserName: pgtype.Text{Valid: false},
+					}, nil)
+			},
+			expectedErr: xerror.ErrInvalidToken,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+
+			_, err := service.Auth(ctx, login)
+
+			if tt.expectedErr != nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestAuthServiceImplV2_auth2(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -26,13 +449,16 @@ func TestAuthServiceImplV2_auth(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		login   Login
+		login   model.Login
 		mock    func()
 		wantErr bool
 	}{
 		{
-			name:  "user not found",
-			login: Login{userName: "test", password: "pass"},
+			name: "user not found",
+			login: model.LoginFromDto(dto.Login{
+				UserName: "test",
+				Password: "pass",
+			}), /*Login{userName: "test", password: "pass"}*/
 			mock: func() {
 				mockUserViewRepo.EXPECT().
 					GetUserName(gomock.Any(), gomock.Any()).
@@ -41,8 +467,11 @@ func TestAuthServiceImplV2_auth(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:  "invalid password",
-			login: Login{userName: "test", password: "wrong"},
+			name: "invalid password",
+			login: model.LoginFromDto(dto.Login{
+				UserName: "test",
+				Password: "wrong",
+			}), /*Login{userName: "test", password: "wrong"}*/
 			mock: func() {
 				mockUserViewRepo.EXPECT().
 					GetUserName(gomock.Any(), gomock.Any()).

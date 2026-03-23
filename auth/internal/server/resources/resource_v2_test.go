@@ -11,7 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
 )
 
 func TestV2_Ok(t *testing.T) {
@@ -341,6 +341,6 @@ func TestV2_Register(t *testing.T) {
 	}
 }
 
-func mockCredentials() services.Credentials {
-	return services.Credentials{}
+func mockCredentials() model.Credentials {
+	return model.Credentials{}
 }

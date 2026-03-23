@@ -1,4 +1,4 @@
-package services
+package model
 
 import (
 	"net/http"
@@ -13,10 +13,18 @@ type Token struct {
 	user      User
 }
 
+func MakeToken(expiresAt time.Time, jwt string, user User) Token {
+	return Token{expiresAt: expiresAt, jwt: jwt, user: user}
+}
+
 type Credentials struct {
 	accessToken        Token
 	refreshTokenCookie http.Cookie
-	expiresAt          time.Time
+	//expiresAt          time.Time // TODO remove
+}
+
+func MakeCredentials(accessToken Token, refreshTokenCookie http.Cookie, expiresAt time.Time) Credentials {
+	return Credentials{accessToken: accessToken, refreshTokenCookie: refreshTokenCookie}
 }
 
 func (c Credentials) AccessToken() Token {

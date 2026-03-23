@@ -7,7 +7,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
 )
 
-//go:generate mockgen -destination=z_mock_ok_service_v1_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources OkServiceV1
+//go:generate mockgen -destination=mock_ok_service_v1_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources OkServiceV1
 type OkServiceV1 interface {
 	Ok() string
 }

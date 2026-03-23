@@ -9,37 +9,38 @@ import (
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
-//go:generate mockgen -destination=z_mock_auth_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources AuthServiceV2
+//go:generate mockgen -destination=mock_auth_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources AuthServiceV2
 type AuthServiceV2 interface {
-	Auth(ctx context.Context, login services.Login) (services.Credentials, error)
+	Auth(ctx context.Context, login model.Login) (model.Credentials, error)
 }
 
-//go:generate mockgen -destination=z_mock_list_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources ListServiceV2
+//go:generate mockgen -destination=mock_list_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources ListServiceV2
 type ListServiceV2 interface {
-	List(ctx context.Context) ([]services.User, error)
+	List(ctx context.Context) ([]model.User, error)
 }
 
-//go:generate mockgen -destination=z_mock_logout_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources LogoutServiceV2
+//go:generate mockgen -destination=mock_logout_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources LogoutServiceV2
 type LogoutServiceV2 interface {
 	Logout(ctx context.Context) error
 }
 
-//go:generate mockgen -destination=z_mock_ok_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources OkServiceV2
+//go:generate mockgen -destination=mock_ok_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources OkServiceV2
 type OkServiceV2 interface {
 	Ok() string
 }
 
-//go:generate mockgen -destination=z_mock_refresh_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources RefreshServiceV2
+//go:generate mockgen -destination=mock_refresh_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources RefreshServiceV2
 type RefreshServiceV2 interface {
-	Refresh(ctx context.Context, token string) (services.Credentials, error)
+	Refresh(ctx context.Context, token string) (model.Credentials, error)
 }
 
-//go:generate mockgen -destination=z_mock_register_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources RegisterServiceV2
+//go:generate mockgen -destination=mock_register_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources RegisterServiceV2
 type RegisterServiceV2 interface {
-	Register(ctx context.Context, user services.CreateUser) (services.Credentials, error)
+	Register(ctx context.Context, user model.CreateUser) (model.Credentials, error)
 }
 
 type ResourceV2 interface {
@@ -82,7 +83,7 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 	if errDecode != nil {
 		return errDecode
 	}
-	creds, err := v.authService.Auth(r.Context(), services.LoginFromDto(login))
+	creds, err := v.authService.Auth(r.Context(), model.LoginFromDto(login))
 	if err != nil {
 		return err
 	}
@@ -113,7 +114,7 @@ func (v V2) List(w http.ResponseWriter, r *http.Request) error {
 	}
 	return json.NewEncoder(w).Encode(APIResponse{
 		Success: true,
-		Data:    tool.Map(list, services.User.ToDto),
+		Data:    tool.Map(list, model.User.ToDto),
 	})
 }
 
@@ -213,7 +214,7 @@ func (v V2) Register(w http.ResponseWriter, r *http.Request) error {
 	if errDecode != nil {
 		return errDecode
 	}
-	creds, err := v.registerService.Register(r.Context(), services.CreateUserFromDto(u))
+	creds, err := v.registerService.Register(r.Context(), model.CreateUserFromDto(u))
 	if err != nil {
 		return err
 	}

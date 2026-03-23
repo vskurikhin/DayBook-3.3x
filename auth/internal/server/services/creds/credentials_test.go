@@ -1,45 +1,50 @@
-package services
+package creds
 
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
+	"go.uber.org/mock/gomock"
 )
 
 func Test_makeCredV2(t *testing.T) {
-	now := time.Now()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	issuer := uuid.New()
-	jti := uuid.New()
-	sub := uuid.New()
+	hostname := "localhost"
+	username := "username"
+	secret := "secret"
 
-	cred := credValuesV2{
-		secret: []byte("test-secret"),
-		sessionID: sessionID{
-			issuerUUID:     issuer,
-			sessionJTIUUID: jti,
-			userNameUUID:   sub,
-		},
-		timeTokens: validTimeTokens{
-			accessTokenTime:   now.Add(time.Hour),
-			refreshTokenTime:  now.Add(2 * time.Hour),
-			cookieExpiresTime: now.Add(2 * time.Hour),
-		},
-		user: User{
-			userName: "test-user",
-		},
+	mockCfg := NewMockConfig(ctrl)
+
+	mockCfg.EXPECT().Values().Return(config.Values{JWThs256SignKey: []byte(secret)}).Times(1)
+
+	c := NewCredentialsMethodFactory(mockCfg)
+	sid, err := model.MakeSessionID(hostname, username)
+	if err != nil {
+		t.Fatal("failed to make session id", err)
 	}
+
+	issuer := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(hostname))
+	jti := sid.SessionJTIUUID()
+	sub := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(username))
+
+	cred := model.MakeCredValuesV2(sid, model.MakeValidTimeTokens(time.Hour, 2*time.Hour), model.User{})
 
 	tests := []struct {
 		name      string
-		input     credValuesV2
+		input     model.CredValuesV2
 		err       error
 		wantError bool
-		check     func(t *testing.T, got Credentials)
+		check     func(t *testing.T, got model.Credentials)
 	}{
 		{
 			name:      "error input",
@@ -52,15 +57,17 @@ func Test_makeCredV2(t *testing.T) {
 			input:     cred,
 			err:       nil,
 			wantError: false,
-			check: func(t *testing.T, got Credentials) {
-				if got.accessToken.jwt == "" {
+			check: func(t *testing.T, got model.Credentials) {
+				if got.AccessToken().ToDto().JWT == "" {
 					t.Fatal("access token is empty")
 				}
 
+				fmt.Fprintf(os.Stderr, "access token: %s\n", got.AccessToken().ToDto().JWT)
+
 				// Парсим access token
-				parsed, err := jwt.Parse(got.accessToken.jwt, func(token *jwt.Token) (interface{}, error) {
-					return cred.secret, nil
-				})
+				parsed, err := jwt.Parse(got.AccessToken().ToDto().JWT, func(token *jwt.Token) (interface{}, error) {
+					return []byte(secret), nil
+				}, jwt.WithValidMethods([]string{"HS256"}))
 				if err != nil {
 					t.Fatalf("failed to parse access token: %v", err)
 				}
@@ -81,7 +88,7 @@ func Test_makeCredV2(t *testing.T) {
 				}
 
 				// Проверка cookie
-				cookie := got.refreshTokenCookie
+				cookie := got.RefreshTokenCookie()
 				if cookie.Name != Refresh {
 					t.Errorf("unexpected cookie name: %v", cookie.Name)
 				}
@@ -97,8 +104,8 @@ func Test_makeCredV2(t *testing.T) {
 
 				// Парсим refresh token
 				refreshParsed, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
-					return cred.secret, nil
-				})
+					return []byte(secret), nil
+				}, jwt.WithValidMethods([]string{"HS256"}))
 				if err != nil {
 					t.Fatalf("failed to parse refresh token: %v", err)
 				}
@@ -124,13 +131,8 @@ func Test_makeCredV2(t *testing.T) {
 			},
 		},
 		{
-			name: "sign error (empty secret)",
-			input: credValuesV2{
-				secret:     []byte{}, // может вызвать ошибку подписи
-				sessionID:  cred.sessionID,
-				timeTokens: cred.timeTokens,
-				user:       cred.user,
-			},
+			name:      "sign error (empty secret)",
+			input:     model.MakeCredValuesV2(cred.SessionID(), cred.TimeTokens(), cred.User()),
 			err:       nil,
 			wantError: false, // jwt обычно всё равно подпишет, но кейс оставляем
 		},
@@ -138,7 +140,7 @@ func Test_makeCredV2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := makeCredV2(tt.input, tt.err)
+			got, err := c.MakeCredentials(tt.input, tt.err)
 
 			if tt.wantError {
 				if err == nil {

@@ -37,7 +37,7 @@
 // The package uses JWT (HS256) for both access and refresh tokens.
 //
 //   - Access token:
-//     Contains standard claims (exp, iss, jti, sub)
+//     Contains standard claims (exp, Iss, Jti, Sub)
 //     Encodes identifiers as plain UUID strings
 //
 //   - Refresh token:
@@ -51,9 +51,9 @@
 // Sessions are persisted in the database and identified by a composite key
 // derived from:
 //
-//   - Issuer (iss)
-//   - Token ID (jti)
-//   - Subject (sub)
+//   - Issuer (Iss)
+//   - Token ID (Jti)
+//   - Subject (Sub)
 //
 // Key operations:
 //
@@ -68,7 +68,7 @@
 // Critical operations (e.g., authentication and registration) are executed
 // within database transactions to ensure consistency.
 //
-// The helper function deferTransaction ensures that:
+// The helper function Defer ensures that:
 //
 //   - Transactions are committed on success
 //   - Transactions are rolled back on error
