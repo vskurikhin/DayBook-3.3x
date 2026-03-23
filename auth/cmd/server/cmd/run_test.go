@@ -48,6 +48,7 @@ func TestRunCmd_ShouldCallServerRun(t *testing.T) {
 	mockServer := NewMockServer(ctrl)
 
 	mockConfig.EXPECT().Values().Return(testDefaultConfigValues).AnyTimes()
+	mockConfig.EXPECT().JWThs256SignKey(gomock.Any()).AnyTimes()
 	mockServer.EXPECT().Run(context.Background()).Return(nil).Times(1)
 
 	// arrange

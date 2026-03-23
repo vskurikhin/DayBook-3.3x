@@ -47,7 +47,6 @@ func TestMainLogicExitCode(t *testing.T) {
 		close(done)
 	}()
 	time.Sleep(900 * time.Millisecond)
-	_, _ = fmt.Fprintf(os.Stderr, "cmd.Process.Pid: %d\n", cmd.Process.Pid)
 	parentPID := cmd.Process.Pid
 	time.Sleep(500 * time.Millisecond)
 

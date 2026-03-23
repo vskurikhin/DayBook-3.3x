@@ -3,16 +3,15 @@ package creds
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"go.uber.org/mock/gomock"
+
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
-	"go.uber.org/mock/gomock"
 )
 
 func Test_makeCredV2(t *testing.T) {
@@ -61,8 +60,6 @@ func Test_makeCredV2(t *testing.T) {
 				if got.AccessToken().ToDto().JWT == "" {
 					t.Fatal("access token is empty")
 				}
-
-				fmt.Fprintf(os.Stderr, "access token: %s\n", got.AccessToken().ToDto().JWT)
 
 				// Парсим access token
 				parsed, err := jwt.Parse(got.AccessToken().ToDto().JWT, func(token *jwt.Token) (interface{}, error) {

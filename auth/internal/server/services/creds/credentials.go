@@ -3,7 +3,6 @@ package creds
 import (
 	"encoding/base64"
 	"net/http"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
@@ -73,9 +72,7 @@ func (c *CredentialsMethodFactoryV2) MakeCredentials(credValues model.CredValues
 		SameSite: http.SameSiteStrictMode, // Mitigates CSRF attacks
 	}
 	return model.MakeCredentials(
-		model.MakeToken(credValues.TimeTokens().AccessTokenTime(), signedAccessToken, credValues.User()),
-		cookie,
-		time.Now(),
+		model.MakeToken(credValues.TimeTokens().AccessTokenTime(), signedAccessToken, credValues.User()), cookie,
 	), nil
 }
 

@@ -8,12 +8,15 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
 )
+
+// --- tests ---
 
 func TestRefreshServiceImplV2_Refresh(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -99,9 +102,9 @@ func TestRefreshServiceImplV2_refresh(t *testing.T) {
 		{
 			name: "session repo error",
 			claims: jwt.MapClaims{
-				"Iss": "test",
-				"Sub": "test",
-				"Jti": "test",
+				"iss": "test",
+				"sub": "test",
+				"jti": "test",
 			},
 			mock: func() {
 				mockSessionRepo.EXPECT().
@@ -127,4 +130,49 @@ func TestRefreshServiceImplV2_refresh(t *testing.T) {
 			assert.Equal(t, tt.wantErr, err != nil)
 		})
 	}
+}
+
+func TestRefresh_InvalidToken(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCfg := NewMockConfig(ctrl)
+
+	s := &RefreshServiceImplV2{
+		BaseService: &BaseService{cfg: mockCfg},
+	}
+
+	_, err := s.Refresh(context.Background(), "invalid-token")
+
+	require.Error(t, err)
+}
+
+func TestRefresh_SessionRepoError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCfg := NewMockConfig(ctrl)
+	mockCfg.EXPECT().Values().Return(config.Values{
+		JWThs256SignKey:        []byte("secret"),
+		ValidPeriodAccessToken: time.Minute,
+	})
+	mockSessionRepo := NewMockSessionRepo(ctrl)
+	mockUserRepo := NewMockUserAttrsRepo(ctrl)
+
+	claims := jwt.MapClaims{
+		"iss": "test",
+		"sub": "test",
+		"jti": "test",
+	}
+
+	s := &RefreshServiceImplV2{
+		BaseService:        &BaseService{cfg: mockCfg},
+		credentialsFactory: creds.NewCredentialsMethodFactory(mockCfg),
+		sessionRepo:        mockSessionRepo,
+		userAttrsRepo:      mockUserRepo,
+	}
+
+	_, err := s.refresh(context.Background(), claims)
+
+	require.Error(t, err)
 }

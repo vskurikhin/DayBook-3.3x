@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -54,8 +53,7 @@ func (s *AuthServiceImplV2) auth(ctx context.Context, login model.Login) (model.
 	if !userView.UserName.Valid {
 		return model.CredValuesV2{}, xerror.ErrInvalidToken
 	}
-	password, err := tool.Hash(userView.Password.String, 13)
-	_, _ = fmt.Fprintf(os.Stderr, "password: %s\n", password)
+
 	if !tool.Verify(userView.Password.String, login.Password()) {
 		return model.CredValuesV2{}, xerror.ErrInvalidPassword
 	}

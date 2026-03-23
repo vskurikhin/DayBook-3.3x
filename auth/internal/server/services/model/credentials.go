@@ -20,10 +20,9 @@ func MakeToken(expiresAt time.Time, jwt string, user User) Token {
 type Credentials struct {
 	accessToken        Token
 	refreshTokenCookie http.Cookie
-	//expiresAt          time.Time // TODO remove
 }
 
-func MakeCredentials(accessToken Token, refreshTokenCookie http.Cookie, expiresAt time.Time) Credentials {
+func MakeCredentials(accessToken Token, refreshTokenCookie http.Cookie) Credentials {
 	return Credentials{accessToken: accessToken, refreshTokenCookie: refreshTokenCookie}
 }
 
