@@ -40,7 +40,7 @@ func TestV1_Ok(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockService := NewMockAuthServiceV1(ctrl)
+			mockService := NewMockOkServiceV1(ctrl)
 			mockService.EXPECT().
 				Ok().
 				Return(tt.mockReturn).

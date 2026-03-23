@@ -9,7 +9,7 @@
 // # Overview
 //
 // The package implements multiple versions of authentication services,
-// with ServiceV2 extending the functionality of ServiceV1. The services
+// with AuthServiceImplV2 extending the functionality of OkServiceImplV1. The services
 // coordinate operations across several repositories:
 //
 //   - Session repository: manages session persistence and lifecycle
