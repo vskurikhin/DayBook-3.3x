@@ -45,7 +45,7 @@ func InitializeServer(cfg config.Config, environments env.Environments) (*server
 	refreshServiceImplV2 := services.NewRefreshServiceV2(cfg, credentialsMethodFactoryV2, queries, user_attrsQueries)
 	user_nameQueries := user_name.New(pgxPool)
 	registerServiceImplV2 := services.NewRegisterServiceV2(cfg, credentialsMethodFactoryV2, pgxPool, queries, transactionDelayer, user_attrsQueries, user_nameQueries)
-	v2 := resources.NewV2(authServiceImplV2, listServiceImplV2, logoutServiceImplV2, okServiceImplV2, refreshServiceImplV2, registerServiceImplV2)
+	v2 := resources.NewV2(authServiceImplV2, cfg, listServiceImplV2, logoutServiceImplV2, okServiceImplV2, refreshServiceImplV2, registerServiceImplV2)
 	apiV2 := handler.NewApiV2(cfg, v2)
 	httpHandler := handler.NewRouter(cfg, environments, apiV1, apiV2)
 	authServer, err := server.NewAuthServer(cfg, environments, httpHandler)

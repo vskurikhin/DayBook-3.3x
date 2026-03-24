@@ -15,18 +15,12 @@ import (
 )
 
 func Test_makeCredV2(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	var mockCfg *MockConfig
 
 	hostname := "localhost"
 	username := "username"
 	secret := "secret"
 
-	mockCfg := NewMockConfig(ctrl)
-
-	mockCfg.EXPECT().Values().Return(config.Values{JWThs256SignKey: []byte(secret)}).Times(1)
-
-	c := NewCredentialsMethodFactory(mockCfg)
 	sid, err := model.MakeSessionID(hostname, username)
 	if err != nil {
 		t.Fatal("failed to make session id", err)
@@ -42,19 +36,29 @@ func Test_makeCredV2(t *testing.T) {
 		name      string
 		input     model.CredValuesV2
 		err       error
+		mockSetup func(c *MockConfig)
 		wantError bool
 		check     func(t *testing.T, got model.Credentials)
 	}{
 		{
-			name:      "error input",
-			input:     cred,
-			err:       errors.New("some error"),
+			name:  "error input",
+			input: cred,
+			err:   errors.New("some error"),
+			mockSetup: func(c *MockConfig) {
+				c.EXPECT().Values().Return(config.Values{}).Times(0)
+			},
 			wantError: true,
 		},
 		{
-			name:      "success",
-			input:     cred,
-			err:       nil,
+			name:  "success",
+			input: cred,
+			err:   nil,
+			mockSetup: func(c *MockConfig) {
+				c.EXPECT().Values().Return(config.Values{
+					HTTPS:           true,
+					JWThs256SignKey: []byte(secret),
+				}).Times(3)
+			},
 			wantError: false,
 			check: func(t *testing.T, got model.Credentials) {
 				if got.AccessToken().ToDto().JWT == "" {
@@ -128,15 +132,27 @@ func Test_makeCredV2(t *testing.T) {
 			},
 		},
 		{
-			name:      "sign error (empty secret)",
-			input:     model.MakeCredValuesV2(cred.SessionID(), cred.TimeTokens(), cred.User()),
-			err:       nil,
+			name:  "sign error (empty secret)",
+			input: model.MakeCredValuesV2(cred.SessionID(), cred.TimeTokens(), cred.User()),
+			err:   nil,
+			mockSetup: func(c *MockConfig) {
+				c.EXPECT().Values().Return(config.Values{
+					HTTPS: true,
+				}).Times(3)
+			},
 			wantError: false, // jwt обычно всё равно подпишет, но кейс оставляем
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockCfg = NewMockConfig(ctrl)
+			tt.mockSetup(mockCfg)
+
+			c := NewCredentialsMethodFactory(mockCfg)
+
 			got, err := c.MakeCredentials(tt.input, tt.err)
 
 			if tt.wantError {

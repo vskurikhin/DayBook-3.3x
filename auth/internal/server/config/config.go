@@ -94,9 +94,13 @@ type Values struct {
 	DBPoolHealthCheckPeriod time.Duration `mapstructure:"db_pool_health_check_period"`
 
 	Debug                   bool          `mapstructure:"debug"`
+	HTTPS                   bool          `mapstructure:"https"`
 	Hostname                string        `mapstructure:"hostname"`
 	InsecureSkipVerify      bool          `mapstructure:"insecure_skip_verify"`
 	JWThs256SignKey         []byte        `mapstructure:"jwt_hs256_sign_key"`
+	RequestMaxBytes         uint64        `mapstructure:"request_max_bytes"`
+	ServerCertFile          string        `mapstructure:"server_cert_file"`
+	ServerKeyFile           string        `mapstructure:"server_key_file"`
 	ValidPeriodAccessToken  time.Duration `mapstructure:"valid_period_access_token"`
 	ValidPeriodRefreshToken time.Duration `mapstructure:"valid_period_refresh_token"`
 	Verbose                 bool          `mapstructure:"verbose"`

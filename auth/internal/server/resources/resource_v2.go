@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
@@ -16,6 +17,12 @@ import (
 //go:generate mockgen -destination=mock_auth_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources AuthServiceV2
 type AuthServiceV2 interface {
 	Auth(ctx context.Context, login model.Login) (model.Credentials, error)
+}
+
+//go:generate mockgen -destination=mock_config_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources Config
+type Config interface {
+	JWThs256SignKey(string)
+	Values() config.Values
 }
 
 //go:generate mockgen -destination=mock_list_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources ListServiceV2
@@ -56,6 +63,7 @@ var _ ResourceV2 = (*V2)(nil)
 
 type V2 struct {
 	authService     services.AuthServiceV2
+	cfg             config.Config
 	listService     services.ListServiceV2
 	logoutService   services.LogoutServiceV2
 	okService       services.OkServiceV2
@@ -77,7 +85,7 @@ type V2 struct {
 // @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
 // @Router /v2/auth [post]
 func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
-	body := http.MaxBytesReader(w, r.Body, 1<<20) // TODO introduce config parameter issue #59
+	body := http.MaxBytesReader(w, r.Body, int64(v.cfg.Values().RequestMaxBytes))
 	decoder := json.NewDecoder(body)
 	var login dto.Login
 	errDecode := decoder.Decode(&login)
@@ -178,7 +186,7 @@ func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
 		)
 		return err
 	}
-	body := http.MaxBytesReader(w, r.Body, 1<<20) // TODO introduce config parameter issue #59
+	body := http.MaxBytesReader(w, r.Body, int64(v.cfg.Values().RequestMaxBytes))
 	decoder := json.NewDecoder(body)
 	var login dto.Login
 	errDecode := decoder.Decode(&login)
@@ -214,7 +222,7 @@ func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
 // @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
 // @Router /v2/register [post]
 func (v V2) Register(w http.ResponseWriter, r *http.Request) error {
-	body := http.MaxBytesReader(w, r.Body, 1<<20) // TODO introduce config parameter issue #59
+	body := http.MaxBytesReader(w, r.Body, int64(v.cfg.Values().RequestMaxBytes))
 	decoder := json.NewDecoder(body)
 	var u dto.CreateUser
 	errDecode := decoder.Decode(&u)
@@ -238,6 +246,7 @@ func (v V2) Register(w http.ResponseWriter, r *http.Request) error {
 // the ResourceV2 interface.
 func NewV2(
 	authService services.AuthServiceV2,
+	cfg config.Config,
 	listService services.ListServiceV2,
 	logoutService services.LogoutServiceV2,
 	okService services.OkServiceV2,
@@ -246,6 +255,7 @@ func NewV2(
 ) *V2 {
 	return &V2{
 		authService:     authService,
+		cfg:             cfg,
 		listService:     listService,
 		logoutService:   logoutService,
 		okService:       okService,

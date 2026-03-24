@@ -152,10 +152,10 @@ func TestRefresh_SessionRepoError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockCfg := NewMockConfig(ctrl)
-	mockCfg.EXPECT().Values().Return(config.Values{
-		JWThs256SignKey:        []byte("secret"),
-		ValidPeriodAccessToken: time.Minute,
-	})
+	mockCfg.EXPECT().
+		Values().
+		Return(config.Values{}).
+		Times(0)
 	mockSessionRepo := NewMockSessionRepo(ctrl)
 	mockUserRepo := NewMockUserAttrsRepo(ctrl)
 
