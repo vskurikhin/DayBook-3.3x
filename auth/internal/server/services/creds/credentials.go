@@ -31,7 +31,7 @@ type CredentialsFactoryV2 interface {
 var _ CredentialsFactoryV2 = (*CredentialsMethodFactoryV2)(nil)
 
 type CredentialsMethodFactoryV2 struct {
-	secret []byte
+	cfg config.Config
 }
 
 func (c *CredentialsMethodFactoryV2) MakeCredentials(credValues model.CredValuesV2, err error) (model.Credentials, error) {
@@ -45,7 +45,7 @@ func (c *CredentialsMethodFactoryV2) MakeCredentials(credValues model.CredValues
 		Sub: credValues.SessionID().UserNameUUID().String(),
 	}
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	signedAccessToken, errSignAccessToken := accessToken.SignedString(c.secret)
+	signedAccessToken, errSignAccessToken := accessToken.SignedString(c.cfg.Values().JWThs256SignKey)
 	if errSignAccessToken != nil {
 		return model.Credentials{}, errSignAccessToken
 	}
@@ -56,7 +56,7 @@ func (c *CredentialsMethodFactoryV2) MakeCredentials(credValues model.CredValues
 		Sub: base64.StdEncoding.EncodeToString(tool.UUIDToSlice(credValues.SessionID().UserNameUUID())),
 	}
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	signedRefreshToken, errSigRefreshToken := refreshToken.SignedString(c.secret)
+	signedRefreshToken, errSigRefreshToken := refreshToken.SignedString(c.cfg.Values().JWThs256SignKey)
 	if errSigRefreshToken != nil {
 		return model.Credentials{}, errSigRefreshToken
 	}
@@ -67,9 +67,8 @@ func (c *CredentialsMethodFactoryV2) MakeCredentials(credValues model.CredValues
 		Path:     "/",                                         // The path for which the cookie is valid
 		Expires:  credValues.TimeTokens().CookieExpiresTime(), // Set the expiration time
 		HttpOnly: true,                                        // Prevents JavaScript from accessing the cookie (security best practice)
-		// TODO Проблема: в dev среде (http) cookie **не будет отправляться** Рекомендация: Secure: cfg.Values().IsHTTPS issue #58
-		Secure:   true,                    // Ensures the cookie is only sent over HTTPS (security best practice)
-		SameSite: http.SameSiteStrictMode, // Mitigates CSRF attacks
+		Secure:   c.cfg.Values().HTTPS,                        // Ensures the cookie is only sent over HTTPS (security best practice)
+		SameSite: http.SameSiteStrictMode,                     // Mitigates CSRF attacks
 	}
 	return model.MakeCredentials(
 		model.MakeToken(credValues.TimeTokens().AccessTokenTime(), signedAccessToken, credValues.User()), cookie,
@@ -77,7 +76,5 @@ func (c *CredentialsMethodFactoryV2) MakeCredentials(credValues model.CredValues
 }
 
 func NewCredentialsMethodFactory(cfg config.Config) *CredentialsMethodFactoryV2 {
-	return &CredentialsMethodFactoryV2{
-		secret: cfg.Values().JWThs256SignKey,
-	}
+	return &CredentialsMethodFactoryV2{cfg: cfg}
 }

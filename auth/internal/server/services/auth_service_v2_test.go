@@ -37,9 +37,6 @@ func TestAuthService_Auth(t *testing.T) {
 		{
 			name: "factory returns error",
 			setupMocks: func() {
-				mockCfg.EXPECT().Values().Return(config.Values{
-					JWThs256SignKey: []byte("secret"),
-				}).Times(1)
 				mockUserViewRepo.EXPECT().
 					GetUserName(gomock.Any(), gomock.Any()).
 					Return(user_view.UserView{}, errors.New("err"))
@@ -49,9 +46,6 @@ func TestAuthService_Auth(t *testing.T) {
 		{
 			name: "password not valid",
 			setupMocks: func() {
-				mockCfg.EXPECT().Values().Return(config.Values{
-					JWThs256SignKey: []byte("secret"),
-				}).Times(1)
 				mockUserViewRepo.EXPECT().
 					GetUserName(gomock.Any(), gomock.Any()).
 					Return(user_view.UserView{}, nil)
@@ -61,9 +55,6 @@ func TestAuthService_Auth(t *testing.T) {
 		{
 			name: "invalid token",
 			setupMocks: func() {
-				mockCfg.EXPECT().Values().Return(config.Values{
-					JWThs256SignKey: []byte("secret"),
-				}).Times(1)
 				mockUserViewRepo.EXPECT().
 					GetUserName(gomock.Any(), gomock.Any()).
 					Return(user_view.UserView{Password: pgtype.Text{Valid: true}}, nil)
@@ -73,9 +64,6 @@ func TestAuthService_Auth(t *testing.T) {
 		{
 			name: "invalid password",
 			setupMocks: func() {
-				mockCfg.EXPECT().Values().Return(config.Values{
-					JWThs256SignKey: []byte("secret"),
-				}).Times(1)
 				mockUserViewRepo.EXPECT().
 					GetUserName(gomock.Any(), gomock.Any()).
 					Return(user_view.UserView{UserName: pgtype.Text{Valid: true}, Password: pgtype.Text{Valid: true}}, nil)
@@ -87,13 +75,14 @@ func TestAuthService_Auth(t *testing.T) {
 			setupMocks: func() {
 				mockCfg.EXPECT().Values().Return(config.Values{
 					JWThs256SignKey: []byte("secret"),
-				}).Times(3)
+				}).Times(5)
 				mockUserViewRepo.EXPECT().
 					GetUserName(gomock.Any(), gomock.Any()).
 					Return(user_view.UserView{
 						UserName: pgtype.Text{Valid: true},
 						Password: pgtype.Text{String: "$2a$13$skbthyXoVBw24OxT0is4muHSZXEe0QRJo2DFN6iP1EmVsPTkEK8QG", Valid: true},
-					}, nil)
+					}, nil).
+					Times(1)
 				mockDBPool.EXPECT().
 					Begin(gomock.Any()).
 					Return(mockTx, nil).

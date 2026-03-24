@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
@@ -30,9 +31,23 @@ func NewAuthServer(cfg config.Config, env env.Environments, handler http.Handler
 }
 
 func (a AuthServer) Run(ctx context.Context) error {
-	server := &http.Server{
-		Addr:    a.cfg.Values().Address,
-		Handler: a.handler,
+	var server *http.Server
+	if a.cfg.Values().HTTPS {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: a.cfg.Values().InsecureSkipVerify,
+			MaxVersion:         tls.VersionTLS13,
+			MinVersion:         tls.VersionTLS12,
+		}
+		server = &http.Server{
+			Addr:      a.cfg.Values().Address,
+			Handler:   a.handler,
+			TLSConfig: tlsConfig,
+		}
+	} else {
+		server = &http.Server{
+			Addr:    a.cfg.Values().Address,
+			Handler: a.handler,
+		}
 	}
 	var errHTTPServe error
 	httpExit := make(chan struct{}, 1)
@@ -45,7 +60,14 @@ func (a AuthServer) Run(ctx context.Context) error {
 	go func() {
 		// Start the HTTP server on port 8089 by default
 		fmt.Printf("HTTPServer starting on %s...\n", a.cfg.Values().Address)
-		errHTTPServe = server.ListenAndServe()
+		if a.cfg.Values().HTTPS {
+			errHTTPServe = server.ListenAndServeTLS(
+				a.cfg.Values().ServerCertFile,
+				a.cfg.Values().ServerKeyFile,
+			)
+		} else {
+			errHTTPServe = server.ListenAndServe()
+		}
 		close(httpExit)
 	}()
 	for {

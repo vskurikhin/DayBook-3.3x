@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"go.uber.org/mock/gomock"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
@@ -33,6 +34,7 @@ func TestV2_Ok(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockCfg := NewMockConfig(ctrl)
 			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
 			mockOkServiceV2.EXPECT().Ok().Return(tt.serviceResp)
 			mockListServiceV2 := NewMockListServiceV2(ctrl)
@@ -42,6 +44,7 @@ func TestV2_Ok(t *testing.T) {
 
 			v := NewV2(
 				mockAuthServiceV2,
+				mockCfg,
 				mockListServiceV2,
 				mockLogoutServiceV2,
 				mockOkServiceV2,
@@ -68,13 +71,18 @@ func TestV2_Auth(t *testing.T) {
 	tests := []struct {
 		name        string
 		body        any
-		mockSetup   func(m *MockAuthServiceV2)
+		mockSetup   func(c *MockConfig, m *MockAuthServiceV2)
 		expectError bool
 	}{
 		{
-			name:        "invalid json",
-			body:        "invalid",
-			mockSetup:   func(m *MockAuthServiceV2) {},
+			name: "invalid json",
+			body: "invalid",
+			mockSetup: func(c *MockConfig, m *MockAuthServiceV2) {
+				c.EXPECT().
+					Values().
+					Return(config.Values{RequestMaxBytes: 1 << 20}).
+					Times(1)
+			},
 			expectError: true,
 		},
 		//{ // TODO
@@ -90,7 +98,11 @@ func TestV2_Auth(t *testing.T) {
 		{
 			name: "success",
 			body: dto.Login{},
-			mockSetup: func(m *MockAuthServiceV2) {
+			mockSetup: func(c *MockConfig, m *MockAuthServiceV2) {
+				c.EXPECT().
+					Values().
+					Return(config.Values{RequestMaxBytes: 1 << 20}).
+					Times(1)
 				m.EXPECT().
 					Auth(gomock.Any(), gomock.Any()).
 					Return(mockCredentials(), nil)
@@ -105,7 +117,8 @@ func TestV2_Auth(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
-			tt.mockSetup(mockAuthServiceV2)
+			mockCfg := NewMockConfig(ctrl)
+			tt.mockSetup(mockCfg, mockAuthServiceV2)
 			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
 			mockListServiceV2 := NewMockListServiceV2(ctrl)
 			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
@@ -114,6 +127,7 @@ func TestV2_Auth(t *testing.T) {
 
 			v := NewV2(
 				mockAuthServiceV2,
+				mockCfg,
 				mockListServiceV2,
 				mockLogoutServiceV2,
 				mockOkServiceV2,
@@ -148,16 +162,21 @@ func TestV2_Refresh(t *testing.T) {
 	tests := []struct {
 		name        string
 		withCookie  bool
-		mockSetup   func(m *MockRefreshServiceV2)
+		mockSetup   func(c *MockConfig, m *MockRefreshServiceV2)
 		expectError bool
 	}{
 		{
-			name:        "no cookie",
-			withCookie:  false,
-			mockSetup:   func(m *MockRefreshServiceV2) {},
+			name:       "no cookie",
+			withCookie: false,
+			mockSetup: func(c *MockConfig, m *MockRefreshServiceV2) {
+				c.EXPECT().
+					Values().
+					Return(config.Values{RequestMaxBytes: 1 << 20}).
+					Times(0)
+			},
 			expectError: true,
 		},
-		//{
+		//{ TODO
 		//	name:       "service error",
 		//	withCookie: true,
 		//	mockSetup: func(m *MockAuthServiceV2) {
@@ -170,7 +189,11 @@ func TestV2_Refresh(t *testing.T) {
 		{
 			name:       "success",
 			withCookie: true,
-			mockSetup: func(m *MockRefreshServiceV2) {
+			mockSetup: func(c *MockConfig, m *MockRefreshServiceV2) {
+				c.EXPECT().
+					Values().
+					Return(config.Values{RequestMaxBytes: 1 << 20}).
+					Times(1)
 				m.EXPECT().
 					Refresh(gomock.Any(), "token").
 					Return(mockCredentials(), nil)
@@ -185,15 +208,17 @@ func TestV2_Refresh(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockCfg := NewMockConfig(ctrl)
 			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
 			mockListServiceV2 := NewMockListServiceV2(ctrl)
 			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
 			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
-			tt.mockSetup(mockRefreshServiceV2)
+			tt.mockSetup(mockCfg, mockRefreshServiceV2)
 			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
 
 			v := NewV2(
 				mockAuthServiceV2,
+				mockCfg,
 				mockListServiceV2,
 				mockLogoutServiceV2,
 				mockOkServiceV2,
@@ -247,6 +272,7 @@ func TestV2_Logout(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockCfg := NewMockConfig(ctrl)
 			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
 			mockListServiceV2 := NewMockListServiceV2(ctrl)
 			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
@@ -256,6 +282,7 @@ func TestV2_Logout(t *testing.T) {
 
 			v := NewV2(
 				mockAuthServiceV2,
+				mockCfg,
 				mockListServiceV2,
 				mockLogoutServiceV2,
 				mockOkServiceV2,
@@ -279,19 +306,28 @@ func TestV2_Register(t *testing.T) {
 	tests := []struct {
 		name        string
 		body        any
-		mockSetup   func(m *MockRegisterServiceV2)
+		mockSetup   func(c *MockConfig, m *MockRegisterServiceV2)
 		expectError bool
 	}{
 		{
-			name:        "invalid json",
-			body:        "bad",
-			mockSetup:   func(m *MockRegisterServiceV2) {},
+			name: "invalid json",
+			body: "bad",
+			mockSetup: func(c *MockConfig, m *MockRegisterServiceV2) {
+				c.EXPECT().
+					Values().
+					Return(config.Values{RequestMaxBytes: 1 << 20}).
+					Times(1)
+			},
 			expectError: true,
 		},
 		{
 			name: "success",
 			body: dto.CreateUser{},
-			mockSetup: func(m *MockRegisterServiceV2) {
+			mockSetup: func(c *MockConfig, m *MockRegisterServiceV2) {
+				c.EXPECT().
+					Values().
+					Return(config.Values{RequestMaxBytes: 1 << 20}).
+					Times(1)
 				m.EXPECT().
 					Register(gomock.Any(), gomock.Any()).
 					Return(mockCredentials(), nil)
@@ -305,15 +341,17 @@ func TestV2_Register(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockCfg := NewMockConfig(ctrl)
 			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
 			mockListServiceV2 := NewMockListServiceV2(ctrl)
 			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
 			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
 			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
-			tt.mockSetup(mockRegisterServiceV2)
+			tt.mockSetup(mockCfg, mockRegisterServiceV2)
 
 			v := NewV2(
 				mockAuthServiceV2,
+				mockCfg,
 				mockListServiceV2,
 				mockLogoutServiceV2,
 				mockOkServiceV2,

@@ -87,7 +87,11 @@ const (
 	FlagDebug                   = "debug"
 	FlagHostname                = "hostname"
 	FlagInsecureSkipVerify      = "insecure-skip-verify"
+	FlagIsHTTPS                 = "https"
 	FlagJWThs256SignKey         = "jwt-hs256-sign-key"
+	FlagRequestMaxBytes         = "request-max-bytes"
+	FlagServerCertFile          = "server-cert-file"
+	FlagServerKeyFile           = "server-key-file"
 	FlagValidPeriodAccessToken  = "valid-period-access-token"
 	FlagValidPeriodRefreshToken = "valid-period-refresh-token"
 	FlagVerbose                 = "verbose"
@@ -115,24 +119,28 @@ func init() {
 	rootCmd.PersistentFlags().BoolP(FlagDebug, "d", false, "Help message for debug.")
 	rootCmd.PersistentFlags().BoolP(FlagVerbose, "v", false, "Verbose.")
 
+	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
+	runCmd.Flags().Bool(FlagIsHTTPS, false, "Controls whether a server's HTTPS bindings.")
+	runCmd.Flags().Duration(FlagDBPoolHealthCheckPeriod, time.Minute, "Pgx DB pool health check period.")
+	runCmd.Flags().Duration(FlagDBPoolMaxConnIdleTime, 30*time.Minute, "Pgx DB pool max connection idle time.")
+	runCmd.Flags().Duration(FlagDBPoolMaxConnLifeTime, time.Hour, "Pgx DB pool max connection lifetime.")
+	runCmd.Flags().Duration(FlagValidPeriodAccessToken, 45*time.Second, "Valid period access token.")
+	runCmd.Flags().Duration(FlagValidPeriodRefreshToken, 15*time.Hour, "Valid period refresh token.")
 	runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")
-	runCmd.Flags().Uint8(FlagAuthCost, 14, "The minimum allowable cost as passed in")
 	runCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
 	runCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")
 	runCmd.Flags().String(FlagDBOptions, "application_name=auth&search_path=auth", "Pgx pool DB options.")
 	runCmd.Flags().String(FlagDBPassword, "password", "Pgx pool DB user password.")
-	runCmd.Flags().Duration(FlagDBPoolHealthCheckPeriod, time.Minute, "Pgx DB pool health check period.")
-	runCmd.Flags().Duration(FlagDBPoolMaxConnIdleTime, 30*time.Minute, "Pgx DB pool max connection idle time.")
-	runCmd.Flags().Duration(FlagDBPoolMaxConnLifeTime, time.Hour, "Pgx DB pool max connection lifetime.")
-	runCmd.Flags().Uint8(FlagDBPoolMaxConns, 4, "Pgx DB pool max connections.")
-	runCmd.Flags().Uint8(FlagDBPoolMinConns, 0, "Pgx DB pool min connections.")
-	runCmd.Flags().Uint16(FlagDBPort, 5432, "Pgx pool DB port.")
 	runCmd.Flags().String(FlagDBUser, "dbuser", "Pgx pool DB username.")
 	runCmd.Flags().String(FlagHostname, "localhost", "Hostname.")
-	runCmd.Flags().Bool(FlagInsecureSkipVerify, false, "Controls whether a client verifies the server's certificate chain and host name.")
 	runCmd.Flags().String(FlagJWThs256SignKey, "", "JWT HS256 signing key.")
-	runCmd.Flags().Duration(FlagValidPeriodAccessToken, 45*time.Second, "Valid period access token.")
-	runCmd.Flags().Duration(FlagValidPeriodRefreshToken, 15*time.Hour, "Valid period refresh token.")
+	runCmd.Flags().String(FlagServerCertFile, "cert.pem", "Server certificate file.")
+	runCmd.Flags().String(FlagServerKeyFile, "key.pem", "Server certificate key file.")
+	runCmd.Flags().Uint16(FlagDBPort, 5432, "Pgx pool DB port.")
+	runCmd.Flags().Uint64(FlagRequestMaxBytes, 1<<20, "Request max bytes.")
+	runCmd.Flags().Uint8(FlagAuthCost, 14, "The minimum allowable cost as passed in")
+	runCmd.Flags().Uint8(FlagDBPoolMaxConns, 4, "Pgx DB pool max connections.")
+	runCmd.Flags().Uint8(FlagDBPoolMinConns, 0, "Pgx DB pool min connections.")
 
 	migrateCmd.Flags().String(FlagDBHost, "localhost", "Pgx pool DB host.")
 	migrateCmd.Flags().String(FlagDBName, "db", "Pgx pool DB name.")

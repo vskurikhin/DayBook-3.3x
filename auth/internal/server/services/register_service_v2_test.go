@@ -61,7 +61,7 @@ func TestRegisterService_Register(t *testing.T) {
 				mockCfg.EXPECT().Values().AnyTimes().Return(config.Values{
 					AuthCost:        1,
 					JWThs256SignKey: []byte("secret"),
-				}).Times(3)
+				}).Times(5)
 				mockDBPool.EXPECT().
 					Begin(gomock.Any()).
 					Return(mockTx, nil).
@@ -214,7 +214,7 @@ func TestRegisterService_transactionRegister(t *testing.T) {
 				mockCfg.EXPECT().Values().AnyTimes().Return(config.Values{
 					AuthCost:        1,
 					JWThs256SignKey: []byte("secret"),
-				}).Times(2)
+				}).Times(1)
 				mockDBPool.EXPECT().
 					Begin(gomock.Any()).
 					Return(mockTx, nil).
