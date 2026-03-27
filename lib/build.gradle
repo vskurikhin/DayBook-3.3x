@@ -3,8 +3,6 @@ plugins {
 	id 'org.liquibase.gradle' version '2.2.0' // Use the latest version
 }
 
-group = 'su.svn'
-version = '0.0.1-SNAPSHOT'
 description = 'Library project for Spring Boot'
 
 java {
@@ -26,24 +24,24 @@ repositories {
 
 dependencies {
 	// Liquibase runtime dependencies for the plugin
-	liquibaseRuntime "org.liquibase:liquibase-core:$libVers.liquibase"
-	liquibaseRuntime "org.liquibase:liquibase-gradle-plugin:3.0.2"
-	liquibaseRuntime "org.postgresql:postgresql:$libVers.org_postgresql"
+	liquibaseRuntime "org.liquibase:liquibase-core:${VERSION_ORG_LIQUIBASE_LIQUIBASE_CORE}"
+	liquibaseRuntime "org.liquibase:liquibase-gradle-plugin:${VERSION_ORG_LIQUIBASE_LIQUIBASE_GRADLE_PLUGIN}"
+	liquibaseRuntime "org.postgresql:postgresql:${VERSION_ORG_POSTGRESQL}"
 
-	compileOnly "org.projectlombok:lombok:$libVers.lombok"
+	compileOnly "org.projectlombok:lombok:${VERSION_LOMBOK}"
 
-	annotationProcessor "org.mapstruct:mapstruct-processor:$libVers.mapstruct"
-	annotationProcessor "org.projectlombok:lombok-mapstruct-binding:0.2.0"
-	annotationProcessor "org.projectlombok:lombok:$libVers.lombok"
+	annotationProcessor "org.mapstruct:mapstruct-processor:${VERSION_ORG_MAPSTRUCT_MAPSTRUCT}"
+	annotationProcessor "org.projectlombok:lombok-mapstruct-binding:${VERSION_ORG_PROJECTLOMBOK_LOMBOK_MAPSTRUCT_BINDING}"
+	annotationProcessor "org.projectlombok:lombok:${VERSION_LOMBOK}"
 	annotationProcessor project(":spi-mapstruct")
 
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 
-	testImplementation "org.junit.jupiter:junit-jupiter:$libVers.junit_jupiter"
+	testImplementation "org.junit.jupiter:junit-jupiter:${VERSION_ORG_JUNIT_JUPITER}"
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-tasks.named('test') {
+test {
 	useJUnitPlatform()
 }
