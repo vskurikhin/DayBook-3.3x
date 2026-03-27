@@ -1,0 +1,94 @@
+/*
+ * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This is free and unencumbered software released into the public domain.
+ * For more information, please refer to <http://unlicense.org>
+ * JsonRecordServiceImpl.java
+ * $Id$
+ */
+
+package su.svn.core.services.domain;
+
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.stereotype.Service;
+import su.svn.core.domain.entities.JsonRecord;
+import su.svn.core.models.dto.NewJsonRecord;
+import su.svn.core.models.dto.ResourceJsonRecord;
+import su.svn.core.models.dto.UpdateJsonRecord;
+import su.svn.core.repository.JsonRecordRepository;
+import su.svn.core.services.mappers.JsonRecordMapper;
+
+import java.util.UUID;
+
+import static lombok.AccessLevel.PRIVATE;
+
+/**
+ * Implementation of {@link JsonRecordService}.
+ *
+ * <p>Handles business logic for JSON records, including persistence
+ * and mapping between entities and DTOs.</p>
+ */
+@FieldDefaults(level = PRIVATE, makeFinal = true)
+@RequiredArgsConstructor
+@Service
+@Slf4j
+public class JsonRecordServiceImpl implements JsonRecordService {
+
+    public static final String ROOT = "root";
+    JsonRecordMapper jsonRecordMapper;
+    JsonRecordRepository jsonRecordRepository;
+
+    @Override
+    public void disable(UUID id) {
+        JsonRecord record = null;
+        try {
+            record = jsonRecordRepository.findByIdAndEnabledTrue(id)
+                    .orElseThrow(ChangeSetPersister.NotFoundException::new);
+            System.out.println("record: " + record);
+            record.baseRecord().userName(ROOT);
+            record.baseRecord().enabled(false);
+            record.userName(ROOT);
+            record.enabled(false);
+
+            jsonRecordRepository.save(record);
+        } catch (ChangeSetPersister.NotFoundException e) {
+            System.out.println("Exception: " + e.getMessage());
+        }
+        // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
+    }
+
+    @Override
+    public ResourceJsonRecord findById(UUID id) throws ChangeSetPersister.NotFoundException {
+        JsonRecord record = jsonRecordRepository.findByIdAndEnabledTrue(id)
+                .orElseThrow(ChangeSetPersister.NotFoundException::new);
+        return jsonRecordMapper.toResource(record);
+    }
+
+    @Override
+    public ResourceJsonRecord save(NewJsonRecord newRecord) {
+        ResourceJsonRecord resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
+        JsonRecord record = jsonRecordMapper.toEntity(resourceJsonRecord);
+        record.baseRecord().userName(ROOT);
+        record.userName(ROOT);
+
+        JsonRecord savedRecord = jsonRecordRepository.save(record);
+        // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
+        return jsonRecordMapper.toResource(savedRecord);
+    }
+
+    @Override
+    public ResourceJsonRecord update(UpdateJsonRecord updateRecord) {
+        ResourceJsonRecord resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
+        System.out.println("resourceJsonRecord: " + resourceJsonRecord);
+        JsonRecord record = jsonRecordMapper.toEntity(resourceJsonRecord);
+        System.out.println("record: " + record);
+        record.baseRecord().userName(ROOT);
+        record.userName(ROOT);
+
+        JsonRecord savedRecord = jsonRecordRepository.save(record);
+        // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
+        return jsonRecordMapper.toResource(savedRecord);
+    }
+}

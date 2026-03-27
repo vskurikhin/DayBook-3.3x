@@ -13,7 +13,6 @@ var _ OkServiceV1 = (*OkServiceImplV2)(nil)
 var _ OkServiceV2 = (*OkServiceImplV2)(nil)
 
 type OkServiceImplV2 struct {
-	*BaseService
 	*OkServiceImplV1
 }
 
@@ -23,11 +22,6 @@ func (s *OkServiceImplV2) Ok() string {
 
 func NewOkServiceV2(cfg config.Config, dbPool db.DB) *OkServiceImplV2 {
 	return &OkServiceImplV2{
-		BaseService: &BaseService{
-			cfg: cfg,
-		},
-		OkServiceImplV1: &OkServiceImplV1{
-			dbPool: dbPool,
-		},
+		OkServiceImplV1: NewOkServiceV1(cfg, dbPool),
 	}
 }

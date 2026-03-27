@@ -22,7 +22,7 @@ dependencies {
     implementation 'io.quarkus:quarkus-container-image-docker'
     implementation 'io.quarkus:quarkus-rest-jackson'
     implementation 'io.quarkiverse.mapstruct:quarkus-mapstruct:1.1.0'
-    implementation "org.mapstruct:mapstruct:$libVers.mapstruct"
+    implementation "org.mapstruct:mapstruct:${VERSION_MAPSTRUCT}"
     // TODO remove quarkus-openapi-generator-server in release
     implementation 'io.quarkus:quarkus-smallrye-openapi'
     // TODO remove quarkus-openapi-generator-server in release
@@ -34,21 +34,18 @@ dependencies {
     implementation 'io.quarkus:quarkus-cache'
     implementation 'io.quarkus:quarkus-arc'
 
-    compileOnly "org.projectlombok:lombok:$libVers.lombok"
+    compileOnly "org.projectlombok:lombok:${VERSION_LOMBOK}"
 
-    annotationProcessor "org.mapstruct:mapstruct-processor:$libVers.mapstruct"
-    annotationProcessor "org.projectlombok:lombok-mapstruct-binding:0.2.0"
-    annotationProcessor "org.projectlombok:lombok:$libVers.lombok"
+    annotationProcessor "org.mapstruct:mapstruct-processor:${VERSION_MAPSTRUCT}"
+    annotationProcessor "org.projectlombok:lombok-mapstruct-binding:${VERSION_ORG_PROJECTLOMBOK_LOMBOK_MAPSTRUCT_BINDING}"
+    annotationProcessor "org.projectlombok:lombok:${VERSION_LOMBOK}"
     annotationProcessor project(":spi-mapstruct")
     annotationProcessor project(":lib")
 
     testImplementation 'io.quarkus:quarkus-junit'
     testImplementation 'io.rest-assured:rest-assured'
-    testAnnotationProcessor "org.mapstruct:mapstruct-processor:$libVers.mapstruct"
+    testAnnotationProcessor "org.mapstruct:mapstruct-processor:${VERSION_MAPSTRUCT}"
 }
-
-group = 'su.svn'
-version = '0.0.1-SNAPSHOT'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21

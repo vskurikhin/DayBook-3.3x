@@ -8,4 +8,6 @@ pluginManagement {
         id "${quarkusPluginId}" version "${quarkusPluginVersion}"
     }
 }
-rootProject.name='api'
+include 'lib'
+project(':lib').projectDir = new File('../lib')
+rootProject.name = 'DayBook-3.3x'
