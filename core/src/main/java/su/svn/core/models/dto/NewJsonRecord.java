@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.03.28 11:32 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * NewJsonRecord.java
@@ -22,10 +22,11 @@ import java.util.UUID;
 @JsonPropertyOrder({"visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NewJsonRecord(
-        @Schema(defaultValue = "00000000-0000-0000-0000-000000000000")
+        @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
         @JsonProperty String title,
         @JsonProperty Map<String, String> values,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty boolean visible,
         @JsonProperty int flags) implements Serializable {
