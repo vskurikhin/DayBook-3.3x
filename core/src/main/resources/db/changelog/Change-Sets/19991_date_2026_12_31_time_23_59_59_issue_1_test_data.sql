@@ -6,7 +6,7 @@
 --
 
 --
-INSERT INTO core.user_name (user_name, id, unique_id) VALUES ('root', '00000000-0000-0000-0000-000000000000', pg_catalog.uuidv7());
+INSERT INTO core.user_name (user_name, id, sequence_id) VALUES ('root', '00000000-0000-0000-0000-000000000000', (SELECT nextval('core.user_name_seq')));
 INSERT INTO core.base_records (id, parent_id, user_name) VALUES ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', 'root');
 
 --

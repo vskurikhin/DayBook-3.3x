@@ -6,11 +6,19 @@
 --
 
 --
+CREATE SEQUENCE IF NOT EXISTS core.user_name_seq
+    AS BIGINT
+    START WITH 1
+    INCREMENT BY 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
+
 CREATE TABLE IF NOT EXISTS core.user_name(
     user_name       VARCHAR(64) PRIMARY KEY     NOT NULL,
     id              UUID                        NOT NULL,
-    unique_id       UUID                        NOT NULL
-      CONSTRAINT core_user_name_must_be_unique  UNIQUE,
+    sequence_id     BIGINT                      NOT NULL
+      CONSTRAINT    user_name_sequence_id_must_be_unique UNIQUE,
     create_time     TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
     update_time     TIMESTAMP WITHOUT TIME ZONE          DEFAULT now(),
     enabled         BOOLEAN                     NOT NULL DEFAULT true,
@@ -25,3 +33,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS IDX_UC_3109_core_id_must_be_unique
 --
 --rollback DROP INDEX IF EXISTS IDX_UC_3109_core_id_must_be_unique;
 --rollback DROP TABLE IF EXISTS core.user_name;
+--rollback DROP SEQUENCE IF EXISTS core.user_name_seq;
