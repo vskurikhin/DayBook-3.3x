@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordView.java
@@ -8,29 +8,12 @@
 
 package su.svn.core.domain.entities;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.*;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.Fetch;
-import org.hibernate.annotations.FetchMode;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.*;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
@@ -49,7 +32,7 @@ import static lombok.AccessLevel.PRIVATE;
 @Getter
 @NoArgsConstructor
 @Setter
-@Table(name="records_view", schema="core")
+@Table(name = "records_view", schema = "core")
 @ToString
 public class RecordView {
     @Id
@@ -91,6 +74,10 @@ public class RecordView {
     @UpdateTimestamp
     @Column(name = "update_time", updatable = false)
     LocalDateTime updateTime;
+
+    @UpdateTimestamp
+    @Column(name = "last_changed_time", updatable = false, nullable = false)
+    LocalDateTime lastChangedTime;
 
     @Builder.Default
     @Column(name = "enabled")

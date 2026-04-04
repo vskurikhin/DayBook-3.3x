@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * UserName.java
@@ -49,10 +49,15 @@ public class UserName {
     UUID id;
 
     @Id
-    @GeneratedValue
-    @UuidGenerator
-    @Column(name = "unique_id")
-    UUID uniqueId;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "userNameSeq")
+    @SequenceGenerator(
+            name = "userNameSeq",
+            schema = "core",
+            sequenceName = "user_name_seq",
+            allocationSize = 1
+    )
+    @Column(name = "sequence_id")
+    Long sequenceId;
 
     @CreationTimestamp
     @Column(name = "create_time", updatable = false, nullable = false)

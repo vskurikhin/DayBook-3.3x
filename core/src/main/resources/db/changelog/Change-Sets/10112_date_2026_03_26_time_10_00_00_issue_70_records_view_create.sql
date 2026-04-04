@@ -8,7 +8,7 @@
 --
 DROP VIEW IF EXISTS core.records_view;
 CREATE OR REPLACE VIEW core.records_view AS
-SELECT Br.*, Jr.title, Jr.values
+SELECT Br.*, COALESCE(Br.update_time, Br.create_time) last_changed_time, Jr.title, Jr.values
 FROM core.base_records Br
     LEFT JOIN core.json_records Jr ON Br.id = Jr.id;
 

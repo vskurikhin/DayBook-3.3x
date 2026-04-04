@@ -46,7 +46,7 @@ class RecordViewControllerTest {
     @Test
     void shouldReturnRecordById() throws Exception {
         UUID id = UUID.randomUUID();
-        ResourceRecordViewFilter filter = new ResourceRecordViewFilter(null, null, null);
+        ResourceRecordViewFilter filter = new ResourceRecordViewFilter(null, null, null, null);
         Pageable pageable = Pageable.ofSize(20);
 
         ResourceRecordView response = ResourceRecordView.builder()

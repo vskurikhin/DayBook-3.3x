@@ -1,0 +1,471 @@
+openapi: 3.1.0
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+- description: Generated server url
+  url: http://localhost:8081
+paths:
+  /core/api/v2/json-records:
+    get:
+      operationId: getAllRecords
+      parameters:
+      - explode: true
+        in: query
+        name: filter
+        required: true
+        schema:
+          $ref: "#/components/schemas/ResourceRecordViewFilter"
+        style: form
+      - explode: true
+        in: query
+        name: pageable
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+        style: form
+      responses:
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResourceRecordView"
+          description: OK
+      tags:
+      - record-view-controller
+      x-accepts:
+      - '*/*'
+    post:
+      operationId: createJsonRecord
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewJsonRecord"
+        required: true
+      responses:
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceJsonRecord"
+          description: OK
+      tags:
+      - json-record-controller
+      x-content-type: application/json
+      x-accepts:
+      - '*/*'
+    put:
+      operationId: updateJsonRecord
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateJsonRecord"
+        required: true
+      responses:
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceJsonRecord"
+          description: OK
+      tags:
+      - json-record-controller
+      x-content-type: application/json
+      x-accepts:
+      - '*/*'
+  /core/api/v2/json-records/{id}:
+    delete:
+      operationId: deleteJsonRecord
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "200":
+          description: OK
+      tags:
+      - json-record-controller
+      x-accepts:
+      - '*/*'
+    get:
+      operationId: readJsonRecord
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceJsonRecord"
+          description: OK
+      tags:
+      - json-record-controller
+      x-accepts:
+      - '*/*'
+components:
+  schemas:
+    ErrorResponse:
+      example:
+        time: 0
+        error: error
+      properties:
+        error:
+          type: string
+        time:
+          format: int64
+          type: integer
+    UpdateJsonRecord:
+      example:
+        postAt: 2000-01-23T04:56:07.000+00:00
+        visible: true
+        values:
+          key: values
+        refreshAt: 2000-01-23T04:56:07.000+00:00
+        flags: 0
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        id:
+          format: uuid
+          type: string
+        parentId:
+          format: uuid
+          type: string
+        title:
+          type: string
+        values:
+          additionalProperties:
+            type: string
+        postAt:
+          format: date-time
+          type: string
+        refreshAt:
+          format: date-time
+          type: string
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+    ResourceJsonRecord:
+      example:
+        postAt: 2000-01-23T04:56:07.000+00:00
+        visible: true
+        values:
+          key: values
+        refreshAt: 2000-01-23T04:56:07.000+00:00
+        flags: 0
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        id:
+          format: uuid
+          type: string
+        parentId:
+          format: uuid
+          type: string
+        title:
+          type: string
+        values:
+          additionalProperties:
+            type: string
+        postAt:
+          format: date-time
+          type: string
+        refreshAt:
+          format: date-time
+          type: string
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+    NewJsonRecord:
+      example:
+        visible: true
+        postAt: 2000-01-23T04:56:07.000+00:00
+        values:
+          key: values
+        flags: 0
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+        parentId:
+          default: 00000000-0000-0000-0000-000000000000
+          format: uuid
+          type: string
+        title:
+          type: string
+        values:
+          additionalProperties:
+            type: string
+        postAt:
+          format: date-time
+          type: string
+    ResourceRecordViewFilter:
+      properties:
+        title:
+          type: string
+        fromTime:
+          format: date-time
+          type: string
+        fromDate:
+          format: date-time
+          type: string
+        toDate:
+          format: date-time
+          type: string
+    Pageable:
+      properties:
+        page:
+          format: int32
+          minimum: 0
+          type: integer
+        size:
+          format: int32
+          minimum: 1
+          type: integer
+        sort:
+          items:
+            type: string
+          type: array
+    PageResourceRecordView:
+      example:
+        number: 2
+        last: true
+        size: 5
+        numberOfElements: 2
+        totalPages: 6
+        pageable:
+          paged: true
+          pageNumber: 9
+          offset: 7
+          pageSize: 3
+          unpaged: true
+          sort:
+            unsorted: true
+            sorted: true
+            empty: true
+        sort:
+          unsorted: true
+          sorted: true
+          empty: true
+        first: true
+        content:
+        - lastChangedTime: 2000-01-23T04:56:07.000+00:00
+          visible: true
+          postAt: 2000-01-23T04:56:07.000+00:00
+          refreshAt: 2000-01-23T04:56:07.000+00:00
+          values:
+            key: values
+          flags: 5
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          title: title
+          parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        - lastChangedTime: 2000-01-23T04:56:07.000+00:00
+          visible: true
+          postAt: 2000-01-23T04:56:07.000+00:00
+          refreshAt: 2000-01-23T04:56:07.000+00:00
+          values:
+            key: values
+          flags: 5
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          title: title
+          parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        totalElements: 1
+        empty: true
+      properties:
+        totalPages:
+          format: int32
+          type: integer
+        totalElements:
+          format: int64
+          type: integer
+        first:
+          type: boolean
+        last:
+          type: boolean
+        size:
+          format: int32
+          type: integer
+        content:
+          items:
+            $ref: "#/components/schemas/ResourceRecordView"
+          type: array
+        number:
+          format: int32
+          type: integer
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          format: int32
+          type: integer
+        empty:
+          type: boolean
+    PageableObject:
+      example:
+        paged: true
+        pageNumber: 9
+        offset: 7
+        pageSize: 3
+        unpaged: true
+        sort:
+          unsorted: true
+          sorted: true
+          empty: true
+      properties:
+        offset:
+          format: int64
+          type: integer
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        paged:
+          type: boolean
+        pageNumber:
+          format: int32
+          type: integer
+        pageSize:
+          format: int32
+          type: integer
+        unpaged:
+          type: boolean
+    ResourceRecordView:
+      example:
+        lastChangedTime: 2000-01-23T04:56:07.000+00:00
+        visible: true
+        postAt: 2000-01-23T04:56:07.000+00:00
+        refreshAt: 2000-01-23T04:56:07.000+00:00
+        values:
+          key: values
+        flags: 5
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        id:
+          format: uuid
+          type: string
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+        parentId:
+          format: uuid
+          type: string
+        postAt:
+          format: date-time
+          type: string
+        refreshAt:
+          format: date-time
+          type: string
+        lastChangedTime:
+          format: date-time
+          type: string
+        title:
+          type: string
+        values:
+          additionalProperties:
+            type: string
+    SortObject:
+      example:
+        unsorted: true
+        sorted: true
+        empty: true
+      properties:
+        empty:
+          type: boolean
+        unsorted:
+          type: boolean
+        sorted:
+          type: boolean
+
