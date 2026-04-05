@@ -83,7 +83,7 @@ class ServicesIT {
         assertThat(foundUpdated.parentId()).isEqualTo(UUID.fromString("00000000-0000-0000-0000-000000000000"));
         assertThat(foundUpdated.refreshAt()).isEqualTo(refreshAt);
 
-        var result = recordViewService.getFilteredRecords(new ResourceRecordViewFilter(null, null, null, null), PageRequest.of(0, 2));
+        var result = recordViewService.getFilteredRecords(new ResourceRecordViewFilter(null, null, null, null, false), PageRequest.of(0, 2));
         result.get().forEach(new Consumer<ResourceRecordView>() {
             @Override
             public void accept(ResourceRecordView resourceRecordView) {

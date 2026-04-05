@@ -47,9 +47,9 @@ dependencies {
 	liquibaseRuntime "org.liquibase:liquibase-core:${VERSION_ORG_LIQUIBASE_LIQUIBASE_CORE}"
 	liquibaseRuntime "org.liquibase:liquibase-gradle-plugin:${VERSION_ORG_LIQUIBASE_LIQUIBASE_GRADLE_PLUGIN}"
 	liquibaseRuntime "org.postgresql:postgresql:${VERSION_ORG_POSTGRESQL}"
-	liquibaseRuntime 'info.picocli:picocli:4.7.7'
+	liquibaseRuntime "info.picocli:picocli:${VERSION_INFO_PICOCLI_PICOCLI}"
 
-	testImplementation 'org.assertj:assertj-core:3.25.3'
+	testImplementation "org.assertj:assertj-core:${VERSION_ORG_ASSERTJ_ASSERTJ_CORE}"
 	testImplementation 'org.liquibase:liquibase-core'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'

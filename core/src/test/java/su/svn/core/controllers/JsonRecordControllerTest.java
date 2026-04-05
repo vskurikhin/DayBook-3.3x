@@ -54,7 +54,7 @@ class JsonRecordControllerTest {
 
         when(jsonRecordService.findById(id)).thenReturn(response);
 
-        mockMvc.perform(get("/core/api/v2/json-records/{id}", id))
+        mockMvc.perform(get("/core/api/v2/json-record/{id}", id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.title").value("test"));
@@ -86,7 +86,7 @@ class JsonRecordControllerTest {
 
         when(jsonRecordService.save(any())).thenReturn(response);
 
-        mockMvc.perform(post("/core/api/v2/json-records")
+        mockMvc.perform(post("/core/api/v2/json-record")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -115,7 +115,7 @@ class JsonRecordControllerTest {
 
         when(jsonRecordService.update(any())).thenReturn(response);
 
-        mockMvc.perform(put("/core/api/v2/json-records")
+        mockMvc.perform(put("/core/api/v2/json-record")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -134,7 +134,7 @@ class JsonRecordControllerTest {
 
         doNothing().when(jsonRecordService).disable(id);
 
-        mockMvc.perform(delete("/core/api/v2/json-records/{id}", id))
+        mockMvc.perform(delete("/core/api/v2/json-record/{id}", id))
                 .andExpect(status().isNoContent());
 
         verify(jsonRecordService).disable(id);

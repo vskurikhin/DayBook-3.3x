@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'io.quarkus'
     id 'idea'
+    id 'org.liquibase.gradle' version '2.2.0' // Use the latest version
 }
 
 repositories {
@@ -20,13 +21,17 @@ dependencies {
      */
     implementation 'io.quarkus:quarkus-hibernate-reactive-panache'
     implementation 'io.quarkus:quarkus-container-image-docker'
+    implementation 'io.quarkus:quarkus-rest-client-jackson'
     implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkus:quarkus-scheduler'
+
     implementation 'io.quarkiverse.mapstruct:quarkus-mapstruct:1.1.0'
     implementation "org.mapstruct:mapstruct:${VERSION_MAPSTRUCT}"
     // TODO remove quarkus-openapi-generator-server in release
     implementation 'io.quarkus:quarkus-smallrye-openapi'
     // TODO remove quarkus-openapi-generator-server in release
     implementation 'io.quarkiverse.openapi.generator:quarkus-openapi-generator-server:2.14.0-lts'
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.46'
     implementation 'io.quarkus:quarkus-reactive-pg-client'
     /* TODO add camel-quarkus-pgevent
     implementation 'org.apache.camel.quarkus:camel-quarkus-pgevent'
@@ -42,8 +47,21 @@ dependencies {
     annotationProcessor project(":spi-mapstruct")
     annotationProcessor project(":lib")
 
+    // Liquibase runtime dependencies for the plugin
+    liquibaseRuntime "org.liquibase:liquibase-core:${VERSION_ORG_LIQUIBASE_LIQUIBASE_CORE}"
+    liquibaseRuntime "org.liquibase:liquibase-gradle-plugin:${VERSION_ORG_LIQUIBASE_LIQUIBASE_GRADLE_PLUGIN}"
+    liquibaseRuntime "org.postgresql:postgresql:${VERSION_ORG_POSTGRESQL}"
+    liquibaseRuntime "info.picocli:picocli:${VERSION_INFO_PICOCLI_PICOCLI}"
+
+    implementation 'io.quarkus:quarkus-jdbc-postgresql'
     testImplementation 'io.quarkus:quarkus-junit'
+    testImplementation 'io.quarkus:quarkus-junit-mockito'
+    testImplementation 'io.quarkus:quarkus-liquibase'
+    testImplementation 'io.quarkus:quarkus-test-vertx'
+    // testImplementation 'io.quarkus:quarkus-test-postgresql'
     testImplementation 'io.rest-assured:rest-assured'
+    testImplementation 'org.testcontainers:junit-jupiter:1.21.4'
+    testImplementation 'org.testcontainers:postgresql:1.21.4'
     testAnnotationProcessor "org.mapstruct:mapstruct-processor:${VERSION_MAPSTRUCT}"
 }
 
@@ -79,3 +97,6 @@ tasks.register('printSourceSets') {
         }
     }
 }
+
+apply from: "${rootDir}/gradle/helpers/generators.gradle"
+apply from: "${rootDir}/gradle/helpers/liquibase.gradle"

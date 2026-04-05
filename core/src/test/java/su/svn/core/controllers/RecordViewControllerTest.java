@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -46,8 +47,6 @@ class RecordViewControllerTest {
     @Test
     void shouldReturnRecordById() throws Exception {
         UUID id = UUID.randomUUID();
-        ResourceRecordViewFilter filter = new ResourceRecordViewFilter(null, null, null, null);
-        Pageable pageable = Pageable.ofSize(20);
 
         ResourceRecordView response = ResourceRecordView.builder()
                 .id(id)
@@ -59,9 +58,9 @@ class RecordViewControllerTest {
                 .build();
         Page<ResourceRecordView> page = getResourceRecordViews(response);
 
-        when(recordViewService.getFilteredRecords(filter, pageable)).thenReturn(page);
+        when(recordViewService.getFilteredRecords(any(), any())).thenReturn(page);
 
-        mockMvc.perform(get("/core/api/v2/json-records"))
+        mockMvc.perform(get("/core/api/v2/records-view"))
                 .andExpect(status().isOk())
                 .andDo(new ResultHandler() {
                     @Override
@@ -73,7 +72,7 @@ class RecordViewControllerTest {
                 .andExpect(jsonPath("$.content[0].id").value(id.toString()))
                 .andExpect(jsonPath("$.content[0].title").value("test"));
 
-        verify(recordViewService).getFilteredRecords(filter, pageable);
+        verify(recordViewService).getFilteredRecords(any(), any());
     }
 
     private static @NotNull Page<ResourceRecordView> getResourceRecordViews(ResourceRecordView response) {

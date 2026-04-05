@@ -126,10 +126,10 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    testImplementation "org.assertj:assertj-core:3.27.7"
-    testImplementation "org.junit.jupiter:junit-jupiter-api:5.11.4"
-    testImplementation "org.mockito:mockito-core:5.23.0"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.11.4"
+    testImplementation "org.assertj:assertj-core:${VERSION_ORG_ASSERTJ_ASSERTJ_CORE}"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${VERSION_ORG_JUNIT_JUPITER_JUNIT_JUPITER_API}"
+    testImplementation "org.mockito:mockito-core:${VERSION_ORG_MOCKITO_MOCKITO_CORE}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${VERSION_ORG_JUNIT_JUPITER_JUNIT_JUPITER_API}"
 }
 
 javadoc {

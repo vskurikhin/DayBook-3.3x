@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewSpecificationBuilder.java
@@ -49,10 +49,11 @@ public class RecordViewSpecificationBuilder {
                         )
                 );
             }
-            criteriaPredicates.add(
-                    cb.equal(root.get(RecordView_.ENABLED), true)
-            );
-
+            if (filterDto.withDisabled() != null && !filterDto.withDisabled()) {
+                criteriaPredicates.add(
+                        cb.equal(root.get(RecordView_.ENABLED), true)
+                );
+            }
             return cb.and(criteriaPredicates.toArray(new Predicate[0]));
         };
     }
