@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 13:04 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PageRecordDataMapper.java
@@ -19,5 +19,4 @@ import su.svn.api.model.dto.RecordData;
 public interface PageRecordDataMapper {
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     Page<RecordData> toPage(Page<PostRecord> record);
-    // RecordData toResource(PostRecord record);
 }

@@ -7,7 +7,7 @@
 
 --
 INSERT INTO api.user_name (user_name, id, sequence_id) VALUES ('root', '00000000-0000-0000-0000-000000000000', (SELECT nextval('api.user_name_seq')));
-INSERT INTO api.post_records (id, parent_id, sequence_id, user_name) VALUES ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', (SELECT nextval('api.post_records_seq')), 'root');
+INSERT INTO api.post_records (id, parent_id, sequence_id, user_name, last_changed_time) VALUES ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', (SELECT nextval('api.post_records_seq')), 'root', NOW());
 
 --
 --rollback DELETE FROM api.base_records WHERE id = '00000000-0000-0000-0000-000000000000';

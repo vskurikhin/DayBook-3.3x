@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewController.java
@@ -27,7 +27,7 @@ import su.svn.core.services.domain.RecordViewService;
 @Slf4j
 @Validated
 @RestController
-@RequestMapping("/core/api/v2/json-records")
+@RequestMapping("/core/api/v2/records-view")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class RecordViewController {

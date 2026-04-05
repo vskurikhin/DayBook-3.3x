@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 13:04 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -8,7 +8,6 @@
 
 package su.svn.api.domain.entities;
 
-import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import io.quarkus.hibernate.reactive.panache.PanacheQuery;
 import io.smallrye.mutiny.Uni;
@@ -17,23 +16,18 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import static lombok.AccessLevel.PRIVATE;
 
-@Accessors(fluent = true, chain = false)
+@Accessors(fluent = true)
 @AllArgsConstructor
 @Builder
 @Entity
@@ -45,6 +39,17 @@ import static lombok.AccessLevel.PRIVATE;
 @Table(schema = "api", name = "post_records")
 @ToString(exclude = "parent")
 @NamedQueries({
+        @NamedQuery(
+                name = PostRecord.FIND_FIND_BY_UUID,
+                query = "FROM PostRecord WHERE id = :id"
+        ),
+        @NamedQuery(
+                name = PostRecord.FIND_LAST_CHANGED_TIME_POST_RECORD,
+                query = """
+                        FROM PostRecord
+                        ORDER BY lastChangedTime DESC, id DESC
+                        """
+        ),
         @NamedQuery(
                 name = PostRecord.READ_ENABLED_AND_ID_IN,
                 query = """
@@ -64,7 +69,9 @@ import static lombok.AccessLevel.PRIVATE;
 })
 public class PostRecord extends PanacheEntityBase implements Serializable {
 
-    public static final Duration TIMEOUT_DURATION = Duration.ofMillis(10000);
+    public static final Duration TIMEOUT_DURATION = Duration.ofMillis(2000);
+    public static final String FIND_FIND_BY_UUID = "PostRecord.findByUUID";
+    public static final String FIND_LAST_CHANGED_TIME_POST_RECORD = "PostRecord.findLastChangedTimePostRecord";
     public static final String READ_ENABLED_AND_ID_IN = "PostRecord.readEnabledAndIdIn";
     public static final String READ_ENABLED_ORDER_POST_REFRESH_DESC = "PostRecord.readEnabledOrderByPostAtAndRefreshAtDesc";
     public static final Map<String, Object> ENABLED = Map.of("enabled", Boolean.TRUE);
@@ -108,13 +115,14 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     @Column(name = "refresh_at")
     OffsetDateTime refreshAt;
 
-    @CreationTimestamp
-    @Column(name = "create_time", updatable = false, nullable = false)
+    @Column(name = "create_time", updatable = false)
     LocalDateTime createTime;
 
-    @UpdateTimestamp
-    @Column(name = "update_time", updatable = false)
+    @Column(name = "update_time")
     LocalDateTime updateTime;
+
+    @Column(name = "last_changed_time", nullable = false)
+    LocalDateTime lastChangedTime;
 
     @Builder.Default
     @Column(name = "enabled")
@@ -137,32 +145,38 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     @JdbcTypeCode(SqlTypes.JSON)
     Map<String, String> values;
 
-    public Uni<PostRecord> update() {
-        return PostRecord.update(this);
+    public static Uni<PostRecord> findByUUID(@Nonnull UUID id) {
+        return find("#" + FIND_FIND_BY_UUID, Map.of("id", id)).firstResult();
     }
 
-    public static Uni<PostRecord> create(@Nonnull PostRecord postRecord) {
-        if (postRecord.parentId == null) {
-            postRecord.parentId(postRecord.id());
-            postRecord.parent(postRecord);
-        }
-        postRecord.flags &= (Integer.MAX_VALUE - 1);
-        return Panache
-                .withTransaction(postRecord::persistAndFlush)
-                .replaceWith(postRecord)
+    public static Uni<LocalDateTime> findLastChangedTime() {
+        return PostRecord.findLastChangedTimePostRecord()
+                .map(postRecord -> postRecord.lastChangedTime);
+    }
+
+    public static Uni<PostRecord> findLastChangedTimePostRecord() {
+        return PostRecord.find("#" + FIND_LAST_CHANGED_TIME_POST_RECORD)
+                .page(0, 1)
+                .firstResult();
+    }
+
+    public static Uni<Void> disable(@Nonnull UUID id) {
+        return findByUUID(id)
+                .onItem()
+                .ifNotNull()
+                .transform(entity -> {
+                    entity.enabled = false;
+                    entity.lastChangedTime(LocalDateTime.now());
+                    return entity;
+                })
+                .flatMap(postRecord -> persist(postRecord))
+                .onItem()
+                .transformToUni(postRecord -> Uni.createFrom().voidItem())
                 .ifNoItem()
                 .after(TIMEOUT_DURATION)
                 .fail()
                 .onFailure()
-                .transform(IllegalStateException::new);
-    }
-
-    public static Uni<Boolean> deleteById(@Nonnull UUID id) {
-        return Panache.withTransaction(() -> PanacheEntityBase.deleteById(id));
-    }
-
-    public static Uni<PostRecord> findById(@Nonnull UUID id) {
-        return PanacheEntityBase.findById(id);
+                .recoverWithUni(Uni.createFrom().voidItem());
     }
 
     public static Uni<List<PostRecord>> readEnabledAndIdIn(List<UUID> ids) {
@@ -176,22 +190,22 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     }
 
     public static Uni<PostRecord> update(@Nonnull PostRecord postRecord) {
-        return Panache
-                .withTransaction(() -> PostRecord.findById(postRecord.id)
-                        .onItem()
-                        .ifNotNull()
-                        .transform(entity -> {
-                            entity.parentId = postRecord.parentId;
-                            entity.type = postRecord.type;
-                            entity.userName = postRecord.userName;
-                            entity.enabled = postRecord.enabled;
-                            entity.visible = postRecord.visible;
-                            entity.flags = postRecord.flags &= (Integer.MAX_VALUE - 1);
-                            return entity;
-                        })
-                        .onFailure()
-                        .recoverWithNull()
-                ).replaceWith(postRecord)
+        return findByUUID(postRecord.id)
+                .onItem()
+                .ifNotNull()
+                .transform(entity -> {
+                    entity.parentId(postRecord.parentId);
+                    entity.type(postRecord.type);
+                    entity.userName(postRecord.userName);
+                    entity.refreshAt(postRecord.refreshAt);
+                    entity.lastChangedTime(LocalDateTime.now());
+                    entity.enabled(postRecord.enabled);
+                    entity.visible(postRecord.visible);
+                    entity.flags(postRecord.flags);
+                    entity.title(postRecord.title);
+                    entity.values(new LinkedHashMap<>(postRecord.flags));
+                    return entity;
+                })
                 .ifNoItem()
                 .after(TIMEOUT_DURATION)
                 .fail()

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordServiceImpl.java
@@ -8,6 +8,7 @@
 
 package su.svn.core.services.domain;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import su.svn.core.models.dto.UpdateJsonRecord;
 import su.svn.core.repository.JsonRecordRepository;
 import su.svn.core.services.mappers.JsonRecordMapper;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static lombok.AccessLevel.PRIVATE;
@@ -46,7 +48,6 @@ public class JsonRecordServiceImpl implements JsonRecordService {
         try {
             record = jsonRecordRepository.findByIdAndEnabledTrue(id)
                     .orElseThrow(ChangeSetPersister.NotFoundException::new);
-            System.out.println("record: " + record);
             record.baseRecord().userName(ROOT);
             record.baseRecord().enabled(false);
             record.userName(ROOT);
@@ -79,12 +80,13 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     }
 
     @Override
+    @Transactional
     public ResourceJsonRecord update(UpdateJsonRecord updateRecord) {
+        Optional<JsonRecord> jsonRecord = jsonRecordRepository.findById(updateRecord.id());
         ResourceJsonRecord resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
-        System.out.println("resourceJsonRecord: " + resourceJsonRecord);
         JsonRecord record = jsonRecordMapper.toEntity(resourceJsonRecord);
-        System.out.println("record: " + record);
         record.baseRecord().userName(ROOT);
+        record.baseRecord().postAt(jsonRecord.orElseThrow().baseRecord().postAt());
         record.userName(ROOT);
 
         JsonRecord savedRecord = jsonRecordRepository.save(record);

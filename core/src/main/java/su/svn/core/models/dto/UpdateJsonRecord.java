@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.28 11:32 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * UpdateJsonRecord.java
@@ -20,6 +20,7 @@ import java.util.UUID;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record UpdateJsonRecord(
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID id,
         @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,

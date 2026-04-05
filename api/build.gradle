@@ -31,6 +31,7 @@ dependencies {
     implementation 'io.quarkus:quarkus-smallrye-openapi'
     // TODO remove quarkus-openapi-generator-server in release
     implementation 'io.quarkiverse.openapi.generator:quarkus-openapi-generator-server:2.14.0-lts'
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.46'
     implementation 'io.quarkus:quarkus-reactive-pg-client'
     /* TODO add camel-quarkus-pgevent
     implementation 'org.apache.camel.quarkus:camel-quarkus-pgevent'

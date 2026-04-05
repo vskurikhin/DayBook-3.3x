@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 13:04 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordResource.java
@@ -9,6 +9,7 @@
 package su.svn.api.resources;
 
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.tuples.Tuple2;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -22,7 +23,7 @@ import su.svn.api.model.dto.RecordData;
 import su.svn.api.services.domain.RecordDataService;
 import su.svn.api.services.mappers.PageRecordDataMapper;
 
-@Path(ResourcePath.RECORD)
+@Path(ResourcePath.RECORDS)
 public class RecordResource {
 
     @Inject

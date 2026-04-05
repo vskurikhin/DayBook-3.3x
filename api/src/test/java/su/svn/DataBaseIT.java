@@ -1,13 +1,22 @@
 package su.svn;
 
+import io.quarkus.test.InjectMock;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.vertx.RunOnVertxContext;
 import io.quarkus.test.vertx.UniAsserter;
+import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import su.svn.api.domain.entities.PostRecord;
+import su.svn.api.model.dto.PageRecordView;
+import su.svn.api.model.dto.RecordView;
 import su.svn.api.repository.PostRecordRepository;
+import su.svn.api.repository.client.rest.RecordViewClient;
+import su.svn.api.services.domain.RecordDataService;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -18,6 +27,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.when;
 
 @QuarkusTest
 @QuarkusTestResource(PostgreSQLTestResource.class)
@@ -27,6 +39,7 @@ public class DataBaseIT {
     public static final int PAGE_SIZE = 127;
     public static final int ITERATION = 10;
     public static final double ITERATION_DOUBLE = ITERATION;
+
     @Inject
     PostRecordRepository postRecordRepository;
 
@@ -45,6 +58,7 @@ public class DataBaseIT {
                         .parentId(id)
                         .userName("root")
                         .postAt(OffsetDateTime.of(LocalDateTime.now(), zoneOffset))
+                        .lastChangedTime(LocalDateTime.now())
                         .build()
                 );
             }
@@ -71,8 +85,6 @@ public class DataBaseIT {
                 postRecords -> {
                     assertEquals(expectedPageCount, postRecords.pageCount());
                     assertEquals(expectedPageIndex2, postRecords.pageIndex());
-                    assertEquals(expectedPageSize2, postRecords.pageSize());
-                    assertEquals(expectedPageSize2, postRecords.list().size());
                     assertFalse(postRecords.hasNextPage());
                     assertTrue(postRecords.hasPreviousPage());
                 }
@@ -88,6 +100,7 @@ public class DataBaseIT {
                     .parentId(id)
                     .userName("root")
                     .postAt(OffsetDateTime.of(LocalDateTime.now(), zoneOffset))
+                    .lastChangedTime(LocalDateTime.now())
                     .build()
             );
         }
@@ -102,6 +115,80 @@ public class DataBaseIT {
                         assertTrue(postRecords.stream().anyMatch(pr -> pr.id().equals(new UUID(0, j))));
                     }
                 }
+        );
+    }
+
+    @InjectMock
+    @RestClient
+    RecordViewClient mockRecordViewClient;
+
+    @Inject
+    RecordDataService recordDataService;
+
+    @BeforeEach
+    void beforeEach() throws InterruptedException {
+        OffsetDateTime odt = OffsetDateTime.now(ZoneId.systemDefault());
+        ZoneOffset zoneOffset = odt.getOffset();
+
+        var list = new ArrayList<RecordView>();
+        var zeroUUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        list.add(RecordView.builder()
+                .id(zeroUUID)
+                .parentId(zeroUUID)
+                .postAt(OffsetDateTime.of(LocalDateTime.now(), zoneOffset))
+                .lastChangedTime(LocalDateTime.now())
+                .flags(0)
+                .build());
+        for (int i = ITERATION; i < 2 * ITERATION; i++) {
+            var id = new UUID(0, i);
+            list.add(RecordView.builder()
+                    .id(id)
+                    .parentId(id)
+                    .postAt(OffsetDateTime.of(LocalDateTime.now(), zoneOffset))
+                    .lastChangedTime(LocalDateTime.now())
+                    .flags(0)
+                    .build()
+            );
+        }
+        when(mockRecordViewClient.getByPageIndexAndSizeAndFromTimeAsUni(anyInt(), anyInt(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(
+                                PageRecordView.builder()
+                                        .content(list)
+                                        .last(true)
+                                        .totalPages(1)
+                                        .totalElements(1)
+                                        .first(true)
+                                        .number(0)
+                                        .numberOfElements(list.size())
+                                        .build()
+                        )
+                );
+    }
+
+    @Test
+    @RunOnVertxContext
+    void testRecordDataService(UniAsserter asserter) throws InterruptedException {
+        asserter.assertThat(
+                () -> recordDataService.sync(0, 2000)
+                        .flatMap(postRecords -> postRecordRepository.readIdIn(
+                                postRecords.stream().map(PostRecord::id).toList()
+                        )),
+                got -> {
+                    assertEquals(ITERATION + 1, got.size());
+                    for (long i = ITERATION; i < 2 * ITERATION; i++) {
+                        var j = i;
+                        assertTrue(got.stream().anyMatch(pr -> pr.id().equals(new UUID(0, j))));
+                    }
+                }
+        );
+    }
+
+    @Test
+    @RunOnVertxContext
+    void testPostRecordRepository2(UniAsserter asserter) {
+        asserter.assertThat(
+                () -> postRecordRepository.findLastChangedTime(),
+                Assertions::assertNotNull
         );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.03 20:02 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecordRepository.java
@@ -17,6 +17,7 @@ import org.hibernate.reactive.mutiny.Mutiny;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.model.dto.Page;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,6 +28,16 @@ public class PostRecordRepository {
 
     @Inject
     Mutiny.SessionFactory mutinySessionFactory;
+
+    @WithTransaction
+    public Uni<Void> disable(UUID id) {
+        return PostRecord.disable(id);
+    }
+
+    @WithSession
+    public Uni<LocalDateTime> findLastChangedTime() {
+        return PostRecord.findLastChangedTime();
+    }
 
     @WithTransaction
     public Uni<List<PostRecord>> persistAll(List<PostRecord> records) {
@@ -54,5 +65,10 @@ public class PostRecordRepository {
         return unis.asTuple().map(t4 ->
                 new Page<>(t4.getItem1(), t4.getItem2(), pageIndex, t4.getItem1().size(), t4.getItem3(), t4.getItem4())
         );
+    }
+
+    @WithTransaction
+    public Uni<PostRecord> update(PostRecord postRecord) {
+        return PostRecord.update(postRecord);
     }
 }

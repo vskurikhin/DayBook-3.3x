@@ -60,6 +60,7 @@ public class ApiIT {
                                         .totalElements(1)
                                         .first(true)
                                         .number(0)
+                                        .numberOfElements(1)
                                         .size(1)
                                         .build()
                         )
@@ -85,7 +86,7 @@ public class ApiIT {
     @Test
     void testHelloEndpoint() {
         @SuppressWarnings("unchecked") Page<LinkedHashMap<String, Object>> resp = given()
-                .when().get(ResourcePath.RECORD)
+                .when().get(ResourcePath.RECORDS)
                 .then()
                 .statusCode(200)
                 .extract()
