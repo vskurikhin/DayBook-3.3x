@@ -1,4 +1,4 @@
-name: Go CI
+name: GoLang 1.26 CI
 
 on:
   push:
