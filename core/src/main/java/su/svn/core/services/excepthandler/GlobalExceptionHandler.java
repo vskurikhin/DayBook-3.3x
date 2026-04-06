@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * GlobalExceptionHandler.java
@@ -35,9 +35,11 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * <p>Annotated with {@code @RestControllerAdvice} to apply globally.</p>
+ *
+ * @author Victor N. Skurikhin
  */
 @Slf4j
-// @RestControllerAdvice
+@RestControllerAdvice
 public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     @ExceptionHandler(ChangeSetPersister.NotFoundException.class)

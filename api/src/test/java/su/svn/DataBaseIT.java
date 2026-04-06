@@ -1,5 +1,6 @@
 package su.svn;
 
+import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -39,9 +40,24 @@ public class DataBaseIT {
     public static final int PAGE_SIZE = 127;
     public static final int ITERATION = 10;
     public static final double ITERATION_DOUBLE = ITERATION;
+    public static final UUID ZERO_UUID = new UUID(0, 0);
+    public static final UUID ONE_UUID = new UUID(0, 1);
 
     @Inject
     PostRecordRepository postRecordRepository;
+
+    @Test
+    @RunOnVertxContext
+    void testPostRecord_findByUUID(UniAsserter asserter) {
+        asserter.assertThat(() -> Panache.withTransaction(() ->
+                        PostRecord.findByUUID(ZERO_UUID)
+                ),
+                postRecord -> {
+                    assertNotNull(postRecord);
+                    assertEquals(ZERO_UUID, postRecord.id());
+                }
+        );
+    }
 
     @Test
     @RunOnVertxContext
@@ -89,8 +105,7 @@ public class DataBaseIT {
                     assertTrue(postRecords.hasPreviousPage());
                 }
         );
-        var zeroUUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
-        var ids = new ArrayList<>(List.of(zeroUUID));
+        var ids = new ArrayList<>(List.of(ZERO_UUID));
         var list = new ArrayList<PostRecord>();
         for (int i = 1; i < ITERATION; i++) {
             var id = new UUID(0, i);
@@ -109,11 +124,21 @@ public class DataBaseIT {
                 () -> postRecordRepository.readIdIn(ids),
                 postRecords -> {
                     assertEquals(ITERATION, postRecords.size());
-                    assertTrue(postRecords.stream().anyMatch(pr -> pr.id().equals(zeroUUID)));
+                    assertTrue(postRecords.stream().anyMatch(pr -> pr.id().equals(ZERO_UUID)));
                     for (long i = 1; i < ITERATION; i++) {
                         var j = i;
                         assertTrue(postRecords.stream().anyMatch(pr -> pr.id().equals(new UUID(0, j))));
                     }
+                }
+        );
+        asserter.execute(() -> postRecordRepository.disable(ONE_UUID));
+        asserter.assertThat(() -> Panache.withTransaction(() ->
+                        PostRecord.findByUUID(ONE_UUID)
+                ),
+                postRecord -> {
+                    assertNotNull(postRecord);
+                    assertEquals(ONE_UUID, postRecord.id());
+                    assertFalse(postRecord.enabled());
                 }
         );
     }
