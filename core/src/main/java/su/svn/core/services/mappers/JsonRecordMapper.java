@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordMapper.java
@@ -37,9 +37,6 @@ public interface JsonRecordMapper {
     @Mapping(source = "baseRecord.refreshAt", target = "refreshAt")
     ResourceJsonRecord toResource(JsonRecord record);
 
-    @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
-    ResourceJsonRecord toResource(RecordView record);
-
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "userName", ignore = true)
     @Mapping(target = "refreshAt", ignore = true)
@@ -47,12 +44,6 @@ public interface JsonRecordMapper {
 
     @Mapping(target = "userName", ignore = true)
     ResourceJsonRecord toResource(UpdateJsonRecord record);
-
-    @Mapping(target = "type", constant = "Json")
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    @Mapping(target = "enabled", ignore = true)
-    BaseRecord toBaseRecord(ResourceJsonRecord record);
 
     @Mapping(target = "baseRecord", ignore = true)
     @Mapping(target = "createTime", ignore = true)

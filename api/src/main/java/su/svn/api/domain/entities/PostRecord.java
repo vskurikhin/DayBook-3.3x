@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -27,6 +27,53 @@ import java.util.*;
 
 import static lombok.AccessLevel.PRIVATE;
 
+/**
+ * Entity representing a post record within the system.
+ *
+ * <p>This class is a reactive Active Record entity based on Panache and is mapped to the
+ * {@code api.post_records} table. It encapsulates metadata and state related to a post,
+ * including lifecycle timestamps, visibility flags, and hierarchical relationships.</p>
+ *
+ * <h2>Key Features</h2>
+ * <ul>
+ *     <li>Supports parent-child relationships via {@code parentId}</li>
+ *     <li>Tracks lifecycle timestamps such as creation, update, and last change time</li>
+ *     <li>Provides soft-disable functionality via the {@code enabled} flag</li>
+ *     <li>Stores additional dynamic attributes in JSON format ({@code values})</li>
+ * </ul>
+ *
+ * <h2>Reactive Operations</h2>
+ * <p>All database operations are implemented using reactive APIs (Mutiny {@code Uni}).</p>
+ * <ul>
+ *     <li>{@link #findByUUID(UUID)} – retrieves a record by its UUID</li>
+ *     <li>{@link #findLastChangedTime()} – returns the most recent {@code lastChangedTime}</li>
+ *     <li>{@link #disable(UUID)} – disables a record by setting {@code enabled = false}</li>
+ *     <li>{@link #update(PostRecord)} – updates mutable fields of an existing record</li>
+ * </ul>
+ *
+ * <h2>Named Queries</h2>
+ * <ul>
+ *     <li>{@value #FIND_FIND_BY_UUID} – find record by UUID</li>
+ *     <li>{@value #FIND_LAST_CHANGED_TIME_POST_RECORD} – fetch latest changed record</li>
+ *     <li>{@value #READ_ENABLED_AND_ID_IN} – fetch enabled records by ID list</li>
+ *     <li>{@value #READ_ENABLED_ORDER_POST_REFRESH_DESC} – fetch enabled records ordered by timestamps</li>
+ * </ul>
+ *
+ * <h2>Concurrency and Timeout</h2>
+ * <p>Operations such as {@link #disable(UUID)} and {@link #update(PostRecord)} include timeout
+ * handling via {@link #TIMEOUT_DURATION} to prevent indefinite waiting.</p>
+ *
+ * <h2>Notes</h2>
+ * <ul>
+ *     <li>This entity uses a sequence-based primary key ({@code sequenceId})</li>
+ *     <li>{@code id} is a business identifier (UUID) and is not auto-generated</li>
+ *     <li>Lazy loading is used for the parent relationship</li>
+ * </ul>
+ *
+ * @see io.quarkus.hibernate.reactive.panache.PanacheEntityBase
+ * @see java.util.UUID
+ * @see io.smallrye.mutiny.Uni
+ */
 @Accessors(fluent = true)
 @AllArgsConstructor
 @Builder
@@ -203,7 +250,7 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
                     entity.visible(postRecord.visible);
                     entity.flags(postRecord.flags);
                     entity.title(postRecord.title);
-                    entity.values(new LinkedHashMap<>(postRecord.flags));
+                    entity.values(new LinkedHashMap<>(postRecord.values));
                     return entity;
                 })
                 .ifNoItem()

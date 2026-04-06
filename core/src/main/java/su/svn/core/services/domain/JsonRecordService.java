@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordService.java
@@ -23,8 +23,12 @@ import java.util.UUID;
  * and disabling records.</p>
  */
 public interface JsonRecordService {
+
     void disable(UUID id);
+
     ResourceJsonRecord findById(UUID id) throws ChangeSetPersister.NotFoundException;
+
     ResourceJsonRecord save(NewJsonRecord newRecord);
+
     ResourceJsonRecord update(UpdateJsonRecord updateRecord);
 }

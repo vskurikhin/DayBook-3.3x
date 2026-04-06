@@ -57,6 +57,7 @@ dependencies {
     testImplementation 'io.quarkus:quarkus-junit'
     testImplementation 'io.quarkus:quarkus-junit-mockito'
     testImplementation 'io.quarkus:quarkus-liquibase'
+    testImplementation 'io.quarkus:quarkus-panache-mock:3.32.1'
     testImplementation 'io.quarkus:quarkus-test-vertx'
     // testImplementation 'io.quarkus:quarkus-test-postgresql'
     testImplementation 'io.rest-assured:rest-assured'

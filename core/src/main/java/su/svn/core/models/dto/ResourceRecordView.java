@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceRecordView.java
@@ -8,7 +8,6 @@
 
 package su.svn.core.models.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
@@ -25,7 +24,7 @@ import java.util.UUID;
 public record ResourceRecordView(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
-        @JsonIgnore String userName,
+        @JsonProperty String userName,
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty LocalDateTime lastChangedTime,

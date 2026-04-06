@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordView.java
@@ -23,6 +23,56 @@ import java.util.UUID;
 
 import static lombok.AccessLevel.PRIVATE;
 
+/**
+ * JPA entity representing a database view of records with extended attributes.
+ *
+ * <p>This entity maps to the database view <b>core.records_view</b> and is used
+ * for read operations that combine data from multiple underlying tables
+ * (e.g., {@link BaseRecord} and related JSON data).</p>
+ *
+ * <p>Unlike standard entities, this class is typically backed by a database view
+ * and is intended for querying and projection purposes rather than direct
+ * modification.</p>
+ *
+ * <h2>Key Features</h2>
+ * <ul>
+ *     <li>Represents a unified view of record data</li>
+ *     <li>Includes hierarchical relationship via {@link #parent}</li>
+ *     <li>Supports JSON storage via {@link #values}</li>
+ *     <li>Contains audit fields such as creation and update timestamps</li>
+ *     <li>Supports soft-delete and visibility flags</li>
+ * </ul>
+ *
+ * <h2>Relationships</h2>
+ * <ul>
+ *     <li>{@link #parent} — many-to-one relationship to {@link BaseRecord}</li>
+ * </ul>
+ *
+ * <h2>Audit Fields</h2>
+ * <ul>
+ *     <li>{@link #createTime} — timestamp when the record was created</li>
+ *     <li>{@link #updateTime} — timestamp when the record was last updated</li>
+ *     <li>{@link #lastChangedTime} — timestamp of the last modification</li>
+ * </ul>
+ *
+ * <h2>Flags</h2>
+ * <ul>
+ *     <li>{@link #enabled} — indicates whether the record is active</li>
+ *     <li>{@link #localChange} — indicates whether the record was modified locally</li>
+ *     <li>{@link #visible} — controls visibility of the record</li>
+ *     <li>{@link #flags} — custom integer flags for additional metadata</li>
+ * </ul>
+ *
+ * <h2>JSON Support</h2>
+ * <p>The {@link #values} field stores structured data in JSON format and is
+ * mapped using Hibernate's {@link org.hibernate.annotations.JdbcTypeCode}.</p>
+ *
+ * <p><b>Note:</b> The {@link #id} field is generated and not insertable/updatable,
+ * as it is managed by the database view.</p>
+ *
+ * @see BaseRecord
+ * @see RecordType
+ */
 @Accessors(fluent = true)
 @AllArgsConstructor
 @Builder

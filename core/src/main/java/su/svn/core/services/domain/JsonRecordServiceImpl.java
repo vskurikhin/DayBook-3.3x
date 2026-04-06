@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordServiceImpl.java
@@ -31,6 +31,8 @@ import static lombok.AccessLevel.PRIVATE;
  *
  * <p>Handles business logic for JSON records, including persistence
  * and mapping between entities and DTOs.</p>
+ *
+ * @author Victor N. Skurikhin
  */
 @FieldDefaults(level = PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
