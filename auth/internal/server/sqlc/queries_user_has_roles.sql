@@ -1,3 +1,9 @@
+-- name: GetRolesForUserName :one
+SELECT user_name, enabled, array_agg(role) AS roles
+FROM user_has_roles
+WHERE enabled AND user_name = $1
+GROUP BY user_name, enabled LIMIT 1;
+
 -- name: ListUserHasRolesByRole :many
 SELECT * FROM user_has_roles
 WHERE role = $1;

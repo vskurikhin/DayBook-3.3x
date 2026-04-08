@@ -14,6 +14,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_has_roles"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
@@ -22,12 +23,14 @@ import (
 
 func TestAuthService_Auth(t *testing.T) {
 	var (
-		mockCfg             *MockConfig
-		mockDBPool          *MockDB
-		mockDBTXSessionRepo *MockDBTX
-		mockSessionRepo     *MockSessionRepo
-		mockTx              *MockTx
-		mockUserViewRepo    *MockUserViewRepo
+		mockCfg                  *MockConfig
+		mockDBPool               *MockDB
+		mockDBTXSessionRepo      *MockDBTX
+		mockDBTXUserHasRolesRepo *MockDBTX
+		mockSessionRepo          *MockSessionRepo
+		mockTx                   *MockTx
+		mockUserHasRolesRepo     *MockUserHasRolesRepo
+		mockUserViewRepo         *MockUserViewRepo
 	)
 	tests := []struct {
 		name        string
@@ -88,6 +91,15 @@ func TestAuthService_Auth(t *testing.T) {
 					Return(mockTx, nil).
 					Times(1)
 
+				mockRowDBTXUserHasRolesRepo := &mockRowUserHasRoles{data: user_has_roles.GetRolesForUserNameRow{}}
+				mockDBTXUserHasRolesRepo.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(mockRowDBTXUserHasRolesRepo).
+					Times(1)
+				mockUserHasRolesRepo.EXPECT().
+					WithTx(mockTx).
+					Return(user_has_roles.New(mockDBTXUserHasRolesRepo))
+
 				mockRowDBTXSessionRepo := &mockRowSession{data: session.Session{}}
 				mockDBTXSessionRepo.EXPECT().
 					QueryRow(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -112,11 +124,13 @@ func TestAuthService_Auth(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockCfg = NewMockConfig(ctrl)
-			mockSessionRepo = NewMockSessionRepo(ctrl)
-			mockUserViewRepo = NewMockUserViewRepo(ctrl)
 			mockDBPool = NewMockDB(ctrl)
 			mockDBTXSessionRepo = NewMockDBTX(ctrl)
+			mockDBTXUserHasRolesRepo = NewMockDBTX(ctrl)
+			mockSessionRepo = NewMockSessionRepo(ctrl)
 			mockTx = NewMockTx(ctrl)
+			mockUserHasRolesRepo = NewMockUserHasRolesRepo(ctrl)
+			mockUserViewRepo = NewMockUserViewRepo(ctrl)
 
 			tt.setupMocks()
 
@@ -124,6 +138,7 @@ func TestAuthService_Auth(t *testing.T) {
 				creds.NewCredentialsMethodFactory(mockCfg),
 				mockDBPool, mockSessionRepo,
 				actions.NewTransactionDelayer(),
+				mockUserHasRolesRepo,
 				mockUserViewRepo,
 			)
 
@@ -235,13 +250,14 @@ func TestAuthService_auth(t *testing.T) {
 
 func TestAuthService_transactionAuth(t *testing.T) {
 	var (
-		mockCfg             *MockConfig
-		mockDBPool          *MockDB
-		mockDBTXSessionRepo *MockDBTX
-		mockSessionRepo     *MockSessionRepo
-		mockTx              *MockTx
-		//mockUserViewRepo    *MockUserViewRepo
-		mockTxDelayer *MockTxDelayer
+		mockCfg                  *MockConfig
+		mockDBPool               *MockDB
+		mockDBTXSessionRepo      *MockDBTX
+		mockDBTXUserHasRolesRepo *MockDBTX
+		mockSessionRepo          *MockSessionRepo
+		mockUserHasRolesRepo     *MockUserHasRolesRepo
+		mockTx                   *MockTx
+		mockTxDelayer            *MockTxDelayer
 	)
 
 	sid, _ := model.MakeSessionID("host", "user")
@@ -271,6 +287,15 @@ func TestAuthService_transactionAuth(t *testing.T) {
 				})
 				mockDBPool.EXPECT().Begin(ctx).Return(mockTx, nil)
 
+				mockRowDBTXUserHasRolesRepo := &mockRowUserHasRoles{data: user_has_roles.GetRolesForUserNameRow{}}
+				mockDBTXUserHasRolesRepo.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(mockRowDBTXUserHasRolesRepo).
+					Times(1)
+				mockUserHasRolesRepo.EXPECT().
+					WithTx(mockTx).
+					Return(user_has_roles.New(mockDBTXUserHasRolesRepo))
+
 				mockRowDBTXSessionRepo := &mockRowSessionError{}
 				mockDBTXSessionRepo.EXPECT().
 					QueryRow(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -293,6 +318,15 @@ func TestAuthService_transactionAuth(t *testing.T) {
 					ValidPeriodRefreshToken: 1,
 				})
 				mockDBPool.EXPECT().Begin(ctx).Return(mockTx, nil)
+
+				mockRowDBTXUserHasRolesRepo := &mockRowUserHasRoles{data: user_has_roles.GetRolesForUserNameRow{}}
+				mockDBTXUserHasRolesRepo.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(mockRowDBTXUserHasRolesRepo).
+					Times(1)
+				mockUserHasRolesRepo.EXPECT().
+					WithTx(mockTx).
+					Return(user_has_roles.New(mockDBTXUserHasRolesRepo))
 
 				mockRowDBTXSessionRepo := &mockRowSession{data: session.Session{}}
 				mockDBTXSessionRepo.EXPECT().
@@ -324,17 +358,20 @@ func TestAuthService_transactionAuth(t *testing.T) {
 			mockCfg = NewMockConfig(ctrl)
 			mockDBPool = NewMockDB(ctrl)
 			mockDBTXSessionRepo = NewMockDBTX(ctrl)
-			mockTx = NewMockTx(ctrl)
+			mockDBTXUserHasRolesRepo = NewMockDBTX(ctrl)
 			mockSessionRepo = NewMockSessionRepo(ctrl)
+			mockTx = NewMockTx(ctrl)
 			mockTxDelayer = NewMockTxDelayer(ctrl)
+			mockUserHasRolesRepo = NewMockUserHasRolesRepo(ctrl)
 
 			tt.setupMocks(context.Background())
 
 			service := &AuthServiceImplV2{
-				BaseService: &BaseService{cfg: mockCfg},
-				dbPool:      mockDBPool,
-				sessionRepo: mockSessionRepo,
-				txDelayer:   mockTxDelayer,
+				BaseService:  &BaseService{cfg: mockCfg},
+				dbPool:       mockDBPool,
+				sessionRepo:  mockSessionRepo,
+				txDelayer:    mockTxDelayer,
+				userHasRoles: mockUserHasRolesRepo,
 			}
 
 			_, err := service.transactionAuth(ctx, sid, user)
@@ -355,6 +392,7 @@ func TestAuthServiceImplV2_Auth(t *testing.T) {
 	ctx := context.Background()
 
 	mockSessionRepo := NewMockSessionRepo(ctrl)
+	mockUserHasRolesRepo := NewMockUserHasRolesRepo(ctrl)
 	mockUserViewRepo := NewMockUserViewRepo(ctrl)
 	mockDB := NewMockDB(ctrl)
 
@@ -364,7 +402,7 @@ func TestAuthServiceImplV2_Auth(t *testing.T) {
 	credentialsFactory := creds.NewCredentialsMethodFactory(mockCfg)
 	txDelayer := actions.TransactionDelayer{}
 
-	service := NewAuthServiceV2(mockCfg, credentialsFactory, mockDB, mockSessionRepo, txDelayer, mockUserViewRepo)
+	service := NewAuthServiceV2(mockCfg, credentialsFactory, mockDB, mockSessionRepo, txDelayer, mockUserHasRolesRepo, mockUserViewRepo)
 
 	login := model.LoginFromDto(dto.Login{
 		UserName: "test",

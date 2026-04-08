@@ -10,11 +10,11 @@ import (
 
 type UserHasRole struct {
 	ID          int64            `json:"id"`
-	UserName    pgtype.Text      `json:"user_name"`
-	Role        pgtype.Text      `json:"role"`
+	UserName    string           `json:"user_name"`
+	Role        string           `json:"role"`
 	CreateTime  pgtype.Timestamp `json:"create_time"`
 	UpdateTime  pgtype.Timestamp `json:"update_time"`
-	Enabled     pgtype.Bool      `json:"enabled"`
+	Enabled     bool             `json:"enabled"`
 	LocalChange bool             `json:"local_change"`
 	Visible     pgtype.Bool      `json:"visible"`
 	Flags       int32            `json:"flags"`

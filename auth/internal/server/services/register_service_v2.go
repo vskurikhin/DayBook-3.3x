@@ -35,6 +35,7 @@ type RegisterServiceImplV2 struct {
 	userNameRepo       user_name.Repo
 }
 
+// Register creates a new user, hashes the password, and returns credentials.
 func (s *RegisterServiceImplV2) Register(ctx context.Context, user model.CreateUser) (model.Credentials, error) {
 	cost := int(s.cfg.Values().AuthCost)
 	password, err := tool.Hash(user.Password(), cost)
@@ -100,8 +101,8 @@ func (s *RegisterServiceImplV2) transactionRegister(ctx context.Context, user mo
 		Iss:       primaryKey.Iss,
 		Jti:       primaryKey.Jti,
 		Sub:       primaryKey.Sub,
-		UserName:  pgtype.Text{String: userName.UserName, Valid: true},
-		Roles:     []string{},
+		UserName:  userName.UserName,
+		Roles:     []string{"GUEST"},
 		ValidTime: pgtype.Timestamptz{Time: validPeriodAccessToken.SessionValidTime().Local(), Valid: true},
 	})
 	if errTransaction != nil {

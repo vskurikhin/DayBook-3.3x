@@ -1,0 +1,10 @@
+{
+  "keys": [
+    {
+      "kty": "oct",
+      "kid":"secretKey",
+      "k": "RmRoOXU4cklOeGZpdmJyaWFuYmJWVDF1MjMyVlFCWllLeDFIR0FHUHQySQ==",
+      "alg": "HS256"
+    }
+  ]
+}

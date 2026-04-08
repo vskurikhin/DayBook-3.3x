@@ -12,12 +12,12 @@ type Session struct {
 	Iss         pgtype.UUID
 	Jti         pgtype.UUID
 	Sub         pgtype.UUID
-	UserName    pgtype.Text
+	UserName    string
 	Roles       []string
 	ValidTime   pgtype.Timestamptz
 	CreateTime  pgtype.Timestamp
 	UpdateTime  pgtype.Timestamp
-	Enabled     pgtype.Bool
+	Enabled     bool
 	LocalChange bool
 	Visible     pgtype.Bool
 	Flags       int32

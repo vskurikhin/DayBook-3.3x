@@ -7,8 +7,6 @@ package user_has_roles
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUserHasRoles = `-- name: CreateUserHasRoles :one
@@ -21,8 +19,8 @@ RETURNING id, user_name, role, create_time, update_time, enabled, local_change, 
 `
 
 type CreateUserHasRolesParams struct {
-	UserName pgtype.Text `json:"user_name"`
-	Role     pgtype.Text `json:"role"`
+	UserName string `json:"user_name"`
+	Role     string `json:"role"`
 }
 
 func (q *Queries) CreateUserHasRoles(ctx context.Context, arg CreateUserHasRolesParams) (UserHasRole, error) {
@@ -47,7 +45,7 @@ DELETE FROM user_has_roles
 WHERE user_name = $1
 `
 
-func (q *Queries) DeleteUserHasRolesBy(ctx context.Context, userName pgtype.Text) error {
+func (q *Queries) DeleteUserHasRolesBy(ctx context.Context, userName string) error {
 	_, err := q.db.Exec(ctx, deleteUserHasRolesBy, userName)
 	return err
 }
@@ -60,6 +58,26 @@ WHERE id = $1
 func (q *Queries) DeleteUserHasRolesByID(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, deleteUserHasRolesByID, id)
 	return err
+}
+
+const getRolesForUserName = `-- name: GetRolesForUserName :one
+SELECT user_name, enabled, array_agg(role) AS roles
+FROM user_has_roles
+WHERE enabled AND user_name = $1
+GROUP BY user_name, enabled LIMIT 1
+`
+
+type GetRolesForUserNameRow struct {
+	UserName string   `json:"user_name"`
+	Enabled  bool     `json:"enabled"`
+	Roles    []string `json:"roles"`
+}
+
+func (q *Queries) GetRolesForUserName(ctx context.Context, userName string) (GetRolesForUserNameRow, error) {
+	row := q.db.QueryRow(ctx, getRolesForUserName, userName)
+	var i GetRolesForUserNameRow
+	err := row.Scan(&i.UserName, &i.Enabled, &i.Roles)
+	return i, err
 }
 
 const listUserHasRoles = `-- name: ListUserHasRoles :many
@@ -102,7 +120,7 @@ SELECT id, user_name, role, create_time, update_time, enabled, local_change, vis
 WHERE role = $1
 `
 
-func (q *Queries) ListUserHasRolesByRole(ctx context.Context, role pgtype.Text) ([]UserHasRole, error) {
+func (q *Queries) ListUserHasRolesByRole(ctx context.Context, role string) ([]UserHasRole, error) {
 	rows, err := q.db.Query(ctx, listUserHasRolesByRole, role)
 	if err != nil {
 		return nil, err
@@ -137,7 +155,7 @@ SELECT id, user_name, role, create_time, update_time, enabled, local_change, vis
 WHERE user_name = $1
 `
 
-func (q *Queries) ListUserHasRolesByUserName(ctx context.Context, userName pgtype.Text) ([]UserHasRole, error) {
+func (q *Queries) ListUserHasRolesByUserName(ctx context.Context, userName string) ([]UserHasRole, error) {
 	rows, err := q.db.Query(ctx, listUserHasRolesByUserName, userName)
 	if err != nil {
 		return nil, err
@@ -174,8 +192,8 @@ WHERE user_name = $1
 `
 
 type UpdateUserHasRolesParams struct {
-	UserName pgtype.Text `json:"user_name"`
-	Enabled  pgtype.Bool `json:"enabled"`
+	UserName string `json:"user_name"`
+	Enabled  bool   `json:"enabled"`
 }
 
 func (q *Queries) UpdateUserHasRoles(ctx context.Context, arg UpdateUserHasRolesParams) error {
