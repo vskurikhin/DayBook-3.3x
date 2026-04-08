@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
 	"go.uber.org/mock/gomock"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
@@ -41,6 +42,7 @@ func TestV2_Ok(t *testing.T) {
 			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
 			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
 			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
+			mockSessionRolesV2 := NewMockSessionRolesV2(ctrl)
 
 			v := NewV2(
 				mockAuthServiceV2,
@@ -50,6 +52,7 @@ func TestV2_Ok(t *testing.T) {
 				mockOkServiceV2,
 				mockRefreshServiceV2,
 				mockRegisterServiceV2,
+				mockSessionRolesV2,
 			)
 
 			req := httptest.NewRequest(http.MethodGet, "/v2/ok", nil)
@@ -85,16 +88,6 @@ func TestV2_Auth(t *testing.T) {
 			},
 			expectError: true,
 		},
-		//{ // TODO
-		//	name: "service error",
-		//	body: dto.Login{},
-		//	mockSetup: func(m *MockAuthServiceV2) {
-		//		m.EXPECT().
-		//			Auth(gomock.Any(), gomock.Any()).
-		//			Return(nil, errors.New("fail"))
-		//	},
-		//	expectError: true,
-		//},
 		{
 			name: "success",
 			body: dto.Login{},
@@ -124,6 +117,7 @@ func TestV2_Auth(t *testing.T) {
 			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
 			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
 			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
+			mockSessionRolesV2 := NewMockSessionRolesV2(ctrl)
 
 			v := NewV2(
 				mockAuthServiceV2,
@@ -133,6 +127,7 @@ func TestV2_Auth(t *testing.T) {
 				mockOkServiceV2,
 				mockRefreshServiceV2,
 				mockRegisterServiceV2,
+				mockSessionRolesV2,
 			)
 
 			var bodyBytes []byte
@@ -176,16 +171,6 @@ func TestV2_Refresh(t *testing.T) {
 			},
 			expectError: true,
 		},
-		//{ TODO
-		//	name:       "service error",
-		//	withCookie: true,
-		//	mockSetup: func(m *MockAuthServiceV2) {
-		//		m.EXPECT().
-		//			Refresh(gomock.Any(), "token").
-		//			Return(nil, errors.New("fail"))
-		//	},
-		//	expectError: true,
-		//},
 		{
 			name:       "success",
 			withCookie: true,
@@ -215,6 +200,7 @@ func TestV2_Refresh(t *testing.T) {
 			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
 			tt.mockSetup(mockCfg, mockRefreshServiceV2)
 			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
+			mockSessionRolesV2 := NewMockSessionRolesV2(ctrl)
 
 			v := NewV2(
 				mockAuthServiceV2,
@@ -224,6 +210,7 @@ func TestV2_Refresh(t *testing.T) {
 				mockOkServiceV2,
 				mockRefreshServiceV2,
 				mockRegisterServiceV2,
+				mockSessionRolesV2,
 			)
 
 			req := httptest.NewRequest(http.MethodPost, "/refresh", bytes.NewReader([]byte(`{}`)))
@@ -240,6 +227,65 @@ func TestV2_Refresh(t *testing.T) {
 			}
 			if !tt.expectError && err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestV2_List(t *testing.T) {
+	tests := []struct {
+		name        string
+		mockSetup   func(m *MockListServiceV2)
+		expectError bool
+	}{
+		{
+			name: "success",
+			mockSetup: func(m *MockListServiceV2) {
+				m.EXPECT().List(gomock.Any()).Return([]model.User{}, nil)
+			},
+		},
+		{
+			name: "error",
+			mockSetup: func(m *MockListServiceV2) {
+				m.EXPECT().List(gomock.Any()).Return(nil, errors.New("fail"))
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockCfg := NewMockConfig(ctrl)
+			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
+			mockListServiceV2 := NewMockListServiceV2(ctrl)
+			tt.mockSetup(mockListServiceV2)
+			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
+			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
+			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
+			mockSessionRolesV2 := NewMockSessionRolesV2(ctrl)
+
+			v := NewV2(
+				mockAuthServiceV2,
+				mockCfg,
+				mockListServiceV2,
+				mockLogoutServiceV2,
+				mockOkServiceV2,
+				mockRefreshServiceV2,
+				mockRegisterServiceV2,
+				mockSessionRolesV2,
+			)
+
+			req := httptest.NewRequest(http.MethodGet, "/user/list", nil)
+			rec := httptest.NewRecorder()
+
+			err := v.List(rec, req)
+
+			if tt.expectError && err == nil {
+				t.Fatal("expected error")
 			}
 		})
 	}
@@ -279,6 +325,7 @@ func TestV2_Logout(t *testing.T) {
 			tt.mockSetup(mockLogoutServiceV2)
 			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
 			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
+			mockSessionRolesV2 := NewMockSessionRolesV2(ctrl)
 
 			v := NewV2(
 				mockAuthServiceV2,
@@ -288,6 +335,7 @@ func TestV2_Logout(t *testing.T) {
 				mockOkServiceV2,
 				mockRefreshServiceV2,
 				mockRegisterServiceV2,
+				mockSessionRolesV2,
 			)
 
 			req := httptest.NewRequest(http.MethodPost, "/logout", nil)
@@ -347,6 +395,7 @@ func TestV2_Register(t *testing.T) {
 			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
 			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
 			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
+			mockSessionRolesV2 := NewMockSessionRolesV2(ctrl)
 			tt.mockSetup(mockCfg, mockRegisterServiceV2)
 
 			v := NewV2(
@@ -357,6 +406,7 @@ func TestV2_Register(t *testing.T) {
 				mockOkServiceV2,
 				mockRefreshServiceV2,
 				mockRegisterServiceV2,
+				mockSessionRolesV2,
 			)
 
 			var bodyBytes []byte
@@ -371,6 +421,67 @@ func TestV2_Register(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			err := v.Register(rec, req)
+
+			if tt.expectError && err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestV2_SessionRoles(t *testing.T) {
+	tests := []struct {
+		name        string
+		mockSetup   func(m *MockSessionRolesV2)
+		expectError bool
+	}{
+		{
+			name: "success",
+			mockSetup: func(m *MockSessionRolesV2) {
+				m.EXPECT().SessionRoles(gomock.Any()).Return(model.UserHasRolesFromModelSession(session.Session{
+					Roles: []string{},
+				}), nil)
+			},
+		},
+		{
+			name: "error",
+			mockSetup: func(m *MockSessionRolesV2) {
+				m.EXPECT().SessionRoles(gomock.Any()).Return(model.UserHasRoles{}, errors.New("fail"))
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAuthServiceV2 := NewMockAuthServiceV2(ctrl)
+			mockCfg := NewMockConfig(ctrl)
+			mockOkServiceV2 := NewMockOkServiceV2(ctrl)
+			mockListServiceV2 := NewMockListServiceV2(ctrl)
+			mockLogoutServiceV2 := NewMockLogoutServiceV2(ctrl)
+			mockRefreshServiceV2 := NewMockRefreshServiceV2(ctrl)
+			mockRegisterServiceV2 := NewMockRegisterServiceV2(ctrl)
+			mockSessionRolesV2 := NewMockSessionRolesV2(ctrl)
+			tt.mockSetup(mockSessionRolesV2)
+
+			v := NewV2(
+				mockAuthServiceV2,
+				mockCfg,
+				mockListServiceV2,
+				mockLogoutServiceV2,
+				mockOkServiceV2,
+				mockRefreshServiceV2,
+				mockRegisterServiceV2,
+				mockSessionRolesV2,
+			)
+
+			req := httptest.NewRequest(http.MethodGet, "/session/roles", nil)
+			rec := httptest.NewRecorder()
+
+			err := v.SessionRoles(rec, req)
 
 			if tt.expectError && err == nil {
 				t.Fatal("expected error")

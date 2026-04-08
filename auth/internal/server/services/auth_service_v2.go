@@ -11,6 +11,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_has_roles"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
@@ -30,9 +31,12 @@ type AuthServiceImplV2 struct {
 	credentialsFactory creds.CredentialsFactoryV2
 	sessionRepo        session.Repo
 	txDelayer          actions.TxDelayer
+	userHasRoles       user_has_roles.Repo
 	userViewRepo       user_view.Repo
 }
 
+// Auth выполняет аутентификацию пользователя и возвращает его учётные данные, а так же
+// выполняет проверку пользователя, валидацию пароля и формирует данные для создания сессии.
 func (s *AuthServiceImplV2) Auth(ctx context.Context, login model.Login) (model.Credentials, error) {
 	return s.credentialsFactory.MakeCredentials(s.auth(ctx, login))
 }
@@ -84,6 +88,20 @@ func (s *AuthServiceImplV2) transactionAuth(ctx context.Context, sid model.Sessi
 	}
 	defer func() { s.txDelayer.Defer(ctx, tx, errTransaction) }()
 
+	userHasRolesTx := s.userHasRoles.WithTx(tx)
+	userHasRoles, errRolesForUser := userHasRolesTx.GetRolesForUserName(ctx, user.UserName.String)
+	if errRolesForUser != nil {
+		slog.ErrorContext(ctx,
+			"failed to get roles for user",
+			slog.String("error", errTransaction.Error()),
+			slog.String("errorType", fmt.Sprintf("%T", errTransaction)),
+		)
+		return model.CredValuesV2{}, errRolesForUser
+	}
+	slog.ErrorContext(ctx,
+		"get roles for user",
+		slog.String("Roles", fmt.Sprintf("%+v", userHasRoles.Roles)),
+	)
 	sessionRepoTx := s.sessionRepo.WithTx(tx)
 	cfgValues := s.cfg.Values()
 	validTimePeriodsTokens := model.MakeValidTimeTokens(cfgValues.ValidPeriodAccessToken, cfgValues.ValidPeriodRefreshToken)
@@ -92,8 +110,8 @@ func (s *AuthServiceImplV2) transactionAuth(ctx context.Context, sid model.Sessi
 		Iss:       primaryKey.Iss,
 		Jti:       primaryKey.Jti,
 		Sub:       primaryKey.Sub,
-		UserName:  pgtype.Text{String: user.UserName.String, Valid: true},
-		Roles:     []string{},
+		UserName:  user.UserName.String,
+		Roles:     userHasRoles.Roles,
 		ValidTime: pgtype.Timestamptz{Time: validTimePeriodsTokens.SessionValidTime().Local(), Valid: true},
 	})
 	if errTransaction != nil {
@@ -102,12 +120,14 @@ func (s *AuthServiceImplV2) transactionAuth(ctx context.Context, sid model.Sessi
 	return model.MakeCredValuesV2(sid, validTimePeriodsTokens, model.UserFromModelUserView(user)), errTransaction
 }
 
+// NewAuthServiceV2 создаёт новый сервис аутентификации с необходимыми зависимостями.
 func NewAuthServiceV2(
 	cfg config.Config,
 	credentialsFactory creds.CredentialsFactoryV2,
 	dbPool db.DB,
 	sessionRepo session.Repo,
 	txDelayer actions.TxDelayer,
+	userHasRoles user_has_roles.Repo,
 	userViewRepo user_view.Repo,
 ) *AuthServiceImplV2 {
 	return &AuthServiceImplV2{
@@ -118,6 +138,7 @@ func NewAuthServiceV2(
 		dbPool:             dbPool,
 		txDelayer:          txDelayer,
 		sessionRepo:        sessionRepo,
+		userHasRoles:       userHasRoles,
 		userViewRepo:       userViewRepo,
 	}
 }

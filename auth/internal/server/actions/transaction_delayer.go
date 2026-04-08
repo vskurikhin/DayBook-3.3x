@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
 //go:generate mockgen -destination=mock_tx_test.go -package=actions github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions Tx
@@ -31,7 +32,7 @@ type TxDelayer interface {
 type TransactionDelayer struct{}
 
 func (d TransactionDelayer) Defer(ctx context.Context, tx pgx.Tx, err error) {
-	if tx == nil {
+	if tx == nil || tool.IsReallyNil(tx) {
 		slog.ErrorContext(ctx, "transaction cannot be nil")
 		return
 	}

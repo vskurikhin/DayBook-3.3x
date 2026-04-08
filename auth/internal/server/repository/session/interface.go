@@ -12,6 +12,8 @@ import (
 
 //go:generate mockgen -destination=db_mock_test.go -package=session github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session DBTX
 
+var _ Repo = (*Queries)(nil)
+
 type Repo interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	DeleteSession(ctx context.Context, arg DeleteSessionParams) error

@@ -13,7 +13,7 @@ const Users = () => {
 
   useEffect(() => {
     axios
-      .get("/auth/api/v2/list", { // TODO
+      .get("/auth/api/v2/user/list", { // TODO
         headers: {
           Authorization: `Bearer ${token}`,
         },

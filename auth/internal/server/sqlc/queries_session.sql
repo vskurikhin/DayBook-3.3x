@@ -1,6 +1,6 @@
 -- name: GetSession :one
 SELECT * FROM session
-WHERE iss = $1 AND jti = $2 AND sub = $3
+WHERE iss = $1 AND jti = $2 AND sub = $3 AND enabled
 LIMIT 1;
 
 -- name: ListSessions :many

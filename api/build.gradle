@@ -24,6 +24,8 @@ dependencies {
     implementation 'io.quarkus:quarkus-rest-client-jackson'
     implementation 'io.quarkus:quarkus-rest-jackson'
     implementation 'io.quarkus:quarkus-scheduler'
+    implementation("io.quarkus:quarkus-smallrye-jwt")
+    implementation("io.quarkus:quarkus-smallrye-jwt-build")
 
     implementation 'io.quarkiverse.mapstruct:quarkus-mapstruct:1.1.0'
     implementation "org.mapstruct:mapstruct:${VERSION_MAPSTRUCT}"
@@ -38,6 +40,10 @@ dependencies {
      */
     implementation 'io.quarkus:quarkus-cache'
     implementation 'io.quarkus:quarkus-arc'
+
+    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+    implementation 'io.jsonwebtoken:jjwt-impl:0.13.0'
+    implementation 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
     compileOnly "org.projectlombok:lombok:${VERSION_LOMBOK}"
 
