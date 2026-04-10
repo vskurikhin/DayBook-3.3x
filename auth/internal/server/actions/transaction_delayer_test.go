@@ -62,6 +62,14 @@ func Test_deferTransaction(t *testing.T) {
 				tx.EXPECT().Commit(ctx).Return(errors.New("commit error"))
 			},
 		},
+		{
+			name: "nil -> rollback success",
+			tx: func() *MockTx {
+				return nil
+			},
+			err:         nil,
+			expectCalls: func(tx *MockTx) {},
+		},
 	}
 
 	for _, tt := range tests {
