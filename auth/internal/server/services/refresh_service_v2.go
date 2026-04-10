@@ -29,6 +29,7 @@ type RefreshServiceImplV2 struct {
 	userAttrsRepo      user_attrs.Repo
 }
 
+// Refresh validates the provided JWT token and issues new credentials.
 func (s *RefreshServiceImplV2) Refresh(ctx context.Context, token string) (model.Credentials, error) {
 	parsedToken, err := jwt.ParseWithClaims(token, &tool.CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

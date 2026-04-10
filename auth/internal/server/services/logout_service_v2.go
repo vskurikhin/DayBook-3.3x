@@ -22,6 +22,7 @@ type LogoutServiceImplV2 struct {
 	sessionRepo session.Repo
 }
 
+// Logout удаляет текущую сессию пользователя на основе JWT токена.
 func (s *LogoutServiceImplV2) Logout(ctx context.Context) error {
 	bearerToken, _, errBearerToken := jwtauth.FromContext(ctx)
 	if errBearerToken != nil {
@@ -51,6 +52,7 @@ func (s *LogoutServiceImplV2) Logout(ctx context.Context) error {
 	})
 }
 
+// NewLogoutServiceV2 создаёт новый сервис для выхода пользователя из системы.
 func NewLogoutServiceV2(cfg config.Config, sessionRepo session.Repo) *LogoutServiceImplV2 {
 	return &LogoutServiceImplV2{
 		BaseService: &BaseService{

@@ -35,6 +35,7 @@ type RegisterServiceImplV2 struct {
 	userNameRepo       user_name.Repo
 }
 
+// Register creates a new user, hashes the password, and returns credentials.
 func (s *RegisterServiceImplV2) Register(ctx context.Context, user model.CreateUser) (model.Credentials, error) {
 	cost := int(s.cfg.Values().AuthCost)
 	password, err := tool.Hash(user.Password(), cost)
