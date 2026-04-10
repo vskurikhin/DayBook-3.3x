@@ -34,6 +34,13 @@ type User struct {
 	Name     string    `json:"name"`
 	Email    string    `json:"email"`
 	UserName string    `json:"user_name"`
-	Visible  bool      `json:"visible,omitempty" swaggerignore:"true"`
-	Flags    int32     `json:"flags,omitempty"  swaggerignore:"true"`
+	Visible  bool      `json:"visible"`
+	Flags    int32     `json:"flags"`
+}
+
+type UserHasRoles struct {
+	UserName string   `json:"user_name"`
+	Roles    []string `json:"roles"`
+	Visible  bool     `json:"visible"`
+	Flags    int32    `json:"flags"`
 }
