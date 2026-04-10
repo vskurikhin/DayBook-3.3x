@@ -6,29 +6,98 @@
 //
 // Configuration values are parsed using the
 // github.com/caarlos0/env/v11 library, which maps environment variables
-// to struct fields using struct tags.
+// to struct fields via struct tags and supports default values.
 //
-// The package exposes the Environments interface that allows other
-// components of the application to access configuration values without
-// depending on the concrete implementation. This makes the configuration
-// layer easy to mock in unit tests.
+// # Design Overview
 //
-// Typical usage:
+// The package defines a small abstraction layer via the Environments interface,
+// allowing other components to depend on configuration without being coupled
+// to the конкретной реализации.
+//
+// This approach:
+//
+//   - Improves testability (via mocks)
+//   - Decouples configuration source from business logic
+//   - Provides a stable contract for environment access
+//
+// # Configuration Model
+//
+// Environment variables are mapped to the Values struct. Each field:
+//
+//   - Uses `env` struct tags to define variable names
+//   - May define default values via `envDefault`
+//   - Supports automatic parsing into Go types (e.g. time.Duration)
+//
+// Example variables:
+//
+//	AUTH_SERVER_TIMEOUT
+//	    HTTP server request timeout (default: 10s)
+//
+//	AUTH_SERVER_JWT_HS256_SIGN_KEY
+//	    Secret key for signing JWT tokens
+//
+//	AUTH_SERVER_DEBUG_PPROF_API
+//	    Enables pprof debug endpoints (default: false)
+//
+//	AUTH_SERVER_PGX_POOL_RELOAD_TIMEOUT
+//	    Timeout for reloading database connection pool
+//
+// # Runtime Behavior
+//
+//   - Environment variables are parsed once at startup
+//   - No dynamic reloading is supported
+//   - Parsed values are stored in an immutable struct (Values)
+//
+// # Error Handling
+//
+// If parsing fails:
+//
+//   - The error is returned to the caller
+//   - The caller is responsible for handling or logging it
+//
+// Unlike some configuration systems, this package does not silently
+// fallback to defaults on parsing errors.
+//
+// # Thread Safety
+//
+// The Config struct is effectively immutable after initialization,
+// making it safe for concurrent use without additional synchronization.
+//
+// # Constants
+//
+// PgxPoolReloadTimeout
+//
+//	Default fallback duration used for database pool reload operations
+//	when not explicitly overridden.
+//
+// # Interfaces
+//
+// Environments
+//
+//	Provides access to environment configuration via:
+//
+//	    Values() Values
+//
+//	This abstraction enables mocking and decouples consumers from
+//	the concrete Config implementation.
+//
+// # Functions
+//
+// EnvironmentsLoad() (*Config, error)
+//
+//	Parses environment variables into a Config structure and returns it.
+//
+//	Returns an error if parsing fails.
+//
+// # Example Usage
 //
 //	cfg, err := env.EnvironmentsLoad()
-//	if err == nil {
-//		timeout := cfg.Values().Timeout
+//	if err != nil {
+//	    log.Fatal(err)
 //	}
 //
-// Environment variables:
-//
-//	SERVER_TIMEOUT   HTTP server request timeout (default: 10s)
-//
-// If parsing of environment variables fails, the error is logged using
-// slog and an empty configuration is returned.
-//
-// The package also supports mock generation via go:generate for testing
-// components that depend on the Environments interface.
+//	values := cfg.Values()
+//	fmt.Println(values.Timeout)
 package env
 
 import (
@@ -57,11 +126,13 @@ const PgxPoolReloadTimeout = 500 * time.Millisecond
 
 // Values статичная конфигурация из переменных окружения.
 type Values struct {
-	DebugPprof             bool          `env:"AUTH_SERVER_DEBUG_PPROF_API" envDefault:"false"`
-	JWThs256SignKey        string        `env:"AUTH_SERVER_JWT_HS256_SIGN_KEY" envDefault:""`
-	OldPgxPoolCloseTimeout time.Duration `env:"AUTH_SERVER_OLD_PGX_POOL_CLOSE_TIMEOUT" envDefault:"1m"`
-	PgxPoolReloadTimeout   time.Duration `env:"AUTH_SERVER_PGX_POOL_RELOAD_TIMEOUT" envDefault:"500ms"`
-	Timeout                time.Duration `env:"AUTH_SERVER_TIMEOUT" envDefault:"10s"`
+	AdvisoryLockSleepDuration time.Duration `env:"AUTH_SERVER_ADVISORY_LOCK_SLEEP_DURATION"`
+	DebugPprof                bool          `env:"AUTH_SERVER_DEBUG_PPROF_API" envDefault:"false"`
+	JWThs256SignKey           string        `env:"AUTH_SERVER_JWT_HS256_SIGN_KEY" envDefault:""`
+	OldPgxPoolCloseTimeout    time.Duration `env:"AUTH_SERVER_OLD_PGX_POOL_CLOSE_TIMEOUT" envDefault:"1m"`
+	PgxPoolReloadTimeout      time.Duration `env:"AUTH_SERVER_PGX_POOL_RELOAD_TIMEOUT" envDefault:"500ms"`
+	Timeout                   time.Duration `env:"AUTH_SERVER_TIMEOUT" envDefault:"10s"`
+	SchedulerJobSleepDuration time.Duration `env:"AUTH_SERVER_SCHEDULER_JOB_SLEEP_DURATION"`
 }
 
 // EnvironmentsLoad parses environment variables into a Config structure

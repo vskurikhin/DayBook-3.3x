@@ -1,56 +1,114 @@
 // Package config provides functionality for configuring the DayBook
 // authentication server.
 //
-// Configuration can be loaded from CLI flags, a configuration file,
-// or environment variables using the Viper library. The package
-// implements a singleton pattern for storing the global application
-// configuration and provides a Config interface to access configuration
-// values.
+// Configuration is loaded using Viper and can be sourced from:
 //
-// Types and Functions
+//   - CLI flags (via Cobra)
+//   - Configuration files (e.g. YAML)
+//   - Environment variables
 //
-//	Config
-//		Interface providing access to configuration values.
-//		Methods:
-//			- Values() Values — returns a Values struct with configuration settings.
+// The package implements a thread-safe singleton pattern for storing
+// global application configuration and exposes it via the Config interface.
 //
-//	Values
-//		Struct containing the main configuration fields:
-//			- Address: server address in host:port format
-//			- Debug: enables debug mode
-//			- InsecureSkipVerify: skips server certificate verification
-//			- Verbose: enables verbose logging
-//			- ssl: internal field indicating SSL usage
-//		Methods:
-//			- Ssl() bool — returns the value of the ssl field
+// # Configuration Model
 //
-//	ValuesConfig
-//		Struct implementing the Config interface, containing Values.
+// The configuration is represented by the Values struct, which contains
+// all runtime settings such as:
 //
-//	NewConfig(cmd *cobra.Command) *ValuesConfig
-//		Creates and returns the singleton ValuesConfig instance.
-//		Reads configuration from Viper and CLI commands. If the debug
-//		flag is enabled, logs errors and configuration values.
+//   - Server settings (Address, HTTPS, Hostname)
+//   - Security settings (JWT keys, TLS, auth cost)
+//   - Database connection and pool settings
+//   - Scheduler timings
+//   - Logging options (Debug, Verbose)
 //
-// # Features
+// The Config interface provides controlled access to these values.
 //
-// - Uses [sync.Once] to enforce the singleton pattern.
-// - Supports debug logging via tool.IsDebug(cmd).
-// - Configuration values are loaded via viper.Unmarshal.
-// - The ssl field is unexported and accessible only via the Ssl() method.
+// # Singleton Behavior
 //
-// Example Usage
+// Configuration is initialized only once using sync.Once in NewConfig.
+// All subsequent calls return the same instance.
 //
-//	 cmd := &cobra.Command{}
-//	 cmd.Flags().Bool("debug", false, "enable debug mode")
+// Internally:
+//   - ValuesConfig stores the configuration
+//   - sync.RWMutex ensures thread-safe read/write access
 //
-//	 cfg, err := config.NewConfig(cmd)
-//	 if err == nil {
-//		fmt.Println(cfg.Values().Address)
-//		if cfg.Values().Ssl() {
-//			fmt.Println("SSL enabled")
-//		}
-//	 }
+// # Dynamic Configuration Reloading
+//
+// The package supports runtime configuration reloading in two ways:
+//
+//  1. File system notifications via fsnotify (viper.WatchConfig)
+//  2. OS signal handling (SIGHUP)
+//
+// When a configuration change is detected:
+//   - The config file is re-read
+//   - Values are unmarshaled into a new struct
+//   - The global configuration is updated atomically
+//
+// This allows updating configuration without restarting the application.
+//
+// # Concurrency Guarantees
+//
+//   - Reads are protected by RLock
+//   - Writes (reloads) are protected by Lock
+//   - Values() returns a copy of the configuration
+//
+// # Security Notes
+//
+//   - JWThs256SignKey is stored as a byte slice
+//   - Sensitive fields (e.g., passwords) are loaded but not masked automatically
+//   - The ssl field is unexported and accessible only via Ssl()
+//
+// # Dependency on Viper
+//
+// The package relies on Viper for:
+//
+//   - Unmarshalling configuration into structs
+//   - Watching file changes
+//   - Environment variable binding
+//
+// # Functions
+//
+// NewConfig(cmd *cobra.Command) (*ValuesConfig, error)
+//
+//	Initializes and returns the singleton configuration instance.
+//	Also starts background goroutines for config reload.
+//
+// GetConfig() *ValuesConfig
+//
+//	Returns the existing configuration instance (initializing it if needed).
+//
+// # Runtime Behavior
+//
+// On initialization:
+//
+//   - Configuration is unmarshaled from Viper
+//   - Debug logging may print full config (if enabled)
+//   - File watching is started
+//   - SIGHUP listener is started in a background goroutine
+//
+// # Signal Handling
+//
+// The package listens for syscall.SIGHUP:
+//
+//   - On receiving SIGHUP, configuration is reloaded from file
+//   - Errors during reload are logged but do not stop the application
+//
+// # Example Usage
+//
+//	cmd := &cobra.Command{}
+//	cmd.Flags().Bool("debug", false, "enable debug mode")
+//
+//	cfg, err := config.NewConfig(cmd)
+//	if err != nil {
+//	    panic(err)
+//	}
+//
+//	values := cfg.Values()
+//	fmt.Println(values.Address)
+//
+//	if values.Ssl() {
+//	    fmt.Println("SSL enabled")
+//	}
 package config
 
 import (
@@ -77,8 +135,9 @@ type Config interface {
 }
 
 type Values struct {
-	Address  string `mapstructure:"address"`
-	AuthCost uint8  `mapstructure:"auth_cost"`
+	Address                   string        `mapstructure:"address"`
+	AdvisoryLockSleepDuration time.Duration `mapstructure:"advisory_lock_sleep_duration"`
+	AuthCost                  uint8         `mapstructure:"auth_cost"`
 
 	DBHost     string `mapstructure:"dbhost"`
 	DBName     string `mapstructure:"dbname"`
@@ -93,18 +152,19 @@ type Values struct {
 	DBPoolMaxConnIdleTime   time.Duration `mapstructure:"db_pool_max_conn_idle_time"`
 	DBPoolHealthCheckPeriod time.Duration `mapstructure:"db_pool_health_check_period"`
 
-	Debug                   bool          `mapstructure:"debug"`
-	HTTPS                   bool          `mapstructure:"https"`
-	Hostname                string        `mapstructure:"hostname"`
-	InsecureSkipVerify      bool          `mapstructure:"insecure_skip_verify"`
-	JWThs256SignKey         []byte        `mapstructure:"jwt_hs256_sign_key"`
-	RequestMaxBytes         uint64        `mapstructure:"request_max_bytes"`
-	ServerCertFile          string        `mapstructure:"server_cert_file"`
-	ServerKeyFile           string        `mapstructure:"server_key_file"`
-	ValidPeriodAccessToken  time.Duration `mapstructure:"valid_period_access_token"`
-	ValidPeriodRefreshToken time.Duration `mapstructure:"valid_period_refresh_token"`
-	Verbose                 bool          `mapstructure:"verbose"`
-	ssl                     bool
+	Debug                     bool          `mapstructure:"debug"`
+	HTTPS                     bool          `mapstructure:"https"`
+	Hostname                  string        `mapstructure:"hostname"`
+	InsecureSkipVerify        bool          `mapstructure:"insecure_skip_verify"`
+	JWThs256SignKey           []byte        `mapstructure:"jwt_hs256_sign_key"`
+	RequestMaxBytes           uint64        `mapstructure:"request_max_bytes"`
+	SchedulerJobSleepDuration time.Duration `mapstructure:"scheduler_job_sleep_duration"`
+	ServerCertFile            string        `mapstructure:"server_cert_file"`
+	ServerKeyFile             string        `mapstructure:"server_key_file"`
+	ValidPeriodAccessToken    time.Duration `mapstructure:"valid_period_access_token"`
+	ValidPeriodRefreshToken   time.Duration `mapstructure:"valid_period_refresh_token"`
+	Verbose                   bool          `mapstructure:"verbose"`
+	ssl                       bool
 }
 
 var _ Config = (*ValuesConfig)(nil)

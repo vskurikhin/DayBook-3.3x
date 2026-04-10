@@ -193,10 +193,18 @@ import (
 )
 
 type DB interface {
+	Acquire(ctx context.Context) (c *pgxpool.Conn, err error)
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
+}
+
+//go:generate mockgen -destination=mock_pgx_conn_test.go -package=services github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services PgxConn
+type PgxConn interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Release()
 }
 
 var _ DB = (*PgxPool)(nil)
