@@ -9,6 +9,7 @@ import (
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_has_roles"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_name"
 )
 
@@ -69,6 +70,19 @@ func (s *mockRowUserAttrs) Scan(dest ...any) error {
 	*(dest[6].(*bool)) = s.data.LocalChange
 	*(dest[7].(*bool)) = s.data.Visible
 	*(dest[8].(*int32)) = s.data.Flags
+
+	return nil
+}
+
+type mockRowUserHasRoles struct {
+	data user_has_roles.GetRolesForUserNameRow
+}
+
+func (s *mockRowUserHasRoles) Scan(dest ...any) error {
+
+	*(dest[0].(*string)) = s.data.UserName
+	*(dest[1].(*bool)) = s.data.Enabled
+	*(dest[2].(*[]string)) = s.data.Roles
 
 	return nil
 }

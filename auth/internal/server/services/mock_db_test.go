@@ -15,6 +15,7 @@ import (
 
 	pgx "github.com/jackc/pgx/v5"
 	pgconn "github.com/jackc/pgx/v5/pgconn"
+	pgxpool "github.com/jackc/pgx/v5/pgxpool"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -40,6 +41,21 @@ func NewMockDB(ctrl *gomock.Controller) *MockDB {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockDB) EXPECT() *MockDBMockRecorder {
 	return m.recorder
+}
+
+// Acquire mocks base method.
+func (m *MockDB) Acquire(ctx context.Context) (*pgxpool.Conn, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Acquire", ctx)
+	ret0, _ := ret[0].(*pgxpool.Conn)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Acquire indicates an expected call of Acquire.
+func (mr *MockDBMockRecorder) Acquire(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Acquire", reflect.TypeOf((*MockDB)(nil).Acquire), ctx)
 }
 
 // Begin mocks base method.
