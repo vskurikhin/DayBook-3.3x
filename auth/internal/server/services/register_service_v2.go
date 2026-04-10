@@ -100,8 +100,8 @@ func (s *RegisterServiceImplV2) transactionRegister(ctx context.Context, user mo
 		Iss:       primaryKey.Iss,
 		Jti:       primaryKey.Jti,
 		Sub:       primaryKey.Sub,
-		UserName:  pgtype.Text{String: userName.UserName, Valid: true},
-		Roles:     []string{},
+		UserName:  userName.UserName,
+		Roles:     []string{"GUEST"},
 		ValidTime: pgtype.Timestamptz{Time: validPeriodAccessToken.SessionValidTime().Local(), Valid: true},
 	})
 	if errTransaction != nil {

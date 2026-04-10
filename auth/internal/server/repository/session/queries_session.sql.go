@@ -24,7 +24,7 @@ type CreateSessionParams struct {
 	Iss       pgtype.UUID
 	Jti       pgtype.UUID
 	Sub       pgtype.UUID
-	UserName  pgtype.Text
+	UserName  string
 	Roles     []string
 	ValidTime pgtype.Timestamptz
 }
@@ -74,7 +74,7 @@ func (q *Queries) DeleteSession(ctx context.Context, arg DeleteSessionParams) er
 
 const getSession = `-- name: GetSession :one
 SELECT iss, jti, sub, user_name, roles, valid_time, create_time, update_time, enabled, local_change, visible, flags FROM session
-WHERE iss = $1 AND jti = $2 AND sub = $3
+WHERE iss = $1 AND jti = $2 AND sub = $3 AND enabled
 LIMIT 1
 `
 
@@ -156,7 +156,7 @@ type UpdateSessionParams struct {
 	Sub       pgtype.UUID
 	Roles     []string
 	ValidTime pgtype.Timestamptz
-	Enabled   pgtype.Bool
+	Enabled   bool
 }
 
 func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) error {

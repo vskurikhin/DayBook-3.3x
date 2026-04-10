@@ -70,9 +70,6 @@ func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (
 	if sess.Jti != primaryKey.Jti {
 		return model.CredValuesV2{}, xerror.ErrInvalidToken
 	}
-	if !sess.UserName.Valid {
-		return model.CredValuesV2{}, xerror.ErrJInvalidUserName
-	}
 	if !sess.ValidTime.Valid {
 		return model.CredValuesV2{}, xerror.ErrSessionTimeExpired
 	}
@@ -100,7 +97,7 @@ func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (
 		return model.CredValuesV2{}, xerror.ErrSessionTimeExpired
 	}
 
-	user, err := s.userAttrsRepo.GetUserAttrs(ctx, sess.UserName.String)
+	user, err := s.userAttrsRepo.GetUserAttrs(ctx, sess.UserName)
 	if err != nil {
 		slog.ErrorContext(ctx,
 			"failed to get user attributes",

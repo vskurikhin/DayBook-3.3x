@@ -11,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+var _ Repo = (*Queries)(nil)
+
 type Repo interface {
 	GetUserName(ctx context.Context, userName pgtype.Text) (UserView, error)
 	ListUserNames(ctx context.Context) ([]UserView, error)

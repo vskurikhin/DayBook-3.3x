@@ -30,14 +30,14 @@ func (s *mockRowSession) Scan(dest ...any) error {
 	*(dest[1].(*pgtype.UUID)) = s.data.Jti
 	*(dest[2].(*pgtype.UUID)) = s.data.Sub
 
-	*(dest[3].(*pgtype.Text)) = s.data.UserName
+	*(dest[3].(*string)) = s.data.UserName
 	*(dest[4].(*[]string)) = s.data.Roles
 
 	*(dest[5].(*pgtype.Timestamptz)) = s.data.ValidTime
 	*(dest[6].(*pgtype.Timestamp)) = s.data.CreateTime
 	*(dest[7].(*pgtype.Timestamp)) = s.data.UpdateTime
 
-	*(dest[8].(*pgtype.Bool)) = s.data.Enabled
+	*(dest[8].(*bool)) = s.data.Enabled
 	*(dest[9].(*bool)) = s.data.LocalChange
 	*(dest[10].(*pgtype.Bool)) = s.data.Visible
 	*(dest[11].(*int32)) = s.data.Flags

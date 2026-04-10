@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+var _ Repo = (*Queries)(nil)
+
 type Repo interface {
 	CreateUserName(ctx context.Context, arg CreateUserNameParams) (UserName, error)
 	DeleteUserNameByID(ctx context.Context, id pgtype.UUID) error
