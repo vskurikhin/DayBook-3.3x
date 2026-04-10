@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
@@ -230,7 +231,8 @@ func TestUserFromModelUserAttr(t *testing.T) {
 		Flags:    7,
 	}
 
-	got := UserFromModelUserAttr(input)
+	got, err := UserFromModelUserAttr(input)
+	assert.Nil(t, err)
 
 	if got.id != id ||
 		got.email != "mail" ||

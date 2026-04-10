@@ -23,7 +23,7 @@ func TestRefreshServiceImplV2_Refresh(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockSessionRepo := NewMockSessionRepo(ctrl)
-	mockUserAttrsRepo := NewMockUserAttrsRepo(ctrl)
+	mockUserViewRepo := NewMockUserViewRepo(ctrl)
 
 	cfg := NewMockConfig(ctrl)
 	cfg.EXPECT().Values().Return(config.Values{
@@ -67,7 +67,7 @@ func TestRefreshServiceImplV2_Refresh(t *testing.T) {
 				BaseService:        &BaseService{cfg: cfg},
 				credentialsFactory: creds.NewCredentialsMethodFactory(cfg),
 				sessionRepo:        mockSessionRepo,
-				userAttrsRepo:      mockUserAttrsRepo,
+				userViewRepo:       mockUserViewRepo,
 			}
 
 			_, err := s.Refresh(context.Background(), tt.token)
@@ -157,7 +157,7 @@ func TestRefresh_SessionRepoError(t *testing.T) {
 		Return(config.Values{}).
 		Times(0)
 	mockSessionRepo := NewMockSessionRepo(ctrl)
-	mockUserRepo := NewMockUserAttrsRepo(ctrl)
+	mockUserViewRepo := NewMockUserViewRepo(ctrl)
 
 	claims := jwt.MapClaims{
 		"iss": "test",
@@ -169,7 +169,7 @@ func TestRefresh_SessionRepoError(t *testing.T) {
 		BaseService:        &BaseService{cfg: mockCfg},
 		credentialsFactory: creds.NewCredentialsMethodFactory(mockCfg),
 		sessionRepo:        mockSessionRepo,
-		userAttrsRepo:      mockUserRepo,
+		userViewRepo:       mockUserViewRepo,
 	}
 
 	_, err := s.refresh(context.Background(), claims)

@@ -75,7 +75,9 @@ func (s *AuthServiceImplV2) auth(ctx context.Context, login model.Login) (model.
 	return s.transactionAuth(ctx, sid, userView)
 }
 
-func (s *AuthServiceImplV2) transactionAuth(ctx context.Context, sid model.SessionID, user user_view.UserView) (model.CredValuesV2, error) {
+func (s *AuthServiceImplV2) transactionAuth(
+	ctx context.Context, sid model.SessionID, userView user_view.UserView,
+) (model.CredValuesV2, error) {
 	var errTransaction = xerror.ErrNil
 	tx, errTransaction := s.dbPool.Begin(ctx)
 	if errTransaction != nil {
@@ -89,7 +91,7 @@ func (s *AuthServiceImplV2) transactionAuth(ctx context.Context, sid model.Sessi
 	defer func() { s.txDelayer.Defer(ctx, tx, errTransaction) }()
 
 	userHasRolesTx := s.userHasRoles.WithTx(tx)
-	userHasRoles, errRolesForUser := userHasRolesTx.GetRolesForUserName(ctx, user.UserName.String)
+	userHasRoles, errRolesForUser := userHasRolesTx.GetRolesForUserName(ctx, userView.UserName.String)
 	if errRolesForUser != nil {
 		slog.ErrorContext(ctx,
 			"failed to get roles for user",
@@ -110,14 +112,16 @@ func (s *AuthServiceImplV2) transactionAuth(ctx context.Context, sid model.Sessi
 		Iss:       primaryKey.Iss,
 		Jti:       primaryKey.Jti,
 		Sub:       primaryKey.Sub,
-		UserName:  user.UserName.String,
+		UserName:  userView.UserName.String,
 		Roles:     userHasRoles.Roles,
 		ValidTime: pgtype.Timestamptz{Time: validTimePeriodsTokens.SessionValidTime().Local(), Valid: true},
 	})
 	if errTransaction != nil {
 		return model.CredValuesV2{}, xerror.ClassingPgError(errTransaction)
 	}
-	return model.MakeCredValuesV2(sid, validTimePeriodsTokens, model.UserFromModelUserView(user)), errTransaction
+	user := model.UserFromModelUserView(userView)
+
+	return model.MakeCredValuesV2(sid, validTimePeriodsTokens, user), errTransaction
 }
 
 // NewAuthServiceV2 создаёт новый сервис аутентификации с необходимыми зависимостями.

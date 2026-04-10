@@ -50,7 +50,6 @@ const (
 	GoRoutineURL     = "/" + GoRoutine
 	Heap             = "heap"
 	HeapURL          = "/" + Heap
-	ListURL          = "/list"
 	LogoutURL        = "/logout"
 	Mutex            = "mutex"
 	MutexURL         = "/" + Mutex
@@ -58,10 +57,12 @@ const (
 	ProfileURL       = "/profile"
 	RefreshURL       = "/refresh"
 	RegisterURL      = "/register"
+	SessionRolesURL  = "/session/roles"
 	SymbolURL        = "/symbol"
 	ThreadCreate     = "threadcreate"
 	ThreadCreateURL  = "/" + ThreadCreate
 	Trace            = "/trace"
+	UserListURL      = "/user/list"
 	V1               = "/v1"
 	V2               = "/v2"
 )
