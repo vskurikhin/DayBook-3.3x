@@ -13,6 +13,8 @@ import (
 
 //go:generate mockgen -destination=db_mock_test.go -package=user_attrs github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session DBTX
 
+var _ Repo = (*Queries)(nil)
+
 type Repo interface {
 	CreateUserAttrs(ctx context.Context, arg CreateUserAttrsParams) (UserAttr, error)
 	DeleteUserAttrs(ctx context.Context, userName string) error

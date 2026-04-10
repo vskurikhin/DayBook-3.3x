@@ -8,7 +8,195 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
+
+// 🔹 CreateUserHasRoles
+func TestCreateUserHasRoles(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		name    string
+		mock    func(db *MockDBTX)
+		wantErr bool
+	}{
+		{
+			name: "success",
+			mock: func(db *MockDBTX) {
+				row := NewMockRow(ctrl)
+
+				db.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), "user", "admin").
+					Return(row)
+
+				row.EXPECT().
+					Scan(gomock.Any(), gomock.Any(), gomock.Any(),
+						gomock.Any(), gomock.Any(), gomock.Any(),
+						gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
+			},
+		},
+		{
+			name: "scan error",
+			mock: func(db *MockDBTX) {
+				row := NewMockRow(ctrl)
+
+				db.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(row)
+
+				row.EXPECT().
+					Scan(gomock.Any(), gomock.Any(), gomock.Any(),
+						gomock.Any(), gomock.Any(), gomock.Any(),
+						gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(errors.New("scan error"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := NewMockDBTX(ctrl)
+			tt.mock(db)
+
+			q := &Queries{db: db}
+
+			_, err := q.CreateUserHasRoles(context.Background(),
+				CreateUserHasRolesParams{
+					UserName: "user",
+					Role:     "admin",
+				},
+			)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// 🔹 GetRolesForUserName
+func TestGetRolesForUserName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		name    string
+		mock    func(db *MockDBTX)
+		wantErr bool
+	}{
+		{
+			name: "success",
+			mock: func(db *MockDBTX) {
+				row := NewMockRow(ctrl)
+
+				db.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), "user").
+					Return(row)
+
+				row.EXPECT().
+					Scan(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
+			},
+		},
+		{
+			name: "error",
+			mock: func(db *MockDBTX) {
+				row := NewMockRow(ctrl)
+
+				db.EXPECT().
+					QueryRow(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(row)
+
+				row.EXPECT().
+					Scan(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(errors.New("scan error"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := NewMockDBTX(ctrl)
+			tt.mock(db)
+
+			q := &Queries{db: db}
+
+			_, err := q.GetRolesForUserName(context.Background(), "user")
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// 🔹 ListUserHasRoles (пример для всех list-методов)
+func TestListUserHasRoles(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		name    string
+		mock    func(db *MockDBTX)
+		wantErr bool
+	}{
+		{
+			name: "success",
+			mock: func(db *MockDBTX) {
+				rows := NewMockRows(ctrl)
+
+				db.EXPECT().
+					Query(gomock.Any(), gomock.Any()).
+					Return(rows, nil)
+
+				rows.EXPECT().Next().Return(true)
+				rows.EXPECT().Scan(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
+
+				rows.EXPECT().Next().Return(false)
+				rows.EXPECT().Err().Return(nil)
+				rows.EXPECT().Close()
+			},
+		},
+		{
+			name: "query error",
+			mock: func(db *MockDBTX) {
+				db.EXPECT().
+					Query(gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("db error"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := NewMockDBTX(ctrl)
+			tt.mock(db)
+
+			q := &Queries{db: db}
+
+			_, err := q.ListUserHasRoles(context.Background())
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
 
 type mockRow struct {
 	scan func(dest ...any) error
@@ -33,11 +221,11 @@ func (m *mockRows) Scan(dest ...any) error {
 	m.index++
 
 	*(dest[0].(*int64)) = r.ID
-	*(dest[1].(*pgtype.Text)) = r.UserName
-	*(dest[2].(*pgtype.Text)) = r.Role
+	*(dest[1].(*string)) = r.UserName
+	*(dest[2].(*string)) = r.Role
 	*(dest[3].(*pgtype.Timestamp)) = r.CreateTime
 	*(dest[4].(*pgtype.Timestamp)) = r.UpdateTime
-	*(dest[5].(*pgtype.Bool)) = r.Enabled
+	*(dest[5].(*bool)) = r.Enabled
 	*(dest[6].(*bool)) = r.LocalChange
 	*(dest[7].(*pgtype.Bool)) = r.Visible
 	*(dest[8].(*int32)) = r.Flags
@@ -71,7 +259,7 @@ func (m mockDB) QueryRow(ctx context.Context, sql string, args ...interface{}) p
 	return m.row(ctx, sql, args...)
 }
 
-func TestCreateUserHasRoles(t *testing.T) {
+func Test_CreateUserHasRoles(t *testing.T) {
 	db := mockDB{
 		row: func(ctx context.Context, sql string, args ...interface{}) pgx.Row {
 			return mockRow{
@@ -108,7 +296,7 @@ func TestDeleteUserHasRolesBy(t *testing.T) {
 
 	q := New(db)
 
-	err := q.DeleteUserHasRolesBy(context.Background(), pgtype.Text{})
+	err := q.DeleteUserHasRolesBy(context.Background(), "")
 
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +323,7 @@ func TestDeleteUserHasRolesByID_Error(t *testing.T) {
 	}
 }
 
-func TestListUserHasRoles(t *testing.T) {
+func Test_ListUserHasRoles(t *testing.T) {
 	rows := &mockRows{
 		data: []UserHasRole{
 			{ID: 1},
@@ -191,7 +379,7 @@ func TestListUserHasRolesByRole(t *testing.T) {
 
 	q := New(db)
 
-	res, err := q.ListUserHasRolesByRole(context.Background(), pgtype.Text{})
+	res, err := q.ListUserHasRolesByRole(context.Background(), "")
 
 	if err != nil {
 		t.Fatal(err)
@@ -215,7 +403,7 @@ func TestListUserHasRolesByUserName(t *testing.T) {
 
 	q := New(db)
 
-	res, err := q.ListUserHasRolesByUserName(context.Background(), pgtype.Text{})
+	res, err := q.ListUserHasRolesByUserName(context.Background(), "")
 
 	if err != nil {
 		t.Fatal(err)

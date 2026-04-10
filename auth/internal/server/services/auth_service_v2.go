@@ -92,7 +92,7 @@ func (s *AuthServiceImplV2) transactionAuth(ctx context.Context, sid model.Sessi
 		Iss:       primaryKey.Iss,
 		Jti:       primaryKey.Jti,
 		Sub:       primaryKey.Sub,
-		UserName:  pgtype.Text{String: user.UserName.String, Valid: true},
+		UserName:  user.UserName.String,
 		Roles:     []string{},
 		ValidTime: pgtype.Timestamptz{Time: validTimePeriodsTokens.SessionValidTime().Local(), Valid: true},
 	})
