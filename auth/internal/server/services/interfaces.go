@@ -44,7 +44,7 @@ type DBTX interface {
 	QueryRow(context.Context, string, ...interface{}) pgx.Row
 }
 
-//go:generate mockgen -destination=pgx_conn_mock_test.go -package=services github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services PgxConn
+//go:generate mockgen -destination=mock_pgx_conn_test.go -package=services github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services PgxConn
 type PgxConn interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
