@@ -3,12 +3,14 @@ package model
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_name"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
@@ -201,6 +203,27 @@ func UserFromModelUserAttr(user user_attrs.UserAttr) User {
 		email:    a.Email,
 		visible:  user.Visible,
 		flags:    user.Flags,
+	}
+}
+
+type UserHasRoles struct {
+	userName string
+	roles    []string
+	visible  bool
+	flags    int32
+}
+
+func UserHasRolesFromModelSession(s session.Session) UserHasRoles {
+	return UserHasRoles{userName: s.UserName, roles: s.Roles, visible: s.Visible.Bool, flags: s.Flags}
+}
+
+func (u UserHasRoles) ToDto() dto.UserHasRoles {
+	roles := slices.Clone(u.roles)
+	return dto.UserHasRoles{
+		UserName: u.userName,
+		Roles:    roles,
+		Visible:  u.visible,
+		Flags:    u.flags,
 	}
 }
 
