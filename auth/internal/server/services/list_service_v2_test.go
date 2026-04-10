@@ -5,11 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 )
 
 func TestListServiceImplV2_List(t *testing.T) {
@@ -17,7 +18,7 @@ func TestListServiceImplV2_List(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockCfg := NewMockConfig(ctrl)
-	mockUserAttrsRepo := NewMockUserAttrsRepo(ctrl)
+	mockUserViewRepo := NewMockUserViewRepo(ctrl)
 
 	tests := []struct {
 		name    string
@@ -31,10 +32,10 @@ func TestListServiceImplV2_List(t *testing.T) {
 					Values().
 					Return(config.Values{}).
 					Times(0)
-				mockUserAttrsRepo.EXPECT().
-					ListUserAttrs(gomock.Any()).
-					Return([]user_attrs.UserAttr{
-						{UserName: "test"},
+				mockUserViewRepo.EXPECT().
+					ListUserNames(gomock.Any()).
+					Return([]user_view.UserView{
+						{UserName: pgtype.Text{String: "test", Valid: true}},
 					}, nil)
 			},
 			wantErr: false,
@@ -46,8 +47,8 @@ func TestListServiceImplV2_List(t *testing.T) {
 					Values().
 					Return(config.Values{}).
 					Times(0)
-				mockUserAttrsRepo.EXPECT().
-					ListUserAttrs(gomock.Any()).
+				mockUserViewRepo.EXPECT().
+					ListUserNames(gomock.Any()).
 					Return(nil, errors.New("err"))
 			},
 			wantErr: true,
@@ -62,7 +63,7 @@ func TestListServiceImplV2_List(t *testing.T) {
 				BaseService: &BaseService{
 					cfg: mockCfg,
 				},
-				userAttrsRepo: mockUserAttrsRepo,
+				userViewRepo: mockUserViewRepo,
 			}
 
 			_, err := s.List(context.Background())

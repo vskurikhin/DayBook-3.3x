@@ -105,6 +105,7 @@ go-install:
 go-swag:
 	swag init --parseInternal --st -ot yaml -g $(MAIN_GO) --output $(DOCS_DIR)
 	gsed -i 's/host: localhost:8089/host: $(ADDRESS)/' $(DOCS_GO)
+	cd docs ; redocly build-docs ./swagger.yaml ; cd -
 
 go-clean:
 	@echo "  >  Cleaning build cache"

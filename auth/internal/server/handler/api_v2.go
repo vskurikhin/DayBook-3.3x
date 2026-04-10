@@ -31,8 +31,9 @@ func NewApiV2(cfg config.Config, v2 resources.ResourceV2) ApiV2 {
 		// Seek, verify and validate JWT tokens
 		r.Use(jwtauth.Verifier(tokenAuth))
 		r.Use(jwtauth.Authenticator(tokenAuth))
-		r.Method(http.MethodGet, ListURL, APISyncHandler(v2.List))
+		r.Method(http.MethodGet, UserListURL, APISyncHandler(v2.List))
 		r.Method(http.MethodPost, LogoutURL, APISyncHandler(v2.Logout))
+		r.Method(http.MethodGet, SessionRolesURL, APISyncHandler(v2.SessionRoles))
 	})
 
 	return r

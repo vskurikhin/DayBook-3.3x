@@ -65,7 +65,7 @@ func TestApiV2(t *testing.T) {
 			},
 		},
 		{
-			name: "positive #3 route: " + ListURL,
+			name: "positive #3 route: " + UserListURL,
 			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
 				ctrl := gomock.NewController(t)
 				cfgMock := NewMockConfig(ctrl)
@@ -76,7 +76,7 @@ func TestApiV2(t *testing.T) {
 				return NewApiV2(cfgMock, mock), mock, ctrl
 			},
 			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
-				req := httptest.NewRequest(http.MethodGet, ListURL, nil)
+				req := httptest.NewRequest(http.MethodGet, UserListURL, nil)
 				token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{})
 				st, _ := token.SignedString([]byte("secret"))
 				req.Header.Set("Authorization", "Bearer "+string(st))
@@ -150,6 +150,29 @@ func TestApiV2(t *testing.T) {
 				body: "register",
 			},
 		},
+		{
+			name: "positive #7 route: " + SessionRolesURL,
+			newFunc: func(t gomock.TestReporter, opts ...gomock.ControllerOption) (ApiV2, *mockResourceV2Ok, *gomock.Controller) {
+				ctrl := gomock.NewController(t)
+				cfgMock := NewMockConfig(ctrl)
+				mock := &mockResourceV2Ok{}
+
+				cfgMock.EXPECT().Values().Return(config.Values{JWThs256SignKey: []byte("secret")}).AnyTimes()
+
+				return NewApiV2(cfgMock, mock), mock, ctrl
+			},
+			testFunc: func(t *testing.T, router ApiV2) *httptest.ResponseRecorder {
+				req := httptest.NewRequest(http.MethodGet, SessionRolesURL, nil)
+				token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{})
+				st, _ := token.SignedString([]byte("secret"))
+				req.Header.Set("Authorization", "Bearer "+string(st))
+				return testServeHTTP(router, req)
+			},
+			want: wantType{
+				code: http.StatusOK,
+				body: "session roles",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -214,5 +237,12 @@ func (m *mockResourceV2Ok) Register(w http.ResponseWriter, _ *http.Request) erro
 	m.called = true
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("register"))
+	return nil
+}
+
+func (m *mockResourceV2Ok) SessionRoles(w http.ResponseWriter, _ *http.Request) error {
+	m.called = true
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("session roles"))
 	return nil
 }

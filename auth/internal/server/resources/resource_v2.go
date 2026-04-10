@@ -1,7 +1,6 @@
 package resources
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -14,42 +13,6 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
-//go:generate mockgen -destination=mock_auth_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources AuthServiceV2
-type AuthServiceV2 interface {
-	Auth(ctx context.Context, login model.Login) (model.Credentials, error)
-}
-
-//go:generate mockgen -destination=mock_config_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources Config
-type Config interface {
-	JWThs256SignKey(string)
-	Values() config.Values
-}
-
-//go:generate mockgen -destination=mock_list_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources ListServiceV2
-type ListServiceV2 interface {
-	List(ctx context.Context) ([]model.User, error)
-}
-
-//go:generate mockgen -destination=mock_logout_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources LogoutServiceV2
-type LogoutServiceV2 interface {
-	Logout(ctx context.Context) error
-}
-
-//go:generate mockgen -destination=mock_ok_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources OkServiceV2
-type OkServiceV2 interface {
-	Ok() string
-}
-
-//go:generate mockgen -destination=mock_refresh_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources RefreshServiceV2
-type RefreshServiceV2 interface {
-	Refresh(ctx context.Context, token string) (model.Credentials, error)
-}
-
-//go:generate mockgen -destination=mock_register_service_v2_test.go -package=resources github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources RegisterServiceV2
-type RegisterServiceV2 interface {
-	Register(ctx context.Context, user model.CreateUser) (model.Credentials, error)
-}
-
 type ResourceV2 interface {
 	Auth(w http.ResponseWriter, r *http.Request) error
 	List(w http.ResponseWriter, r *http.Request) error
@@ -57,18 +20,20 @@ type ResourceV2 interface {
 	Ok(w http.ResponseWriter, r *http.Request) error
 	Refresh(w http.ResponseWriter, r *http.Request) error
 	Register(w http.ResponseWriter, r *http.Request) error
+	SessionRoles(w http.ResponseWriter, r *http.Request) error
 }
 
 var _ ResourceV2 = (*V2)(nil)
 
 type V2 struct {
-	authService     services.AuthServiceV2
-	cfg             config.Config
-	listService     services.ListServiceV2
-	logoutService   services.LogoutServiceV2
-	okService       services.OkServiceV2
-	refreshService  services.RefreshServiceV2
-	registerService services.RegisterServiceV2
+	authService         services.AuthServiceV2
+	cfg                 config.Config
+	listService         services.ListServiceV2
+	logoutService       services.LogoutServiceV2
+	okService           services.OkServiceV2
+	refreshService      services.RefreshServiceV2
+	registerService     services.RegisterServiceV2
+	sessionRolesService services.SessionRolesV2
 }
 
 // Auth godoc
@@ -117,7 +82,7 @@ func (v V2) Auth(w http.ResponseWriter, r *http.Request) error {
 // @Failure 500 {object} APIResponse{error=string,success=bool} "server error 'success': false"
 // @Failure 503 {object} APIResponse{error=string,success=bool} "service unavailable"
 // @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
-// @Router /v2/list [get]
+// @Router /v2/user/list [get]
 func (v V2) List(w http.ResponseWriter, r *http.Request) error {
 	list, err := v.listService.List(r.Context())
 	if err != nil {
@@ -167,7 +132,7 @@ func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body dto.Login true "User credentials by cookie string"
+// @Param request body dto.Empty false "User credentials by cookie string"
 // @Success 200 {object} APIResponse{data=dto.Token}
 // @Success 206
 // @Failure 400 {object} APIResponse{error=string,success=bool} "bad request"
@@ -242,6 +207,29 @@ func (v V2) Register(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
+// SessionRoles godoc
+// @Summary for user get roles in session
+// @Description Invalidates user session. Requires JWT authentication.
+// @Tags session
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} APIResponse{data=dto.UserHasRoles}
+// @Failure 401 {object} string "unauthorized"
+// @Failure 500 {object} APIResponse{error=string,success=bool} "server error 'success': false"
+// @Failure 503 {object} APIResponse{error=string,success=bool} "service unavailable"
+// @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
+// @Router /v2/session/roles [get]
+func (v V2) SessionRoles(w http.ResponseWriter, r *http.Request) error {
+	userHasRoles, err := v.sessionRolesService.SessionRoles(r.Context())
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Data:    userHasRoles.ToDto(),
+	})
+}
+
 // NewV2 creates and returns a new V2 resource instance that implements
 // the ResourceV2 interface.
 func NewV2(
@@ -252,14 +240,16 @@ func NewV2(
 	okService services.OkServiceV2,
 	refreshService services.RefreshServiceV2,
 	registerService services.RegisterServiceV2,
+	sessionRolesService services.SessionRolesV2,
 ) *V2 {
 	return &V2{
-		authService:     authService,
-		cfg:             cfg,
-		listService:     listService,
-		logoutService:   logoutService,
-		okService:       okService,
-		refreshService:  refreshService,
-		registerService: registerService,
+		authService:         authService,
+		cfg:                 cfg,
+		listService:         listService,
+		logoutService:       logoutService,
+		okService:           okService,
+		refreshService:      refreshService,
+		registerService:     registerService,
+		sessionRolesService: sessionRolesService,
 	}
 }

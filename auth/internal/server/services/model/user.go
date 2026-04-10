@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -168,10 +169,15 @@ func UserFromModelUserView(user user_view.UserView) User {
 	if user.Flags.Valid {
 		flags = user.Flags.Int32
 	}
-	bb := bytes.NewBuffer(user.Attrs)
-	decoder := json.NewDecoder(bb)
 	var a userAttrs
-	_ = decoder.Decode(&a) // TODO issue #61
+	if user.Attrs != nil {
+		bb := bytes.NewBuffer(user.Attrs)
+		decoder := json.NewDecoder(bb)
+		err := decoder.Decode(&a)
+		if err != nil {
+			slog.Debug("UserFromModelUserView", slog.String("error", err.Error()))
+		}
+	}
 	return User{
 		id:       user.ID.Bytes,
 		name:     user.Name.String,
@@ -191,11 +197,16 @@ func UserFromModelUserName(user user_name.UserName) User {
 	}
 }
 
-func UserFromModelUserAttr(user user_attrs.UserAttr) User {
-	bb := bytes.NewBuffer(user.Attrs)
-	decoder := json.NewDecoder(bb)
+func UserFromModelUserAttr(user user_attrs.UserAttr) (User, error) {
 	var a userAttrs
-	_ = decoder.Decode(&a) // TODO issue #61
+	if user.Attrs != nil {
+		bb := bytes.NewBuffer(user.Attrs)
+		decoder := json.NewDecoder(bb)
+		err := decoder.Decode(&a)
+		if err != nil {
+			return User{}, err
+		}
+	}
 	return User{
 		id:       a.ID,
 		name:     user.Name,
@@ -203,7 +214,7 @@ func UserFromModelUserAttr(user user_attrs.UserAttr) User {
 		email:    a.Email,
 		visible:  user.Visible,
 		flags:    user.Flags,
-	}
+	}, nil
 }
 
 type UserHasRoles struct {

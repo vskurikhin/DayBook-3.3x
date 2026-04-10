@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
@@ -26,7 +28,7 @@ type RefreshServiceImplV2 struct {
 	*BaseService
 	credentialsFactory creds.CredentialsFactoryV2
 	sessionRepo        session.Repo
-	userAttrsRepo      user_attrs.Repo
+	userViewRepo       user_view.Repo
 }
 
 // Refresh validates the provided JWT token and issues new credentials.
@@ -98,7 +100,7 @@ func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (
 		return model.CredValuesV2{}, xerror.ErrSessionTimeExpired
 	}
 
-	user, err := s.userAttrsRepo.GetUserAttrs(ctx, sess.UserName)
+	userView, err := s.userViewRepo.GetUserName(ctx, pgtype.Text{String: sess.UserName, Valid: true})
 	if err != nil {
 		slog.ErrorContext(ctx,
 			"failed to get user attributes",
@@ -113,17 +115,16 @@ func (s *RefreshServiceImplV2) refresh(ctx context.Context, claims jwt.Claims) (
 	}
 	validTimePeriodsTokens := model.MakeValidTimeTokens(validPeriodAccessToken, sess.ValidTime.Time.Sub(time.Now()))
 
-	return model.MakeCredValuesV2(
-		sid, validTimePeriodsTokens,
-		model.UserFromModelUserAttr(user),
-	), nil
+	user := model.UserFromModelUserView(userView)
+
+	return model.MakeCredValuesV2(sid, validTimePeriodsTokens, user), nil
 }
 
 func NewRefreshServiceV2(
 	cfg config.Config,
 	credentialsFactory creds.CredentialsFactoryV2,
 	sessionRepo session.Repo,
-	userAttrsRepo user_attrs.Repo,
+	userViewRepo user_view.Repo,
 ) *RefreshServiceImplV2 {
 	return &RefreshServiceImplV2{
 		BaseService: &BaseService{
@@ -131,6 +132,6 @@ func NewRefreshServiceV2(
 		},
 		credentialsFactory: credentialsFactory,
 		sessionRepo:        sessionRepo,
-		userAttrsRepo:      userAttrsRepo,
+		userViewRepo:       userViewRepo,
 	}
 }
