@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
@@ -125,6 +126,64 @@ func TestQueryRow_AcquireError(t *testing.T) {
 	}
 
 	_ = pool.QueryRow(context.Background(), "SELECT 1")
+}
+
+func TestPgxPool_Acquire(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+
+	tests := []struct {
+		name      string
+		setupMock func(m *MockPool)
+		wantErr   bool
+	}{
+		{
+			name: "success",
+			setupMock: func(m *MockPool) {
+				m.EXPECT().
+					Acquire(ctx).
+					Return(&pgxpool.Conn{}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "error from pool",
+			setupMock: func(m *MockPool) {
+				m.EXPECT().
+					Acquire(ctx).
+					Return(nil, errors.New("acquire error"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockPool := NewMockPool(ctrl)
+
+			if tt.name != "nil pool panic protection (optional case)" {
+				tt.setupMock(mockPool)
+			}
+
+			p := &PgxPool{
+				pgxPool: func() Pool {
+					return mockPool
+				}(),
+			}
+
+			conn, err := p.Acquire(ctx)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, conn)
+		})
+	}
 }
 
 type mockPool struct {

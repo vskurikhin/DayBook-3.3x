@@ -26,6 +26,21 @@ type PgxPool struct {
 	mu      sync.RWMutex
 }
 
+// Acquire returns a connection from the underlying pgx connection pool.
+//
+// It safely reads the current pool instance using a read lock and delegates
+// the call to the wrapped Pool implementation.
+//
+// The returned connection must be released by the caller.
+// An error is returned if acquiring a connection fails.
+func (p *PgxPool) Acquire(ctx context.Context) (c *pgxpool.Conn, err error) {
+	p.mu.RLock()
+	pool := p.pgxPool
+	p.mu.RUnlock()
+	return pool.Acquire(ctx)
+
+}
+
 // Begin starts a new database transaction using a connection acquired
 // from the underlying pgx connection pool.
 //
