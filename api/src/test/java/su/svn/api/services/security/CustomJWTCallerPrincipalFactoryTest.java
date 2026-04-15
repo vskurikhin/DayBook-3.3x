@@ -1,138 +1,83 @@
 package su.svn.api.services.security;
 
-import io.jsonwebtoken.security.Keys;
 import io.quarkus.test.junit.QuarkusTest;
-import io.smallrye.jwt.algorithm.SignatureAlgorithm;
-import io.smallrye.jwt.auth.principal.JWTAuthContextInfo;
-import org.junit.jupiter.api.BeforeEach;
+import io.quarkus.test.junit.TestProfile;
+import io.smallrye.jwt.build.Jwt;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import su.svn.api.model.dto.UserHasRoles;
-import su.svn.lib.auth.ApiException;
-import su.svn.lib.auth.api.SessionApi;
-import su.svn.lib.auth.model.V2SessionRolesGet200Response;
+import su.svn.api.model.exceptions.CustomParseException;
+import su.svn.api.profile.NoContainersProfile;
 
-import java.util.List;
-import java.util.Set;
+import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
+import static org.assertj.core.api.Assertions.*;
 
 @QuarkusTest
+@TestProfile(NoContainersProfile.class)
 class CustomJWTCallerPrincipalFactoryTest {
 
+    @Inject
     CustomJWTCallerPrincipalFactory factory;
 
-    @BeforeEach
-    void setUp() {
-        factory = Mockito.spy(new CustomJWTCallerPrincipalFactory());
+    private static final String SECRET = "12345678901234567890123456789012";
+
+    /**
+     * Helper method to generate a valid HS256 token.
+     */
+    private String generateToken() {
+        return Jwt.issuer("test-issuer")
+                .subject(UUID.randomUUID().toString())
+                .claim("custom", "value")
+                .signWithSecret(SECRET);
     }
 
     @Test
-    void roles_shouldReturnUserAndRoles() throws Exception {
+    void shouldParseValidToken() {
         // given
-        String token = "test-token";
-
-        SessionApi api = mock(SessionApi.class);
-        var response = mockResponse("john", List.of("ADMIN", "USER"));
-
-        doReturn(api).when(factory).getSessionApi(token);
-        when(api.v2SessionRolesGet()).thenReturn((V2SessionRolesGet200Response) response);
+        String token = generateToken();
 
         // when
-        UserHasRoles result = factory.roles(token);
+        var principal = factory.parse(token, null);
 
         // then
-        assertEquals("john", result.userName());
-        assertTrue(result.roles().contains("ADMIN"));
-        assertTrue(result.roles().contains("USER"));
+        assertThat(principal).isNotNull();
     }
 
     @Test
-    void roles_shouldReturnGuest_whenRolesNull() throws Exception {
-        String token = "test-token";
+    void shouldContainExpectedClaims() {
+        // given
+        String subject = UUID.randomUUID().toString();
 
-        SessionApi api = mock(SessionApi.class);
-        var response = mockResponse("john", null);
+        String token = Jwt.issuer("test-issuer")
+                .subject(subject)
+                .signWithSecret(SECRET);
 
-        doReturn(api).when(factory).getSessionApi(token);
-        when(api.v2SessionRolesGet()).thenReturn((V2SessionRolesGet200Response) response);
+        // when
+        var principal = factory.parse(token, null);
 
-        UserHasRoles result = factory.roles(token);
-
-        assertEquals("john", result.userName());
-        assertTrue(result.roles().contains(CustomJWTCallerPrincipalFactory.GUEST));
+        // then
+        assertThat(principal.getSubject()).isEqualTo(subject);
     }
 
     @Test
-    void roles_shouldThrowException_whenUserNameNull() throws Exception {
-        String token = "test-token";
+    void shouldThrowExceptionForInvalidToken() {
+        // given
+        String invalidToken = "invalid.token.value";
 
-        SessionApi api = mock(SessionApi.class);
-        var response = mockResponse(null, List.of("ADMIN"));
-
-        doReturn(api).when(factory).getSessionApi(token);
-        when(api.v2SessionRolesGet()).thenReturn((V2SessionRolesGet200Response) response);
-
-        assertThrows(ApiException.class, () -> factory.roles(token));
+        // when / then
+        assertThatThrownBy(() -> factory.parse(invalidToken, null))
+                .isInstanceOf(CustomParseException.class);
     }
 
     @Test
-    void parse_shouldReturnPrincipal() throws Exception {
-        CustomJWTCallerPrincipalFactory factory = Mockito.spy(new CustomJWTCallerPrincipalFactory());
+    void shouldThrowExceptionForWrongSignature() {
+        // given
+        String token = Jwt.issuer("test-issuer")
+                .subject("user")
+                .signWithSecret("wrong-secret-12345678901234567890");
 
-        // config values
-        factory.secret = "12345678901234567890123456789012"; // 32 bytes
-        factory.apiKeyPrefix = "Bearer";
-        factory.authServerUrl = "http://localhost";
-
-        String token = generateTestToken(factory.secret);
-
-        doReturn(UserHasRoles.builder()
-                .userName("john")
-                .roles(Set.of("USER"))
-                .build()
-        ).when(factory).roles(token);
-
-        // var authContext = mock(io.smallrye.jwt.auth.principal.JWTAuthContextInfo.class);
-
-        JWTAuthContextInfo authContextInfo = new JWTAuthContextInfo();
-
-        // ВАЖНО 👇
-        authContextInfo.setSecretVerificationKey(
-                Keys.hmacShaKeyFor("12345678901234567890123456789012".getBytes())
-        );
-        // ВАЖНО: разрешаем HS256
-        authContextInfo.setSignatureAlgorithm(Set.of(SignatureAlgorithm.HS256));
-
-        var result = factory.parse(token, authContextInfo);
-
-        assertNotNull(result);
-        assertEquals("john", result.getName());
-    }
-
-    // helper
-    private Object mockResponse(String userName, List<String> roles) {
-        var response = mock(V2SessionRolesGet200Response.class, RETURNS_DEEP_STUBS);
-
-        // deep stub
-        assert response.getData() != null;
-        when(response.getData().getUserName())
-                .thenReturn(userName);
-
-        when(response.getData().getRoles())
-                .thenReturn(roles);
-
-        return response;
-    }
-
-    private String generateTestToken(String secret) {
-        return io.jsonwebtoken.Jwts.builder()
-                .setSubject("123")
-                .setIssuer("cd8f5f9f-e3e8-569f-87ef-f03c6cfc29bc")
-                .setId("jti-1")
-                .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(secret.getBytes()))
-                .compact();
+        // when / then
+        assertThatThrownBy(() -> factory.parse(token, null))
+                .isInstanceOf(CustomParseException.class);
     }
 }

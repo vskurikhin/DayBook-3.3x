@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.15 20:40 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.20 00:29 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordResource.java
@@ -23,6 +23,28 @@ import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.util.UUID;
 
+/**
+ * REST resource for managing JSON records.
+ *
+ * <p>This resource exposes CRUD operations for JSON records and delegates
+ * the business logic to {@link RecordDataService}. After each successful
+ * mutation (create, update, delete), it triggers {@link RecordSchedulerService}.
+ *
+ * <p>All endpoints are protected with {@link RolesAllowed} and require the "USER" role.
+ *
+ * <p>Reactive behavior:
+ * <ul>
+ *     <li>All methods return {@link Uni} and are non-blocking</li>
+ *     <li>Scheduler trigger is executed as a side-effect using {@code onItem().invoke(...)}</li>
+ * </ul>
+ *
+ * <p>Endpoints:
+ * <ul>
+ *     <li>{@code POST /record/json} — create a new record</li>
+ *     <li>{@code DELETE /record/json/{id}} — delete a record</li>
+ *     <li>{@code PUT /record/json} — update a record</li>
+ * </ul>
+ */
 @Path(ResourcePath.RECORD + "/json")
 public class JsonRecordResource {
 

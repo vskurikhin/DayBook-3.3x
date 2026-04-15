@@ -20,6 +20,7 @@ dependencies {
     implementation 'io.quarkus:quarkus-container-image-docker'
     implementation 'io.quarkus:quarkus-grpc'
     implementation 'io.quarkus:quarkus-hibernate-reactive-panache'
+    implementation 'io.quarkus:quarkus-jackson'
     implementation 'io.quarkus:quarkus-jdbc-postgresql'
     implementation 'io.quarkus:quarkus-reactive-pg-client'
     implementation 'io.quarkus:quarkus-rest'
@@ -33,12 +34,6 @@ dependencies {
     // TODO remove quarkus-openapi-generator-server in release
     implementation 'io.quarkiverse.openapi.generator:quarkus-openapi-generator-server:2.14.0-lts'
     implementation 'io.swagger.core.v3:swagger-annotations:2.2.46'
-    /* TODO add camel-quarkus-pgevent
-    implementation 'org.apache.camel.quarkus:camel-quarkus-pgevent'
-     */
-    implementation "io.jsonwebtoken:jjwt-api:${VERSION_IO_JSONWEBTOKEN}"
-    implementation "io.jsonwebtoken:jjwt-impl:${VERSION_IO_JSONWEBTOKEN}"
-    implementation "io.jsonwebtoken:jjwt-jackson:${VERSION_IO_JSONWEBTOKEN}"
 
     implementation "org.mapstruct:mapstruct:${VERSION_MAPSTRUCT}"
 
@@ -58,12 +53,14 @@ dependencies {
 
     testImplementation 'io.quarkus:quarkus-junit'
     testImplementation 'io.quarkus:quarkus-junit-mockito'
+    testImplementation 'io.quarkus:quarkus-junit5-mockito'
     testImplementation 'io.quarkus:quarkus-liquibase'
     testImplementation 'io.quarkus:quarkus-panache-mock:3.33.1'
     // testImplementation 'io.quarkus:quarkus-test-postgresql'
     testImplementation 'io.quarkus:quarkus-test-security'
     testImplementation 'io.quarkus:quarkus-test-vertx'
     testImplementation 'io.rest-assured:rest-assured'
+    testImplementation "org.assertj:assertj-core:${VERSION_ORG_ASSERTJ_ASSERTJ_CORE}"
     testImplementation "org.mockito:mockito-core:${VERSION_ORG_MOCKITO_MOCKITO_CORE}"
     testImplementation "org.mockito:mockito-inline:${VERSION_ORG_MOCKITO_MOCKITO_INLINE}"
     testImplementation "org.testcontainers:junit-jupiter:${VERSION_ORG_TESTCONTAINERS}"
