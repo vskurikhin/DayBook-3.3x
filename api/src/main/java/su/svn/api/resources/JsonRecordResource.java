@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.15 20:40 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordResource.java
@@ -9,6 +9,7 @@
 package su.svn.api.resources;
 
 import io.smallrye.mutiny.Uni;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -31,6 +32,7 @@ public class JsonRecordResource {
     @Inject
     RecordSchedulerService recordSchedulerService;
 
+    @RolesAllowed("USER")
     @Operation(summary = "Create JSON record")
     @POST
     @Path(ResourcePath.NONE)
@@ -47,6 +49,7 @@ public class JsonRecordResource {
                 .invoke(() -> recordSchedulerService.fire(true));
     }
 
+    @RolesAllowed("USER")
     @Operation(summary = "Delete JSON record")
     @DELETE
     @Path(ResourcePath.ID)
@@ -60,6 +63,7 @@ public class JsonRecordResource {
                 .invoke(() -> recordSchedulerService.fire(true));
     }
 
+    @RolesAllowed("USER")
     @Operation(summary = "Update JSON record")
     @PUT
     @Path(ResourcePath.NONE)

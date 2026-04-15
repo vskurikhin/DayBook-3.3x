@@ -4,6 +4,7 @@ import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
 import io.quarkus.test.vertx.RunOnVertxContext;
 import io.quarkus.test.vertx.UniAsserter;
 import io.smallrye.mutiny.Uni;
@@ -175,7 +176,7 @@ public class DataBaseIT {
                     .build()
             );
         }
-        when(mockRecordViewClient.getByPageIndexAndSizeAndFromTimeAsUni(anyInt(), anyInt(), any(), any(), any()))
+        when(mockRecordViewClient.getByPageIndexAndSizeAndFromTimeAsUni(any(), anyInt(), anyInt(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(
                                 PageRecordView.builder()
                                         .content(list)

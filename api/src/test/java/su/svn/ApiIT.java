@@ -44,7 +44,7 @@ public class ApiIT {
         OffsetDateTime odt = OffsetDateTime.now(ZoneId.systemDefault());
         ZoneOffset zoneOffset = odt.getOffset();
 
-        when(mockRecordViewClient.getByPageIndexAndSizeAsUni(anyInt(), anyInt(), any()))
+        when(mockRecordViewClient.getByPageIndexAndSizeAsUni(any(), anyInt(), anyInt(), any()))
                 .thenReturn(Uni.createFrom().item(
                                 PageRecordView.builder()
                                         .content(List.of(

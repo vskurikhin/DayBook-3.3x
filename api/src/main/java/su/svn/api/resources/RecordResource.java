@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.15 20:40 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordResource.java
@@ -9,7 +9,7 @@
 package su.svn.api.resources;
 
 import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.tuples.Tuple2;
+import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -32,6 +32,7 @@ public class RecordResource {
     @Inject
     RecordDataService recordDataService;
 
+    @PermitAll
     @Operation(summary = "Get page with list of JSON record")
     @GET
     @Produces(MediaType.APPLICATION_JSON)

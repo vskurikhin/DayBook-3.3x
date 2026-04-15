@@ -3,8 +3,11 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -524,4 +527,8 @@ func TestAuthServiceImplV2_auth2(t *testing.T) {
 			assert.Equal(t, tt.wantErr, err != nil)
 		})
 	}
+}
+
+func TestSubjectUUIDPrint(t *testing.T) {
+	_, _ = fmt.Fprintf(os.Stderr, "%s\n", uuid.NewSHA1(uuid.NameSpaceDNS, []byte("guest")).String())
 }

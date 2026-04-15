@@ -1,8 +1,8 @@
 /*
- * This file was last modified at 2026.03.01 16:37 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.15 20:40 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * GreetingResource.java
+ * HealthCheckResource.java
  * $Id$
  */
 
@@ -13,8 +13,8 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
-@Path("/hello")
-public class GreetingResource {
+@Path("/health")
+public class HealthCheckResource {
 
     @GET
     @Produces(MediaType.TEXT_PLAIN)
