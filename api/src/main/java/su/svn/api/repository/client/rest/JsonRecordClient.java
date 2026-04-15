@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.15 20:40 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordClient.java
@@ -25,13 +25,13 @@ public interface JsonRecordClient {
     @DELETE
     @Path("/" + ResourcePath.ID)
     @Consumes(MediaType.APPLICATION_JSON)
-    Uni<Void> delete(UUID id);
+    Uni<Void> delete(@HeaderParam("Authorization") String authorization, UUID id);
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    Uni<ResourceJsonRecord> post(NewJsonRecord newJsonRecord);
+    Uni<ResourceJsonRecord> post(@HeaderParam("Authorization") String authorization, NewJsonRecord newJsonRecord);
 
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
-    Uni<ResourceJsonRecord> put(UpdateJsonRecord updateJsonRecord);
+    Uni<ResourceJsonRecord> put(@HeaderParam("Authorization") String authorization, UpdateJsonRecord updateJsonRecord);
 }
