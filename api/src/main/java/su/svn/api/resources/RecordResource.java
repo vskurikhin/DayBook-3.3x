@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.15 20:40 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.20 00:29 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordResource.java
@@ -17,6 +17,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.jboss.logging.Logger;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.model.dto.Page;
 import su.svn.api.model.dto.RecordData;
@@ -25,6 +26,8 @@ import su.svn.api.services.mappers.PageRecordDataMapper;
 
 @Path(ResourcePath.RECORDS)
 public class RecordResource {
+
+    private static final Logger LOG = Logger.getLogger(RecordResource.class);
 
     @Inject
     PageRecordDataMapper pageRecordDataMapper;
@@ -38,6 +41,10 @@ public class RecordResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Page<RecordData>> page(@QueryParam("page") int page, @QueryParam("size") byte size) {
         return recordDataService.readPage(page, size)
-                .map(postRecordPage -> pageRecordDataMapper.toPage(postRecordPage));
+                .log("TUT")
+                .map(postRecordPage -> {
+                    LOG.infof("postRecordPage: %s", postRecordPage);
+                    return pageRecordDataMapper.toPage(postRecordPage);
+                });
     }
 }

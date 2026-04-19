@@ -4,7 +4,7 @@ import io.quarkus.hibernate.reactive.panache.Panache;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.security.TestSecurity;
+import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.vertx.RunOnVertxContext;
 import io.quarkus.test.vertx.UniAsserter;
 import io.smallrye.mutiny.Uni;
@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.model.dto.PageRecordView;
 import su.svn.api.model.dto.RecordView;
+import su.svn.api.profile.ContainersProfile;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.client.rest.RecordViewClient;
 import su.svn.api.services.domain.RecordDataService;
@@ -34,7 +35,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
 @QuarkusTest
-@QuarkusTestResource(PostgreSQLTestResource.class)
+@QuarkusTestResource(value = PostgreSQLTestResource.class, restrictToAnnotatedClass = true)
+@TestProfile(ContainersProfile.class)
 public class DataBaseIT {
 
     public static final int CHUNK_SIZE = 1024;
