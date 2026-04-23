@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.23 20:14 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordController.java
@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import su.svn.core.models.dto.NewJsonRecord;
@@ -73,6 +74,7 @@ public class JsonRecordController {
      *         and HTTP status {@code 201 Created}
      */
     @PostMapping
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResourceJsonRecord> createJsonRecord(@RequestBody @Valid NewJsonRecord record) {
         ResourceJsonRecord createdRecord = jsonRecordService.save(record);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdRecord);
@@ -100,6 +102,7 @@ public class JsonRecordController {
      *         and HTTP status {@code 200 OK}
      */
     @PutMapping
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResourceJsonRecord> updateJsonRecord(@RequestBody @Valid UpdateJsonRecord record) {
         ResourceJsonRecord updatedRecord = jsonRecordService.update(record);
         return ResponseEntity.ok(updatedRecord);
@@ -114,6 +117,7 @@ public class JsonRecordController {
      * @return {@link ResponseEntity} with HTTP status {@code 204 No Content}
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Void> deleteJsonRecord(@PathVariable UUID id) {
         jsonRecordService.disable(id);
         return ResponseEntity.noContent().build();

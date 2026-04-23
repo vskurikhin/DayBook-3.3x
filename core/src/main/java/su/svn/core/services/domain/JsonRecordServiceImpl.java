@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.23 20:14 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordServiceImpl.java
@@ -13,8 +13,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 import su.svn.core.domain.entities.JsonRecord;
+import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.NewJsonRecord;
 import su.svn.core.models.dto.ResourceJsonRecord;
 import su.svn.core.models.dto.UpdateJsonRecord;
@@ -73,8 +76,9 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     public ResourceJsonRecord save(NewJsonRecord newRecord) {
         ResourceJsonRecord resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
         JsonRecord record = jsonRecordMapper.toEntity(resourceJsonRecord);
-        record.baseRecord().userName(ROOT);
-        record.userName(ROOT);
+        String username = getUserName();
+        record.baseRecord().userName(username);
+        record.userName(username);
 
         JsonRecord savedRecord = jsonRecordRepository.save(record);
         // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
@@ -85,14 +89,28 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     @Transactional
     public ResourceJsonRecord update(UpdateJsonRecord updateRecord) {
         Optional<JsonRecord> jsonRecord = jsonRecordRepository.findById(updateRecord.id());
-        ResourceJsonRecord resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
-        JsonRecord record = jsonRecordMapper.toEntity(resourceJsonRecord);
-        record.baseRecord().userName(ROOT);
-        record.baseRecord().postAt(jsonRecord.orElseThrow().baseRecord().postAt());
-        record.userName(ROOT);
+        String username = getUserName();
+        if (username.equals(jsonRecord.orElseThrow().userName())) {
+            ResourceJsonRecord resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
+            JsonRecord record = jsonRecordMapper.toEntity(resourceJsonRecord);
+            record.baseRecord().userName(username);
+            record.baseRecord().postAt(jsonRecord.orElseThrow().baseRecord().postAt());
+            record.userName(username);
 
-        JsonRecord savedRecord = jsonRecordRepository.save(record);
-        // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
-        return jsonRecordMapper.toResource(savedRecord);
+            JsonRecord savedRecord = jsonRecordRepository.save(record);
+            // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
+            return jsonRecordMapper.toResource(savedRecord);
+        }
+        throw new RuntimeException("access decided");
+    }
+
+    private static String getUserName() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String username;
+        return switch (principal) {
+            case UserName userName -> userName.userName();
+            case User user -> user.getUsername();
+            default -> "guest";
+        };
     }
 }
