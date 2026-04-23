@@ -6,6 +6,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
 import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.*;
@@ -41,6 +42,7 @@ class ServicesIT {
     private UserNameServiceImpl userNameService;
 
     @Test
+    @WithMockUser(username = "root")
     void JsonRecordServiceImpl_shouldSaveAndFindPlusUpdateAndFindUser() throws Exception {
         // given
         String userName = UUID.randomUUID().toString();

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.04.23 20:14 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * UserNameService.java
@@ -9,6 +9,7 @@
 package su.svn.core.services.domain;
 
 import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.NewUserName;
 
@@ -22,4 +23,6 @@ public interface UserNameService {
     UserName findByUserName(String userName) throws ChangeSetPersister.NotFoundException;
 
     UserName save(NewUserName userName);
+
+    UserDetailsService userDetailsService();
 }
