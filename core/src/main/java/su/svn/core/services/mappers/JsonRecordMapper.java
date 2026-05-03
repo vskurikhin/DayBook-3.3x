@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordMapper.java
@@ -12,9 +12,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.ValueMapping;
-import su.svn.core.domain.entities.BaseRecord;
 import su.svn.core.domain.entities.JsonRecord;
-import su.svn.core.domain.entities.RecordView;
 import su.svn.core.models.dto.NewJsonRecord;
 import su.svn.core.models.dto.ResourceJsonRecord;
 import su.svn.core.models.dto.UpdateJsonRecord;

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.23 20:14 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordServiceImpl.java
@@ -8,6 +8,7 @@
 
 package su.svn.core.services.domain;
 
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -21,10 +22,10 @@ import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.NewJsonRecord;
 import su.svn.core.models.dto.ResourceJsonRecord;
 import su.svn.core.models.dto.UpdateJsonRecord;
+import su.svn.core.models.exceptions.CustomNotFoundException;
 import su.svn.core.repository.JsonRecordRepository;
 import su.svn.core.services.mappers.JsonRecordMapper;
 
-import java.util.Optional;
 import java.util.UUID;
 
 import static lombok.AccessLevel.PRIVATE;
@@ -43,22 +44,26 @@ import static lombok.AccessLevel.PRIVATE;
 @Slf4j
 public class JsonRecordServiceImpl implements JsonRecordService {
 
-    public static final String ROOT = "root";
+    public static final String GUEST = "guest";
+
+    EntityManager entityManager;
+
     JsonRecordMapper jsonRecordMapper;
     JsonRecordRepository jsonRecordRepository;
 
     @Override
+    @Transactional
     public void disable(UUID id) {
         JsonRecord record = null;
         try {
+            var username = getUserName();
             record = jsonRecordRepository.findByIdAndEnabledTrue(id)
                     .orElseThrow(ChangeSetPersister.NotFoundException::new);
-            record.baseRecord().userName(ROOT);
-            record.baseRecord().enabled(false);
-            record.userName(ROOT);
-            record.enabled(false);
-
-            jsonRecordRepository.save(record);
+            if (username.equals(record.userName())) {
+                record.baseRecord().enabled(false);
+                record.enabled(false);
+                jsonRecordRepository.save(record);
+            }
         } catch (ChangeSetPersister.NotFoundException e) {
             System.out.println("Exception: " + e.getMessage());
         }
@@ -66,51 +71,58 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     }
 
     @Override
-    public ResourceJsonRecord findById(UUID id) throws ChangeSetPersister.NotFoundException {
-        JsonRecord record = jsonRecordRepository.findByIdAndEnabledTrue(id)
-                .orElseThrow(ChangeSetPersister.NotFoundException::new);
-        return jsonRecordMapper.toResource(record);
+    public ResourceJsonRecord findById(UUID id) {
+        return jsonRecordMapper.toResource(jsonRecordRepository.findByIdAndEnabledTrue(id)
+                .orElseThrow(CustomNotFoundException::new)
+        );
     }
 
     @Override
+    @Transactional
     public ResourceJsonRecord save(NewJsonRecord newRecord) {
-        ResourceJsonRecord resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
-        JsonRecord record = jsonRecordMapper.toEntity(resourceJsonRecord);
-        String username = getUserName();
-        record.baseRecord().userName(username);
-        record.userName(username);
-
-        JsonRecord savedRecord = jsonRecordRepository.save(record);
+        var resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
+        var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+        var username = getUserName();
+        jsonRecord.baseRecord().userName(username);
+        jsonRecord.userName(username);
+        var baseRecord = jsonRecord.baseRecord();
+        entityManager.persist(baseRecord);
+        entityManager.refresh(baseRecord);
         // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
-        return jsonRecordMapper.toResource(savedRecord);
+        return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
     }
 
     @Override
     @Transactional
     public ResourceJsonRecord update(UpdateJsonRecord updateRecord) {
-        Optional<JsonRecord> jsonRecord = jsonRecordRepository.findById(updateRecord.id());
+        var optionalJsonRecord = jsonRecordRepository.findById(updateRecord.id());
         String username = getUserName();
-        if (username.equals(jsonRecord.orElseThrow().userName())) {
-            ResourceJsonRecord resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
-            JsonRecord record = jsonRecordMapper.toEntity(resourceJsonRecord);
-            record.baseRecord().userName(username);
-            record.baseRecord().postAt(jsonRecord.orElseThrow().baseRecord().postAt());
-            record.userName(username);
-
-            JsonRecord savedRecord = jsonRecordRepository.save(record);
+        if (username.equals(optionalJsonRecord.orElseThrow().userName())) {
+            var resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
+            var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+            jsonRecord.baseRecord()
+                    .postAt(optionalJsonRecord.orElseThrow()
+                            .baseRecord()
+                            .postAt()
+                    );
+            jsonRecord.baseRecord()
+                    .userName(optionalJsonRecord.orElseThrow()
+                            .baseRecord()
+                            .userName()
+                    );
+            jsonRecord.userName(username);
             // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
-            return jsonRecordMapper.toResource(savedRecord);
+            return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
         }
-        throw new RuntimeException("access decided");
+        throw new RuntimeException("access denied");
     }
 
     private static String getUserName() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        String username;
         return switch (principal) {
             case UserName userName -> userName.userName();
             case User user -> user.getUsername();
-            default -> "guest";
+            default -> GUEST;
         };
     }
 }

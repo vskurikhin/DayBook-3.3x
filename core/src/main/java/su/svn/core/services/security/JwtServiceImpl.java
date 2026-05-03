@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.23 20:14 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JwtServiceImpl.java
@@ -127,8 +127,6 @@ public class JwtServiceImpl implements JwtService {
      * @return ключ
      */
     private Key getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSigningKey);
-        System.err.println("jwtSigningKey = " + jwtSigningKey);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSigningKey));
     }
 }
