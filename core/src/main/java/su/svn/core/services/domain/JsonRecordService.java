@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordService.java
@@ -26,7 +26,7 @@ public interface JsonRecordService {
 
     void disable(UUID id);
 
-    ResourceJsonRecord findById(UUID id) throws ChangeSetPersister.NotFoundException;
+    ResourceJsonRecord findById(UUID id);
 
     ResourceJsonRecord save(NewJsonRecord newRecord);
 

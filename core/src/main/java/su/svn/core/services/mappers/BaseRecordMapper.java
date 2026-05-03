@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * BaseRecordMapper.java
@@ -28,7 +28,6 @@ public interface BaseRecordMapper {
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     ResourceBaseRecord toResource(BaseRecord record);
 
-    @Mapping(target = "parent", ignore = true)
     @Mapping(target = "type", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)

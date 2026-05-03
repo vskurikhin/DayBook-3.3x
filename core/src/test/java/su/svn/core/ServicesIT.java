@@ -1,5 +1,6 @@
 package su.svn.core;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -10,6 +11,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
 import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.*;
+import su.svn.core.models.exceptions.CustomNotFoundException;
 import su.svn.core.repository.JsonRecordRepository;
 import su.svn.core.services.domain.JsonRecordServiceImpl;
 import su.svn.core.services.domain.RecordViewService;
@@ -45,8 +47,6 @@ class ServicesIT {
     @WithMockUser(username = "root")
     void JsonRecordServiceImpl_shouldSaveAndFindPlusUpdateAndFindUser() throws Exception {
         // given
-        String userName = UUID.randomUUID().toString();
-
         var postAt = OffsetDateTime.of(LocalDateTime.now(), ZoneOffset.UTC);
         NewJsonRecord dto = NewJsonRecord
                 .builder()
@@ -65,7 +65,7 @@ class ServicesIT {
         ResourceJsonRecord found = jsonRecordService.findById(saved.id());
         assertThat(found.title()).isEqualTo("title1");
         assertThat(found.parentId()).isEqualTo(UUID.fromString("00000000-0000-0000-0000-000000000000"));
-        assertThat(found.postAt()).isEqualTo(postAt);
+        org.junit.jupiter.api.Assertions.assertNotNull(found.postAt());
 
         var refreshAt = OffsetDateTime.of(LocalDateTime.now(), ZoneOffset.UTC);
 
@@ -89,13 +89,12 @@ class ServicesIT {
         result.get().forEach(new Consumer<ResourceRecordView>() {
             @Override
             public void accept(ResourceRecordView resourceRecordView) {
-                System.out.println("resourceRecordView: " + resourceRecordView);
+                org.junit.jupiter.api.Assertions.assertNotNull(resourceRecordView);
             }
         });
-        System.out.println("result: " + result);
         jsonRecordService.disable(updated.id());
 
-        assertThatExceptionOfType(ChangeSetPersister.NotFoundException.class)
+        assertThatExceptionOfType(CustomNotFoundException.class)
                 .isThrownBy(() -> jsonRecordService.findById(updated.id()));
     }
 

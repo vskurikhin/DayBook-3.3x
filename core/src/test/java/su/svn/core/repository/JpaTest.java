@@ -34,6 +34,7 @@ class JpaTest {
                 .build();
 
         BaseRecord saved = entityManager.persistAndFlush(record);
+        entityManager.refresh(saved);
 
         assertThat(saved.id()).isNotNull();
         assertThat(saved.createTime()).isNotNull();
