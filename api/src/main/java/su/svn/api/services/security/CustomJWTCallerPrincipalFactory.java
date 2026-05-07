@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.20 00:29 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * CustomJWTCallerPrincipalFactory.java
@@ -63,7 +63,7 @@ public class CustomJWTCallerPrincipalFactory extends JWTCallerPrincipalFactory {
 
     private static final Logger LOG = Logger.getLogger(CustomJWTCallerPrincipalFactory.class);
 
-    @ConfigProperty(name = "application.external-jwt-verify-key-hmac")
+    @ConfigProperty(name = "app.external-jwt-verify-key-hmac")
     String secret;
 
     private final DefaultJWTTokenParser defaultParser = new DefaultJWTTokenParser();

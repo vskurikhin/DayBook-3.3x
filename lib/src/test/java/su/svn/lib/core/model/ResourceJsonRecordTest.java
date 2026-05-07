@@ -50,6 +50,22 @@ public class ResourceJsonRecordTest {
     }
 
     /**
+     * Test the property 'visible'
+     */
+    @Test
+    public void visibleTest() {
+        // TODO: test visible
+    }
+
+    /**
+     * Test the property 'flags'
+     */
+    @Test
+    public void flagsTest() {
+        // TODO: test flags
+    }
+
+    /**
      * Test the property 'parentId'
      */
     @Test
@@ -87,22 +103,6 @@ public class ResourceJsonRecordTest {
     @Test
     public void refreshAtTest() {
         // TODO: test refreshAt
-    }
-
-    /**
-     * Test the property 'visible'
-     */
-    @Test
-    public void visibleTest() {
-        // TODO: test visible
-    }
-
-    /**
-     * Test the property 'flags'
-     */
-    @Test
-    public void flagsTest() {
-        // TODO: test flags
     }
 
 }

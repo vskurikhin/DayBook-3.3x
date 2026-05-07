@@ -17,6 +17,7 @@ import su.svn.api.services.security.SecurityContextPrincipalHelper;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @QuarkusTest
@@ -40,13 +41,13 @@ class JsonRecordRepositoryTest {
         // given
         UUID id = UUID.randomUUID();
         when(principalHelper.authorization()).thenReturn(AUTH);
-        when(client.delete(AUTH, id)).thenReturn(Uni.createFrom().voidItem());
+        when(client.delete(eq(AUTH), anyString(), eq(id))).thenReturn(Uni.createFrom().voidItem());
 
         // when
         repository.delete(id).await().indefinitely();
 
         // then
-        verify(client).delete(AUTH, id);
+        verify(client).delete(eq(AUTH), anyString(), eq(id));
     }
 
     @Test
@@ -56,14 +57,15 @@ class JsonRecordRepositoryTest {
         ResourceJsonRecord response = ResourceJsonRecord.builder().build();
 
         when(principalHelper.authorization()).thenReturn(AUTH);
-        when(client.post(AUTH, request)).thenReturn(Uni.createFrom().item(response));
+        when(client.post(eq(AUTH), anyString(), eq(request))).thenReturn(Uni.createFrom().item(response));
+        org.jboss.logging.MDC.put("REQUEST_ID", UUID.randomUUID().toString());
 
         // when
         ResourceJsonRecord result = repository.post(request).await().indefinitely();
 
         // then
         assertThat(result).isEqualTo(response);
-        verify(client).post(AUTH, request);
+        verify(client).post(eq(AUTH), anyString(), eq(request));
     }
 
     @Test
@@ -73,14 +75,15 @@ class JsonRecordRepositoryTest {
         ResourceJsonRecord response = ResourceJsonRecord.builder().build();
 
         when(principalHelper.authorization()).thenReturn(AUTH);
-        when(client.put(AUTH, request)).thenReturn(Uni.createFrom().item(response));
+        when(client.put(eq(AUTH), anyString(), eq(request))).thenReturn(Uni.createFrom().item(response));
+        org.jboss.logging.MDC.put("REQUEST_ID", UUID.randomUUID().toString());
 
         // when
         ResourceJsonRecord result = repository.put(request).await().indefinitely();
 
         // then
         assertThat(result).isEqualTo(response);
-        verify(client).put(AUTH, request);
+        verify(client).put(eq(AUTH), anyString(), eq(request));
     }
 
     @Test
@@ -88,7 +91,8 @@ class JsonRecordRepositoryTest {
         // given
         UUID id = UUID.randomUUID();
         when(principalHelper.authorization()).thenReturn(AUTH);
-        when(client.delete(AUTH, id)).thenReturn(Uni.createFrom().voidItem());
+        when(client.delete(eq(AUTH), anyString(), eq(id))).thenReturn(Uni.createFrom().voidItem());
+        org.jboss.logging.MDC.put("REQUEST_ID", UUID.randomUUID().toString());
 
         // when
         repository.delete(id).await().indefinitely();

@@ -70,4 +70,12 @@ public class ResourceRecordViewFilterTest {
         // TODO: test toDate
     }
 
+    /**
+     * Test the property 'withDisabled'
+     */
+    @Test
+    public void withDisabledTest() {
+        // TODO: test withDisabled
+    }
+
 }

@@ -15,8 +15,8 @@ package su.svn.lib.core.api;
 
 import su.svn.lib.core.ApiException;
 import su.svn.lib.core.model.ErrorResponse;
-import su.svn.lib.core.model.PageResourceRecordView;
 import su.svn.lib.core.model.Pageable;
+import su.svn.lib.core.model.PagedModelEntityModelResourceRecordView;
 import su.svn.lib.core.model.ResourceRecordViewFilter;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -41,7 +41,7 @@ public class RecordViewControllerApiTest {
     public void getAllRecordsTest() throws ApiException {
         ResourceRecordViewFilter filter = null;
         Pageable pageable = null;
-        PageResourceRecordView response = api.getAllRecords(filter, pageable);
+        PagedModelEntityModelResourceRecordView response = api.getAllRecords(filter, pageable);
         // TODO: test validations
     }
 

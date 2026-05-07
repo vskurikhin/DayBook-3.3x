@@ -56,11 +56,11 @@ public class Example {
             e.printStackTrace();
         }
 
-        RecordViewControllerApi viewControllerApi = new RecordViewControllerApi(defaultClient);
+        RecordViewControllerApi apiInstance = new RecordViewControllerApi(defaultClient);
         ResourceRecordViewFilter filter = new ResourceRecordViewFilter(); // ResourceRecordViewFilter |
         Pageable pageable = new Pageable(); // Pageable |
         try {
-            PageResourceRecordView result = viewControllerApi.getAllRecords(filter, pageable);
+            PagedModelEntityModelResourceRecordView result = apiInstance.getAllRecords(filter, pageable);
             System.out.println(result);
         } catch (ApiException e) {
             System.err.println("Exception when calling RecordViewControllerApi#getAllRecords");

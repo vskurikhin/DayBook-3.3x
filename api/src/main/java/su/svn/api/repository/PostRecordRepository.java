@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecordRepository.java
@@ -56,14 +56,9 @@ public class PostRecordRepository {
     public Uni<Page<PostRecord>> readPage(int pageIndex, byte size) {
         var query = PostRecord.readEnabledOrderByPostAtAndRefreshAtDesc();
         var page = query.page(pageIndex, size);
-        var unis = Uni.combine().all().unis(
-                page.list(),
-                page.pageCount(),
-                page.hasNextPage(),
-                Uni.createFrom().item(page.hasPreviousPage())
-        );
-        return unis.asTuple().map(t4 ->
-                new Page<>(t4.getItem1(), t4.getItem2(), pageIndex, t4.getItem1().size(), t4.getItem3(), t4.getItem4())
+        var unis = Uni.combine().all().unis(page.list(), page.pageCount());
+        return unis.asTuple().map(t2 ->
+                new Page<>(t2.getItem1(), t2.getItem2(), pageIndex, t2.getItem1().size())
         );
     }
 

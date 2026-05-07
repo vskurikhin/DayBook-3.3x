@@ -1,0 +1,563 @@
+openapi: 3.1.0
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+- description: Generated server url
+  url: http://localhost:8081
+paths:
+  /core/api/v2/json-record:
+    post:
+      operationId: createJsonRecord
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewJsonRecord"
+        required: true
+      responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceJsonRecord"
+          description: OK
+      tags:
+      - json-record-controller
+    put:
+      operationId: updateJsonRecord
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateJsonRecord"
+        required: true
+      responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceJsonRecord"
+          description: OK
+      tags:
+      - json-record-controller
+  /core/api/v2/records-view:
+    get:
+      operationId: getAllRecords
+      parameters:
+      - explode: true
+        in: query
+        name: filter
+        required: true
+        schema:
+          $ref: "#/components/schemas/ResourceRecordViewFilter"
+        style: form
+      - explode: true
+        in: query
+        name: pageable
+        required: true
+        schema:
+          $ref: "#/components/schemas/Pageable"
+        style: form
+      responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PagedModelEntityModelResourceRecordView"
+          description: OK
+      tags:
+      - record-view-controller
+  /core/api/v2/json-record/{id}:
+    delete:
+      operationId: deleteJsonRecord
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "200":
+          description: OK
+      tags:
+      - json-record-controller
+    get:
+      operationId: readJsonRecord
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceJsonRecord"
+          description: OK
+      tags:
+      - json-record-controller
+  /core/api/v2/hello:
+    get:
+      operationId: hello
+      responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+          description: OK
+      tags:
+      - hello-controller
+components:
+  schemas:
+    ErrorResponse:
+      example:
+        time: 0
+        error: error
+      properties:
+        error:
+          type: string
+        time:
+          format: int64
+          type: integer
+    UpdateJsonRecord:
+      example:
+        postAt: 2000-01-23T04:56:07.000+00:00
+        visible: true
+        values:
+          key: values
+        refreshAt: 2000-01-23T04:56:07.000+00:00
+        flags: 0
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        id:
+          format: uuid
+          type: string
+        parentId:
+          default: 00000000-0000-0000-0000-000000000000
+          format: uuid
+          type: string
+        title:
+          type: string
+        values:
+          additionalProperties:
+            type: string
+        postAt:
+          format: date-time
+          type: string
+        refreshAt:
+          format: date-time
+          type: string
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+      required:
+      - id
+      - parentId
+      - refreshAt
+    ResourceJsonRecord:
+      example:
+        visible: true
+        postAt: 2000-01-23T04:56:07.000+00:00
+        values:
+          key: values
+        refreshAt: 2000-01-23T04:56:07.000+00:00
+        flags: 6
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        id:
+          format: uuid
+          type: string
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+        parentId:
+          format: uuid
+          type: string
+        title:
+          type: string
+        values:
+          additionalProperties:
+            type: string
+        postAt:
+          format: date-time
+          type: string
+        refreshAt:
+          format: date-time
+          type: string
+    NewJsonRecord:
+      example:
+        visible: true
+        postAt: 2000-01-23T04:56:07.000+00:00
+        values:
+          key: values
+        flags: 0
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+        parentId:
+          default: 00000000-0000-0000-0000-000000000000
+          format: uuid
+          type: string
+        title:
+          type: string
+        values:
+          additionalProperties:
+            type: string
+        postAt:
+          format: date-time
+          type: string
+      required:
+      - parentId
+      - postAt
+    ResourceRecordViewFilter:
+      properties:
+        title:
+          type: string
+        fromTime:
+          format: date-time
+          type: string
+        fromDate:
+          format: date-time
+          type: string
+        toDate:
+          format: date-time
+          type: string
+        withDisabled:
+          type: boolean
+    Pageable:
+      properties:
+        page:
+          format: int32
+          minimum: 0
+          type: integer
+        size:
+          format: int32
+          minimum: 1
+          type: integer
+        sort:
+          items:
+            type: string
+          type: array
+    EntityModelResourceRecordView:
+      example:
+        lastChangedTime: 2000-01-23T04:56:07.000+00:00
+        visible: true
+        postAt: 2000-01-23T04:56:07.000+00:00
+        _links:
+          key:
+            hreflang: hreflang
+            templated: true
+            profile: profile
+            name: name
+            href: href
+            title: title
+            type: type
+            deprecation: deprecation
+        refreshAt: 2000-01-23T04:56:07.000+00:00
+        values:
+          key: values
+        flags: 0
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        userName: userName
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        id:
+          format: uuid
+          type: string
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+        parentId:
+          format: uuid
+          type: string
+        userName:
+          type: string
+        postAt:
+          format: date-time
+          type: string
+        refreshAt:
+          format: date-time
+          type: string
+        lastChangedTime:
+          format: date-time
+          type: string
+        title:
+          type: string
+        values:
+          additionalProperties:
+            type: string
+        _links:
+          additionalProperties:
+            $ref: "#/components/schemas/Link"
+    PageMetadata:
+      example:
+        number: 5
+        size: 6
+        totalPages: 5
+        totalElements: 1
+      properties:
+        size:
+          format: int64
+          type: integer
+        totalElements:
+          format: int64
+          type: integer
+        totalPages:
+          format: int64
+          type: integer
+        number:
+          format: int64
+          type: integer
+    PagedModelEntityModelResourceRecordView:
+      example:
+        _embedded:
+          resourceRecordViewList:
+          - lastChangedTime: 2000-01-23T04:56:07.000+00:00
+            visible: true
+            postAt: 2000-01-23T04:56:07.000+00:00
+            _links:
+              key:
+                hreflang: hreflang
+                templated: true
+                profile: profile
+                name: name
+                href: href
+                title: title
+                type: type
+                deprecation: deprecation
+            refreshAt: 2000-01-23T04:56:07.000+00:00
+            values:
+              key: values
+            flags: 0
+            id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+            userName: userName
+            title: title
+            parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          - lastChangedTime: 2000-01-23T04:56:07.000+00:00
+            visible: true
+            postAt: 2000-01-23T04:56:07.000+00:00
+            _links:
+              key:
+                hreflang: hreflang
+                templated: true
+                profile: profile
+                name: name
+                href: href
+                title: title
+                type: type
+                deprecation: deprecation
+            refreshAt: 2000-01-23T04:56:07.000+00:00
+            values:
+              key: values
+            flags: 0
+            id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+            userName: userName
+            title: title
+            parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        _links:
+          key:
+            hreflang: hreflang
+            templated: true
+            profile: profile
+            name: name
+            href: href
+            title: title
+            type: type
+            deprecation: deprecation
+        page:
+          number: 5
+          size: 6
+          totalPages: 5
+          totalElements: 1
+      properties:
+        _embedded:
+          $ref: "#/components/schemas/PagedModelEntityModelResourceRecordView__embedded"
+        _links:
+          additionalProperties:
+            $ref: "#/components/schemas/Link"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    Link:
+      example:
+        hreflang: hreflang
+        templated: true
+        profile: profile
+        name: name
+        href: href
+        title: title
+        type: type
+        deprecation: deprecation
+      properties:
+        href:
+          type: string
+        hreflang:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        deprecation:
+          type: string
+        profile:
+          type: string
+        name:
+          type: string
+        templated:
+          type: boolean
+    Links:
+      additionalProperties:
+        $ref: "#/components/schemas/Link"
+    PagedModelEntityModelResourceRecordView__embedded:
+      example:
+        resourceRecordViewList:
+        - lastChangedTime: 2000-01-23T04:56:07.000+00:00
+          visible: true
+          postAt: 2000-01-23T04:56:07.000+00:00
+          _links:
+            key:
+              hreflang: hreflang
+              templated: true
+              profile: profile
+              name: name
+              href: href
+              title: title
+              type: type
+              deprecation: deprecation
+          refreshAt: 2000-01-23T04:56:07.000+00:00
+          values:
+            key: values
+          flags: 0
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          userName: userName
+          title: title
+          parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        - lastChangedTime: 2000-01-23T04:56:07.000+00:00
+          visible: true
+          postAt: 2000-01-23T04:56:07.000+00:00
+          _links:
+            key:
+              hreflang: hreflang
+              templated: true
+              profile: profile
+              name: name
+              href: href
+              title: title
+              type: type
+              deprecation: deprecation
+          refreshAt: 2000-01-23T04:56:07.000+00:00
+          values:
+            key: values
+          flags: 0
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          userName: userName
+          title: title
+          parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        resourceRecordViewList:
+          items:
+            $ref: "#/components/schemas/EntityModelResourceRecordView"
+          type: array

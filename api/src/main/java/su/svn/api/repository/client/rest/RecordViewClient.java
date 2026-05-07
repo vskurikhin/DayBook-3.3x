@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.15 20:40 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewClient.java
@@ -14,7 +14,7 @@ import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.QueryParam;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
-import su.svn.api.model.dto.PageRecordView;
+import su.svn.api.model.dto.PagedModelEntityModelResourceRecordView;
 
 import java.time.LocalDateTime;
 
@@ -22,16 +22,18 @@ import java.time.LocalDateTime;
 @RegisterRestClient
 public interface RecordViewClient {
     @GET
-    Uni<PageRecordView> getByPageIndexAndSizeAsUni(
+    Uni<PagedModelEntityModelResourceRecordView> getByPageIndexAndSizeAsUni(
             @HeaderParam("Authorization") String authorization,
+            @HeaderParam("X-Request-ID") String requestId,
             @QueryParam("page") int pageIndex,
             @QueryParam("size") int size,
             @QueryParam("sort") String sort
     );
 
     @GET
-    Uni<PageRecordView> getByPageIndexAndSizeAndFromTimeAsUni(
+    Uni<PagedModelEntityModelResourceRecordView> getByPageIndexAndSizeAndFromTimeAsUni(
             @HeaderParam("Authorization") String authorization,
+            @HeaderParam("X-Request-ID") String requestId,
             @QueryParam("page") int pageIndex,
             @QueryParam("size") int size,
             @QueryParam("sort") String sort,

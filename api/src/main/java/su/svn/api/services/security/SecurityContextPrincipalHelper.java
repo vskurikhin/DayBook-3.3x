@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.20 00:29 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * SecurityContextPrincipalHelper.java
@@ -74,13 +74,13 @@ public class SecurityContextPrincipalHelper {
     private static final Logger LOG = Logger.getLogger(SecurityContextPrincipalHelper.class);
     private static final String GUEST_SUBJECT_UUID = "0f9233b1-7390-515d-9787-175006338642";
 
-    @ConfigProperty(name = "application.external-jwt-api-key-prefix")
+    @ConfigProperty(name = "app.external-jwt-api-key-prefix")
     String apiKeyPrefix;
 
     @ConfigProperty(name = "mp.jwt.verify.issuer")
     String mpJwtVerifyIssuer;
 
-    @ConfigProperty(name = "application.external-jwt-verify-key-hmac")
+    @ConfigProperty(name = "app.external-jwt-verify-key-hmac")
     String secret;
 
     @Inject
@@ -100,17 +100,22 @@ public class SecurityContextPrincipalHelper {
                         .groups(identity.getRoles())
                         .claim(Claims.jti, principal.getTokenID())
                         .signWithSecret(secret);
-                LOG.debugf("extToken1: %s", extToken1); // TODO remove
+                LOG.infof(
+                        "subject=%s, JTI=%s, issuer=%s",
+                        principal.getSubject(), principal.getTokenID(), principal.getIssuer()
+                );
                 return extToken1;
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
+        var jti = UUID.randomUUID();
         var extToken2 = Jwt.issuer(mpJwtVerifyIssuer)
                 .subject(GUEST_SUBJECT_UUID)
                 .upn(CustomIdentityAugmentor.GUEST_UPN)
                 .groups(Set.of(CustomIdentityAugmentor.GUEST))
-                .claim(Claims.jti, UUID.randomUUID())
+                .claim(Claims.jti, jti)
                 .signWithSecret(secret);
-        LOG.debugf("extToken2: %s", extToken2); // TODO remove
+        LOG.infof("subject=%s, JTI=%s, issuer=%s", GUEST_SUBJECT_UUID, jti, mpJwtVerifyIssuer);
         return extToken2;
     }
 }

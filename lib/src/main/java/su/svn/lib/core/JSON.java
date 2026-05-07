@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JSON.java
@@ -104,15 +104,16 @@ public class JSON {
         gsonBuilder.registerTypeAdapter(OffsetDateTime.class, offsetDateTimeTypeAdapter);
         gsonBuilder.registerTypeAdapter(LocalDate.class, localDateTypeAdapter);
         gsonBuilder.registerTypeAdapter(byte[].class, byteArrayAdapter);
+        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.EntityModelResourceRecordView.CustomTypeAdapterFactory());
         gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.ErrorResponse.CustomTypeAdapterFactory());
+        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.Link.CustomTypeAdapterFactory());
         gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.NewJsonRecord.CustomTypeAdapterFactory());
-        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.PageResourceRecordView.CustomTypeAdapterFactory());
+        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.PageMetadata.CustomTypeAdapterFactory());
         gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.Pageable.CustomTypeAdapterFactory());
-        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.PageableObject.CustomTypeAdapterFactory());
+        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.PagedModelEntityModelResourceRecordView.CustomTypeAdapterFactory());
+        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.PagedModelEntityModelResourceRecordViewEmbedded.CustomTypeAdapterFactory());
         gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.ResourceJsonRecord.CustomTypeAdapterFactory());
-        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.ResourceRecordView.CustomTypeAdapterFactory());
         gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.ResourceRecordViewFilter.CustomTypeAdapterFactory());
-        gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.SortObject.CustomTypeAdapterFactory());
         gsonBuilder.registerTypeAdapterFactory(new su.svn.lib.core.model.UpdateJsonRecord.CustomTypeAdapterFactory());
         gson = gsonBuilder.create();
     }

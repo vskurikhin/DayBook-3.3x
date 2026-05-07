@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.20 00:29 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordResource.java
@@ -41,9 +41,8 @@ public class RecordResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Page<RecordData>> page(@QueryParam("page") int page, @QueryParam("size") byte size) {
         return recordDataService.readPage(page, size)
-                .log("TUT")
                 .map(postRecordPage -> {
-                    LOG.infof("postRecordPage: %s", postRecordPage);
+                    LOG.debugf("postRecordPage: %s", postRecordPage);
                     return pageRecordDataMapper.toPage(postRecordPage);
                 });
     }
