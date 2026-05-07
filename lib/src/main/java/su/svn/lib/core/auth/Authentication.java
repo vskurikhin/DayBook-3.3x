@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * Authentication.java
@@ -28,7 +28,7 @@ import java.net.URI;
 import java.util.Map;
 import java.util.List;
 
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-04-04T15:39:52.250208+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-06T19:35:13.196232+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public interface Authentication {
     /**
      * Apply authentication settings to header and query params.

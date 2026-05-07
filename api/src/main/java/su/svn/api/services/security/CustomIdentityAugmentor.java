@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.20 00:29 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * CustomIdentityAugmentor.java
@@ -15,7 +15,6 @@ import io.quarkus.security.runtime.QuarkusSecurityIdentity;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.logging.Logger;
 import su.svn.api.repository.client.rest.AuthRolesClient;

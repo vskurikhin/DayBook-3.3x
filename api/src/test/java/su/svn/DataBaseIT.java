@@ -14,8 +14,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import su.svn.api.domain.entities.PostRecord;
-import su.svn.api.model.dto.PageRecordView;
-import su.svn.api.model.dto.RecordView;
+import su.svn.api.model.dto.*;
 import su.svn.api.profile.ContainersProfile;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.client.rest.RecordViewClient;
@@ -30,8 +29,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
 @QuarkusTest
@@ -93,8 +91,6 @@ public class DataBaseIT {
                     assertEquals(expectedPageIndex, postRecords.pageIndex());
                     assertEquals(expectedPageSize, postRecords.pageSize());
                     assertEquals(expectedPageSize, postRecords.list().size());
-                    assertTrue(postRecords.hasNextPage());
-                    assertFalse(postRecords.hasPreviousPage());
                 }
         );
         var expectedPageIndex2 = expectedPageCount - 1;
@@ -104,8 +100,6 @@ public class DataBaseIT {
                 postRecords -> {
                     assertEquals(expectedPageCount, postRecords.pageCount());
                     assertEquals(expectedPageIndex2, postRecords.pageIndex());
-                    assertFalse(postRecords.hasNextPage());
-                    assertTrue(postRecords.hasPreviousPage());
                 }
         );
         var ids = new ArrayList<>(List.of(ZERO_UUID));
@@ -155,42 +149,41 @@ public class DataBaseIT {
 
     @BeforeEach
     void beforeEach() throws InterruptedException {
-        OffsetDateTime odt = OffsetDateTime.now(ZoneId.systemDefault());
-        ZoneOffset zoneOffset = odt.getOffset();
-
-        var list = new ArrayList<RecordView>();
+        var list = new ArrayList<EntityModelResourceRecordView>();
         var zeroUUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
-        list.add(RecordView.builder()
+        list.add(EntityModelResourceRecordView.builder()
                 .id(zeroUUID)
                 .parentId(zeroUUID)
-                .postAt(OffsetDateTime.of(LocalDateTime.now(), zoneOffset))
+                .postAt(OffsetDateTime.now())
                 .lastChangedTime(LocalDateTime.now())
                 .flags(0)
                 .build());
         for (int i = ITERATION; i < 2 * ITERATION; i++) {
             var id = new UUID(0, i);
-            list.add(RecordView.builder()
+            list.add(EntityModelResourceRecordView.builder()
                     .id(id)
                     .parentId(id)
-                    .postAt(OffsetDateTime.of(LocalDateTime.now(), zoneOffset))
+                    .postAt(OffsetDateTime.now())
                     .lastChangedTime(LocalDateTime.now())
                     .flags(0)
                     .build()
             );
         }
-        when(mockRecordViewClient.getByPageIndexAndSizeAndFromTimeAsUni(any(), anyInt(), anyInt(), any(), any(), any()))
-                .thenReturn(Uni.createFrom().item(
-                                PageRecordView.builder()
-                                        .content(list)
-                                        .last(true)
-                                        .totalPages(1)
-                                        .totalElements(1)
-                                        .first(true)
-                                        .number(0)
-                                        .numberOfElements(list.size())
-                                        .build()
-                        )
-                );
+        var pagedModelEntityModelResourceRecordViewStub = PagedModelEntityModelResourceRecordView.builder()
+                .page(PageMetadata.builder()
+                        .number(0L)
+                        .size((long) list.size())
+                        .totalElements((long) list.size())
+                        .totalPages(1L)
+                        .build()
+                )
+                .embedded(PagedModelEntityModelResourceRecordViewEmbedded.builder()
+                        .resourceRecordViewList(list)
+                        .build()
+                )
+                .build();
+        when(mockRecordViewClient.getByPageIndexAndSizeAndFromTimeAsUni(any(), any(), anyInt(), anyInt(), any(), any(), any()))
+                .thenReturn(Uni.createFrom().item(pagedModelEntityModelResourceRecordViewStub));
     }
 
     @Test

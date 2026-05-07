@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * NewJsonRecord.java
@@ -60,7 +60,7 @@ import su.svn.lib.core.JSON;
 /**
  * NewJsonRecord
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-04-04T15:39:52.250208+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-06T19:35:13.196232+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class NewJsonRecord {
   public static final String SERIALIZED_NAME_VISIBLE = "visible";
   @SerializedName(SERIALIZED_NAME_VISIBLE)
@@ -74,8 +74,8 @@ public class NewJsonRecord {
 
   public static final String SERIALIZED_NAME_PARENT_ID = "parentId";
   @SerializedName(SERIALIZED_NAME_PARENT_ID)
-  @javax.annotation.Nullable
-  private UUID parentId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+  @javax.annotation.Nonnull
+  private UUID parentId = new UUID(0, 0);
 
   public static final String SERIALIZED_NAME_TITLE = "title";
   @SerializedName(SERIALIZED_NAME_TITLE)
@@ -89,7 +89,7 @@ public class NewJsonRecord {
 
   public static final String SERIALIZED_NAME_POST_AT = "postAt";
   @SerializedName(SERIALIZED_NAME_POST_AT)
-  @javax.annotation.Nullable
+  @javax.annotation.Nonnull
   private OffsetDateTime postAt;
 
   public NewJsonRecord() {
@@ -133,7 +133,7 @@ public class NewJsonRecord {
   }
 
 
-  public NewJsonRecord parentId(@javax.annotation.Nullable UUID parentId) {
+  public NewJsonRecord parentId(@javax.annotation.Nonnull UUID parentId) {
     this.parentId = parentId;
     return this;
   }
@@ -142,12 +142,12 @@ public class NewJsonRecord {
    * Get parentId
    * @return parentId
    */
-  @javax.annotation.Nullable
+  @javax.annotation.Nonnull
   public UUID getParentId() {
     return parentId;
   }
 
-  public void setParentId(@javax.annotation.Nullable UUID parentId) {
+  public void setParentId(@javax.annotation.Nonnull UUID parentId) {
     this.parentId = parentId;
   }
 
@@ -198,7 +198,7 @@ public class NewJsonRecord {
   }
 
 
-  public NewJsonRecord postAt(@javax.annotation.Nullable OffsetDateTime postAt) {
+  public NewJsonRecord postAt(@javax.annotation.Nonnull OffsetDateTime postAt) {
     this.postAt = postAt;
     return this;
   }
@@ -207,12 +207,12 @@ public class NewJsonRecord {
    * Get postAt
    * @return postAt
    */
-  @javax.annotation.Nullable
+  @javax.annotation.Nonnull
   public OffsetDateTime getPostAt() {
     return postAt;
   }
 
-  public void setPostAt(@javax.annotation.Nullable OffsetDateTime postAt) {
+  public void setPostAt(@javax.annotation.Nonnull OffsetDateTime postAt) {
     this.postAt = postAt;
   }
 
@@ -271,7 +271,7 @@ public class NewJsonRecord {
     openapiFields = new HashSet<String>(Arrays.asList("visible", "flags", "parentId", "title", "values", "postAt"));
 
     // a set of required properties/fields (JSON key names)
-    openapiRequiredFields = new HashSet<String>(0);
+    openapiRequiredFields = new HashSet<String>(Arrays.asList("parentId", "postAt"));
   }
 
   /**
@@ -294,8 +294,15 @@ public class NewJsonRecord {
           throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "The field `%s` in the JSON string is not defined in the `NewJsonRecord` properties. JSON: %s", entry.getKey(), jsonElement.toString()));
         }
       }
+
+      // check to make sure all required properties/fields are present in the JSON string
+      for (String requiredField : NewJsonRecord.openapiRequiredFields) {
+        if (jsonElement.getAsJsonObject().get(requiredField) == null) {
+          throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "The required field `%s` is not found in the JSON string: %s", requiredField, jsonElement.toString()));
+        }
+      }
         JsonObject jsonObj = jsonElement.getAsJsonObject();
-      if ((jsonObj.get("parentId") != null && !jsonObj.get("parentId").isJsonNull()) && !jsonObj.get("parentId").isJsonPrimitive()) {
+      if (!jsonObj.get("parentId").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `parentId` to be a primitive type in the JSON string but got `%s`", jsonObj.get("parentId").toString()));
       }
       if ((jsonObj.get("title") != null && !jsonObj.get("title").isJsonNull()) && !jsonObj.get("title").isJsonPrimitive()) {

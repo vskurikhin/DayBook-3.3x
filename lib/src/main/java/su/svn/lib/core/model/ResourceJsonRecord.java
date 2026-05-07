@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceJsonRecord.java
@@ -60,12 +60,22 @@ import su.svn.lib.core.JSON;
 /**
  * ResourceJsonRecord
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-04-04T15:39:52.250208+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-06T19:35:13.196232+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class ResourceJsonRecord {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
   @javax.annotation.Nullable
   private UUID id;
+
+  public static final String SERIALIZED_NAME_VISIBLE = "visible";
+  @SerializedName(SERIALIZED_NAME_VISIBLE)
+  @javax.annotation.Nullable
+  private Boolean visible;
+
+  public static final String SERIALIZED_NAME_FLAGS = "flags";
+  @SerializedName(SERIALIZED_NAME_FLAGS)
+  @javax.annotation.Nullable
+  private Integer flags;
 
   public static final String SERIALIZED_NAME_PARENT_ID = "parentId";
   @SerializedName(SERIALIZED_NAME_PARENT_ID)
@@ -92,16 +102,6 @@ public class ResourceJsonRecord {
   @javax.annotation.Nullable
   private OffsetDateTime refreshAt;
 
-  public static final String SERIALIZED_NAME_VISIBLE = "visible";
-  @SerializedName(SERIALIZED_NAME_VISIBLE)
-  @javax.annotation.Nullable
-  private Boolean visible;
-
-  public static final String SERIALIZED_NAME_FLAGS = "flags";
-  @SerializedName(SERIALIZED_NAME_FLAGS)
-  @javax.annotation.Nullable
-  private Integer flags;
-
   public ResourceJsonRecord() {
   }
 
@@ -121,6 +121,44 @@ public class ResourceJsonRecord {
 
   public void setId(@javax.annotation.Nullable UUID id) {
     this.id = id;
+  }
+
+
+  public ResourceJsonRecord visible(@javax.annotation.Nullable Boolean visible) {
+    this.visible = visible;
+    return this;
+  }
+
+  /**
+   * Get visible
+   * @return visible
+   */
+  @javax.annotation.Nullable
+  public Boolean getVisible() {
+    return visible;
+  }
+
+  public void setVisible(@javax.annotation.Nullable Boolean visible) {
+    this.visible = visible;
+  }
+
+
+  public ResourceJsonRecord flags(@javax.annotation.Nullable Integer flags) {
+    this.flags = flags;
+    return this;
+  }
+
+  /**
+   * Get flags
+   * @return flags
+   */
+  @javax.annotation.Nullable
+  public Integer getFlags() {
+    return flags;
+  }
+
+  public void setFlags(@javax.annotation.Nullable Integer flags) {
+    this.flags = flags;
   }
 
 
@@ -227,44 +265,6 @@ public class ResourceJsonRecord {
   }
 
 
-  public ResourceJsonRecord visible(@javax.annotation.Nullable Boolean visible) {
-    this.visible = visible;
-    return this;
-  }
-
-  /**
-   * Get visible
-   * @return visible
-   */
-  @javax.annotation.Nullable
-  public Boolean getVisible() {
-    return visible;
-  }
-
-  public void setVisible(@javax.annotation.Nullable Boolean visible) {
-    this.visible = visible;
-  }
-
-
-  public ResourceJsonRecord flags(@javax.annotation.Nullable Integer flags) {
-    this.flags = flags;
-    return this;
-  }
-
-  /**
-   * Get flags
-   * @return flags
-   */
-  @javax.annotation.Nullable
-  public Integer getFlags() {
-    return flags;
-  }
-
-  public void setFlags(@javax.annotation.Nullable Integer flags) {
-    this.flags = flags;
-  }
-
-
 
   @Override
   public boolean equals(Object o) {
@@ -276,18 +276,18 @@ public class ResourceJsonRecord {
     }
     ResourceJsonRecord resourceJsonRecord = (ResourceJsonRecord) o;
     return Objects.equals(this.id, resourceJsonRecord.id) &&
+        Objects.equals(this.visible, resourceJsonRecord.visible) &&
+        Objects.equals(this.flags, resourceJsonRecord.flags) &&
         Objects.equals(this.parentId, resourceJsonRecord.parentId) &&
         Objects.equals(this.title, resourceJsonRecord.title) &&
         Objects.equals(this.values, resourceJsonRecord.values) &&
         Objects.equals(this.postAt, resourceJsonRecord.postAt) &&
-        Objects.equals(this.refreshAt, resourceJsonRecord.refreshAt) &&
-        Objects.equals(this.visible, resourceJsonRecord.visible) &&
-        Objects.equals(this.flags, resourceJsonRecord.flags);
+        Objects.equals(this.refreshAt, resourceJsonRecord.refreshAt);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, parentId, title, values, postAt, refreshAt, visible, flags);
+    return Objects.hash(id, visible, flags, parentId, title, values, postAt, refreshAt);
   }
 
   @Override
@@ -295,13 +295,13 @@ public class ResourceJsonRecord {
     StringBuilder sb = new StringBuilder();
     sb.append("class ResourceJsonRecord {\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
+    sb.append("    visible: ").append(toIndentedString(visible)).append("\n");
+    sb.append("    flags: ").append(toIndentedString(flags)).append("\n");
     sb.append("    parentId: ").append(toIndentedString(parentId)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("    values: ").append(toIndentedString(values)).append("\n");
     sb.append("    postAt: ").append(toIndentedString(postAt)).append("\n");
     sb.append("    refreshAt: ").append(toIndentedString(refreshAt)).append("\n");
-    sb.append("    visible: ").append(toIndentedString(visible)).append("\n");
-    sb.append("    flags: ").append(toIndentedString(flags)).append("\n");
     sb.append("}");
     return sb.toString();
   }
@@ -320,7 +320,7 @@ public class ResourceJsonRecord {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("id", "parentId", "title", "values", "postAt", "refreshAt", "visible", "flags"));
+    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "title", "values", "postAt", "refreshAt"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);

@@ -12,8 +12,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -60,6 +64,9 @@ class RecordViewControllerTest {
     RecordViewService recordViewService;
 
     @Autowired
+    PagedResourcesAssembler<ResourceRecordView> assembler;
+
+    @Autowired
     JwtService jwtService;
 
     @Autowired
@@ -78,6 +85,7 @@ class RecordViewControllerTest {
     // -----------------------------
     @Test
     void shouldReturnRecordById() throws Exception {
+
         UUID id = UUID.randomUUID();
 
         ResourceRecordView response = ResourceRecordView.builder()
@@ -88,23 +96,35 @@ class RecordViewControllerTest {
                 .visible(true)
                 .flags(1)
                 .build();
-        Page<ResourceRecordView> page = getResourceRecordViews(response);
 
-        when(recordViewService.getFilteredRecords(any(), any())).thenReturn(page);
+        Page<ResourceRecordView> page =
+                new PageImpl<>(List.of(response));
+
+        PagedModel<EntityModel<ResourceRecordView>> pagedModel =
+                PagedModel.of(
+                        List.of(EntityModel.of(response)),
+                        new PagedModel.PageMetadata(1, 0, 1)
+                );
+
+        when(recordViewService.getFilteredRecords(any(), any()))
+                .thenReturn(page);
 
         mockMvc.perform(get("/core/api/v2/records-view"))
                 .andExpect(status().isOk())
-                .andDo(new ResultHandler() {
-                    @Override
-                    public void handle(MvcResult result) throws Exception {
-                        System.out.println("result = " + result.getResponse().getContentAsString());
-                    }
-                })
-                .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.content[0].id").value(id.toString()))
-                .andExpect(jsonPath("$.content[0].title").value("test"));
 
-        verify(recordViewService).getFilteredRecords(any(), any());
+                .andDo(result ->
+                        System.out.println(result.getResponse().getContentAsString()))
+
+                .andExpect(jsonPath(
+                        "$._embedded.resourceRecordViewList[0].id")
+                        .value(id.toString()))
+
+                .andExpect(jsonPath(
+                        "$._embedded.resourceRecordViewList[0].title")
+                        .value("test"));
+
+        verify(recordViewService)
+                .getFilteredRecords(any(), any());
     }
 
     private static @NotNull Page<ResourceRecordView> getResourceRecordViews(ResourceRecordView response) {

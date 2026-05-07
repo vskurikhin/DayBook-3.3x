@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.20 00:29 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordRepository.java
@@ -12,13 +12,18 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.jboss.logging.Logger;
+import org.jboss.logging.MDC;
 import su.svn.api.model.dto.NewJsonRecord;
 import su.svn.api.model.dto.ResourceJsonRecord;
 import su.svn.api.model.dto.UpdateJsonRecord;
 import su.svn.api.repository.client.rest.JsonRecordClient;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 
+import java.util.Objects;
 import java.util.UUID;
+
+import static su.svn.lib.Constants.REQUEST_ID;
 
 /**
  * Repository layer responsible for interacting with the remote JSON Record service.
@@ -41,6 +46,10 @@ import java.util.UUID;
  */
 @ApplicationScoped
 public class JsonRecordRepository {
+
+    private static final Logger LOG = Logger.getLogger(JsonRecordRepository.class);
+    public static final String NONE = "NONE";
+
     @Inject
     @RestClient
     JsonRecordClient jsonRecordClient;
@@ -50,16 +59,19 @@ public class JsonRecordRepository {
 
     public Uni<Void> delete(UUID id) {
         var authorization = principalHelper.authorization();
-        return jsonRecordClient.delete(authorization, id);
+        var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
+        return jsonRecordClient.delete(authorization, requestId, id);
     }
 
     public Uni<ResourceJsonRecord> post(NewJsonRecord newJsonRecord) {
         var authorization = principalHelper.authorization();
-        return jsonRecordClient.post(authorization, newJsonRecord);
+        var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
+        return jsonRecordClient.post(authorization, requestId, newJsonRecord);
     }
 
     public Uni<ResourceJsonRecord> put(UpdateJsonRecord updateJsonRecord) {
         var authorization = principalHelper.authorization();
-        return jsonRecordClient.put(authorization, updateJsonRecord);
+        var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
+        return jsonRecordClient.put(authorization, requestId, updateJsonRecord);
     }
 }

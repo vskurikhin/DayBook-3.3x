@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceRecordViewFilter.java
@@ -57,7 +57,7 @@ import su.svn.lib.core.JSON;
 /**
  * ResourceRecordViewFilter
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-04-04T15:39:52.250208+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-06T19:35:13.196232+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class ResourceRecordViewFilter {
   public static final String SERIALIZED_NAME_TITLE = "title";
   @SerializedName(SERIALIZED_NAME_TITLE)
@@ -78,6 +78,11 @@ public class ResourceRecordViewFilter {
   @SerializedName(SERIALIZED_NAME_TO_DATE)
   @javax.annotation.Nullable
   private OffsetDateTime toDate;
+
+  public static final String SERIALIZED_NAME_WITH_DISABLED = "withDisabled";
+  @SerializedName(SERIALIZED_NAME_WITH_DISABLED)
+  @javax.annotation.Nullable
+  private Boolean withDisabled;
 
   public ResourceRecordViewFilter() {
   }
@@ -158,6 +163,25 @@ public class ResourceRecordViewFilter {
   }
 
 
+  public ResourceRecordViewFilter withDisabled(@javax.annotation.Nullable Boolean withDisabled) {
+    this.withDisabled = withDisabled;
+    return this;
+  }
+
+  /**
+   * Get withDisabled
+   * @return withDisabled
+   */
+  @javax.annotation.Nullable
+  public Boolean getWithDisabled() {
+    return withDisabled;
+  }
+
+  public void setWithDisabled(@javax.annotation.Nullable Boolean withDisabled) {
+    this.withDisabled = withDisabled;
+  }
+
+
 
   @Override
   public boolean equals(Object o) {
@@ -171,12 +195,13 @@ public class ResourceRecordViewFilter {
     return Objects.equals(this.title, resourceRecordViewFilter.title) &&
         Objects.equals(this.fromTime, resourceRecordViewFilter.fromTime) &&
         Objects.equals(this.fromDate, resourceRecordViewFilter.fromDate) &&
-        Objects.equals(this.toDate, resourceRecordViewFilter.toDate);
+        Objects.equals(this.toDate, resourceRecordViewFilter.toDate) &&
+        Objects.equals(this.withDisabled, resourceRecordViewFilter.withDisabled);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(title, fromTime, fromDate, toDate);
+    return Objects.hash(title, fromTime, fromDate, toDate, withDisabled);
   }
 
   @Override
@@ -187,6 +212,7 @@ public class ResourceRecordViewFilter {
     sb.append("    fromTime: ").append(toIndentedString(fromTime)).append("\n");
     sb.append("    fromDate: ").append(toIndentedString(fromDate)).append("\n");
     sb.append("    toDate: ").append(toIndentedString(toDate)).append("\n");
+    sb.append("    withDisabled: ").append(toIndentedString(withDisabled)).append("\n");
     sb.append("}");
     return sb.toString();
   }
@@ -205,7 +231,7 @@ public class ResourceRecordViewFilter {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("title", "fromTime", "fromDate", "toDate"));
+    openapiFields = new HashSet<String>(Arrays.asList("title", "fromTime", "fromDate", "toDate", "withDisabled"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);

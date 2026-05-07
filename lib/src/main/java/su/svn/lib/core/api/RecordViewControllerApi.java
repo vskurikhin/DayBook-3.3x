@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewControllerApi.java
@@ -36,8 +36,8 @@ import java.io.IOException;
 
 
 import su.svn.lib.core.model.ErrorResponse;
-import su.svn.lib.core.model.PageResourceRecordView;
 import su.svn.lib.core.model.Pageable;
+import su.svn.lib.core.model.PagedModelEntityModelResourceRecordView;
 import su.svn.lib.core.model.ResourceRecordViewFilter;
 
 import java.lang.reflect.Type;
@@ -94,8 +94,8 @@ public class RecordViewControllerApi {
      <table border="1">
        <caption>Response Details</caption>
         <tr><td> Status Code </td><td> Description </td><td> Response Headers </td></tr>
-        <tr><td> 500 </td><td> Internal Server Error </td><td>  -  </td></tr>
         <tr><td> 400 </td><td> Bad Request </td><td>  -  </td></tr>
+        <tr><td> 500 </td><td> Internal Server Error </td><td>  -  </td></tr>
         <tr><td> 200 </td><td> OK </td><td>  -  </td></tr>
      </table>
      */
@@ -116,7 +116,7 @@ public class RecordViewControllerApi {
         Object localVarPostBody = null;
 
         // create path and map variables
-        String localVarPath = "/core/api/v2/json-records";
+        String localVarPath = "/core/api/v2/records-view";
 
         List<Pair> localVarQueryParams = new ArrayList<Pair>();
         List<Pair> localVarCollectionQueryParams = new ArrayList<Pair>();
@@ -172,19 +172,19 @@ public class RecordViewControllerApi {
      * 
      * @param filter  (required)
      * @param pageable  (required)
-     * @return PageResourceRecordView
+     * @return PagedModelEntityModelResourceRecordView
      * @throws ApiException If fail to call the API, e.g. server error or cannot deserialize the response body
      * @http.response.details
      <table border="1">
        <caption>Response Details</caption>
         <tr><td> Status Code </td><td> Description </td><td> Response Headers </td></tr>
-        <tr><td> 500 </td><td> Internal Server Error </td><td>  -  </td></tr>
         <tr><td> 400 </td><td> Bad Request </td><td>  -  </td></tr>
+        <tr><td> 500 </td><td> Internal Server Error </td><td>  -  </td></tr>
         <tr><td> 200 </td><td> OK </td><td>  -  </td></tr>
      </table>
      */
-    public PageResourceRecordView getAllRecords(@javax.annotation.Nonnull ResourceRecordViewFilter filter, @javax.annotation.Nonnull Pageable pageable) throws ApiException {
-        ApiResponse<PageResourceRecordView> localVarResp = getAllRecordsWithHttpInfo(filter, pageable);
+    public PagedModelEntityModelResourceRecordView getAllRecords(@javax.annotation.Nonnull ResourceRecordViewFilter filter, @javax.annotation.Nonnull Pageable pageable) throws ApiException {
+        ApiResponse<PagedModelEntityModelResourceRecordView> localVarResp = getAllRecordsWithHttpInfo(filter, pageable);
         return localVarResp.getData();
     }
 
@@ -193,20 +193,20 @@ public class RecordViewControllerApi {
      * 
      * @param filter  (required)
      * @param pageable  (required)
-     * @return ApiResponse&lt;PageResourceRecordView&gt;
+     * @return ApiResponse&lt;PagedModelEntityModelResourceRecordView&gt;
      * @throws ApiException If fail to call the API, e.g. server error or cannot deserialize the response body
      * @http.response.details
      <table border="1">
        <caption>Response Details</caption>
         <tr><td> Status Code </td><td> Description </td><td> Response Headers </td></tr>
-        <tr><td> 500 </td><td> Internal Server Error </td><td>  -  </td></tr>
         <tr><td> 400 </td><td> Bad Request </td><td>  -  </td></tr>
+        <tr><td> 500 </td><td> Internal Server Error </td><td>  -  </td></tr>
         <tr><td> 200 </td><td> OK </td><td>  -  </td></tr>
      </table>
      */
-    public ApiResponse<PageResourceRecordView> getAllRecordsWithHttpInfo(@javax.annotation.Nonnull ResourceRecordViewFilter filter, @javax.annotation.Nonnull Pageable pageable) throws ApiException {
+    public ApiResponse<PagedModelEntityModelResourceRecordView> getAllRecordsWithHttpInfo(@javax.annotation.Nonnull ResourceRecordViewFilter filter, @javax.annotation.Nonnull Pageable pageable) throws ApiException {
         okhttp3.Call localVarCall = getAllRecordsValidateBeforeCall(filter, pageable, null);
-        Type localVarReturnType = new TypeToken<PageResourceRecordView>(){}.getType();
+        Type localVarReturnType = new TypeToken<PagedModelEntityModelResourceRecordView>(){}.getType();
         return localVarApiClient.execute(localVarCall, localVarReturnType);
     }
 
@@ -222,15 +222,15 @@ public class RecordViewControllerApi {
      <table border="1">
        <caption>Response Details</caption>
         <tr><td> Status Code </td><td> Description </td><td> Response Headers </td></tr>
-        <tr><td> 500 </td><td> Internal Server Error </td><td>  -  </td></tr>
         <tr><td> 400 </td><td> Bad Request </td><td>  -  </td></tr>
+        <tr><td> 500 </td><td> Internal Server Error </td><td>  -  </td></tr>
         <tr><td> 200 </td><td> OK </td><td>  -  </td></tr>
      </table>
      */
-    public okhttp3.Call getAllRecordsAsync(@javax.annotation.Nonnull ResourceRecordViewFilter filter, @javax.annotation.Nonnull Pageable pageable, final ApiCallback<PageResourceRecordView> _callback) throws ApiException {
+    public okhttp3.Call getAllRecordsAsync(@javax.annotation.Nonnull ResourceRecordViewFilter filter, @javax.annotation.Nonnull Pageable pageable, final ApiCallback<PagedModelEntityModelResourceRecordView> _callback) throws ApiException {
 
         okhttp3.Call localVarCall = getAllRecordsValidateBeforeCall(filter, pageable, _callback);
-        Type localVarReturnType = new TypeToken<PageResourceRecordView>(){}.getType();
+        Type localVarReturnType = new TypeToken<PagedModelEntityModelResourceRecordView>(){}.getType();
         localVarApiClient.executeAsync(localVarCall, localVarReturnType, _callback);
         return localVarCall;
     }

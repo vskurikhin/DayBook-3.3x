@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 13:04 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * Page.java
@@ -18,11 +18,9 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record Page<T>(
         @JsonProperty List<T> list,
-        @JsonProperty int pageCount,
-        @JsonProperty int pageIndex,
-        @JsonProperty int pageSize,
-        @JsonProperty boolean hasNextPage,
-        @JsonProperty boolean hasPreviousPage) implements Serializable {
+        @JsonProperty long pageCount,
+        @JsonProperty long pageIndex,
+        @JsonProperty long pageSize) implements Serializable {
     @Builder
     public Page {
     }

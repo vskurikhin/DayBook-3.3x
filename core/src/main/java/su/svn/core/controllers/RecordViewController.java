@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewController.java
@@ -14,6 +14,9 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -74,6 +77,8 @@ public class RecordViewController {
      */
     RecordViewService recordViewService;
 
+    PagedResourcesAssembler<ResourceRecordView> assembler;
+
     /**
      * Retrieves a paginated list of record views based on the provided filter and pagination parameters.
      *
@@ -83,9 +88,10 @@ public class RecordViewController {
      *         and HTTP status {@code 200 OK}
      */
     @GetMapping
-    public ResponseEntity<Page<ResourceRecordView>> getAllRecords(
+    public ResponseEntity<PagedModel<EntityModel<ResourceRecordView>>> getAllRecords(
             @ModelAttribute ResourceRecordViewFilter filter, Pageable pageable) {
-        Page<ResourceRecordView> records = recordViewService.getFilteredRecords(filter, pageable);
-        return ResponseEntity.ok(records);
+        var records = recordViewService.getFilteredRecords(filter, pageable);
+        var model = assembler.toModel(records);
+        return ResponseEntity.ok(model);
     }
 }

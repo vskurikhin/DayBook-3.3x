@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecordMapper.java
@@ -13,12 +13,27 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.ValueMapping;
 import su.svn.api.domain.entities.PostRecord;
+import su.svn.api.model.dto.EntityModelResourceRecordView;
 import su.svn.api.model.dto.RecordView;
 import su.svn.api.model.dto.ResourceJsonRecord;
 import su.svn.api.model.dto.UpdateJsonRecord;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+
 @Mapper(componentModel = "cdi")
 public interface PostRecordMapper {
+    @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
+    @Mapping(target = "parent", ignore = true)
+    @Mapping(target = "sequenceId", ignore = true)
+    @Mapping(target = "type", ignore = true)
+    @Mapping(target = "userName", constant = "root")
+    @Mapping(target = "createTime", ignore = true)
+    @Mapping(target = "updateTime", ignore = true)
+    @Mapping(target = "enabled", ignore = true)
+    @Mapping(target = "localChange", ignore = true)
+    PostRecord toEntity(EntityModelResourceRecordView recordView);
+
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     @Mapping(target = "parent", ignore = true)
     @Mapping(target = "sequenceId", ignore = true)
@@ -44,4 +59,8 @@ public interface PostRecordMapper {
 
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     ResourceJsonRecord toResource(PostRecord postRecord);
+
+    default LocalDateTime map(OffsetDateTime value) {
+        return value != null ? value.toLocalDateTime() : null;
+    }
 }
