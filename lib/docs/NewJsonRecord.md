@@ -11,8 +11,9 @@
 |**flags** | **Integer** |  |  [optional] |
 |**parentId** | **UUID** |  |  |
 |**title** | **String** |  |  [optional] |
-|**values** | **Map&lt;String, String&gt;** |  |  [optional] |
+|**json** | **Map&lt;String, String&gt;** |  |  [optional] |
 |**postAt** | **OffsetDateTime** |  |  |
+|**tags** | **Set&lt;String&gt;** |  |  [optional] |
 
 
 

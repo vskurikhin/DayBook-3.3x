@@ -26,8 +26,9 @@ type NewJsonRecord struct {
 	Flags *int32 `json:"flags,omitempty"`
 	ParentId string `json:"parentId"`
 	Title *string `json:"title,omitempty"`
-	Values map[string]string `json:"values,omitempty"`
+	Json map[string]string `json:"json,omitempty"`
 	PostAt time.Time `json:"postAt"`
+	Tags []string `json:"tags,omitempty"`
 }
 
 type _NewJsonRecord NewJsonRecord
@@ -173,36 +174,36 @@ func (o *NewJsonRecord) SetTitle(v string) {
 	o.Title = &v
 }
 
-// GetValues returns the Values field value if set, zero value otherwise.
-func (o *NewJsonRecord) GetValues() map[string]string {
-	if o == nil || IsNil(o.Values) {
+// GetJson returns the Json field value if set, zero value otherwise.
+func (o *NewJsonRecord) GetJson() map[string]string {
+	if o == nil || IsNil(o.Json) {
 		var ret map[string]string
 		return ret
 	}
-	return o.Values
+	return o.Json
 }
 
-// GetValuesOk returns a tuple with the Values field value if set, nil otherwise
+// GetJsonOk returns a tuple with the Json field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *NewJsonRecord) GetValuesOk() (map[string]string, bool) {
-	if o == nil || IsNil(o.Values) {
+func (o *NewJsonRecord) GetJsonOk() (map[string]string, bool) {
+	if o == nil || IsNil(o.Json) {
 		return map[string]string{}, false
 	}
-	return o.Values, true
+	return o.Json, true
 }
 
-// HasValues returns a boolean if a field has been set.
-func (o *NewJsonRecord) HasValues() bool {
-	if o != nil && !IsNil(o.Values) {
+// HasJson returns a boolean if a field has been set.
+func (o *NewJsonRecord) HasJson() bool {
+	if o != nil && !IsNil(o.Json) {
 		return true
 	}
 
 	return false
 }
 
-// SetValues gets a reference to the given map[string]string and assigns it to the Values field.
-func (o *NewJsonRecord) SetValues(v map[string]string) {
-	o.Values = v
+// SetJson gets a reference to the given map[string]string and assigns it to the Json field.
+func (o *NewJsonRecord) SetJson(v map[string]string) {
+	o.Json = v
 }
 
 // GetPostAt returns the PostAt field value
@@ -229,6 +230,38 @@ func (o *NewJsonRecord) SetPostAt(v time.Time) {
 	o.PostAt = v
 }
 
+// GetTags returns the Tags field value if set, zero value otherwise.
+func (o *NewJsonRecord) GetTags() []string {
+	if o == nil || IsNil(o.Tags) {
+		var ret []string
+		return ret
+	}
+	return o.Tags
+}
+
+// GetTagsOk returns a tuple with the Tags field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *NewJsonRecord) GetTagsOk() ([]string, bool) {
+	if o == nil || IsNil(o.Tags) {
+		return nil, false
+	}
+	return o.Tags, true
+}
+
+// HasTags returns a boolean if a field has been set.
+func (o *NewJsonRecord) HasTags() bool {
+	if o != nil && !IsNil(o.Tags) {
+		return true
+	}
+
+	return false
+}
+
+// SetTags gets a reference to the given []string and assigns it to the Tags field.
+func (o *NewJsonRecord) SetTags(v []string) {
+	o.Tags = v
+}
+
 func (o NewJsonRecord) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -249,10 +282,13 @@ func (o NewJsonRecord) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Title) {
 		toSerialize["title"] = o.Title
 	}
-	if !IsNil(o.Values) {
-		toSerialize["values"] = o.Values
+	if !IsNil(o.Json) {
+		toSerialize["json"] = o.Json
 	}
 	toSerialize["postAt"] = o.PostAt
+	if !IsNil(o.Tags) {
+		toSerialize["tags"] = o.Tags
+	}
 	return toSerialize, nil
 }
 

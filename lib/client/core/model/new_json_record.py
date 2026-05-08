@@ -33,9 +33,10 @@ class NewJsonRecord(BaseModel):
     flags: Optional[StrictInt] = None
     parent_id: UUID = Field(alias="parentId")
     title: Optional[StrictStr] = None
-    values: Optional[Dict[str, StrictStr]] = None
+    var_json: Optional[Dict[str, StrictStr]] = Field(default=None, alias="json")
     post_at: datetime = Field(alias="postAt")
-    __properties: ClassVar[List[str]] = ["visible", "flags", "parentId", "title", "values", "postAt"]
+    tags: Optional[List[StrictStr]] = None
+    __properties: ClassVar[List[str]] = ["visible", "flags", "parentId", "title", "json", "postAt", "tags"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -92,8 +93,9 @@ class NewJsonRecord(BaseModel):
             "flags": obj.get("flags"),
             "parentId": obj.get("parentId") if obj.get("parentId") is not None else '00000000-0000-0000-0000-000000000000',
             "title": obj.get("title"),
-            "values": obj.get("values"),
-            "postAt": obj.get("postAt")
+            "json": obj.get("json"),
+            "postAt": obj.get("postAt"),
+            "tags": obj.get("tags")
         })
         return _obj
 

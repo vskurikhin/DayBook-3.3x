@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 14:03 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordServiceImpl.java
@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 import su.svn.core.domain.entities.BaseRecord;
+import su.svn.core.domain.entities.RecordType;
 import su.svn.core.domain.entities.Tag;
 import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.NewJsonRecord;
@@ -85,6 +86,7 @@ public class JsonRecordServiceImpl implements JsonRecordService {
         var resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
         var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
         final String username = getUserName();
+        jsonRecord.baseRecord().type(RecordType.Json);
         jsonRecord.baseRecord().userName(username);
         jsonRecord.userName(username);
         var baseRecord = jsonRecord.baseRecord();
@@ -102,6 +104,8 @@ public class JsonRecordServiceImpl implements JsonRecordService {
         if (username.equals(optionalJsonRecord.orElseThrow().userName())) {
             var resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
             var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+            jsonRecord.baseRecord()
+                    .type(RecordType.Json);
             jsonRecord.baseRecord()
                     .postAt(optionalJsonRecord.orElseThrow()
                             .baseRecord()

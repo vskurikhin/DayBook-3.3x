@@ -21,10 +21,12 @@ pub struct NewJsonRecord {
     pub parent_id: uuid::Uuid,
     #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(rename = "values", skip_serializing_if = "Option::is_none")]
-    pub values: Option<std::collections::HashMap<String, String>>,
+    #[serde(rename = "json", skip_serializing_if = "Option::is_none")]
+    pub json: Option<std::collections::HashMap<String, String>>,
     #[serde(rename = "postAt")]
     pub post_at: String,
+    #[serde(rename = "tags", skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
 }
 
 impl NewJsonRecord {
@@ -34,8 +36,9 @@ impl NewJsonRecord {
             flags: None,
             parent_id,
             title: None,
-            values: None,
+            json: None,
             post_at,
+            tags: None,
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -39,7 +39,7 @@ import static lombok.AccessLevel.PRIVATE;
  *     <li>Supports parent-child relationships via {@code parentId}</li>
  *     <li>Tracks lifecycle timestamps such as creation, update, and last change time</li>
  *     <li>Provides soft-disable functionality via the {@code enabled} flag</li>
- *     <li>Stores additional dynamic attributes in JSON format ({@code values})</li>
+ *     <li>Stores additional dynamic attributes in JSON format ({@code json})</li>
  * </ul>
  *
  * <h2>Reactive Operations</h2>
@@ -188,9 +188,9 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     @Column(name = "title", columnDefinition = "TEXT")
     String title;
 
-    @Column(name = "values")
+    @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)
-    Map<String, String> values;
+    Map<String, String> json;
 
     public static Uni<PostRecord> findByUUID(@Nonnull UUID id) {
         return find("#" + FIND_FIND_BY_UUID, Map.of("id", id)).firstResult();
@@ -250,7 +250,7 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
                     entity.visible(postRecord.visible);
                     entity.flags(postRecord.flags);
                     entity.title(postRecord.title);
-                    entity.values(new LinkedHashMap<>(postRecord.values));
+                    entity.json(new LinkedHashMap<>(postRecord.json));
                     return entity;
                 })
                 .ifNoItem()

@@ -9,8 +9,9 @@ Name | Type | Description | Notes
 **flags** | **int** |  | [optional] 
 **parent_id** | **UUID** |  | [default to '00000000-0000-0000-0000-000000000000']
 **title** | **str** |  | [optional] 
-**values** | **Dict[str, str]** |  | [optional] 
+**var_json** | **Dict[str, str]** |  | [optional] 
 **post_at** | **datetime** |  | 
+**tags** | **List[str]** |  | [optional] 
 
 ## Example
 

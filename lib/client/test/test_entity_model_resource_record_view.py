@@ -44,9 +44,12 @@ class TestEntityModelResourceRecordView(unittest.TestCase):
                 refresh_at = datetime.datetime.strptime('2013-10-20 19:20:30.00', '%Y-%m-%d %H:%M:%S.%f'),
                 last_changed_time = datetime.datetime.strptime('2013-10-20 19:20:30.00', '%Y-%m-%d %H:%M:%S.%f'),
                 title = '',
-                values = {
+                var_json = {
                     'key' : ''
                     },
+                tags = [
+                    ''
+                    ],
                 links = {
                     'key' : core.models.link.Link(
                         href = '', 

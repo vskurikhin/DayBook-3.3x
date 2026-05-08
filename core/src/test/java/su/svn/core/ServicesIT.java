@@ -74,7 +74,7 @@ class ServicesIT {
                 .id(found.id())
                 .parentId(found.parentId())
                 .title("title2")
-                .values(found.values())
+                .json(found.json())
                 .refreshAt(refreshAt)
                 .tags(Set.of("tag1", "tag2"))
                 .build();

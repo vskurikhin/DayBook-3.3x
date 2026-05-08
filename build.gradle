@@ -54,5 +54,4 @@ subprojects {
             languageVersion = JavaLanguageVersion.of(21)
         }
     }
-
 }

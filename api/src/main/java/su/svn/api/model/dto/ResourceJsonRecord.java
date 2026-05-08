@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceJsonRecord.java
@@ -25,7 +25,7 @@ public record ResourceJsonRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
-        @JsonProperty Map<String, String> values,
+        @JsonProperty Map<String, String> json,
         @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,

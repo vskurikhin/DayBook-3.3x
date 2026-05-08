@@ -34,10 +34,11 @@ class ResourceJsonRecord(BaseModel):
     flags: Optional[StrictInt] = None
     parent_id: Optional[UUID] = Field(default=None, alias="parentId")
     title: Optional[StrictStr] = None
-    values: Optional[Dict[str, StrictStr]] = None
+    var_json: Optional[Dict[str, StrictStr]] = Field(default=None, alias="json")
     post_at: Optional[datetime] = Field(default=None, alias="postAt")
     refresh_at: Optional[datetime] = Field(default=None, alias="refreshAt")
-    __properties: ClassVar[List[str]] = ["id", "visible", "flags", "parentId", "title", "values", "postAt", "refreshAt"]
+    tags: Optional[List[StrictStr]] = None
+    __properties: ClassVar[List[str]] = ["id", "visible", "flags", "parentId", "title", "json", "postAt", "refreshAt", "tags"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -95,9 +96,10 @@ class ResourceJsonRecord(BaseModel):
             "flags": obj.get("flags"),
             "parentId": obj.get("parentId"),
             "title": obj.get("title"),
-            "values": obj.get("values"),
+            "json": obj.get("json"),
             "postAt": obj.get("postAt"),
-            "refreshAt": obj.get("refreshAt")
+            "refreshAt": obj.get("refreshAt"),
+            "tags": obj.get("tags")
         })
         return _obj
 

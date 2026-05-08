@@ -25,9 +25,10 @@ type ResourceJsonRecord struct {
 	Flags *int32 `json:"flags,omitempty"`
 	ParentId *string `json:"parentId,omitempty"`
 	Title *string `json:"title,omitempty"`
-	Values map[string]string `json:"values,omitempty"`
+	Json map[string]string `json:"json,omitempty"`
 	PostAt *time.Time `json:"postAt,omitempty"`
 	RefreshAt *time.Time `json:"refreshAt,omitempty"`
+	Tags []string `json:"tags,omitempty"`
 }
 
 // NewResourceJsonRecord instantiates a new ResourceJsonRecord object
@@ -207,36 +208,36 @@ func (o *ResourceJsonRecord) SetTitle(v string) {
 	o.Title = &v
 }
 
-// GetValues returns the Values field value if set, zero value otherwise.
-func (o *ResourceJsonRecord) GetValues() map[string]string {
-	if o == nil || IsNil(o.Values) {
+// GetJson returns the Json field value if set, zero value otherwise.
+func (o *ResourceJsonRecord) GetJson() map[string]string {
+	if o == nil || IsNil(o.Json) {
 		var ret map[string]string
 		return ret
 	}
-	return o.Values
+	return o.Json
 }
 
-// GetValuesOk returns a tuple with the Values field value if set, nil otherwise
+// GetJsonOk returns a tuple with the Json field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ResourceJsonRecord) GetValuesOk() (map[string]string, bool) {
-	if o == nil || IsNil(o.Values) {
+func (o *ResourceJsonRecord) GetJsonOk() (map[string]string, bool) {
+	if o == nil || IsNil(o.Json) {
 		return map[string]string{}, false
 	}
-	return o.Values, true
+	return o.Json, true
 }
 
-// HasValues returns a boolean if a field has been set.
-func (o *ResourceJsonRecord) HasValues() bool {
-	if o != nil && !IsNil(o.Values) {
+// HasJson returns a boolean if a field has been set.
+func (o *ResourceJsonRecord) HasJson() bool {
+	if o != nil && !IsNil(o.Json) {
 		return true
 	}
 
 	return false
 }
 
-// SetValues gets a reference to the given map[string]string and assigns it to the Values field.
-func (o *ResourceJsonRecord) SetValues(v map[string]string) {
-	o.Values = v
+// SetJson gets a reference to the given map[string]string and assigns it to the Json field.
+func (o *ResourceJsonRecord) SetJson(v map[string]string) {
+	o.Json = v
 }
 
 // GetPostAt returns the PostAt field value if set, zero value otherwise.
@@ -303,6 +304,38 @@ func (o *ResourceJsonRecord) SetRefreshAt(v time.Time) {
 	o.RefreshAt = &v
 }
 
+// GetTags returns the Tags field value if set, zero value otherwise.
+func (o *ResourceJsonRecord) GetTags() []string {
+	if o == nil || IsNil(o.Tags) {
+		var ret []string
+		return ret
+	}
+	return o.Tags
+}
+
+// GetTagsOk returns a tuple with the Tags field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ResourceJsonRecord) GetTagsOk() ([]string, bool) {
+	if o == nil || IsNil(o.Tags) {
+		return nil, false
+	}
+	return o.Tags, true
+}
+
+// HasTags returns a boolean if a field has been set.
+func (o *ResourceJsonRecord) HasTags() bool {
+	if o != nil && !IsNil(o.Tags) {
+		return true
+	}
+
+	return false
+}
+
+// SetTags gets a reference to the given []string and assigns it to the Tags field.
+func (o *ResourceJsonRecord) SetTags(v []string) {
+	o.Tags = v
+}
+
 func (o ResourceJsonRecord) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -328,14 +361,17 @@ func (o ResourceJsonRecord) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Title) {
 		toSerialize["title"] = o.Title
 	}
-	if !IsNil(o.Values) {
-		toSerialize["values"] = o.Values
+	if !IsNil(o.Json) {
+		toSerialize["json"] = o.Json
 	}
 	if !IsNil(o.PostAt) {
 		toSerialize["postAt"] = o.PostAt
 	}
 	if !IsNil(o.RefreshAt) {
 		toSerialize["refreshAt"] = o.RefreshAt
+	}
+	if !IsNil(o.Tags) {
+		toSerialize["tags"] = o.Tags
 	}
 	return toSerialize, nil
 }

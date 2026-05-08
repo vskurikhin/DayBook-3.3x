@@ -8,11 +8,12 @@ Name | Type | Description | Notes
 **id** | **UUID** |  | 
 **parent_id** | **UUID** |  | [default to '00000000-0000-0000-0000-000000000000']
 **title** | **str** |  | [optional] 
-**values** | **Dict[str, str]** |  | [optional] 
+**var_json** | **Dict[str, str]** |  | [optional] 
 **post_at** | **datetime** |  | [optional] 
 **refresh_at** | **datetime** |  | 
 **visible** | **bool** |  | [optional] 
 **flags** | **int** |  | [optional] 
+**tags** | **List[str]** |  | [optional] 
 
 ## Example
 

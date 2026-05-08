@@ -19,8 +19,8 @@ pub struct UpdateJsonRecord {
     pub parent_id: uuid::Uuid,
     #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(rename = "values", skip_serializing_if = "Option::is_none")]
-    pub values: Option<std::collections::HashMap<String, String>>,
+    #[serde(rename = "json", skip_serializing_if = "Option::is_none")]
+    pub json: Option<std::collections::HashMap<String, String>>,
     #[serde(rename = "postAt", skip_serializing_if = "Option::is_none")]
     pub post_at: Option<String>,
     #[serde(rename = "refreshAt")]
@@ -29,6 +29,8 @@ pub struct UpdateJsonRecord {
     pub visible: Option<bool>,
     #[serde(rename = "flags", skip_serializing_if = "Option::is_none")]
     pub flags: Option<i32>,
+    #[serde(rename = "tags", skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
 }
 
 impl UpdateJsonRecord {
@@ -37,11 +39,12 @@ impl UpdateJsonRecord {
             id,
             parent_id,
             title: None,
-            values: None,
+            json: None,
             post_at: None,
             refresh_at,
             visible: None,
             flags: None,
+            tags: None,
         }
     }
 }

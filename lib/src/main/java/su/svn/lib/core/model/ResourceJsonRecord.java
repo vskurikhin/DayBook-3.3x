@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceJsonRecord.java
@@ -31,7 +31,9 @@ import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.gson.Gson;
@@ -60,7 +62,7 @@ import su.svn.lib.core.JSON;
 /**
  * ResourceJsonRecord
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-06T19:35:13.196232+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-08T19:23:51.960842+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class ResourceJsonRecord {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
@@ -87,10 +89,10 @@ public class ResourceJsonRecord {
   @javax.annotation.Nullable
   private String title;
 
-  public static final String SERIALIZED_NAME_VALUES = "values";
-  @SerializedName(SERIALIZED_NAME_VALUES)
+  public static final String SERIALIZED_NAME_JSON = "json";
+  @SerializedName(SERIALIZED_NAME_JSON)
   @javax.annotation.Nullable
-  private Map<String, String> values = new HashMap<>();
+  private Map<String, String> json = new HashMap<>();
 
   public static final String SERIALIZED_NAME_POST_AT = "postAt";
   @SerializedName(SERIALIZED_NAME_POST_AT)
@@ -101,6 +103,11 @@ public class ResourceJsonRecord {
   @SerializedName(SERIALIZED_NAME_REFRESH_AT)
   @javax.annotation.Nullable
   private OffsetDateTime refreshAt;
+
+  public static final String SERIALIZED_NAME_TAGS = "tags";
+  @SerializedName(SERIALIZED_NAME_TAGS)
+  @javax.annotation.Nullable
+  private Set<String> tags = new LinkedHashSet<>();
 
   public ResourceJsonRecord() {
   }
@@ -200,30 +207,30 @@ public class ResourceJsonRecord {
   }
 
 
-  public ResourceJsonRecord values(@javax.annotation.Nullable Map<String, String> values) {
-    this.values = values;
+  public ResourceJsonRecord json(@javax.annotation.Nullable Map<String, String> json) {
+    this.json = json;
     return this;
   }
 
-  public ResourceJsonRecord putValuesItem(String key, String valuesItem) {
-    if (this.values == null) {
-      this.values = new HashMap<>();
+  public ResourceJsonRecord putJsonItem(String key, String jsonItem) {
+    if (this.json == null) {
+      this.json = new HashMap<>();
     }
-    this.values.put(key, valuesItem);
+    this.json.put(key, jsonItem);
     return this;
   }
 
   /**
-   * Get values
-   * @return values
+   * Get json
+   * @return json
    */
   @javax.annotation.Nullable
-  public Map<String, String> getValues() {
-    return values;
+  public Map<String, String> getJson() {
+    return json;
   }
 
-  public void setValues(@javax.annotation.Nullable Map<String, String> values) {
-    this.values = values;
+  public void setJson(@javax.annotation.Nullable Map<String, String> json) {
+    this.json = json;
   }
 
 
@@ -265,6 +272,33 @@ public class ResourceJsonRecord {
   }
 
 
+  public ResourceJsonRecord tags(@javax.annotation.Nullable Set<String> tags) {
+    this.tags = tags;
+    return this;
+  }
+
+  public ResourceJsonRecord addTagsItem(String tagsItem) {
+    if (this.tags == null) {
+      this.tags = new LinkedHashSet<>();
+    }
+    this.tags.add(tagsItem);
+    return this;
+  }
+
+  /**
+   * Get tags
+   * @return tags
+   */
+  @javax.annotation.Nullable
+  public Set<String> getTags() {
+    return tags;
+  }
+
+  public void setTags(@javax.annotation.Nullable Set<String> tags) {
+    this.tags = tags;
+  }
+
+
 
   @Override
   public boolean equals(Object o) {
@@ -280,14 +314,15 @@ public class ResourceJsonRecord {
         Objects.equals(this.flags, resourceJsonRecord.flags) &&
         Objects.equals(this.parentId, resourceJsonRecord.parentId) &&
         Objects.equals(this.title, resourceJsonRecord.title) &&
-        Objects.equals(this.values, resourceJsonRecord.values) &&
+        Objects.equals(this.json, resourceJsonRecord.json) &&
         Objects.equals(this.postAt, resourceJsonRecord.postAt) &&
-        Objects.equals(this.refreshAt, resourceJsonRecord.refreshAt);
+        Objects.equals(this.refreshAt, resourceJsonRecord.refreshAt) &&
+        Objects.equals(this.tags, resourceJsonRecord.tags);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, visible, flags, parentId, title, values, postAt, refreshAt);
+    return Objects.hash(id, visible, flags, parentId, title, json, postAt, refreshAt, tags);
   }
 
   @Override
@@ -299,9 +334,10 @@ public class ResourceJsonRecord {
     sb.append("    flags: ").append(toIndentedString(flags)).append("\n");
     sb.append("    parentId: ").append(toIndentedString(parentId)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
-    sb.append("    values: ").append(toIndentedString(values)).append("\n");
+    sb.append("    json: ").append(toIndentedString(json)).append("\n");
     sb.append("    postAt: ").append(toIndentedString(postAt)).append("\n");
     sb.append("    refreshAt: ").append(toIndentedString(refreshAt)).append("\n");
+    sb.append("    tags: ").append(toIndentedString(tags)).append("\n");
     sb.append("}");
     return sb.toString();
   }
@@ -320,7 +356,7 @@ public class ResourceJsonRecord {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "title", "values", "postAt", "refreshAt"));
+    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "title", "json", "postAt", "refreshAt", "tags"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);
@@ -355,6 +391,10 @@ public class ResourceJsonRecord {
       }
       if ((jsonObj.get("title") != null && !jsonObj.get("title").isJsonNull()) && !jsonObj.get("title").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `title` to be a primitive type in the JSON string but got `%s`", jsonObj.get("title").toString()));
+      }
+      // ensure the optional json data is an array if present
+      if (jsonObj.get("tags") != null && !jsonObj.get("tags").isJsonNull() && !jsonObj.get("tags").isJsonArray()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `tags` to be an array in the JSON string but got `%s`", jsonObj.get("tags").toString()));
       }
   }
 

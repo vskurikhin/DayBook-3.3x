@@ -14,7 +14,8 @@ Name | Type | Description | Notes
 **refresh_at** | **datetime** |  | [optional] 
 **last_changed_time** | **datetime** |  | [optional] 
 **title** | **str** |  | [optional] 
-**values** | **Dict[str, str]** |  | [optional] 
+**var_json** | **Dict[str, str]** |  | [optional] 
+**tags** | **List[str]** |  | [optional] 
 **links** | [**Dict[str, Link]**](Link.md) |  | [optional] 
 
 ## Example

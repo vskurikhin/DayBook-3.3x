@@ -22,6 +22,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
         "500":
           content:
             '*/*':
@@ -54,6 +60,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
         "500":
           content:
             '*/*':
@@ -96,6 +108,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
         "500":
           content:
             '*/*':
@@ -131,6 +149,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
         "500":
           content:
             '*/*':
@@ -155,18 +179,18 @@ paths:
           type: string
         style: simple
       responses:
-        "404":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Not Found
         "400":
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
         "500":
           content:
             '*/*':
@@ -193,6 +217,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Bad Request
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
         "500":
           content:
             '*/*':
@@ -225,13 +255,16 @@ components:
       example:
         postAt: 2000-01-23T04:56:07.000+00:00
         visible: true
-        values:
-          key: values
         refreshAt: 2000-01-23T04:56:07.000+00:00
         flags: 0
+        json:
+          key: json
         id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
         title: title
         parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        tags:
+        - tags
+        - tags
       properties:
         id:
           format: uuid
@@ -242,7 +275,7 @@ components:
           type: string
         title:
           type: string
-        values:
+        json:
           additionalProperties:
             type: string
         postAt:
@@ -256,6 +289,11 @@ components:
         flags:
           format: int32
           type: integer
+        tags:
+          items:
+            type: string
+          type: array
+          uniqueItems: true
       required:
       - id
       - parentId
@@ -264,13 +302,16 @@ components:
       example:
         visible: true
         postAt: 2000-01-23T04:56:07.000+00:00
-        values:
-          key: values
         refreshAt: 2000-01-23T04:56:07.000+00:00
         flags: 6
+        json:
+          key: json
         id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
         title: title
         parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        tags:
+        - tags
+        - tags
       properties:
         id:
           format: uuid
@@ -285,7 +326,7 @@ components:
           type: string
         title:
           type: string
-        values:
+        json:
           additionalProperties:
             type: string
         postAt:
@@ -294,15 +335,23 @@ components:
         refreshAt:
           format: date-time
           type: string
+        tags:
+          items:
+            type: string
+          type: array
+          uniqueItems: true
     NewJsonRecord:
       example:
         visible: true
         postAt: 2000-01-23T04:56:07.000+00:00
-        values:
-          key: values
         flags: 0
+        json:
+          key: json
         title: title
         parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        tags:
+        - tags
+        - tags
       properties:
         visible:
           type: boolean
@@ -315,12 +364,17 @@ components:
           type: string
         title:
           type: string
-        values:
+        json:
           additionalProperties:
             type: string
         postAt:
           format: date-time
           type: string
+        tags:
+          items:
+            type: string
+          type: array
+          uniqueItems: true
       required:
       - parentId
       - postAt
@@ -369,13 +423,16 @@ components:
             type: type
             deprecation: deprecation
         refreshAt: 2000-01-23T04:56:07.000+00:00
-        values:
-          key: values
         flags: 0
+        json:
+          key: json
         id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
         userName: userName
         title: title
         parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        tags:
+        - tags
+        - tags
       properties:
         id:
           format: uuid
@@ -401,9 +458,13 @@ components:
           type: string
         title:
           type: string
-        values:
+        json:
           additionalProperties:
             type: string
+        tags:
+          items:
+            type: string
+          type: array
         _links:
           additionalProperties:
             $ref: "#/components/schemas/Link"
@@ -444,13 +505,16 @@ components:
                 type: type
                 deprecation: deprecation
             refreshAt: 2000-01-23T04:56:07.000+00:00
-            values:
-              key: values
             flags: 0
+            json:
+              key: json
             id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
             userName: userName
             title: title
             parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+            tags:
+            - tags
+            - tags
           - lastChangedTime: 2000-01-23T04:56:07.000+00:00
             visible: true
             postAt: 2000-01-23T04:56:07.000+00:00
@@ -465,13 +529,16 @@ components:
                 type: type
                 deprecation: deprecation
             refreshAt: 2000-01-23T04:56:07.000+00:00
-            values:
-              key: values
             flags: 0
+            json:
+              key: json
             id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
             userName: userName
             title: title
             parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+            tags:
+            - tags
+            - tags
         _links:
           key:
             hreflang: hreflang
@@ -542,13 +609,16 @@ components:
               type: type
               deprecation: deprecation
           refreshAt: 2000-01-23T04:56:07.000+00:00
-          values:
-            key: values
           flags: 0
+          json:
+            key: json
           id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
           userName: userName
           title: title
           parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          tags:
+          - tags
+          - tags
         - lastChangedTime: 2000-01-23T04:56:07.000+00:00
           visible: true
           postAt: 2000-01-23T04:56:07.000+00:00
@@ -563,13 +633,16 @@ components:
               type: type
               deprecation: deprecation
           refreshAt: 2000-01-23T04:56:07.000+00:00
-          values:
-            key: values
           flags: 0
+          json:
+            key: json
           id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
           userName: userName
           title: title
           parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          tags:
+          - tags
+          - tags
       properties:
         resourceRecordViewList:
           items:

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 13:04 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordData.java
@@ -28,7 +28,7 @@ public record RecordData(
         @JsonProperty Boolean visible,
         @JsonProperty int flags,
         @JsonProperty String title,
-        @JsonProperty Map<String, String> values) implements Serializable {
+        @JsonProperty Map<String, String> json) implements Serializable {
     @Builder
     public RecordData {
     }

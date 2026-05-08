@@ -20,8 +20,10 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import su.svn.lib.core.model.Link;
@@ -115,11 +117,19 @@ public class EntityModelResourceRecordViewTest {
     }
 
     /**
-     * Test the property 'values'
+     * Test the property 'json'
      */
     @Test
-    public void valuesTest() {
-        // TODO: test values
+    public void jsonTest() {
+        // TODO: test json
+    }
+
+    /**
+     * Test the property 'tags'
+     */
+    @Test
+    public void tagsTest() {
+        // TODO: test tags
     }
 
     /**
