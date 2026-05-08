@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 11:39 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordMapper.java
@@ -13,6 +13,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.ValueMapping;
 import su.svn.core.domain.entities.JsonRecord;
+import su.svn.core.domain.entities.Tag;
 import su.svn.core.models.dto.NewJsonRecord;
 import su.svn.core.models.dto.ResourceJsonRecord;
 import su.svn.core.models.dto.UpdateJsonRecord;
@@ -33,6 +34,7 @@ public interface JsonRecordMapper {
     @Mapping(source = "baseRecord.parentId", target = "parentId")
     @Mapping(source = "baseRecord.postAt", target = "postAt")
     @Mapping(source = "baseRecord.refreshAt", target = "refreshAt")
+    @Mapping(source = "baseRecord.tags", target = "tags")
     ResourceJsonRecord toResource(JsonRecord record);
 
     @Mapping(target = "id", ignore = true)
@@ -53,5 +55,16 @@ public interface JsonRecordMapper {
     @Mapping(source = "parentId", target = "baseRecord.parentId")
     @Mapping(source = "postAt", target = "baseRecord.postAt")
     @Mapping(source = "refreshAt", target = "baseRecord.refreshAt")
+    @Mapping(source = "tags", target = "baseRecord.tags")
     JsonRecord toEntity(ResourceJsonRecord record);
+
+    default Tag map(String value) {
+        return Tag.builder()
+                .tag(value)
+                .build();
+    }
+
+    default String map(Tag value) {
+        return value.tag();
+    }
 }

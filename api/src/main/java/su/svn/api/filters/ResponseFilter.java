@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 17:43 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 09:18 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResponseFilter.java
@@ -27,8 +27,8 @@ public class ResponseFilter implements ContainerResponseFilter {
     @Override
     public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) {
         var requestId = org.jboss.logging.MDC.get(REQUEST_ID);
-        long startTime = (Long) requestContext.getProperty("request-start-time");
-        long duration = System.currentTimeMillis() - startTime;
+        var startTime = (Long) requestContext.getProperty("request-start-time");
+        long duration = System.currentTimeMillis() - (startTime != null ? startTime : 0);
         LOG.infof("HTTP RESPONSE, status=%s, content_type=%s, length=%d, duration=%dms",
                 responseContext.getStatus(),
                 getMediaType(responseContext),

@@ -1,12 +1,12 @@
 /*
- * This file was last modified at 2026.05.07 17:43 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 11:39 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * GlobalExceptionHandler.java
  * $Id$
  */
 
-package su.svn.api.resources;
+package su.svn.api.resources.handlers;
 
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
@@ -35,6 +35,6 @@ public class GlobalExceptionHandler implements ExceptionMapper<Throwable> {
                 "Unhandled exception: %s message: %s %s",
                 exception.getClass().getName(), exception.getMessage(), sStackTrace
         );
-        return Response.status(500).entity("Oops, something went wrong").build();
+        return Response.status(500).entity("HTTP 500 Oops, something went wrong").build();
     }
 }

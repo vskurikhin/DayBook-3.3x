@@ -128,7 +128,7 @@ dependencies {
 
     testImplementation "org.assertj:assertj-core:${VERSION_ORG_ASSERTJ_ASSERTJ_CORE}"
     testImplementation "org.junit.jupiter:junit-jupiter-api:${VERSION_ORG_JUNIT_JUPITER_JUNIT_JUPITER_API}"
-    testImplementation "org.mockito:mockito-core:${VERSION_ORG_MOCKITO_MOCKITO_CORE}"
+    testImplementation "org.mockito:mockito-inline:${VERSION_ORG_MOCKITO_MOCKITO_INLINE}"
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${VERSION_ORG_JUNIT_JUPITER_JUNIT_JUPITER_API}"
 }
 
@@ -174,5 +174,7 @@ test {
     testLogging {
         events "passed", "skipped", "failed"
     }
-
+    jvmArgs += [
+        "-javaagent:${configurations.testRuntimeClasspath.find { it.name.contains('byte-buddy-agent') }}"
+    ]
 }

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 11:39 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ApiLoggingFilter.java
@@ -27,17 +27,70 @@ import java.util.UUID;
 
 import static su.svn.lib.Constants.REQUEST_ID;
 
+/**
+ * Servlet filter responsible for:
+ * <ul>
+ *     <li>Generating or propagating request id</li>
+ *     <li>Logging HTTP request information</li>
+ *     <li>Logging HTTP response metadata</li>
+ *     <li>Masking sensitive request headers and parameters</li>
+ *     <li>Calculating raw and gzip response sizes</li>
+ * </ul>
+ *
+ * <p>
+ * The filter stores request identifier in MDC under key {@code REQUEST_ID}
+ * for correlation logging.
+ * </p>
+ *
+ * <p>
+ * Sensitive data masking:
+ * </p>
+ * <ul>
+ *     <li>{@code Authorization} header is masked</li>
+ *     <li>{@code password} request parameter is masked</li>
+ * </ul>
+ */
 @Slf4j
 public class ApiLoggingFilter implements Filter {
 
+    /**
+     * Default username used when authentication is absent.
+     */
     public static final String GUEST = "guest";
 
+    /**
+     * Header name used for request identifier propagation.
+     */
     private final String requestIdParamName;
 
+    /**
+     * Creates logging filter.
+     *
+     * @param requestIdParamName request id header name
+     */
     public ApiLoggingFilter(String requestIdParamName) {
         this.requestIdParamName = requestIdParamName.toLowerCase();
     }
 
+    /**
+     * Logs HTTP request and response metadata.
+     *
+     * <p>
+     * The method:
+     * </p>
+     * <ul>
+     *     <li>Extracts request id from headers or generates a new one</li>
+     *     <li>Stores request id in MDC</li>
+     *     <li>Logs request metadata</li>
+     *     <li>Wraps response for gzip/raw size calculation</li>
+     *     <li>Logs response metadata</li>
+     *     <li>Clears MDC after processing</li>
+     * </ul>
+     *
+     * @param request servlet request
+     * @param response servlet response
+     * @param chain servlet filter chain
+     */
     @SuppressWarnings("StringBufferReplaceableByString")
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
@@ -72,6 +125,16 @@ public class ApiLoggingFilter implements Filter {
         }
     }
 
+    /**
+     * Creates type-safe request header map.
+     *
+     * <p>
+     * Authorization header value is masked.
+     * </p>
+     *
+     * @param request http servlet request
+     * @return header map
+     */
     private Map<String, String> getTypeSafeHeaderMap(HttpServletRequest request) {
         var typeSafeRequestMap = new HashMap<String, String>();
         var requestHeaderNames = request.getHeaderNames();
@@ -88,6 +151,16 @@ public class ApiLoggingFilter implements Filter {
         return typeSafeRequestMap;
     }
 
+    /**
+     * Creates type-safe request parameter map.
+     *
+     * <p>
+     * Password parameter value is masked.
+     * </p>
+     *
+     * @param request http servlet request
+     * @return request parameter map
+     */
     private Map<String, String> getTypeSafeRequestMap(HttpServletRequest request) {
         var typeSafeRequestMap = new HashMap<String, String>();
         var requestParamNames = request.getParameterNames();
@@ -104,8 +177,17 @@ public class ApiLoggingFilter implements Filter {
         return typeSafeRequestMap;
     }
 
+    /**
+     * Resolves current authenticated username.
+     *
+     * @return authenticated username or {@link #GUEST}
+     */
     private static String getUserName() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return GUEST;
+        }
+        Object principal = authentication.getPrincipal();
         return switch (principal) {
             case UserName userName -> userName.userName();
             case User user -> user.getUsername();

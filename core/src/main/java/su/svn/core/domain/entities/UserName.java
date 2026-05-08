@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.04 15:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 09:18 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * UserName.java
@@ -14,7 +14,6 @@ import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;

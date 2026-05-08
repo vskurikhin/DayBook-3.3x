@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import su.svn.core.models.dto.ErrorResponse;
+import su.svn.core.models.exceptions.CustomNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,13 +27,27 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void shouldHandleNotFoundException() {
+    void ChangeSetPersistershouldHandleNotFoundException() {
         // given
         ChangeSetPersister.NotFoundException ex =
                 new ChangeSetPersister.NotFoundException();
 
         // when
         ErrorResponse response = handler.handleNotFoundException(ex, request);
+
+        // then
+        assertNotNull(response);
+        assertEquals("Resource not found", response.getError());
+        assertTrue(response.getTime() > 0);
+    }
+
+    @Test
+    void shouldHandleNotFoundException() {
+        // given
+        var ex = new CustomNotFoundException();
+
+        // when
+        ErrorResponse response = handler.handleCustomNotFound(ex, request);
 
         // then
         assertNotNull(response);

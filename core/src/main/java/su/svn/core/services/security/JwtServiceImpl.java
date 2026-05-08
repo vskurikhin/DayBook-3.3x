@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 11:39 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JwtServiceImpl.java
@@ -9,6 +9,8 @@
 package su.svn.core.services.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -45,9 +47,7 @@ public class JwtServiceImpl implements JwtService {
      */
     @Override
     public String extractUserName(String token) {
-        return extractClaim(token, claims -> {
-            return claims.get(UPN).toString();
-        });
+        return extractClaim(token, claims -> claims.get(UPN).toString());
     }
 
     @Override
@@ -67,7 +67,14 @@ public class JwtServiceImpl implements JwtService {
      */
     @Override
     public boolean isTokenValid(String token) {
-        return !isTokenExpired(token);
+        try {
+            return !isTokenExpired(token);
+        } catch (ExpiredJwtException e) {
+            log.debug("JWT expired");
+        } catch (JwtException | IllegalArgumentException e) {
+            log.debug("Invalid JWT token: {}", e.getMessage());
+        }
+        return false;
     }
 
     @Override

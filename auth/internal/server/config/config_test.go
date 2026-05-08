@@ -3,9 +3,6 @@ package config
 import (
 	"bytes"
 	"context"
-	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -13,6 +10,10 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // 🔧 Вспомогательная функция сброса глобального состояния
@@ -275,6 +276,8 @@ func TestLoopSigHup_ConfigReload(t *testing.T) {
 	viper.AddConfigPath(".")
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("test.yaml")
+
+	cfg = &ValuesConfig{}
 
 	go loopSigHup(context.Background())
 	p, err := os.FindProcess(os.Getpid())

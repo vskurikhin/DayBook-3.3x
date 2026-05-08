@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.20 00:29 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 11:52 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordResource.java
@@ -15,6 +15,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.model.dto.NewJsonRecord;
 import su.svn.api.model.dto.UpdateJsonRecord;
@@ -54,6 +55,11 @@ public class JsonRecordResource {
     @Inject
     RecordSchedulerService recordSchedulerService;
 
+    @APIResponse(
+            responseCode = "201",
+            description = "Created"
+    )
+    @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
     @Operation(summary = "Create JSON record")
     @POST
@@ -71,6 +77,11 @@ public class JsonRecordResource {
                 .invoke(() -> recordSchedulerService.fire(true));
     }
 
+    @APIResponse(
+            responseCode = "204",
+            description = "No Content"
+    )
+    @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
     @Operation(summary = "Delete JSON record")
     @DELETE
@@ -85,6 +96,8 @@ public class JsonRecordResource {
                 .invoke(() -> recordSchedulerService.fire(true));
     }
 
+    @APIResponse(ref = "200OK")
+    @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
     @Operation(summary = "Update JSON record")
     @PUT

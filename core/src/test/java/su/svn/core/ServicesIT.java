@@ -1,11 +1,10 @@
 package su.svn.core;
 
-import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +19,9 @@ import su.svn.core.services.domain.UserNameServiceImpl;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -53,6 +53,7 @@ class ServicesIT {
                 .parentId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
                 .title("title1")
                 .postAt(postAt)
+                .tags(Collections.singleton("tag1"))
                 .build();
 
         // when
@@ -75,6 +76,7 @@ class ServicesIT {
                 .title("title2")
                 .values(found.values())
                 .refreshAt(refreshAt)
+                .tags(Set.of("tag1", "tag2"))
                 .build();
 
         ResourceJsonRecord updated = jsonRecordService.update(upDto);
@@ -84,14 +86,12 @@ class ServicesIT {
         assertThat(foundUpdated.title()).isEqualTo("title2");
         assertThat(foundUpdated.parentId()).isEqualTo(UUID.fromString("00000000-0000-0000-0000-000000000000"));
         assertThat(foundUpdated.refreshAt()).isEqualTo(refreshAt);
+        org.junit.jupiter.api.Assertions.assertNotNull(foundUpdated.tags());
+        org.junit.jupiter.api.Assertions.assertTrue(foundUpdated.tags().contains("tag1"));
+        org.junit.jupiter.api.Assertions.assertTrue(foundUpdated.tags().contains("tag2"));
 
         var result = recordViewService.getFilteredRecords(new ResourceRecordViewFilter(null, null, null, null, false), PageRequest.of(0, 2));
-        result.get().forEach(new Consumer<ResourceRecordView>() {
-            @Override
-            public void accept(ResourceRecordView resourceRecordView) {
-                org.junit.jupiter.api.Assertions.assertNotNull(resourceRecordView);
-            }
-        });
+        result.get().forEach(Assertions::assertNotNull);
         jsonRecordService.disable(updated.id());
 
         assertThatExceptionOfType(CustomNotFoundException.class)

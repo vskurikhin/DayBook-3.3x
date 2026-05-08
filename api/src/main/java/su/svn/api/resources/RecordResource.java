@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 11:52 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordResource.java
@@ -17,6 +17,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.jboss.logging.Logger;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.model.dto.Page;
@@ -35,6 +36,8 @@ public class RecordResource {
     @Inject
     RecordDataService recordDataService;
 
+    @APIResponse(ref = "200OK")
+    @APIResponse(ref = "500Error")
     @PermitAll
     @Operation(summary = "Get page with list of JSON record")
     @GET
