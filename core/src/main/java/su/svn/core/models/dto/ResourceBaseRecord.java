@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.03.27 14:01 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 09:18 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceBaseRecord.java
@@ -16,6 +16,8 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @JsonPropertyOrder({"id", "visible", "flags"})
@@ -27,8 +29,11 @@ public record ResourceBaseRecord(
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty boolean visible,
-        @JsonProperty int flags) implements Serializable {
+        @JsonProperty int flags,
+        @JsonProperty Set<Tag> tags) implements Serializable {
     @Builder(toBuilder = true)
     public ResourceBaseRecord {
+        //noinspection ReassignedVariable
+        if (tags == null) tags = new HashSet<>();
     }
 }

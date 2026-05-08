@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 09:18 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * NewJsonRecord.java
@@ -17,6 +17,7 @@ import lombok.Builder;
 import java.io.Serializable;
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @JsonPropertyOrder({"visible", "flags"})
@@ -29,7 +30,8 @@ public record NewJsonRecord(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty boolean visible,
-        @JsonProperty int flags) implements Serializable {
+        @JsonProperty int flags,
+        @JsonProperty Set<String> tags) implements Serializable {
     @Builder
     public NewJsonRecord {
     }

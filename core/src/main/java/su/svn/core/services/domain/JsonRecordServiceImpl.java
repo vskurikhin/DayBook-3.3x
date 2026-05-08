@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 14:03 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordServiceImpl.java
@@ -13,20 +13,25 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
-import su.svn.core.domain.entities.JsonRecord;
+import su.svn.core.domain.entities.BaseRecord;
+import su.svn.core.domain.entities.Tag;
 import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.NewJsonRecord;
 import su.svn.core.models.dto.ResourceJsonRecord;
 import su.svn.core.models.dto.UpdateJsonRecord;
 import su.svn.core.models.exceptions.CustomNotFoundException;
 import su.svn.core.repository.JsonRecordRepository;
+import su.svn.core.repository.TagRepository;
 import su.svn.core.services.mappers.JsonRecordMapper;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static lombok.AccessLevel.PRIVATE;
 
@@ -51,29 +56,26 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     JsonRecordMapper jsonRecordMapper;
     JsonRecordRepository jsonRecordRepository;
 
+    TagRepository tagRepository;
+
     @Override
     @Transactional
     public void disable(UUID id) {
-        JsonRecord record = null;
-        try {
-            var username = getUserName();
-            record = jsonRecordRepository.findByIdAndEnabledTrue(id)
-                    .orElseThrow(ChangeSetPersister.NotFoundException::new);
-            if (username.equals(record.userName())) {
-                record.baseRecord().enabled(false);
-                record.enabled(false);
-                jsonRecordRepository.save(record);
-            }
-        } catch (ChangeSetPersister.NotFoundException e) {
-            System.out.println("Exception: " + e.getMessage());
+        var username = getUserName();
+        var record = jsonRecordRepository.findByIdAndEnabledTrue(id)
+                .orElseThrow(CustomNotFoundException::new);
+        if (username.equals(record.userName())) {
+            record.baseRecord().enabled(false);
+            record.enabled(false);
+            jsonRecordRepository.save(record);
         }
-        // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
     }
 
     @Override
     public ResourceJsonRecord findById(UUID id) {
-        return jsonRecordMapper.toResource(jsonRecordRepository.findByIdAndEnabledTrue(id)
-                .orElseThrow(CustomNotFoundException::new)
+        return jsonRecordMapper.toResource(
+                jsonRecordRepository.findByIdAndEnabledTrue(id)
+                        .orElseThrow(CustomNotFoundException::new)
         );
     }
 
@@ -82,13 +84,13 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     public ResourceJsonRecord save(NewJsonRecord newRecord) {
         var resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
         var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
-        var username = getUserName();
+        final String username = getUserName();
         jsonRecord.baseRecord().userName(username);
         jsonRecord.userName(username);
         var baseRecord = jsonRecord.baseRecord();
+        upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
         entityManager.persist(baseRecord);
         entityManager.refresh(baseRecord);
-        // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
         return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
     }
 
@@ -96,7 +98,7 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     @Transactional
     public ResourceJsonRecord update(UpdateJsonRecord updateRecord) {
         var optionalJsonRecord = jsonRecordRepository.findById(updateRecord.id());
-        String username = getUserName();
+        final String username = getUserName();
         if (username.equals(optionalJsonRecord.orElseThrow().userName())) {
             var resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
             var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
@@ -111,10 +113,30 @@ public class JsonRecordServiceImpl implements JsonRecordService {
                             .userName()
                     );
             jsonRecord.userName(username);
-            // TODO log.info(RecordLogMessages.RECORD_CREATED.getFormatted(savedRecord.getId()));
+            var baseRecord = jsonRecord.baseRecord();
+            upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
             return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
         }
         throw new RuntimeException("access denied");
+    }
+
+    private void upTagsInBaseRecordFromDB(BaseRecord baseRecord, Set<String> tags, final String username) {
+        final List<Tag> existingTags = tagRepository.findByTagIn(tags);
+        var existingTagNames = existingTags.stream()
+                .map(Tag::tag)
+                .collect(Collectors.toSet());
+        var newTags = tags.stream()
+                .filter(tag -> !existingTagNames.contains(tag))
+                .map(tag -> Tag.builder()
+                        .tag(tag)
+                        .userName(username)
+                        .build())
+                .toList();
+        var savedNewTags = tagRepository.saveAll(newTags);
+        List<Tag> allTags = new ArrayList<>();
+        allTags.addAll(existingTags);
+        allTags.addAll(savedNewTags);
+        baseRecord.tags(allTags);
     }
 
     private static String getUserName() {

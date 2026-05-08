@@ -8,6 +8,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.profile.NoContainersProfile;
 import su.svn.api.services.domain.RecordDataService;
@@ -28,8 +29,9 @@ class RecordSchedulerServiceTest {
     RecordSchedulerService recordSchedulerService;
 
     @BeforeEach
-    public void setUp() {
+    void beforeEach(TestInfo testInfo) {
         when(mockRecordDataService.sync(anyInt(), anyInt())).thenReturn(Uni.createFrom().item(List.of(PostRecord.builder().build())));
+        System.err.println("Running: " + testInfo.getDisplayName());
     }
 
     @Test

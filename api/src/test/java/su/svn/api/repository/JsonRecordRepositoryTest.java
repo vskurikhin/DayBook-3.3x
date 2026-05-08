@@ -6,7 +6,10 @@ import io.quarkus.test.junit.TestProfile;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import su.svn.api.model.dto.NewJsonRecord;
 import su.svn.api.model.dto.ResourceJsonRecord;
 import su.svn.api.model.dto.UpdateJsonRecord;
@@ -36,7 +39,13 @@ class JsonRecordRepositoryTest {
 
     private static final String AUTH = "Bearer test-token";
 
+    @BeforeEach
+    void beforeEach(TestInfo testInfo) {
+        System.err.println("Running: " + testInfo.getDisplayName());
+    }
+
     @Test
+    @DisplayName("JsonRecordRepository should delete record")
     void shouldDeleteRecord() {
         // given
         UUID id = UUID.randomUUID();
@@ -51,6 +60,7 @@ class JsonRecordRepositoryTest {
     }
 
     @Test
+    @DisplayName("JsonRecordRepository should post record")
     void shouldPostRecord() {
         // given
         NewJsonRecord request = NewJsonRecord.builder().build();
@@ -69,6 +79,7 @@ class JsonRecordRepositoryTest {
     }
 
     @Test
+    @DisplayName("JsonRecordRepository should put record")
     void shouldPutRecord() {
         // given
         UpdateJsonRecord request = UpdateJsonRecord.builder().build();
@@ -87,6 +98,7 @@ class JsonRecordRepositoryTest {
     }
 
     @Test
+    @DisplayName("JsonRecordRepository should use authorization from helper")
     void shouldUseAuthorizationFromHelper() {
         // given
         UUID id = UUID.randomUUID();

@@ -11,8 +11,10 @@ import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.model.dto.NewJsonRecord;
+import su.svn.api.model.dto.Page;
 import su.svn.api.model.dto.ResourceJsonRecord;
 import su.svn.api.model.dto.UpdateJsonRecord;
 import su.svn.api.profile.ContainersProfile;
@@ -22,6 +24,7 @@ import su.svn.api.services.domain.RecordDataService;
 import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -38,17 +41,6 @@ public class ApiIT {
     @Inject
     RecordDataService recordViewRepository;
 
-    @Test
-    @RunOnVertxContext
-    void tests(UniAsserter asserter) {
-        asserter.assertThat(
-                () -> recordViewRepository.readPage(0, (byte) 127),
-                recordView -> {
-                    System.out.println("RESULT = " + recordView);
-                }
-        );
-    }
-
     @Inject
     JsonRecordResource resource;
 
@@ -58,8 +50,29 @@ public class ApiIT {
     @InjectMock
     RecordSchedulerService recordSchedulerService;
 
+    @BeforeEach
+    void beforeEach(TestInfo testInfo) {
+        System.err.println("Running: " + testInfo.getDisplayName());
+    }
+
+    @Test
+    @DisplayName("RecordViewRepository read page")
+    @RunOnVertxContext
+    void tests(UniAsserter asserter) {
+        asserter.assertThat(
+                () -> recordViewRepository.readPage(0, (byte) 127),
+                new Consumer<Page<PostRecord>>() {
+                    @Override
+                    public void accept(Page<PostRecord> postRecordPage) {
+                        System.out.println(postRecordPage);
+                    }
+                }
+        );
+    }
+
     @TestSecurity(user = "john", roles = {"USER"})
     @Test
+    @DisplayName("JsonRecordResource create")
     void jsonRecordResourceTest_shouldCreateRecord() {
         // given
         NewJsonRecord request = NewJsonRecord.builder().build();
@@ -81,6 +94,7 @@ public class ApiIT {
 
     @TestSecurity(user = "john", roles = {"USER"})
     @Test
+    @DisplayName("JsonRecordResource delete")
     void jsonRecordResourceTest_shouldDeleteRecord() {
         // given
         UUID id = UUID.randomUUID();
@@ -100,6 +114,7 @@ public class ApiIT {
 
     @TestSecurity(user = "john", roles = {"USER"})
     @Test
+    @DisplayName("JsonRecordResource update")
     void jsonRecordResourceTest_shouldUpdateRecord() {
         // given
         UpdateJsonRecord request = UpdateJsonRecord.builder().build();
@@ -121,6 +136,7 @@ public class ApiIT {
 
     @TestSecurity(user = "john", roles = {"USER"})
     @Test
+    @DisplayName("JsonRecordResource should trigger scheduler only after success create")
     void jsonRecordResourceTest_shouldTriggerSchedulerOnlyAfterSuccess_create() {
         // given
         NewJsonRecord request = NewJsonRecord.builder().build();
@@ -137,6 +153,7 @@ public class ApiIT {
 
     @TestSecurity(user = "john", roles = {"USER"})
     @Test
+    @DisplayName("JsonRecordResource should not trigger scheduler on failure")
     void jsonRecordResourceTest_shouldNotTriggerSchedulerOnFailure() {
         // given
         NewJsonRecord request = NewJsonRecord.builder().build();

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 14:03 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * GlobalExceptionHandler.java
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import su.svn.core.models.dto.ErrorResponse;
+import su.svn.core.models.exceptions.CustomNotFoundException;
 
 import java.util.stream.Collectors;
 /**
@@ -39,14 +40,13 @@ import java.util.stream.Collectors;
  * @author Victor N. Skurikhin
  */
 @Slf4j
-// @RestControllerAdvice
+@RestControllerAdvice
 public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     @ExceptionHandler(ChangeSetPersister.NotFoundException.class)
     public ErrorResponse handleNotFoundException(ChangeSetPersister.NotFoundException e, WebRequest request) {
-        log.info("Entity not found: {}, Request details: {}", e, request);
-        String userFriendlyMessage = "Resource not found";
-        return new ErrorResponse(userFriendlyMessage, System.currentTimeMillis());
+        log.warn("Entity not found, request details: {}", request, e);
+        return new ErrorResponse("Resource not found", System.currentTimeMillis());
     }
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -55,7 +55,8 @@ public class GlobalExceptionHandler {
         String validationErrors = e.getBindingResult().getFieldErrors().stream()
                 .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
                 .collect(Collectors.joining(", "));
-        log.warn("Validation failed: {}, Errors: {}, Request details: {}", e, validationErrors, request);
+        log.warn("Validation failed: Errors: {}, Request details: {}", validationErrors, request);
+        log.debug("Stacktrace:", e);
         return new ErrorResponse("Validation error: " + validationErrors, System.currentTimeMillis());
     }
 
@@ -71,10 +72,17 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(userFriendlyMessage, System.currentTimeMillis());
     }
 
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ExceptionHandler(CustomNotFoundException.class)
+    public ErrorResponse handleCustomNotFound(CustomNotFoundException e, WebRequest request) {
+        log.warn("Resource not found, request details: {}", request, e);
+        return new ErrorResponse("Resource not found", System.currentTimeMillis());
+    }
+
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     @ExceptionHandler(Exception.class)
     public ErrorResponse handleGlobalException(Exception e, WebRequest request) {
-        log.error("Unexpected error: {} {} {}", e.getMessage(), e, request);
+        log.error("Unexpected error: {} {}", e.getMessage(), request, e);
         return new ErrorResponse("An unexpected error occurred", System.currentTimeMillis());
     }
 }

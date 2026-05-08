@@ -2,7 +2,7 @@
  * This file was last modified at 2026.05.08 09:18 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * BaseRecord.java
+ * Tag.java
  * $Id$
  */
 
@@ -14,41 +14,23 @@ import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static lombok.AccessLevel.PRIVATE;
 
-/**
- * Base entity representing a generic record in the system.
- *
- * <p>This entity serves as the root for different record types and supports
- * hierarchical relationships via self-referencing parent linkage.</p>
- *
- * <p>Key features:</p>
- * <ul>
- *     <li>UUID-based identifier</li>
- *     <li>Parent-child relationship</li>
- *     <li>Audit fields (creation/update timestamps)</li>
- *     <li>Soft-delete and visibility flags</li>
- * </ul>
- *
- * <p>Mapped to table {@code core.base_records}.</p>
- */
 @Accessors(fluent = true)
 @AllArgsConstructor
 @Builder
 @Entity
-@EqualsAndHashCode(callSuper = false, exclude = "id")
+@EqualsAndHashCode(callSuper = false, exclude = {"id", "baseRecords"})
 @FieldDefaults(level = PRIVATE)
 @Getter
 @NoArgsConstructor
 @Setter
-@Table(name = "base_records", schema = "core")
-@ToString
-public class BaseRecord {
+@Table(name = "tags", schema = "core")
+@ToString(exclude = "baseRecords")
+public class Tag {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(
@@ -59,21 +41,11 @@ public class BaseRecord {
     )
     UUID id;
 
-    @Column(name = "parent_id", nullable = false)
-    UUID parentId;
-
-    @Builder.Default
-    @Column(name = "type")
-    RecordType type = RecordType.Base;
+    @Column(name = "tag", updatable = false, nullable = false)
+    String tag;
 
     @Column(name = "user_name", nullable = false)
     String userName;
-
-    @Column(name = "post_at", updatable = false, nullable = false)
-    OffsetDateTime postAt;
-
-    @Column(name = "refresh_at")
-    OffsetDateTime refreshAt;
 
     @Column(name = "create_time", updatable = false, nullable = false)
     LocalDateTime createTime;
@@ -95,13 +67,6 @@ public class BaseRecord {
     @Column(name = "flags")
     int flags;
 
-    @ManyToMany
-    @JoinTable(
-            schema = "core",
-            name = "base_records_has_tags",
-            joinColumns = @JoinColumn(name = "base_records_id"),
-            inverseJoinColumns = @JoinColumn(name = "tag_id")
-    )
-    @Builder.Default
-    List<Tag> tags = new ArrayList<>();
+    @ManyToMany(mappedBy = "tags")
+    List<BaseRecord> baseRecords;
 }

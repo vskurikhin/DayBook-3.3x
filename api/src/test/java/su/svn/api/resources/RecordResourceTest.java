@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.model.dto.Page;
-import su.svn.api.profile.ContainersProfile;
 import su.svn.api.profile.NoContainersProfile;
 import su.svn.api.services.domain.RecordDataService;
 
