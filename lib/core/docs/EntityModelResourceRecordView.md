@@ -13,7 +13,8 @@ Name | Type | Description | Notes
 **refresh_at** | Option<**String**> |  | [optional]
 **last_changed_time** | Option<**String**> |  | [optional]
 **title** | Option<**String**> |  | [optional]
-**values** | Option<**std::collections::HashMap<String, String>**> |  | [optional]
+**json** | Option<**std::collections::HashMap<String, String>**> |  | [optional]
+**tags** | Option<**Vec<String>**> |  | [optional]
 **_links** | Option<[**std::collections::HashMap<String, models::Link>**](Link.md)> |  | [optional]
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

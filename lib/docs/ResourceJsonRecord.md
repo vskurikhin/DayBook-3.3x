@@ -11,10 +11,11 @@
 |**visible** | **Boolean** |  |  [optional] |
 |**flags** | **Integer** |  |  [optional] |
 |**parentId** | **UUID** |  |  [optional] |
+|**title** | **String** |  |  [optional] |
+|**json** | **Map&lt;String, String&gt;** |  |  [optional] |
 |**postAt** | **OffsetDateTime** |  |  [optional] |
 |**refreshAt** | **OffsetDateTime** |  |  [optional] |
-|**title** | **String** |  |  [optional] |
-|**values** | **Map&lt;String, String&gt;** |  |  [optional] |
+|**tags** | **Set&lt;String&gt;** |  |  [optional] |
 
 
 

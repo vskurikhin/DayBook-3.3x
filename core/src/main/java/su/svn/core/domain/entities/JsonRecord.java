@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecord.java
@@ -71,9 +71,9 @@ public class JsonRecord {
     @Column(name = "title")
     String title;
 
-    @Column(name = "values")
+    @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)
-    Map<String, String> values;
+    Map<String, String> json;
 
     @Column(name = "user_name", nullable = false)
     String userName;

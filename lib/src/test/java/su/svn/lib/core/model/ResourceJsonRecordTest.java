@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -82,11 +84,11 @@ public class ResourceJsonRecordTest {
     }
 
     /**
-     * Test the property 'values'
+     * Test the property 'json'
      */
     @Test
-    public void valuesTest() {
-        // TODO: test values
+    public void jsonTest() {
+        // TODO: test json
     }
 
     /**
@@ -103,6 +105,14 @@ public class ResourceJsonRecordTest {
     @Test
     public void refreshAtTest() {
         // TODO: test refreshAt
+    }
+
+    /**
+     * Test the property 'tags'
+     */
+    @Test
+    public void tagsTest() {
+        // TODO: test tags
     }
 
 }

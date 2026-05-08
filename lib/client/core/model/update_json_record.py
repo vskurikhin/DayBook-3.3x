@@ -32,12 +32,13 @@ class UpdateJsonRecord(BaseModel):
     id: UUID
     parent_id: UUID = Field(alias="parentId")
     title: Optional[StrictStr] = None
-    values: Optional[Dict[str, StrictStr]] = None
+    var_json: Optional[Dict[str, StrictStr]] = Field(default=None, alias="json")
     post_at: Optional[datetime] = Field(default=None, alias="postAt")
     refresh_at: datetime = Field(alias="refreshAt")
     visible: Optional[StrictBool] = None
     flags: Optional[StrictInt] = None
-    __properties: ClassVar[List[str]] = ["id", "parentId", "title", "values", "postAt", "refreshAt", "visible", "flags"]
+    tags: Optional[List[StrictStr]] = None
+    __properties: ClassVar[List[str]] = ["id", "parentId", "title", "json", "postAt", "refreshAt", "visible", "flags", "tags"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -93,11 +94,12 @@ class UpdateJsonRecord(BaseModel):
             "id": obj.get("id"),
             "parentId": obj.get("parentId") if obj.get("parentId") is not None else '00000000-0000-0000-0000-000000000000',
             "title": obj.get("title"),
-            "values": obj.get("values"),
+            "json": obj.get("json"),
             "postAt": obj.get("postAt"),
             "refreshAt": obj.get("refreshAt"),
             "visible": obj.get("visible"),
-            "flags": obj.get("flags")
+            "flags": obj.get("flags"),
+            "tags": obj.get("tags")
         })
         return _obj
 

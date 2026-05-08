@@ -23,12 +23,14 @@ pub struct ResourceJsonRecord {
     pub parent_id: Option<uuid::Uuid>,
     #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(rename = "values", skip_serializing_if = "Option::is_none")]
-    pub values: Option<std::collections::HashMap<String, String>>,
+    #[serde(rename = "json", skip_serializing_if = "Option::is_none")]
+    pub json: Option<std::collections::HashMap<String, String>>,
     #[serde(rename = "postAt", skip_serializing_if = "Option::is_none")]
     pub post_at: Option<String>,
     #[serde(rename = "refreshAt", skip_serializing_if = "Option::is_none")]
     pub refresh_at: Option<String>,
+    #[serde(rename = "tags", skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
 }
 
 impl ResourceJsonRecord {
@@ -39,9 +41,10 @@ impl ResourceJsonRecord {
             flags: None,
             parent_id: None,
             title: None,
-            values: None,
+            json: None,
             post_at: None,
             refresh_at: None,
+            tags: None,
         }
     }
 }

@@ -85,7 +85,7 @@ class JsonRecordControllerTest {
         ResourceJsonRecord response = ResourceJsonRecord.builder()
                 .id(id)
                 .title("test")
-                .values(Map.of("key", "value"))
+                .json(Map.of("key", "value"))
                 .postAt(OffsetDateTime.now())
                 .visible(true)
                 .flags(1)
@@ -110,7 +110,7 @@ class JsonRecordControllerTest {
 
         NewJsonRecord request = NewJsonRecord.builder()
                 .title("new title")
-                .values(Map.of("a", "b"))
+                .json(Map.of("a", "b"))
                 .postAt(OffsetDateTime.now())
                 .visible(true)
                 .flags(0)
@@ -119,7 +119,7 @@ class JsonRecordControllerTest {
         ResourceJsonRecord response = ResourceJsonRecord.builder()
                 .id(UUID.randomUUID())
                 .title("new title")
-                .values(Map.of("a", "b"))
+                .json(Map.of("a", "b"))
                 .visible(true)
                 .flags(0)
                 .build();

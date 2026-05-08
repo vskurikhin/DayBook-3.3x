@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceRecordView.java
@@ -16,6 +16,7 @@ import lombok.Builder;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,7 +32,8 @@ public record ResourceRecordView(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty String title,
-        @JsonProperty Map<String, String> values
+        @JsonProperty Map<String, String> json,
+        @JsonProperty List<String> tags
 ) implements Serializable {
     @Builder(toBuilder = true)
     public ResourceRecordView {

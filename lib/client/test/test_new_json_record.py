@@ -39,10 +39,13 @@ class TestNewJsonRecord(unittest.TestCase):
                 flags = 56,
                 parent_id = '00000000-0000-0000-0000-000000000000',
                 title = '',
-                values = {
+                var_json = {
                     'key' : ''
                     },
-                post_at = datetime.datetime.strptime('2013-10-20 19:20:30.00', '%Y-%m-%d %H:%M:%S.%f')
+                post_at = datetime.datetime.strptime('2013-10-20 19:20:30.00', '%Y-%m-%d %H:%M:%S.%f'),
+                tags = [
+                    ''
+                    ]
             )
         else:
             return NewJsonRecord(

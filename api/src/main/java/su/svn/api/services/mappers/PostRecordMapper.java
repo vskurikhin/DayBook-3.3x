@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 21:11 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecordMapper.java
@@ -34,6 +34,7 @@ public interface PostRecordMapper {
     @Mapping(target = "localChange", ignore = true)
     PostRecord toEntity(EntityModelResourceRecordView recordView);
 
+    @Deprecated
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     @Mapping(target = "parent", ignore = true)
     @Mapping(target = "sequenceId", ignore = true)
@@ -43,6 +44,7 @@ public interface PostRecordMapper {
     @Mapping(target = "updateTime", ignore = true)
     @Mapping(target = "enabled", ignore = true)
     @Mapping(target = "localChange", ignore = true)
+    @Mapping(source = "values", target = "json")
     PostRecord toEntity(RecordView recordView);
 
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * EntityModelResourceRecordView.java
@@ -29,8 +29,10 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import su.svn.lib.core.model.Link;
@@ -61,7 +63,7 @@ import su.svn.lib.core.JSON;
 /**
  * EntityModelResourceRecordView
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-06T19:35:13.196232+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-08T19:23:51.960842+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class EntityModelResourceRecordView {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
@@ -108,10 +110,15 @@ public class EntityModelResourceRecordView {
   @javax.annotation.Nullable
   private String title;
 
-  public static final String SERIALIZED_NAME_VALUES = "values";
-  @SerializedName(SERIALIZED_NAME_VALUES)
+  public static final String SERIALIZED_NAME_JSON = "json";
+  @SerializedName(SERIALIZED_NAME_JSON)
   @javax.annotation.Nullable
-  private Map<String, String> values = new HashMap<>();
+  private Map<String, String> json = new HashMap<>();
+
+  public static final String SERIALIZED_NAME_TAGS = "tags";
+  @SerializedName(SERIALIZED_NAME_TAGS)
+  @javax.annotation.Nullable
+  private List<String> tags = new ArrayList<>();
 
   public static final String SERIALIZED_NAME_LINKS = "_links";
   @SerializedName(SERIALIZED_NAME_LINKS)
@@ -292,30 +299,57 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView values(@javax.annotation.Nullable Map<String, String> values) {
-    this.values = values;
+  public EntityModelResourceRecordView json(@javax.annotation.Nullable Map<String, String> json) {
+    this.json = json;
     return this;
   }
 
-  public EntityModelResourceRecordView putValuesItem(String key, String valuesItem) {
-    if (this.values == null) {
-      this.values = new HashMap<>();
+  public EntityModelResourceRecordView putJsonItem(String key, String jsonItem) {
+    if (this.json == null) {
+      this.json = new HashMap<>();
     }
-    this.values.put(key, valuesItem);
+    this.json.put(key, jsonItem);
     return this;
   }
 
   /**
-   * Get values
-   * @return values
+   * Get json
+   * @return json
    */
   @javax.annotation.Nullable
-  public Map<String, String> getValues() {
-    return values;
+  public Map<String, String> getJson() {
+    return json;
   }
 
-  public void setValues(@javax.annotation.Nullable Map<String, String> values) {
-    this.values = values;
+  public void setJson(@javax.annotation.Nullable Map<String, String> json) {
+    this.json = json;
+  }
+
+
+  public EntityModelResourceRecordView tags(@javax.annotation.Nullable List<String> tags) {
+    this.tags = tags;
+    return this;
+  }
+
+  public EntityModelResourceRecordView addTagsItem(String tagsItem) {
+    if (this.tags == null) {
+      this.tags = new ArrayList<>();
+    }
+    this.tags.add(tagsItem);
+    return this;
+  }
+
+  /**
+   * Get tags
+   * @return tags
+   */
+  @javax.annotation.Nullable
+  public List<String> getTags() {
+    return tags;
+  }
+
+  public void setTags(@javax.annotation.Nullable List<String> tags) {
+    this.tags = tags;
   }
 
 
@@ -365,13 +399,14 @@ public class EntityModelResourceRecordView {
         Objects.equals(this.refreshAt, entityModelResourceRecordView.refreshAt) &&
         Objects.equals(this.lastChangedTime, entityModelResourceRecordView.lastChangedTime) &&
         Objects.equals(this.title, entityModelResourceRecordView.title) &&
-        Objects.equals(this.values, entityModelResourceRecordView.values) &&
+        Objects.equals(this.json, entityModelResourceRecordView.json) &&
+        Objects.equals(this.tags, entityModelResourceRecordView.tags) &&
         Objects.equals(this.links, entityModelResourceRecordView.links);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, visible, flags, parentId, userName, postAt, refreshAt, lastChangedTime, title, values, links);
+    return Objects.hash(id, visible, flags, parentId, userName, postAt, refreshAt, lastChangedTime, title, json, tags, links);
   }
 
   @Override
@@ -387,7 +422,8 @@ public class EntityModelResourceRecordView {
     sb.append("    refreshAt: ").append(toIndentedString(refreshAt)).append("\n");
     sb.append("    lastChangedTime: ").append(toIndentedString(lastChangedTime)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
-    sb.append("    values: ").append(toIndentedString(values)).append("\n");
+    sb.append("    json: ").append(toIndentedString(json)).append("\n");
+    sb.append("    tags: ").append(toIndentedString(tags)).append("\n");
     sb.append("    links: ").append(toIndentedString(links)).append("\n");
     sb.append("}");
     return sb.toString();
@@ -407,7 +443,7 @@ public class EntityModelResourceRecordView {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "userName", "postAt", "refreshAt", "lastChangedTime", "title", "values", "_links"));
+    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "userName", "postAt", "refreshAt", "lastChangedTime", "title", "json", "tags", "_links"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);
@@ -445,6 +481,10 @@ public class EntityModelResourceRecordView {
       }
       if ((jsonObj.get("title") != null && !jsonObj.get("title").isJsonNull()) && !jsonObj.get("title").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `title` to be a primitive type in the JSON string but got `%s`", jsonObj.get("title").toString()));
+      }
+      // ensure the optional json data is an array if present
+      if (jsonObj.get("tags") != null && !jsonObj.get("tags").isJsonNull() && !jsonObj.get("tags").isJsonArray()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `tags` to be an array in the JSON string but got `%s`", jsonObj.get("tags").toString()));
       }
   }
 

@@ -10,9 +10,10 @@ Name | Type | Description | Notes
 **flags** | **int** |  | [optional] 
 **parent_id** | **UUID** |  | [optional] 
 **title** | **str** |  | [optional] 
-**values** | **Dict[str, str]** |  | [optional] 
+**var_json** | **Dict[str, str]** |  | [optional] 
 **post_at** | **datetime** |  | [optional] 
 **refresh_at** | **datetime** |  | [optional] 
+**tags** | **List[str]** |  | [optional] 
 
 ## Example
 

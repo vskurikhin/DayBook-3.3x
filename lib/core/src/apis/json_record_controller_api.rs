@@ -20,6 +20,7 @@ use super::{Error, configuration, ContentType};
 #[serde(untagged)]
 pub enum CreateJsonRecordError {
     Status400(models::ErrorResponse),
+    Status404(models::ErrorResponse),
     Status500(models::ErrorResponse),
     UnknownValue(serde_json::Value),
 }
@@ -29,6 +30,7 @@ pub enum CreateJsonRecordError {
 #[serde(untagged)]
 pub enum DeleteJsonRecordError {
     Status400(models::ErrorResponse),
+    Status404(models::ErrorResponse),
     Status500(models::ErrorResponse),
     UnknownValue(serde_json::Value),
 }
@@ -37,8 +39,8 @@ pub enum DeleteJsonRecordError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ReadJsonRecordError {
-    Status404(models::ErrorResponse),
     Status400(models::ErrorResponse),
+    Status404(models::ErrorResponse),
     Status500(models::ErrorResponse),
     UnknownValue(serde_json::Value),
 }
@@ -48,6 +50,7 @@ pub enum ReadJsonRecordError {
 #[serde(untagged)]
 pub enum UpdateJsonRecordError {
     Status400(models::ErrorResponse),
+    Status404(models::ErrorResponse),
     Status500(models::ErrorResponse),
     UnknownValue(serde_json::Value),
 }

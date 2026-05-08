@@ -71,6 +71,7 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **400** | Bad Request |  -  |
+**404** | Not Found |  -  |
 **500** | Internal Server Error |  -  |
 **200** | OK |  -  |
 
@@ -133,6 +134,7 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **400** | Bad Request |  -  |
+**404** | Not Found |  -  |
 **500** | Internal Server Error |  -  |
 **200** | OK |  -  |
 
@@ -197,8 +199,8 @@ No authorization required
 
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-**404** | Not Found |  -  |
 **400** | Bad Request |  -  |
+**404** | Not Found |  -  |
 **500** | Internal Server Error |  -  |
 **200** | OK |  -  |
 
@@ -265,6 +267,7 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **400** | Bad Request |  -  |
+**404** | Not Found |  -  |
 **500** | Internal Server Error |  -  |
 **200** | OK |  -  |
 

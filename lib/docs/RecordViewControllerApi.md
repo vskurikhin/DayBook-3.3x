@@ -4,23 +4,23 @@ All URIs are relative to *http://localhost:8081*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
-| [**getAllRecords**](RecordViewControllerApi.md#getAllRecords) | **GET** /core/api/v2/json-records |  |
+| [**getAllRecords**](RecordViewControllerApi.md#getAllRecords) | **GET** /core/api/v2/records-view |  |
 
 
 <a id="getAllRecords"></a>
 # **getAllRecords**
-> PageResourceRecordView getAllRecords(filter, pageable)
+> PagedModelEntityModelResourceRecordView getAllRecords(filter, pageable)
 
 
 
 ### Example
 ```java
 // Import classes:
-import su.svn.ApiClient;
-import su.svn.ApiException;
-import su.svn.Configuration;
-import su.svn.models.*;
-import su.svn.lib.RecordViewControllerApi;
+import su.svn.lib.core.ApiClient;
+import su.svn.lib.core.ApiException;
+import su.svn.lib.core.Configuration;
+import su.svn.lib.core.models.*;
+import su.svn.lib.core.api.RecordViewControllerApi;
 
 public class Example {
   public static void main(String[] args) {
@@ -31,7 +31,7 @@ public class Example {
     ResourceRecordViewFilter filter = new ResourceRecordViewFilter(); // ResourceRecordViewFilter | 
     Pageable pageable = new Pageable(); // Pageable | 
     try {
-      PageResourceRecordView result = apiInstance.getAllRecords(filter, pageable);
+      PagedModelEntityModelResourceRecordView result = apiInstance.getAllRecords(filter, pageable);
       System.out.println(result);
     } catch (ApiException e) {
       System.err.println("Exception when calling RecordViewControllerApi#getAllRecords");
@@ -53,7 +53,7 @@ public class Example {
 
 ### Return type
 
-[**PageResourceRecordView**](PageResourceRecordView.md)
+[**PagedModelEntityModelResourceRecordView**](PagedModelEntityModelResourceRecordView.md)
 
 ### Authorization
 
@@ -67,7 +67,8 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **500** | Internal Server Error |  -  |
 | **400** | Bad Request |  -  |
+| **404** | Not Found |  -  |
+| **500** | Internal Server Error |  -  |
 | **200** | OK |  -  |
 

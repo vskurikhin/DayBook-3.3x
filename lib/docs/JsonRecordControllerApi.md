@@ -4,10 +4,10 @@ All URIs are relative to *http://localhost:8081*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
-| [**createJsonRecord**](JsonRecordControllerApi.md#createJsonRecord) | **POST** /core/api/v2/json-records |  |
-| [**deleteJsonRecord**](JsonRecordControllerApi.md#deleteJsonRecord) | **DELETE** /core/api/v2/json-records/{id} |  |
-| [**readJsonRecord**](JsonRecordControllerApi.md#readJsonRecord) | **GET** /core/api/v2/json-records/{id} |  |
-| [**updateJsonRecord**](JsonRecordControllerApi.md#updateJsonRecord) | **PUT** /core/api/v2/json-records |  |
+| [**createJsonRecord**](JsonRecordControllerApi.md#createJsonRecord) | **POST** /core/api/v2/json-record |  |
+| [**deleteJsonRecord**](JsonRecordControllerApi.md#deleteJsonRecord) | **DELETE** /core/api/v2/json-record/{id} |  |
+| [**readJsonRecord**](JsonRecordControllerApi.md#readJsonRecord) | **GET** /core/api/v2/json-record/{id} |  |
+| [**updateJsonRecord**](JsonRecordControllerApi.md#updateJsonRecord) | **PUT** /core/api/v2/json-record |  |
 
 
 <a id="createJsonRecord"></a>
@@ -19,11 +19,11 @@ All URIs are relative to *http://localhost:8081*
 ### Example
 ```java
 // Import classes:
-import su.svn.ApiClient;
-import su.svn.ApiException;
-import su.svn.Configuration;
-import su.svn.models.*;
-import su.svn.lib.JsonRecordControllerApi;
+import su.svn.lib.core.ApiClient;
+import su.svn.lib.core.ApiException;
+import su.svn.lib.core.Configuration;
+import su.svn.lib.core.models.*;
+import su.svn.lib.core.api.JsonRecordControllerApi;
 
 public class Example {
   public static void main(String[] args) {
@@ -68,8 +68,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **500** | Internal Server Error |  -  |
 | **400** | Bad Request |  -  |
+| **404** | Not Found |  -  |
+| **500** | Internal Server Error |  -  |
 | **200** | OK |  -  |
 
 <a id="deleteJsonRecord"></a>
@@ -81,11 +82,11 @@ No authorization required
 ### Example
 ```java
 // Import classes:
-import su.svn.ApiClient;
-import su.svn.ApiException;
-import su.svn.Configuration;
-import su.svn.models.*;
-import su.svn.lib.JsonRecordControllerApi;
+import su.svn.lib.core.ApiClient;
+import su.svn.lib.core.ApiException;
+import su.svn.lib.core.Configuration;
+import su.svn.lib.core.models.*;
+import su.svn.lib.core.api.JsonRecordControllerApi;
 
 public class Example {
   public static void main(String[] args) {
@@ -129,8 +130,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **500** | Internal Server Error |  -  |
 | **400** | Bad Request |  -  |
+| **404** | Not Found |  -  |
+| **500** | Internal Server Error |  -  |
 | **200** | OK |  -  |
 
 <a id="readJsonRecord"></a>
@@ -142,11 +144,11 @@ No authorization required
 ### Example
 ```java
 // Import classes:
-import su.svn.ApiClient;
-import su.svn.ApiException;
-import su.svn.Configuration;
-import su.svn.models.*;
-import su.svn.lib.JsonRecordControllerApi;
+import su.svn.lib.core.ApiClient;
+import su.svn.lib.core.ApiException;
+import su.svn.lib.core.Configuration;
+import su.svn.lib.core.models.*;
+import su.svn.lib.core.api.JsonRecordControllerApi;
 
 public class Example {
   public static void main(String[] args) {
@@ -191,9 +193,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **500** | Internal Server Error |  -  |
 | **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
+| **500** | Internal Server Error |  -  |
 | **200** | OK |  -  |
 
 <a id="updateJsonRecord"></a>
@@ -205,11 +207,11 @@ No authorization required
 ### Example
 ```java
 // Import classes:
-import su.svn.ApiClient;
-import su.svn.ApiException;
-import su.svn.Configuration;
-import su.svn.models.*;
-import su.svn.lib.JsonRecordControllerApi;
+import su.svn.lib.core.ApiClient;
+import su.svn.lib.core.ApiException;
+import su.svn.lib.core.Configuration;
+import su.svn.lib.core.models.*;
+import su.svn.lib.core.api.JsonRecordControllerApi;
 
 public class Example {
   public static void main(String[] args) {
@@ -254,7 +256,8 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **500** | Internal Server Error |  -  |
 | **400** | Bad Request |  -  |
+| **404** | Not Found |  -  |
+| **500** | Internal Server Error |  -  |
 | **200** | OK |  -  |
 

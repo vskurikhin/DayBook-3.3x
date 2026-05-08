@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.05 22:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordDataService.java
@@ -93,8 +93,8 @@ public class RecordDataService {
                         exsistPostRecord.visible(newItem.visible());
                         exsistPostRecord.flags(newItem.flags());
                         exsistPostRecord.title(newItem.title());
-                        if (newItem.values() != null) {
-                            exsistPostRecord.values(new HashMap<>(newItem.values()));
+                        if (newItem.json() != null) {
+                            exsistPostRecord.json(new HashMap<>(newItem.json()));
                         }
                         map.put(exsistPostRecord.id(), exsistPostRecord);
                     }

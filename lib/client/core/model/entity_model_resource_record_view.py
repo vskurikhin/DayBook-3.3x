@@ -39,9 +39,10 @@ class EntityModelResourceRecordView(BaseModel):
     refresh_at: Optional[datetime] = Field(default=None, alias="refreshAt")
     last_changed_time: Optional[datetime] = Field(default=None, alias="lastChangedTime")
     title: Optional[StrictStr] = None
-    values: Optional[Dict[str, StrictStr]] = None
+    var_json: Optional[Dict[str, StrictStr]] = Field(default=None, alias="json")
+    tags: Optional[List[StrictStr]] = None
     links: Optional[Dict[str, Link]] = Field(default=None, alias="_links")
-    __properties: ClassVar[List[str]] = ["id", "visible", "flags", "parentId", "userName", "postAt", "refreshAt", "lastChangedTime", "title", "values", "_links"]
+    __properties: ClassVar[List[str]] = ["id", "visible", "flags", "parentId", "userName", "postAt", "refreshAt", "lastChangedTime", "title", "json", "tags", "_links"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -110,7 +111,8 @@ class EntityModelResourceRecordView(BaseModel):
             "refreshAt": obj.get("refreshAt"),
             "lastChangedTime": obj.get("lastChangedTime"),
             "title": obj.get("title"),
-            "values": obj.get("values"),
+            "json": obj.get("json"),
+            "tags": obj.get("tags"),
             "_links": dict(
                 (_k, Link.from_dict(_v))
                 for _k, _v in obj["_links"].items()

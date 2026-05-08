@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * EntityModelResourceRecordView.java
@@ -15,10 +15,7 @@ import lombok.Builder;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * EntityModelResourceRecordView
@@ -34,13 +31,15 @@ public record EntityModelResourceRecordView(
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty LocalDateTime lastChangedTime,
         @JsonProperty String title,
-        @JsonProperty Map<String, String> values,
+        @JsonProperty Map<String, String> json,
+        @JsonProperty List<String> tags,
         @JsonProperty("_links") Map<String, Link> links) implements Serializable {
 
     @SuppressWarnings("ReassignedVariable")
     @Builder
     public EntityModelResourceRecordView {
-        if (values == null) values = new LinkedHashMap<>();
+        if (json == null) json = new LinkedHashMap<>();
+        if (tags == null) tags = new ArrayList<>();
         if (links == null) links = new LinkedHashMap<>();
     }
 
@@ -50,7 +49,7 @@ public record EntityModelResourceRecordView(
                 null,
                 OffsetDateTime.now(), null, LocalDateTime.now(),
                 null,
-                new HashMap<>(), new HashMap<>()
+                new HashMap<>(), new ArrayList<>(), new HashMap<>()
         );
     }
 }

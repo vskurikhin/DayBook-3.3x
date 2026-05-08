@@ -38,13 +38,16 @@ class TestUpdateJsonRecord(unittest.TestCase):
                 id = '',
                 parent_id = '00000000-0000-0000-0000-000000000000',
                 title = '',
-                values = {
+                var_json = {
                     'key' : ''
                     },
                 post_at = datetime.datetime.strptime('2013-10-20 19:20:30.00', '%Y-%m-%d %H:%M:%S.%f'),
                 refresh_at = datetime.datetime.strptime('2013-10-20 19:20:30.00', '%Y-%m-%d %H:%M:%S.%f'),
                 visible = True,
-                flags = 56
+                flags = 56,
+                tags = [
+                    ''
+                    ]
             )
         else:
             return UpdateJsonRecord(

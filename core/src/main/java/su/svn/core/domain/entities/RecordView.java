@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.06 22:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordView.java
@@ -18,6 +18,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -38,7 +39,7 @@ import static lombok.AccessLevel.PRIVATE;
  * <ul>
  *     <li>Represents a unified view of record data</li>
  *     <li>Includes hierarchical relationship via {@link #parent}</li>
- *     <li>Supports JSON storage via {@link #values}</li>
+ *     <li>Supports JSON storage via {@link #json}</li>
  *     <li>Contains audit fields such as creation and update timestamps</li>
  *     <li>Supports soft-delete and visibility flags</li>
  * </ul>
@@ -64,7 +65,7 @@ import static lombok.AccessLevel.PRIVATE;
  * </ul>
  *
  * <h2>JSON Support</h2>
- * <p>The {@link #values} field stores structured data in JSON format and is
+ * <p>The {@link #json} field stores structured data in JSON format and is
  * mapped using Hibernate's {@link org.hibernate.annotations.JdbcTypeCode}.</p>
  *
  * <p><b>Note:</b> The {@link #id} field is generated and not insertable/updatable,
@@ -146,7 +147,11 @@ public class RecordView {
     @Column(name = "title")
     String title;
 
-    @Column(name = "values")
+    @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)
-    Map<String, String> values;
+    Map<String, String> json;
+
+    @Column(name = "tags")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    List<String> tags;
 }

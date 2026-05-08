@@ -91,7 +91,7 @@ class RecordViewControllerTest {
         ResourceRecordView response = ResourceRecordView.builder()
                 .id(id)
                 .title("test")
-                .values(Map.of("key", "value"))
+                .json(Map.of("key", "value"))
                 .postAt(OffsetDateTime.now())
                 .visible(true)
                 .flags(1)

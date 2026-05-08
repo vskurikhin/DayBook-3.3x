@@ -92,6 +92,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }
@@ -160,6 +161,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }
@@ -228,6 +230,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }
@@ -368,6 +371,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': None,
         }
@@ -436,6 +440,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': None,
         }
@@ -504,6 +509,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': None,
         }
@@ -630,8 +636,8 @@ class JsonRecordControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '404': "ErrorResponse",
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }
@@ -699,8 +705,8 @@ class JsonRecordControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '404': "ErrorResponse",
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }
@@ -768,8 +774,8 @@ class JsonRecordControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '404': "ErrorResponse",
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }
@@ -897,6 +903,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }
@@ -965,6 +972,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }
@@ -1033,6 +1041,7 @@ class JsonRecordControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "ResourceJsonRecord",
         }

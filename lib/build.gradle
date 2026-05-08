@@ -3,8 +3,7 @@ apply plugin: 'eclipse'
 apply plugin: 'java'
 apply plugin: 'com.diffplug.spotless'
 
-group = 'org.openapitools'
-version = '0.0.1'
+group = 'su.svn'
 
 buildscript {
     repositories {

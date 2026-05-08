@@ -85,6 +85,7 @@ class HelloControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "str",
         }
@@ -149,6 +150,7 @@ class HelloControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "str",
         }
@@ -213,6 +215,7 @@ class HelloControllerApi:
 
         _response_types_map: Dict[str, Optional[str]] = {
             '400': "ErrorResponse",
+            '404': "ErrorResponse",
             '500': "ErrorResponse",
             '200': "str",
         }

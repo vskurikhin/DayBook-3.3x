@@ -31,8 +31,10 @@ pub struct EntityModelResourceRecordView {
     pub last_changed_time: Option<String>,
     #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(rename = "values", skip_serializing_if = "Option::is_none")]
-    pub values: Option<std::collections::HashMap<String, String>>,
+    #[serde(rename = "json", skip_serializing_if = "Option::is_none")]
+    pub json: Option<std::collections::HashMap<String, String>>,
+    #[serde(rename = "tags", skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
     #[serde(rename = "_links", skip_serializing_if = "Option::is_none")]
     pub _links: Option<std::collections::HashMap<String, models::Link>>,
 }
@@ -49,7 +51,8 @@ impl EntityModelResourceRecordView {
             refresh_at: None,
             last_changed_time: None,
             title: None,
-            values: None,
+            json: None,
+            tags: None,
             _links: None,
         }
     }

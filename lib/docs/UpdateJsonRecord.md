@@ -7,14 +7,15 @@
 
 | Name | Type | Description | Notes |
 |------------ | ------------- | ------------- | -------------|
-|**id** | **UUID** |  |  [optional] |
+|**id** | **UUID** |  |  |
 |**parentId** | **UUID** |  |  |
 |**title** | **String** |  |  [optional] |
-|**values** | **Map&lt;String, String&gt;** |  |  [optional] |
+|**json** | **Map&lt;String, String&gt;** |  |  [optional] |
 |**postAt** | **OffsetDateTime** |  |  [optional] |
 |**refreshAt** | **OffsetDateTime** |  |  |
 |**visible** | **Boolean** |  |  [optional] |
 |**flags** | **Integer** |  |  [optional] |
+|**tags** | **Set&lt;String&gt;** |  |  [optional] |
 
 
 
