@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.09 10:37 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordDataService.java
@@ -83,7 +83,7 @@ public class RecordDataService {
         final Map<UUID, PostRecord> map = convertToMap(postRecords);
         return postRecordRepository.readIdIn(map.keySet().stream().toList())
                 .map(pr0 -> pr0.stream().peek(exsistPostRecord -> {
-                    var newItem = map.get(exsistPostRecord.id());
+                    PostRecord newItem = map.get(exsistPostRecord.id());
                     if (newItem != null) {
                         exsistPostRecord.type(newItem.type());
                         exsistPostRecord.userName(newItem.userName());
