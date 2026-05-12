@@ -6,14 +6,16 @@
  * $Id$
  */
 
-package su.svn.api.domain.entities;
+package su.svn.lib;
 
+/**
+ * Enumeration of supported record types.
+ *
+ * <p>Defines the type of content stored in {@link su.svn.core.domain.entities.BaseRecord}.</p>
+ */
 public enum RecordType {
-    Array,
     Base,
     Blob,
-    File,
-    Folder,
     Json,
     Link,
     Markdown,

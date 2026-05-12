@@ -2,7 +2,7 @@
  * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * JsonRecordServiceImpl.java
+ * BlobRecordServiceImpl.java
  * $Id$
  */
 
@@ -19,13 +19,13 @@ import org.springframework.stereotype.Service;
 import su.svn.core.domain.entities.BaseRecord;
 import su.svn.core.domain.entities.Tag;
 import su.svn.core.domain.entities.UserName;
-import su.svn.core.models.dto.NewJsonRecord;
-import su.svn.core.models.dto.ResourceJsonRecord;
-import su.svn.core.models.dto.UpdateJsonRecord;
+import su.svn.core.models.dto.NewBlobRecord;
+import su.svn.core.models.dto.ResourceBlobRecord;
+import su.svn.core.models.dto.UpdateBlobRecord;
 import su.svn.core.models.exceptions.CustomNotFoundException;
-import su.svn.core.repository.JsonRecordRepository;
+import su.svn.core.repository.BlobRecordRepository;
 import su.svn.core.repository.TagRepository;
-import su.svn.core.services.mappers.JsonRecordMapper;
+import su.svn.core.services.mappers.BlobRecordMapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,26 +35,18 @@ import java.util.stream.Collectors;
 
 import static lombok.AccessLevel.PRIVATE;
 
-/**
- * Implementation of {@link JsonRecordService}.
- *
- * <p>Handles business logic for JSON records, including persistence
- * and mapping between entities and DTOs.</p>
- *
- * @author Victor N. Skurikhin
- */
 @FieldDefaults(level = PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
 @Service
 @Slf4j
-public class JsonRecordServiceImpl implements JsonRecordService {
+public class BlobRecordServiceImpl implements BlobRecordService {
 
     public static final String GUEST = "guest";
 
     EntityManager entityManager;
 
-    JsonRecordMapper jsonRecordMapper;
-    JsonRecordRepository jsonRecordRepository;
+    BlobRecordMapper jsonRecordMapper;
+    BlobRecordRepository jsonRecordRepository;
 
     TagRepository tagRepository;
 
@@ -72,7 +64,7 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     }
 
     @Override
-    public ResourceJsonRecord findById(UUID id) {
+    public ResourceBlobRecord findById(UUID id) {
         return jsonRecordMapper.toResource(
                 jsonRecordRepository.findByIdAndEnabledTrue(id)
                         .orElseThrow(CustomNotFoundException::new)
@@ -81,9 +73,9 @@ public class JsonRecordServiceImpl implements JsonRecordService {
 
     @Override
     @Transactional
-    public ResourceJsonRecord save(NewJsonRecord newRecord) {
-        var resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
-        var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+    public ResourceBlobRecord save(NewBlobRecord newRecord) {
+        var resourceBlobRecord = jsonRecordMapper.toResource(newRecord);
+        var jsonRecord = jsonRecordMapper.toEntity(resourceBlobRecord);
         final String username = getUserName();
         jsonRecord.baseRecord().type(su.svn.lib.RecordType.Json);
         jsonRecord.baseRecord().userName(username);
@@ -97,21 +89,21 @@ public class JsonRecordServiceImpl implements JsonRecordService {
 
     @Override
     @Transactional
-    public ResourceJsonRecord update(UpdateJsonRecord updateRecord) {
-        var optionalJsonRecord = jsonRecordRepository.findById(updateRecord.id());
+    public ResourceBlobRecord update(UpdateBlobRecord updateRecord) {
+        var optionalBlobRecord = jsonRecordRepository.findById(updateRecord.id());
         final String username = getUserName();
-        if (username.equals(optionalJsonRecord.orElseThrow().userName())) {
-            var resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
-            var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+        if (username.equals(optionalBlobRecord.orElseThrow().userName())) {
+            var resourceBlobRecord = jsonRecordMapper.toResource(updateRecord);
+            var jsonRecord = jsonRecordMapper.toEntity(resourceBlobRecord);
             jsonRecord.baseRecord()
                     .type(su.svn.lib.RecordType.Json);
             jsonRecord.baseRecord()
-                    .postAt(optionalJsonRecord.orElseThrow()
+                    .postAt(optionalBlobRecord.orElseThrow()
                             .baseRecord()
                             .postAt()
                     );
             jsonRecord.baseRecord()
-                    .userName(optionalJsonRecord.orElseThrow()
+                    .userName(optionalBlobRecord.orElseThrow()
                             .baseRecord()
                             .userName()
                     );

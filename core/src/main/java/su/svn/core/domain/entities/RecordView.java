@@ -72,7 +72,7 @@ import static lombok.AccessLevel.PRIVATE;
  * as it is managed by the database view.</p>
  *
  * @see BaseRecord
- * @see RecordType
+ * @see su.svn.lib.RecordType
  */
 @Accessors(fluent = true)
 @AllArgsConstructor
@@ -107,7 +107,7 @@ public class RecordView {
 
     @Builder.Default
     @Column(name = "type")
-    RecordType type = RecordType.Base;
+    su.svn.lib.RecordType type = su.svn.lib.RecordType.Base;
 
     @Column(name = "user_name", nullable = false)
     String userName;

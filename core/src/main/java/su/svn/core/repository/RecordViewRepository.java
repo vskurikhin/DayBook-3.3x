@@ -21,5 +21,5 @@ import java.util.UUID;
  * <p>Supports pagination and filtering via {@code JpaSpecificationExecutor}.</p>
  */
 @Repository
-public interface JsonRecordViewRepository extends JpaRepository<RecordView, UUID>, JpaSpecificationExecutor<RecordView> {
+public interface RecordViewRepository extends JpaRepository<RecordView, UUID>, JpaSpecificationExecutor<RecordView> {
 }

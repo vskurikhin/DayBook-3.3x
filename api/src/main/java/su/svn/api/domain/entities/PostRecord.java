@@ -151,7 +151,7 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
 
     @Builder.Default
     @Column(name = "type", nullable = false)
-    RecordType type = RecordType.Base;
+    su.svn.lib.RecordType type = su.svn.lib.RecordType.Base;
 
     @Column(name = "user_name", nullable = false)
     String userName;

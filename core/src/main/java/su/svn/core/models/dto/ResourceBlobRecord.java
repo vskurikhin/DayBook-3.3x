@@ -2,33 +2,40 @@
  * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * RecordData.java
+ * ResourceBlobRecord.java
  * $Id$
  */
 
-package su.svn.api.model.dto;
+package su.svn.core.models.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
+@JsonPropertyOrder({"id", "visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record RecordData(
+public record ResourceBlobRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
-        @JsonProperty su.svn.lib.RecordType type,
+        @JsonProperty String title,
+        @JsonProperty byte[] blob,
+        @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,
-        @JsonProperty Boolean visible,
+        @JsonProperty boolean visible,
         @JsonProperty int flags,
-        @JsonProperty String title,
-        @JsonProperty Map<String, String> json) implements Serializable {
-    @Builder
-    public RecordData {
+        @JsonProperty Set<String> tags) implements Serializable {
+    @Builder(toBuilder = true)
+    public ResourceBlobRecord {
+        //noinspection ReassignedVariable
+        if (tags == null) tags = new HashSet<>();
     }
 }
