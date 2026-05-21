@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 09:26 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -189,12 +189,15 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     String title;
 
     @Column(name = "blob")
-    @JdbcTypeCode(SqlTypes.BLOB)
     byte[] blob;
 
     @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)
     Map<String, String> json;
+
+    @Column(name = "texts")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    Set<String> texts;
 
     public static Uni<PostRecord> findByUUID(@Nonnull UUID id) {
         return find("#" + FIND_FIND_BY_UUID, Map.of("id", id)).firstResult();

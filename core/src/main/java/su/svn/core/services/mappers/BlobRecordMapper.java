@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 11:39 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 09:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * BlobRecordMapper.java
@@ -13,7 +13,6 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.ValueMapping;
 import su.svn.core.domain.entities.BlobRecord;
-import su.svn.core.domain.entities.Tag;
 import su.svn.core.models.dto.NewBlobRecord;
 import su.svn.core.models.dto.ResourceBlobRecord;
 import su.svn.core.models.dto.UpdateBlobRecord;
@@ -23,7 +22,7 @@ import su.svn.core.models.dto.UpdateBlobRecord;
         unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE,
         uses = {BaseRecordMapper.class}
 )
-public interface BlobRecordMapper {
+public interface BlobRecordMapper extends TagMapper {
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     @Mapping(source = "baseRecord.parentId", target = "parentId")
     @Mapping(source = "baseRecord.postAt", target = "postAt")
@@ -51,14 +50,4 @@ public interface BlobRecordMapper {
     @Mapping(source = "refreshAt", target = "baseRecord.refreshAt")
     @Mapping(source = "tags", target = "baseRecord.tags")
     BlobRecord toEntity(ResourceBlobRecord record);
-
-    default Tag map(String value) {
-        return Tag.builder()
-                .tag(value)
-                .build();
-    }
-
-    default String map(Tag value) {
-        return value.tag();
-    }
 }

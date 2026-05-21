@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 09:26 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordView.java
@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static lombok.AccessLevel.PRIVATE;
@@ -148,12 +149,15 @@ public class RecordView {
     String title;
 
     @Column(name = "blob")
-    @JdbcTypeCode(SqlTypes.BLOB)
     byte[] blob;
 
     @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)
     Map<String, String> json;
+
+    @Column(name = "texts")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    Set<String> texts;
 
     @Column(name = "tags")
     @JdbcTypeCode(SqlTypes.ARRAY)

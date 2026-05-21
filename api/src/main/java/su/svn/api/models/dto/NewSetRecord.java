@@ -2,44 +2,36 @@
  * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * ResourceRecordView.java
+ * NewSetRecord.java
  * $Id$
  */
 
-package su.svn.core.models.dto;
+package su.svn.api.models.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-@JsonPropertyOrder({"id", "visible", "flags"})
+@JsonPropertyOrder({"visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record ResourceRecordView(
-        @JsonProperty UUID id,
+public record NewSetRecord(
+        @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
-        @JsonProperty su.svn.lib.RecordType type,
-        @JsonProperty String userName,
+        @JsonProperty String title,
+        @JsonProperty Set<String> texts,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty OffsetDateTime postAt,
-        @JsonProperty OffsetDateTime refreshAt,
-        @JsonProperty LocalDateTime lastChangedTime,
         @JsonProperty boolean visible,
         @JsonProperty int flags,
-        @JsonProperty String title,
-        @JsonProperty byte[] blob,
-        @JsonProperty Map<String, String> json,
-        @JsonProperty Set<String> texts,
-        @JsonProperty List<String> tags
-) implements Serializable {
-    @Builder(toBuilder = true)
-    public ResourceRecordView {
+        @JsonProperty Set<String> tags) implements Serializable {
+    @Builder
+    public NewSetRecord {
     }
 }
