@@ -7,8 +7,8 @@ import io.quarkus.security.runtime.QuarkusSecurityIdentity;
 import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import su.svn.api.model.dto.SessionRolesData;
-import su.svn.api.model.dto.UserHasRoles;
+import su.svn.api.models.dto.SessionRolesData;
+import su.svn.api.models.dto.UserHasRoles;
 import su.svn.api.repository.client.rest.AuthRolesClient;
 
 import java.security.Principal;

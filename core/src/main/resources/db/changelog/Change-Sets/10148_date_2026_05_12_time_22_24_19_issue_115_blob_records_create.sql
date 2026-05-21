@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS core.blob_records (
       REFERENCES  core.base_records (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     title         TEXT,
-    blob          BYTEA,
+    blob          BYTEA                         NOT NULL,
     user_name     VARCHAR(64)                   NOT NULL,
       CONSTRAINT  FK_4a13_core_blob_records_security_user_name
       FOREIGN KEY (user_name)

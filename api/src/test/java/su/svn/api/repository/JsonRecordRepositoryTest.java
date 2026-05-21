@@ -1,115 +1,151 @@
 package su.svn.api.repository;
 
-import io.quarkus.test.InjectMock;
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import io.smallrye.mutiny.Uni;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.jboss.logging.MDC;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import su.svn.api.model.dto.NewJsonRecord;
-import su.svn.api.model.dto.ResourceJsonRecord;
-import su.svn.api.model.dto.UpdateJsonRecord;
-import su.svn.api.profile.NoContainersProfile;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import su.svn.api.models.dto.NewJsonRecord;
+import su.svn.api.models.dto.ResourceJsonRecord;
+import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.repository.client.rest.JsonRecordClient;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 
+import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static su.svn.lib.Constants.REQUEST_ID;
 
-@QuarkusTest
-@TestProfile(NoContainersProfile.class)
+@ExtendWith(org.mockito.junit.jupiter.MockitoExtension.class)
 class JsonRecordRepositoryTest {
 
-    @Inject
-    JsonRecordRepository repository;
+    private static final String AUTHORIZATION = "Bearer token";
+    private static final String REQUEST_ID_VALUE = "req-123";
 
-    @InjectMock
-    @RestClient
-    JsonRecordClient client;
+    @Mock
+    JsonRecordClient jsonRecordClient;
 
-    @InjectMock
+    @Mock
     SecurityContextPrincipalHelper principalHelper;
 
-    private static final String AUTH = "Bearer test-token";
+    @InjectMocks
+    JsonRecordRepository jsonRecordRepository;
+
+    UUID id;
 
     @BeforeEach
-    void beforeEach(TestInfo testInfo) {
-        System.err.println("Running: " + testInfo.getDisplayName());
+    void setUp() {
+        id = UUID.randomUUID();
+        MDC.put(REQUEST_ID, REQUEST_ID_VALUE);
+
+        when(principalHelper.authorization())
+                .thenReturn(AUTHORIZATION);
+    }
+
+    @AfterEach
+    void tearDown() {
+        MDC.clear();
     }
 
     @Test
-    @DisplayName("JsonRecordRepository should delete record")
     void shouldDeleteRecord() {
-        // given
-        UUID id = UUID.randomUUID();
-        when(principalHelper.authorization()).thenReturn(AUTH);
-        when(client.delete(eq(AUTH), anyString(), eq(id))).thenReturn(Uni.createFrom().voidItem());
 
-        // when
-        repository.delete(id).await().indefinitely();
+        when(jsonRecordClient.delete(AUTHORIZATION, REQUEST_ID_VALUE, id))
+                .thenReturn(Uni.createFrom().voidItem());
 
-        // then
-        verify(client).delete(eq(AUTH), anyString(), eq(id));
+        Void result = jsonRecordRepository.delete(id)
+                .await().indefinitely();
+
+        assertThat(result).isNull();
+
+        verify(principalHelper).authorization();
+        verify(jsonRecordClient).delete(AUTHORIZATION, REQUEST_ID_VALUE, id);
     }
 
     @Test
-    @DisplayName("JsonRecordRepository should post record")
     void shouldPostRecord() {
-        // given
-        NewJsonRecord request = NewJsonRecord.builder().build();
-        ResourceJsonRecord response = ResourceJsonRecord.builder().build();
 
-        when(principalHelper.authorization()).thenReturn(AUTH);
-        when(client.post(eq(AUTH), anyString(), eq(request))).thenReturn(Uni.createFrom().item(response));
-        org.jboss.logging.MDC.put("REQUEST_ID", UUID.randomUUID().toString());
+        NewJsonRecord request = NewJsonRecord.builder()
+                .parentId(UUID.randomUUID())
+                .title("title")
+                .json(Map.of("key", "value"))
+                .postAt(OffsetDateTime.now())
+                .build();
 
-        // when
-        ResourceJsonRecord result = repository.post(request).await().indefinitely();
+        ResourceJsonRecord expected = ResourceJsonRecord.builder()
+                .id(id)
+                .title("title")
+                .json(Map.of("key", "value"))
+                .build();
 
-        // then
-        assertThat(result).isEqualTo(response);
-        verify(client).post(eq(AUTH), anyString(), eq(request));
+        when(jsonRecordClient.post(AUTHORIZATION, REQUEST_ID_VALUE, request))
+                .thenReturn(Uni.createFrom().item(expected));
+
+        ResourceJsonRecord result = jsonRecordRepository.post(request)
+                .await().indefinitely();
+
+        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(id);
+        assertThat(result.title()).isEqualTo("title");
+
+        verify(principalHelper).authorization();
+        verify(jsonRecordClient).post(AUTHORIZATION, REQUEST_ID_VALUE, request);
     }
 
     @Test
-    @DisplayName("JsonRecordRepository should put record")
     void shouldPutRecord() {
-        // given
-        UpdateJsonRecord request = UpdateJsonRecord.builder().build();
-        ResourceJsonRecord response = ResourceJsonRecord.builder().build();
 
-        when(principalHelper.authorization()).thenReturn(AUTH);
-        when(client.put(eq(AUTH), anyString(), eq(request))).thenReturn(Uni.createFrom().item(response));
-        org.jboss.logging.MDC.put("REQUEST_ID", UUID.randomUUID().toString());
+        UpdateJsonRecord request = UpdateJsonRecord.builder()
+                .id(id)
+                .parentId(UUID.randomUUID())
+                .title("updated")
+                .refreshAt(OffsetDateTime.now())
+                .build();
 
-        // when
-        ResourceJsonRecord result = repository.put(request).await().indefinitely();
+        ResourceJsonRecord expected = ResourceJsonRecord.builder()
+                .id(id)
+                .title("updated")
+                .build();
 
-        // then
-        assertThat(result).isEqualTo(response);
-        verify(client).put(eq(AUTH), anyString(), eq(request));
+        when(jsonRecordClient.put(AUTHORIZATION, REQUEST_ID_VALUE, request))
+                .thenReturn(Uni.createFrom().item(expected));
+
+        ResourceJsonRecord result = jsonRecordRepository.put(request)
+                .await().indefinitely();
+
+        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(id);
+        assertThat(result.title()).isEqualTo("updated");
+
+        verify(principalHelper).authorization();
+        verify(jsonRecordClient).put(AUTHORIZATION, REQUEST_ID_VALUE, request);
     }
 
     @Test
-    @DisplayName("JsonRecordRepository should use authorization from helper")
-    void shouldUseAuthorizationFromHelper() {
-        // given
-        UUID id = UUID.randomUUID();
-        when(principalHelper.authorization()).thenReturn(AUTH);
-        when(client.delete(eq(AUTH), anyString(), eq(id))).thenReturn(Uni.createFrom().voidItem());
-        org.jboss.logging.MDC.put("REQUEST_ID", UUID.randomUUID().toString());
+    void shouldUseNoneRequestIdWhenMdcIsEmpty() {
 
-        // when
-        repository.delete(id).await().indefinitely();
+        MDC.clear();
 
-        // then
-        verify(principalHelper, times(1)).authorization();
+        when(jsonRecordClient.delete(
+                AUTHORIZATION,
+                JsonRecordRepository.NONE,
+                id
+        )).thenReturn(Uni.createFrom().voidItem());
+
+        jsonRecordRepository.delete(id)
+                .await().indefinitely();
+
+        verify(jsonRecordClient).delete(
+                AUTHORIZATION,
+                JsonRecordRepository.NONE,
+                id
+        );
     }
 }

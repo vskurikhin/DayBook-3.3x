@@ -12,6 +12,7 @@ import su.svn.core.domain.entities.JsonRecord;
 import su.svn.core.domain.entities.UserName;
 
 import java.time.*;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +52,7 @@ class JpaTest {
         JsonRecord jsonRecord = JsonRecord.builder()
                 .baseRecord(baseRecord)
                 .userName("root")
+                .json(Map.of())
                 .build();
 
         JsonRecord saved = entityManager.persistAndFlush(jsonRecord);

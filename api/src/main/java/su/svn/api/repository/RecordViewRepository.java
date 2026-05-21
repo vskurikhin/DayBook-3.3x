@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewRepository.java
@@ -14,9 +14,9 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.slf4j.MDC;
 import su.svn.api.domain.entities.PostRecord;
-import su.svn.api.model.dto.Page;
+import su.svn.api.models.dto.Page;
 import su.svn.api.repository.client.rest.RecordViewClient;
-import su.svn.api.services.mappers.PostRecordMapper;
+import su.svn.api.services.mappers.JsonPostRecordMapper;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 
 import java.time.LocalDateTime;
@@ -31,7 +31,7 @@ public class RecordViewRepository {
     public static String SORT_PAGE_PARAMS = "postAt%2CrefreshAt%2Cid%2Cdesc";
 
     @Inject
-    PostRecordMapper postRecordMapper;
+    JsonPostRecordMapper jsonPostRecordMapper;
 
     @Inject
     @RestClient
@@ -47,7 +47,7 @@ public class RecordViewRepository {
                 .map(pageRecordView -> {
                     var list = pageRecordView.embedded().resourceRecordViewList()
                             .stream()
-                            .map(postRecordMapper::toEntity)
+                            .map(jsonPostRecordMapper::toEntity)
                             .toList();
                     return new Page<>(
                             list,
@@ -65,7 +65,7 @@ public class RecordViewRepository {
                 authorization, requestId, pageIndex, size, SORT_LIST_PARAMS, fromTime, true
         ).map(pageRecordView -> pageRecordView.embedded().resourceRecordViewList()
                 .stream()
-                .map(postRecordMapper::toEntity)
+                .map(jsonPostRecordMapper::toEntity)
                 .toList());
     }
 }

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceRecordView.java
@@ -25,6 +25,7 @@ import java.util.UUID;
 public record ResourceRecordView(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
+        @JsonProperty su.svn.lib.RecordType type,
         @JsonProperty String userName,
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,
@@ -32,6 +33,7 @@ public record ResourceRecordView(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty String title,
+        @JsonProperty byte[] blob,
         @JsonProperty Map<String, String> json,
         @JsonProperty List<String> tags
 ) implements Serializable {

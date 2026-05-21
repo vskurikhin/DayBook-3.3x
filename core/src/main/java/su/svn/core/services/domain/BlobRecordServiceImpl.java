@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * BlobRecordServiceImpl.java
@@ -35,12 +35,32 @@ import java.util.stream.Collectors;
 
 import static lombok.AccessLevel.PRIVATE;
 
+/**
+ * Сервис для работы с BlobRecord.
+ * <p>
+ * Выполняет:
+ * <ul>
+ *     <li>создание записей</li>
+ *     <li>обновление записей</li>
+ *     <li>поиск записей</li>
+ *     <li>логическое удаление записей</li>
+ *     <li>обработку тегов</li>
+ * </ul>
+ * </p>
+ *
+ * <p>
+ * Сервис использует Spring Security для получения текущего пользователя.
+ * </p>
+ */
 @FieldDefaults(level = PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
 @Service
 @Slf4j
 public class BlobRecordServiceImpl implements BlobRecordService {
 
+    /**
+     * Имя пользователя по умолчанию для неавторизованных пользователей.
+     */
     public static final String GUEST = "guest";
 
     EntityManager entityManager;
@@ -50,6 +70,16 @@ public class BlobRecordServiceImpl implements BlobRecordService {
 
     TagRepository tagRepository;
 
+    /**
+     * Выполняет логическое удаление записи.
+     * <p>
+     * Запись отключается только если текущий пользователь
+     * является владельцем записи.
+     * </p>
+     *
+     * @param id идентификатор записи
+     * @throws CustomNotFoundException если запись не найдена
+     */
     @Override
     @Transactional
     public void disable(UUID id) {
@@ -63,6 +93,13 @@ public class BlobRecordServiceImpl implements BlobRecordService {
         }
     }
 
+    /**
+     * Возвращает запись по идентификатору.
+     *
+     * @param id идентификатор записи
+     * @return ресурс записи
+     * @throws CustomNotFoundException если запись не найдена
+     */
     @Override
     public ResourceBlobRecord findById(UUID id) {
         return jsonRecordMapper.toResource(
@@ -71,6 +108,12 @@ public class BlobRecordServiceImpl implements BlobRecordService {
         );
     }
 
+    /**
+     * Создает новую запись.
+     *
+     * @param newRecord данные новой записи
+     * @return сохраненная запись
+     */
     @Override
     @Transactional
     public ResourceBlobRecord save(NewBlobRecord newRecord) {
@@ -87,6 +130,13 @@ public class BlobRecordServiceImpl implements BlobRecordService {
         return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
     }
 
+    /**
+     * Обновляет существующую запись.
+     *
+     * @param updateRecord данные обновления
+     * @return обновленная запись
+     * @throws RuntimeException если пользователь не является владельцем записи
+     */
     @Override
     @Transactional
     public ResourceBlobRecord update(UpdateBlobRecord updateRecord) {
@@ -115,6 +165,17 @@ public class BlobRecordServiceImpl implements BlobRecordService {
         throw new RuntimeException("access denied");
     }
 
+    /**
+     * Обновляет список тегов записи.
+     * <p>
+     * Существующие теги загружаются из БД,
+     * отсутствующие создаются автоматически.
+     * </p>
+     *
+     * @param baseRecord запись
+     * @param tags набор тегов
+     * @param username пользователь
+     */
     private void upTagsInBaseRecordFromDB(BaseRecord baseRecord, Set<String> tags, final String username) {
         final List<Tag> existingTags = tagRepository.findByTagIn(tags);
         var existingTagNames = existingTags.stream()
@@ -134,6 +195,11 @@ public class BlobRecordServiceImpl implements BlobRecordService {
         baseRecord.tags(allTags);
     }
 
+    /**
+     * Возвращает имя текущего пользователя.
+     *
+     * @return имя пользователя или {@value #GUEST}
+     */
     private static String getUserName() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return switch (principal) {

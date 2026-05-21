@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordView.java
@@ -144,8 +144,12 @@ public class RecordView {
     @Column(name = "flags")
     int flags;
 
-    @Column(name = "title")
+    @Column(name = "coalesce_title")
     String title;
+
+    @Column(name = "blob")
+    @JdbcTypeCode(SqlTypes.BLOB)
+    byte[] blob;
 
     @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)

@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -53,6 +54,7 @@ class ServicesIT {
                 .parentId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
                 .title("title1")
                 .postAt(postAt)
+                .json(Map.of())
                 .tags(Collections.singleton("tag1"))
                 .build();
 

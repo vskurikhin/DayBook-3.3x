@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordRepository.java
@@ -12,11 +12,10 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
-import org.jboss.logging.Logger;
 import org.jboss.logging.MDC;
-import su.svn.api.model.dto.NewJsonRecord;
-import su.svn.api.model.dto.ResourceJsonRecord;
-import su.svn.api.model.dto.UpdateJsonRecord;
+import su.svn.api.models.dto.NewJsonRecord;
+import su.svn.api.models.dto.ResourceJsonRecord;
+import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.repository.client.rest.JsonRecordClient;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 
@@ -47,7 +46,6 @@ import static su.svn.lib.Constants.REQUEST_ID;
 @ApplicationScoped
 public class JsonRecordRepository {
 
-    private static final Logger LOG = Logger.getLogger(JsonRecordRepository.class);
     public static final String NONE = "NONE";
 
     @Inject

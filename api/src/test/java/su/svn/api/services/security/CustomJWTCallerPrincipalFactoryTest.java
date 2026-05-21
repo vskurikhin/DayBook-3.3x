@@ -5,7 +5,7 @@ import io.quarkus.test.junit.TestProfile;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
-import su.svn.api.model.exceptions.CustomParseException;
+import su.svn.api.models.exceptions.CustomParseException;
 import su.svn.api.profile.NoContainersProfile;
 
 import java.util.UUID;

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 11:52 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordResource.java
@@ -20,9 +20,9 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.jboss.logging.Logger;
 import su.svn.api.domain.enums.ResourcePath;
-import su.svn.api.model.dto.Page;
-import su.svn.api.model.dto.RecordData;
-import su.svn.api.services.domain.RecordDataService;
+import su.svn.api.models.dto.Page;
+import su.svn.api.models.dto.RecordData;
+import su.svn.api.services.domain.JsonRecordDataService;
 import su.svn.api.services.mappers.PageRecordDataMapper;
 
 @Path(ResourcePath.RECORDS)
@@ -34,7 +34,7 @@ public class RecordResource {
     PageRecordDataMapper pageRecordDataMapper;
 
     @Inject
-    RecordDataService recordDataService;
+    JsonRecordDataService jsonRecordDataService;
 
     @APIResponse(ref = "200OK")
     @APIResponse(ref = "500Error")
@@ -43,7 +43,7 @@ public class RecordResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Page<RecordData>> page(@QueryParam("page") int page, @QueryParam("size") byte size) {
-        return recordDataService.readPage(page, size)
+        return jsonRecordDataService.readPage(page, size)
                 .map(postRecordPage -> {
                     LOG.debugf("postRecordPage: %s", postRecordPage);
                     return pageRecordDataMapper.toPage(postRecordPage);
