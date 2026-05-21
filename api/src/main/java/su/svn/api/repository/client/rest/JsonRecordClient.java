@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordClient.java
@@ -13,9 +13,9 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import su.svn.api.domain.enums.ResourcePath;
-import su.svn.api.model.dto.NewJsonRecord;
-import su.svn.api.model.dto.ResourceJsonRecord;
-import su.svn.api.model.dto.UpdateJsonRecord;
+import su.svn.api.models.dto.NewJsonRecord;
+import su.svn.api.models.dto.ResourceJsonRecord;
+import su.svn.api.models.dto.UpdateJsonRecord;
 
 import java.util.UUID;
 

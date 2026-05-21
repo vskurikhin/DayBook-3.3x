@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * CustomJWTCallerPrincipalFactory.java
@@ -15,7 +15,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
-import su.svn.api.model.exceptions.CustomParseException;
+import su.svn.api.models.exceptions.CustomParseException;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Arrays;

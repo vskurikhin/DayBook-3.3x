@@ -13,14 +13,14 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.*;
 import su.svn.api.domain.entities.PostRecord;
-import su.svn.api.model.dto.NewJsonRecord;
-import su.svn.api.model.dto.Page;
-import su.svn.api.model.dto.ResourceJsonRecord;
-import su.svn.api.model.dto.UpdateJsonRecord;
+import su.svn.api.models.dto.NewJsonRecord;
+import su.svn.api.models.dto.Page;
+import su.svn.api.models.dto.ResourceJsonRecord;
+import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.profile.ContainersProfile;
 import su.svn.api.repository.client.rest.RecordViewClient;
 import su.svn.api.resources.JsonRecordResource;
-import su.svn.api.services.domain.RecordDataService;
+import su.svn.api.services.domain.JsonRecordDataService;
 import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.util.UUID;
@@ -39,13 +39,13 @@ public class ApiIT {
     RecordViewClient mockRecordViewClient;
 
     @Inject
-    RecordDataService recordViewRepository;
+    JsonRecordDataService recordViewRepository;
 
     @Inject
     JsonRecordResource resource;
 
     @InjectMock
-    RecordDataService recordDataService;
+    JsonRecordDataService jsonRecordDataService;
 
     @InjectMock
     RecordSchedulerService recordSchedulerService;
@@ -78,7 +78,7 @@ public class ApiIT {
         NewJsonRecord request = NewJsonRecord.builder().build();
         ResourceJsonRecord responseDto = ResourceJsonRecord.builder().build();
 
-        when(recordDataService.post(request))
+        when(jsonRecordDataService.post(request))
                 .thenReturn(Uni.createFrom().item(responseDto));
 
         // when
@@ -99,7 +99,7 @@ public class ApiIT {
         // given
         UUID id = UUID.randomUUID();
 
-        when(recordDataService.delete(id))
+        when(jsonRecordDataService.delete(id))
                 .thenReturn(Uni.createFrom().voidItem());
 
         // when
@@ -120,7 +120,7 @@ public class ApiIT {
         UpdateJsonRecord request = UpdateJsonRecord.builder().build();
         ResourceJsonRecord responseDto = ResourceJsonRecord.builder().build();
 
-        when(recordDataService.put(request))
+        when(jsonRecordDataService.put(request))
                 .thenReturn(Uni.createFrom().item(responseDto));
 
         // when
@@ -141,7 +141,7 @@ public class ApiIT {
         // given
         NewJsonRecord request = NewJsonRecord.builder().build();
 
-        when(recordDataService.post(request))
+        when(jsonRecordDataService.post(request))
                 .thenReturn(Uni.createFrom().item(ResourceJsonRecord.builder().build()));
 
         // when
@@ -158,7 +158,7 @@ public class ApiIT {
         // given
         NewJsonRecord request = NewJsonRecord.builder().build();
 
-        when(recordDataService.post(request))
+        when(jsonRecordDataService.post(request))
                 .thenReturn(Uni.createFrom().failure(new RuntimeException("boom")));
 
         // when / then

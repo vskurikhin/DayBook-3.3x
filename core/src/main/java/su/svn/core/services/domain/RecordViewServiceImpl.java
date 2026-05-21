@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import su.svn.core.domain.entities.RecordView;
 import su.svn.core.models.dto.ResourceRecordView;
 import su.svn.core.models.dto.ResourceRecordViewFilter;
-import su.svn.core.repository.JsonRecordViewRepository;
+import su.svn.core.repository.RecordViewRepository;
 import su.svn.core.repository.specifications.RecordViewSpecificationBuilder;
 import su.svn.core.services.mappers.RecordViewMapper;
 
@@ -38,14 +38,14 @@ import static lombok.AccessLevel.PRIVATE;
 @Slf4j
 public class RecordViewServiceImpl implements RecordViewService {
 
-    JsonRecordViewRepository jsonRecordViewRepository;
+    RecordViewRepository recordViewRepository;
     RecordViewSpecificationBuilder specificationBuilder;
     RecordViewMapper recordViewMapper;
 
     @Override
     public Page<ResourceRecordView> getFilteredRecords(ResourceRecordViewFilter filter, Pageable pageable) {
         Specification<RecordView> specification = specificationBuilder.build(filter);
-        Page<RecordView> records = jsonRecordViewRepository.findAll(specification, pageable);
+        Page<RecordView> records = recordViewRepository.findAll(specification, pageable);
 
         return records.map(recordViewMapper::toResource);
     }

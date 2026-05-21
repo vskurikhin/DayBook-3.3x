@@ -12,14 +12,14 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.*;
 import su.svn.api.domain.entities.PostRecord;
-import su.svn.api.model.dto.EntityModelResourceRecordView;
-import su.svn.api.model.dto.PageMetadata;
-import su.svn.api.model.dto.PagedModelEntityModelResourceRecordView;
-import su.svn.api.model.dto.PagedModelEntityModelResourceRecordViewEmbedded;
+import su.svn.api.models.dto.EntityModelResourceRecordView;
+import su.svn.api.models.dto.PageMetadata;
+import su.svn.api.models.dto.PagedModelEntityModelResourceRecordView;
+import su.svn.api.models.dto.PagedModelEntityModelResourceRecordViewEmbedded;
 import su.svn.api.profile.ContainersProfile;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.client.rest.RecordViewClient;
-import su.svn.api.services.domain.RecordDataService;
+import su.svn.api.services.domain.JsonRecordDataService;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -54,7 +54,7 @@ public class DataBaseIT {
     RecordViewClient mockRecordViewClient;
 
     @Inject
-    RecordDataService recordDataService;
+    JsonRecordDataService jsonRecordDataService;
 
     @BeforeEach
     void beforeEach(TestInfo testInfo) {
@@ -197,7 +197,7 @@ public class DataBaseIT {
     @RunOnVertxContext
     void testRecordDataService(UniAsserter asserter) throws InterruptedException {
         asserter.assertThat(
-                () -> recordDataService.sync(0, 2000)
+                () -> jsonRecordDataService.sync(0, 2000)
                         .flatMap(postRecords -> postRecordRepository.readIdIn(
                                 postRecords.stream().map(PostRecord::id).toList()
                         )),

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordView.java
@@ -72,7 +72,7 @@ import static lombok.AccessLevel.PRIVATE;
  * as it is managed by the database view.</p>
  *
  * @see BaseRecord
- * @see RecordType
+ * @see su.svn.lib.RecordType
  */
 @Accessors(fluent = true)
 @AllArgsConstructor
@@ -107,7 +107,7 @@ public class RecordView {
 
     @Builder.Default
     @Column(name = "type")
-    RecordType type = RecordType.Base;
+    su.svn.lib.RecordType type = su.svn.lib.RecordType.Base;
 
     @Column(name = "user_name", nullable = false)
     String userName;
@@ -144,8 +144,12 @@ public class RecordView {
     @Column(name = "flags")
     int flags;
 
-    @Column(name = "title")
+    @Column(name = "coalesce_title")
     String title;
+
+    @Column(name = "blob")
+    @JdbcTypeCode(SqlTypes.BLOB)
+    byte[] blob;
 
     @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)

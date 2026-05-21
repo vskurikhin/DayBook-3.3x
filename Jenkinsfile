@@ -4,6 +4,9 @@ pipeline {
     stages {
         stage('Build') {
             steps {
+                script {
+                    println "Build number: ${env.BUILD_NUMBER}"
+                }
                 sh 'cd auth ; touch .env ; make'
 
                 // Ensure the gradlew script has executable permissions
@@ -40,19 +43,26 @@ pipeline {
                 }
                 sh """
                     mkdir distributive-${VERSION}
+                    mkdir distributive-${VERSION}/configuration
+                    mkdir distributive-${VERSION}/configuration/api
+                    mkdir distributive-${VERSION}/configuration/auth
+                    mkdir distributive-${VERSION}/configuration/core
                     mkdir distributive-${VERSION}/migrations
                     mkdir distributive-${VERSION}/migrations/api
                     mkdir distributive-${VERSION}/migrations/auth
                     mkdir distributive-${VERSION}/migrations/core
                     cp api/build/api-*-runner distributive-${VERSION}/
+                    cp api/src/main/resources/application.properties distributive-${VERSION}/configuration/api/
                     cp api/src/main/resources/db/changelog/Change-Sets/* distributive-${VERSION}/migrations/api/
                     cp auth/cmd/server/auth-server distributive-${VERSION}/
+                    cp auth/cmd/server/cfg/.auth-server.yaml distributive-${VERSION}/configuration/auth/
                     cp auth/cmd/server/cmd/migrations/* distributive-${VERSION}/migrations/auth/
                     cp core/build/libs/core-*.jar distributive-${VERSION}/
+                    cp core/src/main/resources/application.yaml distributive-${VERSION}/configuration/core/
                     cp core/src/main/resources/db/changelog/Change-Sets/* distributive-${VERSION}/migrations/core/
                 """
-                sh "tar czvf distributive-${VERSION}.tar.gz distributive-${VERSION}"
-                archiveArtifacts artifacts: "distributive-${VERSION}.tar.gz", fingerprint: true
+                sh "tar czvf distributive-${VERSION}-${env.BUILD_NUMBER}.tar.gz distributive-${VERSION}"
+                archiveArtifacts artifacts: "distributive-${VERSION}-${env.BUILD_NUMBER}.tar.gz", fingerprint: true
             }
         }
     }

@@ -17,7 +17,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 import su.svn.core.domain.entities.BaseRecord;
-import su.svn.core.domain.entities.RecordType;
 import su.svn.core.domain.entities.Tag;
 import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.NewJsonRecord;
@@ -86,7 +85,7 @@ public class JsonRecordServiceImpl implements JsonRecordService {
         var resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
         var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
         final String username = getUserName();
-        jsonRecord.baseRecord().type(RecordType.Json);
+        jsonRecord.baseRecord().type(su.svn.lib.RecordType.Json);
         jsonRecord.baseRecord().userName(username);
         jsonRecord.userName(username);
         var baseRecord = jsonRecord.baseRecord();
@@ -105,7 +104,7 @@ public class JsonRecordServiceImpl implements JsonRecordService {
             var resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
             var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
             jsonRecord.baseRecord()
-                    .type(RecordType.Json);
+                    .type(su.svn.lib.RecordType.Json);
             jsonRecord.baseRecord()
                     .postAt(optionalJsonRecord.orElseThrow()
                             .baseRecord()

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -151,7 +151,7 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
 
     @Builder.Default
     @Column(name = "type", nullable = false)
-    RecordType type = RecordType.Base;
+    su.svn.lib.RecordType type = su.svn.lib.RecordType.Base;
 
     @Column(name = "user_name", nullable = false)
     String userName;
@@ -187,6 +187,10 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
 
     @Column(name = "title", columnDefinition = "TEXT")
     String title;
+
+    @Column(name = "blob")
+    @JdbcTypeCode(SqlTypes.BLOB)
+    byte[] blob;
 
     @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)

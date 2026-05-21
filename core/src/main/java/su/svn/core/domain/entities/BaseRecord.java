@@ -64,7 +64,7 @@ public class BaseRecord {
 
     @Builder.Default
     @Column(name = "type")
-    RecordType type = RecordType.Base;
+    su.svn.lib.RecordType type = su.svn.lib.RecordType.Base;
 
     @Column(name = "user_name", nullable = false)
     String userName;

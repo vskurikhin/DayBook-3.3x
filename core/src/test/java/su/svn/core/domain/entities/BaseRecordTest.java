@@ -32,7 +32,7 @@ class BaseRecordTest {
                 .parentId(UUID.randomUUID())
                 .build();
 
-        assertThat(record.type()).isEqualTo(RecordType.Base);
+        assertThat(record.type()).isEqualTo(su.svn.lib.RecordType.Base);
         assertThat(record.enabled()).isTrue();
         assertThat(record.localChange()).isTrue();
     }
