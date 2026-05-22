@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * EntityModelResourceRecordView.java
@@ -35,16 +35,18 @@ public record EntityModelResourceRecordView(
         @JsonProperty String title,
         @JsonProperty byte[] blob,
         @JsonProperty Map<String, String> json,
+        @JsonProperty Set<String> texts,
         @JsonProperty List<String> tags,
         @JsonProperty("_links") Map<String, Link> links) implements Serializable {
 
     @SuppressWarnings("ReassignedVariable")
     @Builder
     public EntityModelResourceRecordView {
-        if (type == null) type = RecordType.Base;
         if (json == null) json = new LinkedHashMap<>();
-        if (tags == null) tags = new ArrayList<>();
         if (links == null) links = new LinkedHashMap<>();
+        if (tags == null) tags = new ArrayList<>();
+        if (texts == null) texts = new HashSet<>();
+        if (type == null) type = RecordType.Base;
     }
 
     public EntityModelResourceRecordView() {
@@ -54,7 +56,8 @@ public record EntityModelResourceRecordView(
                 null,
                 OffsetDateTime.now(), null, LocalDateTime.now(),
                 null, null,
-                new HashMap<>(), new ArrayList<>(), new HashMap<>()
+                new HashMap<>(), new HashSet<>(),
+                new ArrayList<>(), new HashMap<>()
         );
     }
 }

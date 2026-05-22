@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 09:26 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * BlobRecordServiceImpl.java
@@ -13,25 +13,16 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
-import su.svn.core.domain.entities.BaseRecord;
-import su.svn.core.domain.entities.Tag;
-import su.svn.core.domain.entities.UserName;
 import su.svn.core.models.dto.NewBlobRecord;
 import su.svn.core.models.dto.ResourceBlobRecord;
 import su.svn.core.models.dto.UpdateBlobRecord;
 import su.svn.core.models.exceptions.CustomNotFoundException;
 import su.svn.core.repository.BlobRecordRepository;
-import su.svn.core.repository.TagRepository;
 import su.svn.core.services.mappers.BlobRecordMapper;
+import su.svn.lib.RecordType;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static lombok.AccessLevel.PRIVATE;
 
@@ -58,17 +49,12 @@ import static lombok.AccessLevel.PRIVATE;
 @Slf4j
 public class BlobRecordServiceImpl implements BlobRecordService {
 
-    /**
-     * Имя пользователя по умолчанию для неавторизованных пользователей.
-     */
-    public static final String GUEST = "guest";
-
     EntityManager entityManager;
 
-    BlobRecordMapper jsonRecordMapper;
-    BlobRecordRepository jsonRecordRepository;
+    BlobRecordMapper blobRecordMapper;
+    BlobRecordRepository blobRecordRepository;
 
-    TagRepository tagRepository;
+    RecordServiceHelper recordServiceHelper;
 
     /**
      * Выполняет логическое удаление записи.
@@ -83,13 +69,13 @@ public class BlobRecordServiceImpl implements BlobRecordService {
     @Override
     @Transactional
     public void disable(UUID id) {
-        var username = getUserName();
-        var record = jsonRecordRepository.findByIdAndEnabledTrue(id)
+        var username = recordServiceHelper.getUserName();
+        var record = blobRecordRepository.findByIdAndEnabledTrue(id)
                 .orElseThrow(CustomNotFoundException::new);
         if (username.equals(record.userName())) {
             record.baseRecord().enabled(false);
             record.enabled(false);
-            jsonRecordRepository.save(record);
+            blobRecordRepository.save(record);
         }
     }
 
@@ -102,8 +88,8 @@ public class BlobRecordServiceImpl implements BlobRecordService {
      */
     @Override
     public ResourceBlobRecord findById(UUID id) {
-        return jsonRecordMapper.toResource(
-                jsonRecordRepository.findByIdAndEnabledTrue(id)
+        return blobRecordMapper.toResource(
+                blobRecordRepository.findByIdAndEnabledTrue(id)
                         .orElseThrow(CustomNotFoundException::new)
         );
     }
@@ -117,17 +103,17 @@ public class BlobRecordServiceImpl implements BlobRecordService {
     @Override
     @Transactional
     public ResourceBlobRecord save(NewBlobRecord newRecord) {
-        var resourceBlobRecord = jsonRecordMapper.toResource(newRecord);
-        var jsonRecord = jsonRecordMapper.toEntity(resourceBlobRecord);
-        final String username = getUserName();
-        jsonRecord.baseRecord().type(su.svn.lib.RecordType.Json);
-        jsonRecord.baseRecord().userName(username);
-        jsonRecord.userName(username);
-        var baseRecord = jsonRecord.baseRecord();
-        upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
+        var resourceBlobRecord = blobRecordMapper.toResource(newRecord);
+        var blobRecord = blobRecordMapper.toEntity(resourceBlobRecord);
+        final String username = recordServiceHelper.getUserName();
+        blobRecord.baseRecord().type(RecordType.Blob);
+        blobRecord.baseRecord().userName(username);
+        blobRecord.userName(username);
+        var baseRecord = blobRecord.baseRecord();
+        recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
         entityManager.persist(baseRecord);
         entityManager.refresh(baseRecord);
-        return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
+        return blobRecordMapper.toResource(blobRecordRepository.save(blobRecord));
     }
 
     /**
@@ -140,13 +126,13 @@ public class BlobRecordServiceImpl implements BlobRecordService {
     @Override
     @Transactional
     public ResourceBlobRecord update(UpdateBlobRecord updateRecord) {
-        var optionalBlobRecord = jsonRecordRepository.findById(updateRecord.id());
-        final String username = getUserName();
+        var optionalBlobRecord = blobRecordRepository.findById(updateRecord.id());
+        final String username = recordServiceHelper.getUserName();
         if (username.equals(optionalBlobRecord.orElseThrow().userName())) {
-            var resourceBlobRecord = jsonRecordMapper.toResource(updateRecord);
-            var jsonRecord = jsonRecordMapper.toEntity(resourceBlobRecord);
+            var resourceBlobRecord = blobRecordMapper.toResource(updateRecord);
+            var jsonRecord = blobRecordMapper.toEntity(resourceBlobRecord);
             jsonRecord.baseRecord()
-                    .type(su.svn.lib.RecordType.Json);
+                    .type(RecordType.Blob);
             jsonRecord.baseRecord()
                     .postAt(optionalBlobRecord.orElseThrow()
                             .baseRecord()
@@ -159,53 +145,9 @@ public class BlobRecordServiceImpl implements BlobRecordService {
                     );
             jsonRecord.userName(username);
             var baseRecord = jsonRecord.baseRecord();
-            upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
-            return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
+            recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
+            return blobRecordMapper.toResource(blobRecordRepository.save(jsonRecord));
         }
         throw new RuntimeException("access denied");
-    }
-
-    /**
-     * Обновляет список тегов записи.
-     * <p>
-     * Существующие теги загружаются из БД,
-     * отсутствующие создаются автоматически.
-     * </p>
-     *
-     * @param baseRecord запись
-     * @param tags набор тегов
-     * @param username пользователь
-     */
-    private void upTagsInBaseRecordFromDB(BaseRecord baseRecord, Set<String> tags, final String username) {
-        final List<Tag> existingTags = tagRepository.findByTagIn(tags);
-        var existingTagNames = existingTags.stream()
-                .map(Tag::tag)
-                .collect(Collectors.toSet());
-        var newTags = tags.stream()
-                .filter(tag -> !existingTagNames.contains(tag))
-                .map(tag -> Tag.builder()
-                        .tag(tag)
-                        .userName(username)
-                        .build())
-                .toList();
-        var savedNewTags = tagRepository.saveAll(newTags);
-        List<Tag> allTags = new ArrayList<>();
-        allTags.addAll(existingTags);
-        allTags.addAll(savedNewTags);
-        baseRecord.tags(allTags);
-    }
-
-    /**
-     * Возвращает имя текущего пользователя.
-     *
-     * @return имя пользователя или {@value #GUEST}
-     */
-    private static String getUserName() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return switch (principal) {
-            case UserName userName -> userName.userName();
-            case User user -> user.getUsername();
-            default -> GUEST;
-        };
     }
 }

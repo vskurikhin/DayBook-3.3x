@@ -7,10 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
 import su.svn.core.domain.entities.BaseRecord;
 import su.svn.core.domain.entities.BlobRecord;
 import su.svn.core.models.dto.NewBlobRecord;
@@ -18,16 +15,20 @@ import su.svn.core.models.dto.ResourceBlobRecord;
 import su.svn.core.models.dto.UpdateBlobRecord;
 import su.svn.core.models.exceptions.CustomNotFoundException;
 import su.svn.core.repository.BlobRecordRepository;
-import su.svn.core.repository.TagRepository;
 import su.svn.core.services.domain.BlobRecordServiceImpl;
+import su.svn.core.services.domain.RecordServiceHelper;
 import su.svn.core.services.mappers.BlobRecordMapper;
 
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BlobRecordServiceImplTest {
@@ -41,11 +42,11 @@ class BlobRecordServiceImplTest {
     @Mock
     BlobRecordRepository repository;
 
-    @Mock
-    TagRepository tagRepository;
-
     @InjectMocks
     BlobRecordServiceImpl service;
+
+    @Mock
+    RecordServiceHelper recordServiceHelper;
 
     @BeforeEach
     void setUp() {
@@ -136,11 +137,11 @@ class BlobRecordServiceImplTest {
         when(mapper.toResource(entity))
                 .thenReturn(resource);
 
-        when(tagRepository.findByTagIn(any()))
-                .thenReturn(List.of());
+//        when(tagRepository.findByTagIn(any()))
+//                .thenReturn(List.of());
 
-        when(tagRepository.saveAll(any()))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+//        when(tagRepository.saveAll(any()))
+//                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ResourceBlobRecord result = service.save(request);
 
@@ -189,11 +190,11 @@ class BlobRecordServiceImplTest {
         when(mapper.toEntity(resource))
                 .thenReturn(updatedEntity);
 
-        when(tagRepository.findByTagIn(any()))
-                .thenReturn(List.of());
+//        when(tagRepository.findByTagIn(any()))
+//                .thenReturn(List.of());
 
-        when(tagRepository.saveAll(any()))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+//        when(tagRepository.saveAll(any()))
+//                .thenAnswer(invocation -> invocation.getArgument(0));
 
         when(repository.save(updatedEntity))
                 .thenReturn(updatedEntity);
@@ -230,21 +231,8 @@ class BlobRecordServiceImplTest {
     }
 
     private void mockAuthentication(String username) {
-        Authentication auth = mock(Authentication.class);
 
-        when(auth.getPrincipal())
-                .thenReturn(
-                        User.builder()
-                                .username(username)
-                                .password("password")
-                                .roles("USER")
-                                .build()
-                );
-
-        SecurityContext context = mock(SecurityContext.class);
-
-        when(context.getAuthentication()).thenReturn(auth);
-
-        SecurityContextHolder.setContext(context);
+        when(recordServiceHelper.getUserName())
+                .thenReturn("root");
     }
 }

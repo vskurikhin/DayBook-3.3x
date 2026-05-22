@@ -2,7 +2,7 @@
  * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * JsonRecordServiceImpl.java
+ * SetRecordServiceImpl.java
  * $Id$
  */
 
@@ -14,35 +14,42 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import su.svn.core.models.dto.NewJsonRecord;
-import su.svn.core.models.dto.ResourceJsonRecord;
-import su.svn.core.models.dto.UpdateJsonRecord;
+import su.svn.core.models.dto.NewSetRecord;
+import su.svn.core.models.dto.ResourceSetRecord;
+import su.svn.core.models.dto.UpdateSetRecord;
 import su.svn.core.models.exceptions.CustomNotFoundException;
-import su.svn.core.repository.JsonRecordRepository;
-import su.svn.core.services.mappers.JsonRecordMapper;
+import su.svn.core.repository.SetRecordRepository;
+import su.svn.core.services.mappers.SetRecordMapper;
+import su.svn.lib.RecordType;
 
 import java.util.UUID;
 
 import static lombok.AccessLevel.PRIVATE;
 
 /**
- * Implementation of {@link JsonRecordService}.
+ * Default implementation of {@link SetRecordService}.
  *
- * <p>Handles business logic for JSON records, including persistence
- * and mapping between entities and DTOs.</p>
+ * <p>This service manages persistence and update operations
+ * for {@link su.svn.core.domain.entities.SetRecord} entities.</p>
  *
- * @author Victor N. Skurikhin
+ * <p>The implementation also performs:
+ * <ul>
+ *     <li>User ownership validation</li>
+ *     <li>Tag synchronization</li>
+ *     <li>Logical deletion</li>
+ * </ul>
+ * </p>
  */
 @FieldDefaults(level = PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
 @Service
 @Slf4j
-public class JsonRecordServiceImpl implements JsonRecordService {
+public class SetRecordServiceImpl implements SetRecordService {
 
     EntityManager entityManager;
 
-    JsonRecordMapper jsonRecordMapper;
-    JsonRecordRepository jsonRecordRepository;
+    SetRecordMapper setRecordMapper;
+    SetRecordRepository setRecordRepository;
 
     RecordServiceHelper recordServiceHelper;
 
@@ -50,63 +57,63 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     @Transactional
     public void disable(UUID id) {
         var username = recordServiceHelper.getUserName();
-        var record = jsonRecordRepository.findByIdAndEnabledTrue(id)
+        var record = setRecordRepository.findByIdAndEnabledTrue(id)
                 .orElseThrow(CustomNotFoundException::new);
         if (username.equals(record.userName())) {
             record.baseRecord().enabled(false);
             record.enabled(false);
-            jsonRecordRepository.save(record);
+            setRecordRepository.save(record);
         }
     }
 
     @Override
-    public ResourceJsonRecord findById(UUID id) {
-        return jsonRecordMapper.toResource(
-                jsonRecordRepository.findByIdAndEnabledTrue(id)
+    public ResourceSetRecord findById(UUID id) {
+        return setRecordMapper.toResource(
+                setRecordRepository.findByIdAndEnabledTrue(id)
                         .orElseThrow(CustomNotFoundException::new)
         );
     }
 
     @Override
     @Transactional
-    public ResourceJsonRecord save(NewJsonRecord newRecord) {
-        var resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
-        var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+    public ResourceSetRecord save(NewSetRecord newRecord) {
+        var resourceSetRecord = setRecordMapper.toResource(newRecord);
+        var jsonRecord = setRecordMapper.toEntity(resourceSetRecord);
         final String username = recordServiceHelper.getUserName();
-        jsonRecord.baseRecord().type(su.svn.lib.RecordType.Json);
+        jsonRecord.baseRecord().type(RecordType.Set);
         jsonRecord.baseRecord().userName(username);
         jsonRecord.userName(username);
         var baseRecord = jsonRecord.baseRecord();
         recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
         entityManager.persist(baseRecord);
         entityManager.refresh(baseRecord);
-        return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
+        return setRecordMapper.toResource(setRecordRepository.save(jsonRecord));
     }
 
     @Override
     @Transactional
-    public ResourceJsonRecord update(UpdateJsonRecord updateRecord) {
-        var optionalJsonRecord = jsonRecordRepository.findById(updateRecord.id());
+    public ResourceSetRecord update(UpdateSetRecord updateRecord) {
+        var optionalSetRecord = setRecordRepository.findById(updateRecord.id());
         final String username = recordServiceHelper.getUserName();
-        if (username.equals(optionalJsonRecord.orElseThrow().userName())) {
-            var resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
-            var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+        if (username.equals(optionalSetRecord.orElseThrow().userName())) {
+            var resourceSetRecord = setRecordMapper.toResource(updateRecord);
+            var jsonRecord = setRecordMapper.toEntity(resourceSetRecord);
             jsonRecord.baseRecord()
-                    .type(su.svn.lib.RecordType.Json);
+                    .type(RecordType.Set);
             jsonRecord.baseRecord()
-                    .postAt(optionalJsonRecord.orElseThrow()
+                    .postAt(optionalSetRecord.orElseThrow()
                             .baseRecord()
                             .postAt()
                     );
             jsonRecord.baseRecord()
-                    .userName(optionalJsonRecord.orElseThrow()
+                    .userName(optionalSetRecord.orElseThrow()
                             .baseRecord()
                             .userName()
                     );
             jsonRecord.userName(username);
             var baseRecord = jsonRecord.baseRecord();
             recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
-            return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
+            return setRecordMapper.toResource(setRecordRepository.save(jsonRecord));
         }
         throw new RuntimeException("access denied");
     }

@@ -2,7 +2,7 @@
  * This file was last modified at 2026.05.22 09:26 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * BlobRecord.java
+ * SetRecord.java
  * $Id$
  */
 
@@ -13,13 +13,24 @@ import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 import static lombok.AccessLevel.PRIVATE;
 
+/**
+ * Entity representing a set-based record stored in the system.
+ *
+ * <p>This entity contains a collection of unique string values along with
+ * metadata such as visibility, flags, ownership, and audit timestamps.</p>
+ *
+ * <p>The entity is linked one-to-one with {@link BaseRecord} using a shared identifier.</p>
+ */
 @Accessors(fluent = true)
 @AllArgsConstructor
 @Builder
@@ -29,9 +40,9 @@ import static lombok.AccessLevel.PRIVATE;
 @Getter
 @NoArgsConstructor
 @Setter
-@Table(name = "blob_records", schema = "core")
+@Table(name = "set_records", schema = "core")
 @ToString(exclude = "baseRecord")
-public class BlobRecord {
+public class SetRecord {
     @Id
     @Column(name = "id", updatable = false)
     UUID id;
@@ -47,8 +58,9 @@ public class BlobRecord {
     @Column(name = "title")
     String title;
 
-    @Column(name = "blob", nullable = false)
-    byte[] blob;
+    @Column(name = "texts", nullable = false)
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    Set<String> texts;
 
     @Column(name = "user_name", nullable = false)
     String userName;
