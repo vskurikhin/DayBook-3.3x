@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordRepository.java
@@ -50,7 +50,7 @@ public class JsonRecordRepository {
 
     @Inject
     @RestClient
-    JsonRecordClient jsonRecordClient;
+    JsonRecordClient client;
 
     @Inject
     SecurityContextPrincipalHelper principalHelper;
@@ -58,18 +58,18 @@ public class JsonRecordRepository {
     public Uni<Void> delete(UUID id) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return jsonRecordClient.delete(authorization, requestId, id);
+        return client.delete(authorization, requestId, id);
     }
 
     public Uni<ResourceJsonRecord> post(NewJsonRecord newJsonRecord) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return jsonRecordClient.post(authorization, requestId, newJsonRecord);
+        return client.post(authorization, requestId, newJsonRecord);
     }
 
     public Uni<ResourceJsonRecord> put(UpdateJsonRecord updateJsonRecord) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return jsonRecordClient.put(authorization, requestId, updateJsonRecord);
+        return client.put(authorization, requestId, updateJsonRecord);
     }
 }

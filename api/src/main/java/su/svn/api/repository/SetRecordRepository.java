@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * SetRecordRepository.java
@@ -31,7 +31,7 @@ public class SetRecordRepository {
 
     @Inject
     @RestClient
-    SetRecordClient setRecordClient;
+    SetRecordClient client;
 
     @Inject
     SecurityContextPrincipalHelper principalHelper;
@@ -39,18 +39,18 @@ public class SetRecordRepository {
     public Uni<Void> delete(UUID id) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return setRecordClient.delete(authorization, requestId, id);
+        return client.delete(authorization, requestId, id);
     }
 
     public Uni<ResourceSetRecord> post(NewSetRecord newJsonRecord) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return setRecordClient.post(authorization, requestId, newJsonRecord);
+        return client.post(authorization, requestId, newJsonRecord);
     }
 
     public Uni<ResourceSetRecord> put(UpdateSetRecord updateJsonRecord) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return setRecordClient.put(authorization, requestId, updateJsonRecord);
+        return client.put(authorization, requestId, updateJsonRecord);
     }
 }

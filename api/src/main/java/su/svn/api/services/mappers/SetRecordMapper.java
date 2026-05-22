@@ -1,8 +1,8 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 19:39 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * JsonPostRecordMapper.java
+ * SetRecordMapper.java
  * $Id$
  */
 
@@ -14,12 +14,11 @@ import org.mapstruct.MappingConstants;
 import org.mapstruct.ValueMapping;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.EntityModelResourceRecordView;
-import su.svn.api.models.dto.RecordView;
-import su.svn.api.models.dto.ResourceJsonRecord;
-import su.svn.api.models.dto.UpdateJsonRecord;
+import su.svn.api.models.dto.ResourceSetRecord;
+import su.svn.api.models.dto.UpdateSetRecord;
 
 @Mapper(componentModel = "cdi")
-public interface JsonPostRecordMapper extends DateTimeMapper {
+public interface SetRecordMapper extends DateTimeMapper {
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     @Mapping(target = "parent", ignore = true)
     @Mapping(target = "sequenceId", ignore = true)
@@ -28,6 +27,13 @@ public interface JsonPostRecordMapper extends DateTimeMapper {
     @Mapping(target = "updateTime", ignore = true)
     @Mapping(target = "enabled", ignore = true)
     @Mapping(target = "localChange", ignore = true)
+    @Mapping(target = "blob", ignore = true)
+    @Mapping(target = "json", ignore = true)
+    @Mapping(target = "fileName", ignore = true)
+    @Mapping(target = "html", ignore = true)
+    @Mapping(target = "link", ignore = true)
+    @Mapping(target = "markdown", ignore = true)
+    @Mapping(target = "value", ignore = true)
     PostRecord toEntity(EntityModelResourceRecordView recordView);
 
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
@@ -40,25 +46,14 @@ public interface JsonPostRecordMapper extends DateTimeMapper {
     @Mapping(target = "enabled", ignore = true)
     @Mapping(target = "localChange", ignore = true)
     @Mapping(target = "blob", ignore = true)
-    @Mapping(target = "texts", ignore = true)
-    PostRecord toEntity(UpdateJsonRecord updateJsonRecord);
+    @Mapping(target = "json", ignore = true)
+    @Mapping(target = "fileName", ignore = true)
+    @Mapping(target = "html", ignore = true)
+    @Mapping(target = "link", ignore = true)
+    @Mapping(target = "markdown", ignore = true)
+    @Mapping(target = "value", ignore = true)
+    PostRecord toEntity(UpdateSetRecord record);
 
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
-    ResourceJsonRecord toResource(PostRecord postRecord);
-
-    // DEPRECATED
-    @Deprecated
-    @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
-    @Mapping(target = "parent", ignore = true)
-    @Mapping(target = "sequenceId", ignore = true)
-    @Mapping(target = "type", ignore = true)
-    @Mapping(target = "userName", constant = "root")
-    @Mapping(target = "createTime", ignore = true)
-    @Mapping(target = "updateTime", ignore = true)
-    @Mapping(target = "enabled", ignore = true)
-    @Mapping(target = "localChange", ignore = true)
-    @Mapping(source = "values", target = "json")
-    @Mapping(target = "blob", ignore = true)
-    @Mapping(target = "texts", ignore = true)
-    PostRecord toEntity(RecordView recordView);
+    ResourceSetRecord toResource(PostRecord postRecord);
 }

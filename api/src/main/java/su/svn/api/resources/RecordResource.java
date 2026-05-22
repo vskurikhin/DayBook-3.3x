@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordResource.java
@@ -31,10 +31,10 @@ public class RecordResource {
     private static final Logger LOG = Logger.getLogger(RecordResource.class);
 
     @Inject
-    PageRecordDataMapper pageRecordDataMapper;
+    PageRecordDataMapper mapper;
 
     @Inject
-    JsonRecordDataService jsonRecordDataService;
+    JsonRecordDataService service;
 
     @APIResponse(ref = "200OK")
     @APIResponse(ref = "500Error")
@@ -43,10 +43,10 @@ public class RecordResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Page<RecordData>> page(@QueryParam("page") int page, @QueryParam("size") byte size) {
-        return jsonRecordDataService.readPage(page, size)
+        return service.readPage(page, size)
                 .map(postRecordPage -> {
                     LOG.debugf("postRecordPage: %s", postRecordPage);
-                    return pageRecordDataMapper.toPage(postRecordPage);
+                    return mapper.toPage(postRecordPage);
                 });
     }
 }

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * EntityModelResourceRecordView.java
@@ -36,6 +36,11 @@ public record EntityModelResourceRecordView(
         @JsonProperty byte[] blob,
         @JsonProperty Map<String, String> json,
         @JsonProperty Set<String> texts,
+        @JsonProperty String fileName,
+        @JsonProperty String html,
+        @JsonProperty String link,
+        @JsonProperty String markdown,
+        @JsonProperty String value,
         @JsonProperty List<String> tags,
         @JsonProperty("_links") Map<String, Link> links) implements Serializable {
 
@@ -57,6 +62,7 @@ public record EntityModelResourceRecordView(
                 OffsetDateTime.now(), null, LocalDateTime.now(),
                 null, null,
                 new HashMap<>(), new HashSet<>(),
+                null, null, null, null, null,
                 new ArrayList<>(), new HashMap<>()
         );
     }

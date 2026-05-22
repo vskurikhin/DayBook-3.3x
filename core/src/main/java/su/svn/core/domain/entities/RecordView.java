@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 09:26 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordView.java
@@ -158,6 +158,21 @@ public class RecordView {
     @Column(name = "texts")
     @JdbcTypeCode(SqlTypes.ARRAY)
     Set<String> texts;
+
+    @Column(name = "file_name")
+    String fileName;
+
+    @Column(name = "html")
+    String html;
+
+    @Column(name = "link")
+    String link;
+
+    @Column(name = "markdown")
+    String markdown;
+
+    @Column(name = "value")
+    String value;
 
     @Column(name = "tags")
     @JdbcTypeCode(SqlTypes.ARRAY)

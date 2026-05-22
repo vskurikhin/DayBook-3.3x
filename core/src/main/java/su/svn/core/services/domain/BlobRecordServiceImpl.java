@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 09:26 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * BlobRecordServiceImpl.java
@@ -104,16 +104,16 @@ public class BlobRecordServiceImpl implements BlobRecordService {
     @Transactional
     public ResourceBlobRecord save(NewBlobRecord newRecord) {
         var resourceBlobRecord = blobRecordMapper.toResource(newRecord);
-        var blobRecord = blobRecordMapper.toEntity(resourceBlobRecord);
+        var record = blobRecordMapper.toEntity(resourceBlobRecord);
         final String username = recordServiceHelper.getUserName();
-        blobRecord.baseRecord().type(RecordType.Blob);
-        blobRecord.baseRecord().userName(username);
-        blobRecord.userName(username);
-        var baseRecord = blobRecord.baseRecord();
+        record.baseRecord().type(RecordType.Blob);
+        record.baseRecord().userName(username);
+        record.userName(username);
+        var baseRecord = record.baseRecord();
         recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
         entityManager.persist(baseRecord);
         entityManager.refresh(baseRecord);
-        return blobRecordMapper.toResource(blobRecordRepository.save(blobRecord));
+        return blobRecordMapper.toResource(blobRecordRepository.save(record));
     }
 
     /**
@@ -130,23 +130,23 @@ public class BlobRecordServiceImpl implements BlobRecordService {
         final String username = recordServiceHelper.getUserName();
         if (username.equals(optionalBlobRecord.orElseThrow().userName())) {
             var resourceBlobRecord = blobRecordMapper.toResource(updateRecord);
-            var jsonRecord = blobRecordMapper.toEntity(resourceBlobRecord);
-            jsonRecord.baseRecord()
+            var record = blobRecordMapper.toEntity(resourceBlobRecord);
+            record.baseRecord()
                     .type(RecordType.Blob);
-            jsonRecord.baseRecord()
+            record.baseRecord()
                     .postAt(optionalBlobRecord.orElseThrow()
                             .baseRecord()
                             .postAt()
                     );
-            jsonRecord.baseRecord()
+            record.baseRecord()
                     .userName(optionalBlobRecord.orElseThrow()
                             .baseRecord()
                             .userName()
                     );
-            jsonRecord.userName(username);
-            var baseRecord = jsonRecord.baseRecord();
+            record.userName(username);
+            var baseRecord = record.baseRecord();
             recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
-            return blobRecordMapper.toResource(blobRecordRepository.save(jsonRecord));
+            return blobRecordMapper.toResource(blobRecordRepository.save(record));
         }
         throw new RuntimeException("access denied");
     }

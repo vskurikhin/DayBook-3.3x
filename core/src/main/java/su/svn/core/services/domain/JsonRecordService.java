@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.03 19:13 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordService.java
@@ -8,7 +8,6 @@
 
 package su.svn.core.services.domain;
 
-import org.springframework.data.crossstore.ChangeSetPersister;
 import su.svn.core.domain.entities.JsonRecord;
 import su.svn.core.models.dto.NewJsonRecord;
 import su.svn.core.models.dto.ResourceJsonRecord;

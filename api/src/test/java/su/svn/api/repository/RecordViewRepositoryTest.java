@@ -11,7 +11,7 @@ import org.slf4j.MDC;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.*;
 import su.svn.api.repository.client.rest.RecordViewClient;
-import su.svn.api.services.mappers.JsonPostRecordMapper;
+import su.svn.api.services.mappers.JsonRecordMapper;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 import su.svn.lib.RecordType;
 
@@ -30,7 +30,7 @@ import static su.svn.lib.Constants.REQUEST_ID;
 class RecordViewRepositoryTest {
 
     @Mock
-    private JsonPostRecordMapper jsonPostRecordMapper;
+    private JsonRecordMapper jsonRecordMapper;
 
     @Mock
     private RecordViewClient recordViewClient;
@@ -103,7 +103,7 @@ class RecordViewRepositoryTest {
                 eq(RecordViewRepository.SORT_PAGE_PARAMS)
         )).thenReturn(Uni.createFrom().item(pageModel));
 
-        when(jsonPostRecordMapper.toEntity(entityModel))
+        when(jsonRecordMapper.toEntity(entityModel))
                 .thenReturn(postRecord);
 
         // when
@@ -129,7 +129,7 @@ class RecordViewRepositoryTest {
                 RecordViewRepository.SORT_PAGE_PARAMS
         );
 
-        verify(jsonPostRecordMapper).toEntity(entityModel);
+        verify(jsonRecordMapper).toEntity(entityModel);
     }
 
     @Test
@@ -178,7 +178,7 @@ class RecordViewRepositoryTest {
                 eq(true)
         )).thenReturn(Uni.createFrom().item(pageModel));
 
-        when(jsonPostRecordMapper.toEntity(entityModel))
+        when(jsonRecordMapper.toEntity(entityModel))
                 .thenReturn(postRecord);
 
         // when
@@ -202,7 +202,7 @@ class RecordViewRepositoryTest {
                 true
         );
 
-        verify(jsonPostRecordMapper).toEntity(entityModel);
+        verify(jsonRecordMapper).toEntity(entityModel);
     }
 
     @Test

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * BlobRecordRepository.java
@@ -31,7 +31,7 @@ public class BlobRecordRepository {
 
     @Inject
     @RestClient
-    BlobRecordClient blobRecordClient;
+    BlobRecordClient client;
 
     @Inject
     SecurityContextPrincipalHelper principalHelper;
@@ -39,18 +39,18 @@ public class BlobRecordRepository {
     public Uni<Void> delete(UUID id) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return blobRecordClient.delete(authorization, requestId, id);
+        return client.delete(authorization, requestId, id);
     }
 
     public Uni<ResourceBlobRecord> post(NewBlobRecord newJsonRecord) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return blobRecordClient.post(authorization, requestId, newJsonRecord);
+        return client.post(authorization, requestId, newJsonRecord);
     }
 
     public Uni<ResourceBlobRecord> put(UpdateBlobRecord updateJsonRecord) {
         var authorization = principalHelper.authorization();
         var requestId = Objects.toString(MDC.get(REQUEST_ID), NONE);
-        return blobRecordClient.put(authorization, requestId, updateJsonRecord);
+        return client.put(authorization, requestId, updateJsonRecord);
     }
 }

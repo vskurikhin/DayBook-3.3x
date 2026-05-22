@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * SetRecordResource.java
@@ -24,15 +24,46 @@ import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.util.UUID;
 
+/**
+ * Reactive REST resource for managing set records.
+ *
+ * <p>
+ * Provides endpoints for creating, updating, and deleting
+ * set-based records within the system.
+ * </p>
+ *
+ * <p>
+ * All operations are asynchronous and return {@link Uni}
+ * responses using the Mutiny reactive programming model.
+ * </p>
+ *
+ * <p>
+ * After successful modifications, the record scheduler
+ * is triggered to synchronize record state changes.
+ * </p>
+ */
 @Path(ResourcePath.RECORD + "/set")
 public class SetRecordResource {
 
+    /**
+     * Service responsible for set record business logic.
+     */
     @Inject
-    SetRecordDataService blobRecordDataService;
+    SetRecordDataService service;
 
+    /**
+     * Scheduler service responsible for propagating record updates.
+     */
     @Inject
-    RecordSchedulerService recordSchedulerService;
+    RecordSchedulerService schedulerService;
 
+    /**
+     * Creates a new set record.
+     *
+     * @param entry DTO containing data for the new set record
+     * @return asynchronous HTTP response containing the created record
+     *         with status {@code 201 Created}
+     */
     @APIResponse(
             responseCode = "201",
             description = "Created"
@@ -45,16 +76,28 @@ public class SetRecordResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Response> create(NewSetRecord entry) {
-        return blobRecordDataService.post(entry)
+        return service.post(entry)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.CREATED)
                                 .entity(resourceJsonRecord)
                                 .build()
                 )
                 .onItem()
-                .invoke(() -> recordSchedulerService.fire(true));
+                .invoke(() -> schedulerService.fire(true));
     }
 
+    /**
+     * Deletes an existing set record.
+     *
+     * <p>
+     * Performs a logical deletion operation and triggers
+     * record synchronization.
+     * </p>
+     *
+     * @param id unique identifier of the record
+     * @return asynchronous HTTP response with status
+     *         {@code 204 No Content}
+     */
     @APIResponse(
             responseCode = "204",
             description = "No Content"
@@ -66,14 +109,21 @@ public class SetRecordResource {
     @Path(ResourcePath.ID)
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Response> delete(UUID id) {
-        return blobRecordDataService.delete(id)
+        return service.delete(id)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.NO_CONTENT).build()
                 )
                 .onItem()
-                .invoke(() -> recordSchedulerService.fire(true));
+                .invoke(() -> schedulerService.fire(true));
     }
 
+    /**
+     * Updates an existing set record.
+     *
+     * @param entry DTO containing updated record data
+     * @return asynchronous HTTP response containing the updated record
+     *         with status {@code 200 OK}
+     */
     @APIResponse(ref = "200OK")
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
@@ -83,13 +133,13 @@ public class SetRecordResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Response> update(UpdateSetRecord entry) {
-        return blobRecordDataService.put(entry)
+        return service.put(entry)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.OK)
                                 .entity(resourceJsonRecord)
                                 .build()
                 )
                 .onItem()
-                .invoke(() -> recordSchedulerService.fire(true));
+                .invoke(() -> schedulerService.fire(true));
     }
 }

@@ -1,0 +1,59 @@
+/*
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This is free and unencumbered software released into the public domain.
+ * For more information, please refer to <http://unlicense.org>
+ * UpdateMarkdownRecord.java
+ * $Id$
+ */
+
+package su.svn.api.models.dto;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Builder;
+
+import java.io.Serializable;
+import java.time.OffsetDateTime;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * DTO used for updating an existing markdown record.
+ *
+ * <p>
+ * Contains mutable fields of a markdown record
+ * and metadata required for synchronization.
+ * </p>
+ *
+ * @param id record identifier
+ * @param parentId parent record identifier
+ * @param type record type
+ * @param title record title
+ * @param markdown markdown content
+ * @param postAt publication timestamp
+ * @param refreshAt refresh timestamp
+ * @param visible visibility flag
+ * @param flags additional bitmask flags
+ * @param tags associated tags
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record UpdateMarkdownRecord(
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @JsonProperty UUID id,
+        @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
+        @JsonProperty UUID parentId,
+        @JsonProperty su.svn.lib.RecordType type,
+        @JsonProperty String title,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @JsonProperty String markdown,
+        @JsonProperty OffsetDateTime postAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @JsonProperty OffsetDateTime refreshAt,
+        @JsonProperty boolean visible,
+        @JsonProperty int flags,
+        @JsonProperty Set<String> tags) implements Serializable {
+    @Builder
+    public UpdateMarkdownRecord {
+    }
+}

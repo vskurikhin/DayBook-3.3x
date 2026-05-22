@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceSetRecord.java
@@ -23,16 +23,16 @@ import java.util.UUID;
 /**
  * DTO representing a set record returned to clients.
  *
- * @param id record identifier
- * @param parentId parent record identifier
- * @param title record title
- * @param texts set of unique string values
- * @param userName owner username
- * @param postAt creation timestamp
+ * @param id        record identifier
+ * @param parentId  parent record identifier
+ * @param title     record title
+ * @param texts     set of unique string values
+ * @param userName  owner username
+ * @param postAt    creation timestamp
  * @param refreshAt update timestamp
- * @param visible visibility flag
- * @param flags custom bit flags
- * @param tags associated tags
+ * @param visible   visibility flag
+ * @param flags     custom bit flags
+ * @param tags      associated tags
  */
 @JsonPropertyOrder({"id", "visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -50,7 +50,7 @@ public record ResourceSetRecord(
     @SuppressWarnings("ReassignedVariable")
     @Builder(toBuilder = true)
     public ResourceSetRecord {
-        // if (texts == null) texts = new HashSet<>();
+        if (texts == null) texts = new HashSet<>();
         if (tags == null) tags = new HashSet<>();
     }
 }

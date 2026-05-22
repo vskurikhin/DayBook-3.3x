@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordResource.java
@@ -50,10 +50,10 @@ import java.util.UUID;
 public class JsonRecordResource {
 
     @Inject
-    JsonRecordDataService jsonRecordDataService;
+    JsonRecordDataService service;
 
     @Inject
-    RecordSchedulerService recordSchedulerService;
+    RecordSchedulerService schedulerService;
 
     @APIResponse(
             responseCode = "201",
@@ -67,14 +67,14 @@ public class JsonRecordResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Response> create(NewJsonRecord entry) {
-        return jsonRecordDataService.post(entry)
+        return service.post(entry)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.CREATED)
                                 .entity(resourceJsonRecord)
                                 .build()
                 )
                 .onItem()
-                .invoke(() -> recordSchedulerService.fire(true));
+                .invoke(() -> schedulerService.fire(true));
     }
 
     @APIResponse(
@@ -88,12 +88,12 @@ public class JsonRecordResource {
     @Path(ResourcePath.ID)
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Response> delete(UUID id) {
-        return jsonRecordDataService.delete(id)
+        return service.delete(id)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.NO_CONTENT).build()
                 )
                 .onItem()
-                .invoke(() -> recordSchedulerService.fire(true));
+                .invoke(() -> schedulerService.fire(true));
     }
 
     @APIResponse(ref = "200OK")
@@ -105,13 +105,13 @@ public class JsonRecordResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<Response> update(UpdateJsonRecord entry) {
-        return jsonRecordDataService.put(entry)
+        return service.put(entry)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.OK)
                                 .entity(resourceJsonRecord)
                                 .build()
                 )
                 .onItem()
-                .invoke(() -> recordSchedulerService.fire(true));
+                .invoke(() -> schedulerService.fire(true));
     }
 }

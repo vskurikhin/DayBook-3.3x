@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 09:26 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * SetRecord.java
@@ -58,7 +58,7 @@ public class SetRecord {
     @Column(name = "title")
     String title;
 
-    @Column(name = "texts", nullable = false)
+    @Column(name = "html", nullable = false)
     @JdbcTypeCode(SqlTypes.ARRAY)
     Set<String> texts;
 
