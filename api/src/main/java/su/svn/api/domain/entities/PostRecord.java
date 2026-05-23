@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 09:26 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -18,6 +18,7 @@ import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import su.svn.api.services.mappers.PostRecordMapper;
 
 import java.io.Serializable;
 import java.time.Duration;
@@ -28,11 +29,7 @@ import java.util.*;
 import static lombok.AccessLevel.PRIVATE;
 
 /**
- * Entity representing a post record within the system.
- *
- * <p>This class is a reactive Active Record entity based on Panache and is mapped to the
- * {@code api.post_records} table. It encapsulates metadata and state related to a post,
- * including lifecycle timestamps, visibility flags, and hierarchical relationships.</p>
+ * Reactive entity representing a universal post record.
  *
  * <h2>Key Features</h2>
  * <ul>
@@ -42,13 +39,35 @@ import static lombok.AccessLevel.PRIVATE;
  *     <li>Stores additional dynamic attributes in JSON format ({@code json})</li>
  * </ul>
  *
- * <h2>Reactive Operations</h2>
- * <p>All database operations are implemented using reactive APIs (Mutiny {@code Uni}).</p>
+ * <p>This class is a reactive Active Record entity based on Panache and is mapped to the
+ * {@code api.post_records} table. It encapsulates metadata and state related to a post,
+ * including lifecycle timestamps, visibility flags, and hierarchical relationships and
+ * is used as a polymorphic storage model for different record types such as:</p>
+ *
  * <ul>
- *     <li>{@link #findByUUID(UUID)} – retrieves a record by its UUID</li>
- *     <li>{@link #findLastChangedTime()} – returns the most recent {@code lastChangedTime}</li>
- *     <li>{@link #disable(UUID)} – disables a record by setting {@code enabled = false}</li>
- *     <li>{@link #update(PostRecord)} – updates mutable fields of an existing record</li>
+ *     <li>text records</li>
+ *     <li>markdown records</li>
+ *     <li>blob records</li>
+ *     <li>HTML records</li>
+ *     <li>JSON records</li>
+ *     <li>link records</li>
+ * </ul>
+ *
+ * <p>
+ * The entity supports hierarchical parent-child relations,
+ * soft deletion, visibility control, reactive CRUD operations,
+ * and dynamic structured content.
+ * </p>
+ *
+ * <h2>Reactive Features</h2>
+ * <ul>
+ *     <li>{@link #findByUUID(UUID)} — find record by UUID</li>
+ *     <li>{@link #findLastChangedTime()} — get latest change timestamp</li>
+ *     <li>{@link #findLastChangedTimePostRecord()} — get latest changed record</li>
+ *     <li>{@link #disable(UUID)} — perform soft deletion</li>
+ *     <li>{@link #readEnabledAndIdIn(List)} — load enabled records by identifiers</li>
+ *     <li>{@link #readEnabledOrderByPostAtAndRefreshAtDesc()} — load ordered enabled records</li>
+ *     <li>{@link #update(PostRecord)} — update mutable entity fields</li>
  * </ul>
  *
  * <h2>Named Queries</h2>
@@ -59,16 +78,25 @@ import static lombok.AccessLevel.PRIVATE;
  *     <li>{@value #READ_ENABLED_ORDER_POST_REFRESH_DESC} – fetch enabled records ordered by timestamps</li>
  * </ul>
  *
- * <h2>Concurrency and Timeout</h2>
- * <p>Operations such as {@link #disable(UUID)} and {@link #update(PostRecord)} include timeout
- * handling via {@link #TIMEOUT_DURATION} to prevent indefinite waiting.</p>
- *
- * <h2>Notes</h2>
+ * <h2>Persistence Notes</h2>
  * <ul>
- *     <li>This entity uses a sequence-based primary key ({@code sequenceId})</li>
- *     <li>{@code id} is a business identifier (UUID) and is not auto-generated</li>
- *     <li>Lazy loading is used for the parent relationship</li>
+ *     <li>{@code sequenceId} is the database primary key</li>
+ *     <li>{@code id} is a business UUID identifier</li>
+ *     <li>JSON fields are stored using PostgreSQL JSON type</li>
+ *     <li>Text collections are stored as SQL ARRAY values</li>
  * </ul>
+ *
+ * <h2>Soft Delete Strategy</h2>
+ * <p>
+ * Records are never physically removed from the database.
+ * The {@code enabled} flag is used to mark records as inactive.
+ * </p>
+ *
+ * <h2>Concurrency and Timeout</h2>
+ * <p>
+ * Operations such as {@link #disable(UUID)} and {@link #update(PostRecord)} include timeout
+ * handling via {@link #TIMEOUT_DURATION} to prevent indefinite waiting.
+ * </p>
  *
  * @see io.quarkus.hibernate.reactive.panache.PanacheEntityBase
  * @see java.util.UUID
@@ -116,19 +144,55 @@ import static lombok.AccessLevel.PRIVATE;
 })
 public class PostRecord extends PanacheEntityBase implements Serializable {
 
+    /**
+     * Default timeout duration for reactive operations.
+     */
     public static final Duration TIMEOUT_DURATION = Duration.ofMillis(2000);
-    public static final String FIND_FIND_BY_UUID = "PostRecord.findByUUID";
-    public static final String FIND_LAST_CHANGED_TIME_POST_RECORD = "PostRecord.findLastChangedTimePostRecord";
-    public static final String READ_ENABLED_AND_ID_IN = "PostRecord.readEnabledAndIdIn";
-    public static final String READ_ENABLED_ORDER_POST_REFRESH_DESC = "PostRecord.readEnabledOrderByPostAtAndRefreshAtDesc";
-    public static final Map<String, Object> ENABLED = Map.of("enabled", Boolean.TRUE);
 
+    /**
+     * Named query for finding a record by UUID.
+     */
+    public static final String FIND_FIND_BY_UUID = "PostRecord.findByUUID";
+
+    /**
+     * Named query for retrieving the latest changed record.
+     */
+    public static final String FIND_LAST_CHANGED_TIME_POST_RECORD =
+            "PostRecord.findLastChangedTimePostRecord";
+
+    /**
+     * Named query for reading enabled records by identifiers.
+     */
+    public static final String READ_ENABLED_AND_ID_IN =
+            "PostRecord.readEnabledAndIdIn";
+
+    /**
+     * Named query for reading enabled records ordered by timestamps.
+     */
+    public static final String READ_ENABLED_ORDER_POST_REFRESH_DESC =
+            "PostRecord.readEnabledOrderByPostAtAndRefreshAtDesc";
+
+    /**
+     * Shared query parameter map for enabled records.
+     */
+    public static final Map<String, Object> ENABLED =
+            Map.of("enabled", Boolean.TRUE);
+
+    /**
+     * Business UUID identifier.
+     */
     @Column(name = "id", updatable = false, nullable = false)
     UUID id;
 
+    /**
+     * Parent record identifier.
+     */
     @Column(name = "parent_id", nullable = false)
     UUID parentId;
 
+    /**
+     * Parent entity reference.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "parent_id",
@@ -138,6 +202,9 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
             updatable = false)
     PostRecord parent;
 
+    /**
+     * Database sequence identifier.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "postRecordSeq")
     @SequenceGenerator(
@@ -149,71 +216,173 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     @Column(name = "sequence_id", updatable = false, nullable = false)
     Long sequenceId;
 
+    /**
+     * Type of stored record.
+     */
     @Builder.Default
     @Column(name = "type", nullable = false)
     su.svn.lib.RecordType type = su.svn.lib.RecordType.Base;
 
+    /**
+     * Record owner username.
+     */
     @Column(name = "user_name", nullable = false)
     String userName;
 
+    /**
+     * Publication timestamp.
+     */
     @Column(name = "post_at", updatable = false, nullable = false)
     OffsetDateTime postAt;
 
+    /**
+     * Refresh timestamp.
+     */
     @Column(name = "refresh_at")
     OffsetDateTime refreshAt;
 
+    /**
+     * Entity creation timestamp.
+     */
     @Column(name = "create_time", updatable = false)
     LocalDateTime createTime;
 
+    /**
+     * Last entity update timestamp.
+     */
     @Column(name = "update_time")
     LocalDateTime updateTime;
 
+    /**
+     * Timestamp of the latest content modification.
+     */
     @Column(name = "last_changed_time", nullable = false)
     LocalDateTime lastChangedTime;
 
+    /**
+     * Indicates whether the record is active.
+     */
     @Builder.Default
     @Column(name = "enabled")
     boolean enabled = true;
 
+    /**
+     * Indicates whether the record contains unsynchronized local changes.
+     */
     @Builder.Default
     @Column(name = "local_change", nullable = false)
     boolean localChange = true;
 
+    /**
+     * Visibility flag.
+     */
     @Column(name = "visible")
     Boolean visible;
 
+    /**
+     * Bitmask flags associated with the record.
+     */
     @Column(name = "flags", nullable = false)
     int flags;
 
+    /**
+     * Record title.
+     */
     @Column(name = "title", columnDefinition = "TEXT")
     String title;
 
+    /**
+     * Binary content.
+     */
     @Column(name = "blob")
     byte[] blob;
 
+    /**
+     * JSON structured content.
+     */
     @Column(name = "json")
     @JdbcTypeCode(SqlTypes.JSON)
     Map<String, String> json;
 
+    /**
+     * Collection of textual values.
+     */
     @Column(name = "texts")
     @JdbcTypeCode(SqlTypes.ARRAY)
     Set<String> texts;
 
+    /**
+     * File name value.
+     */
+    @Column(name = "file_name")
+    String fileName;
+
+    /**
+     * HTML content.
+     */
+    @Column(name = "html")
+    String html;
+
+    /**
+     * External link.
+     */
+    @Column(name = "link")
+    String link;
+
+    /**
+     * Markdown content.
+     */
+    @Column(name = "markdown")
+    String markdown;
+
+    /**
+     * Plain text value.
+     */
+    @Column(name = "value")
+    String value;
+
+    /**
+     * Finds a post record by UUID.
+     *
+     * @param id record identifier
+     * @return reactive result containing the found record
+     */
     public static Uni<PostRecord> findByUUID(@Nonnull UUID id) {
         return find("#" + FIND_FIND_BY_UUID, Map.of("id", id)).firstResult();
     }
 
+    /**
+     * Retrieves the timestamp of the latest changed record.
+     *
+     * @return reactive result containing the latest change timestamp
+     */
     public static Uni<LocalDateTime> findLastChangedTime() {
         return PostRecord.findLastChangedTimePostRecord()
                 .map(postRecord -> postRecord.lastChangedTime);
     }
 
+    /**
+     * Retrieves the latest changed record.
+     *
+     * @return reactive result containing the latest modified record
+     */
     public static Uni<PostRecord> findLastChangedTimePostRecord() {
         return PostRecord.find("#" + FIND_LAST_CHANGED_TIME_POST_RECORD)
                 .page(0, 1)
                 .firstResult();
     }
 
+    /**
+     * Performs soft deletion of a record.
+     *
+     * <p>
+     * The record is marked as disabled and its
+     * {@code lastChangedTime} field is updated.
+     * </p>
+     *
+     * @param id record identifier
+     * @return reactive completion signal
+     */
     public static Uni<Void> disable(@Nonnull UUID id) {
         return findByUUID(id)
                 .onItem()
@@ -233,31 +402,39 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
                 .recoverWithUni(Uni.createFrom().voidItem());
     }
 
+    /**
+     * Reads enabled records by identifier list.
+     *
+     * @param ids list of record identifiers
+     * @return reactive result containing matching records
+     */
     public static Uni<List<PostRecord>> readEnabledAndIdIn(List<UUID> ids) {
         var params = new HashMap<>(PostRecord.ENABLED);
         params.put("ids", ids);
         return PostRecord.find("#" + READ_ENABLED_AND_ID_IN, params).list();
     }
 
+    /**
+     * Reads enabled records ordered by publication and refresh timestamps.
+     *
+     * @return reactive query object
+     */
     public static PanacheQuery<PostRecord> readEnabledOrderByPostAtAndRefreshAtDesc() {
         return PostRecord.find("#" + READ_ENABLED_ORDER_POST_REFRESH_DESC, PostRecord.ENABLED);
     }
 
+    /**
+     * Updates mutable fields of an existing post record.
+     *
+     * @param postRecord source entity containing updated values
+     * @return reactive result containing updated entity
+     */
     public static Uni<PostRecord> update(@Nonnull PostRecord postRecord) {
         return findByUUID(postRecord.id)
                 .onItem()
                 .ifNotNull()
                 .transform(entity -> {
-                    entity.parentId(postRecord.parentId);
-                    entity.type(postRecord.type);
-                    entity.userName(postRecord.userName);
-                    entity.refreshAt(postRecord.refreshAt);
-                    entity.lastChangedTime(LocalDateTime.now());
-                    entity.enabled(postRecord.enabled);
-                    entity.visible(postRecord.visible);
-                    entity.flags(postRecord.flags);
-                    entity.title(postRecord.title);
-                    entity.json(new LinkedHashMap<>(postRecord.json));
+                    PostRecordMapper.INSTANCE.update(entity, postRecord);
                     return entity;
                 })
                 .ifNoItem()

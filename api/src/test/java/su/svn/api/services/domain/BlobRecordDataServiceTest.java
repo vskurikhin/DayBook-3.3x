@@ -13,7 +13,7 @@ import su.svn.api.models.dto.UpdateBlobRecord;
 import su.svn.api.repository.BlobRecordRepository;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.RecordViewRepository;
-import su.svn.api.services.mappers.BlobPostRecordMapper;
+import su.svn.api.services.mappers.BlobRecordMapper;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -31,7 +31,7 @@ class BlobRecordDataServiceTest {
     BlobRecordRepository blobRecordRepository;
 
     @Mock
-    BlobPostRecordMapper blobPostRecordMapper;
+    BlobRecordMapper blobRecordMapper;
 
     @Mock
     PostRecordRepository postRecordRepository;
@@ -102,13 +102,13 @@ class BlobRecordDataServiceTest {
         when(blobRecordRepository.put(request))
                 .thenReturn(Uni.createFrom().item(repositoryResponse));
 
-        when(blobPostRecordMapper.toEntity(request))
+        when(blobRecordMapper.toEntity(request))
                 .thenReturn(entity);
 
         when(postRecordRepository.update(entity))
                 .thenReturn(Uni.createFrom().item(entity));
 
-        when(blobPostRecordMapper.toResource(entity))
+        when(blobRecordMapper.toResource(entity))
                 .thenReturn(mappedResponse);
 
         var result = service.put(request)
@@ -117,8 +117,8 @@ class BlobRecordDataServiceTest {
         assertThat(result).isEqualTo(mappedResponse);
 
         verify(blobRecordRepository).put(request);
-        verify(blobPostRecordMapper).toEntity(request);
+        verify(blobRecordMapper).toEntity(request);
         verify(postRecordRepository).update(entity);
-        verify(blobPostRecordMapper).toResource(entity);
+        verify(blobRecordMapper).toResource(entity);
     }
 }

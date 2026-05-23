@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * SetRecordServiceImpl.java
@@ -77,43 +77,43 @@ public class SetRecordServiceImpl implements SetRecordService {
     @Override
     @Transactional
     public ResourceSetRecord save(NewSetRecord newRecord) {
-        var resourceSetRecord = setRecordMapper.toResource(newRecord);
-        var jsonRecord = setRecordMapper.toEntity(resourceSetRecord);
+        var resourceRecord = setRecordMapper.toResource(newRecord);
+        var record = setRecordMapper.toEntity(resourceRecord);
         final String username = recordServiceHelper.getUserName();
-        jsonRecord.baseRecord().type(RecordType.Set);
-        jsonRecord.baseRecord().userName(username);
-        jsonRecord.userName(username);
-        var baseRecord = jsonRecord.baseRecord();
+        record.baseRecord().type(RecordType.Set);
+        record.baseRecord().userName(username);
+        record.userName(username);
+        var baseRecord = record.baseRecord();
         recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
         entityManager.persist(baseRecord);
         entityManager.refresh(baseRecord);
-        return setRecordMapper.toResource(setRecordRepository.save(jsonRecord));
+        return setRecordMapper.toResource(setRecordRepository.save(record));
     }
 
     @Override
     @Transactional
     public ResourceSetRecord update(UpdateSetRecord updateRecord) {
-        var optionalSetRecord = setRecordRepository.findById(updateRecord.id());
+        var optionalRecord = setRecordRepository.findById(updateRecord.id());
         final String username = recordServiceHelper.getUserName();
-        if (username.equals(optionalSetRecord.orElseThrow().userName())) {
-            var resourceSetRecord = setRecordMapper.toResource(updateRecord);
-            var jsonRecord = setRecordMapper.toEntity(resourceSetRecord);
-            jsonRecord.baseRecord()
+        if (username.equals(optionalRecord.orElseThrow().userName())) {
+            var resourceRecord = setRecordMapper.toResource(updateRecord);
+            var record = setRecordMapper.toEntity(resourceRecord);
+            record.baseRecord()
                     .type(RecordType.Set);
-            jsonRecord.baseRecord()
-                    .postAt(optionalSetRecord.orElseThrow()
+            record.baseRecord()
+                    .postAt(optionalRecord.orElseThrow()
                             .baseRecord()
                             .postAt()
                     );
-            jsonRecord.baseRecord()
-                    .userName(optionalSetRecord.orElseThrow()
+            record.baseRecord()
+                    .userName(optionalRecord.orElseThrow()
                             .baseRecord()
                             .userName()
                     );
-            jsonRecord.userName(username);
-            var baseRecord = jsonRecord.baseRecord();
+            record.userName(username);
+            var baseRecord = record.baseRecord();
             recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
-            return setRecordMapper.toResource(setRecordRepository.save(jsonRecord));
+            return setRecordMapper.toResource(setRecordRepository.save(record));
         }
         throw new RuntimeException("access denied");
     }

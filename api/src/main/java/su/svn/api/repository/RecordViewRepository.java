@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewRepository.java
@@ -16,7 +16,7 @@ import org.slf4j.MDC;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.Page;
 import su.svn.api.repository.client.rest.RecordViewClient;
-import su.svn.api.services.mappers.JsonPostRecordMapper;
+import su.svn.api.services.mappers.JsonRecordMapper;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 
 import java.time.LocalDateTime;
@@ -31,11 +31,11 @@ public class RecordViewRepository {
     public static String SORT_PAGE_PARAMS = "postAt%2CrefreshAt%2Cid%2Cdesc";
 
     @Inject
-    JsonPostRecordMapper jsonPostRecordMapper;
+    JsonRecordMapper jsonRecordMapper;
 
     @Inject
     @RestClient
-    RecordViewClient recordViewClient;
+    RecordViewClient viewClient;
 
     @Inject
     SecurityContextPrincipalHelper principalHelper;
@@ -43,11 +43,11 @@ public class RecordViewRepository {
     public Uni<Page<PostRecord>> readPage(int pageIndex, byte size) {
         var authorization = principalHelper.authorization();
         var requestId = MDC.get(REQUEST_ID);
-        return recordViewClient.getByPageIndexAndSizeAsUni(authorization, requestId, pageIndex, size, SORT_PAGE_PARAMS)
+        return viewClient.getByPageIndexAndSizeAsUni(authorization, requestId, pageIndex, size, SORT_PAGE_PARAMS)
                 .map(pageRecordView -> {
                     var list = pageRecordView.embedded().resourceRecordViewList()
                             .stream()
-                            .map(jsonPostRecordMapper::toEntity)
+                            .map(jsonRecordMapper::toEntity)
                             .toList();
                     return new Page<>(
                             list,
@@ -61,11 +61,11 @@ public class RecordViewRepository {
     public Uni<List<PostRecord>> readList(int pageIndex, int size, LocalDateTime fromTime) {
         var authorization = principalHelper.authorization();
         var requestId = MDC.get(REQUEST_ID);
-        return recordViewClient.getByPageIndexAndSizeAndFromTimeAsUni(
+        return viewClient.getByPageIndexAndSizeAndFromTimeAsUni(
                 authorization, requestId, pageIndex, size, SORT_LIST_PARAMS, fromTime, true
         ).map(pageRecordView -> pageRecordView.embedded().resourceRecordViewList()
                 .stream()
-                .map(jsonPostRecordMapper::toEntity)
+                .map(jsonRecordMapper::toEntity)
                 .toList());
     }
 }

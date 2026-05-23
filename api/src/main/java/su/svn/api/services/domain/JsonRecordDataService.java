@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordDataService.java
@@ -21,7 +21,7 @@ import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.repository.JsonRecordRepository;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.RecordViewRepository;
-import su.svn.api.services.mappers.JsonPostRecordMapper;
+import su.svn.api.services.mappers.JsonRecordMapper;
 
 import java.util.HashMap;
 import java.util.List;
@@ -34,10 +34,10 @@ import java.util.stream.Collectors;
 public class JsonRecordDataService {
 
     @Inject
-    JsonRecordRepository jsonRecordRepository;
+    JsonRecordRepository recordRepository;
 
     @Inject
-    JsonPostRecordMapper jsonPostRecordMapper;
+    JsonRecordMapper mapper;
 
     @Inject
     PostRecordRepository postRecordRepository;
@@ -47,20 +47,20 @@ public class JsonRecordDataService {
 
     public Uni<Void> delete(UUID id) {
         return Uni.combine().all().unis(
-                jsonRecordRepository.delete(id),
+                recordRepository.delete(id),
                 postRecordRepository.disable(id)
         ).withUni(l -> Uni.createFrom().voidItem());
     }
 
     public Uni<ResourceJsonRecord> post(NewJsonRecord newJsonRecord) {
-        return jsonRecordRepository.post(newJsonRecord);
+        return recordRepository.post(newJsonRecord);
     }
 
     public Uni<ResourceJsonRecord> put(UpdateJsonRecord updateJsonRecord) {
-        return jsonRecordRepository.put(updateJsonRecord)
+        return recordRepository.put(updateJsonRecord)
                 .flatMap(resourceJsonRecord ->
-                        postRecordRepository.update(jsonPostRecordMapper.toEntity(updateJsonRecord))
-                                .map(postRecord -> jsonPostRecordMapper.toResource(postRecord))
+                        postRecordRepository.update(mapper.toEntity(updateJsonRecord))
+                                .map(postRecord -> mapper.toResource(postRecord))
                 );
     }
 
@@ -84,7 +84,6 @@ public class JsonRecordDataService {
         return postRecordRepository.readIdIn(map.keySet().stream().toList())
                 .map(pr0 -> pr0.stream().peek(exsistPostRecord -> {
                     PostRecord newItem = map.get(exsistPostRecord.id());
-                    System.err.println("newItem = " + newItem);
                     if (newItem != null) {
                         exsistPostRecord.type(newItem.type());
                         exsistPostRecord.userName(newItem.userName());

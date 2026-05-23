@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.08 19:33 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceJsonRecord.java
@@ -16,10 +16,7 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @JsonPropertyOrder({"id", "visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -34,9 +31,10 @@ public record ResourceJsonRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
+    @SuppressWarnings("ReassignedVariable")
     @Builder(toBuilder = true)
     public ResourceJsonRecord {
-        //noinspection ReassignedVariable
+        if (json == null) json = new HashMap<>();
         if (tags == null) tags = new HashSet<>();
     }
 }

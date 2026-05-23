@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * NewSetRecord.java
@@ -24,12 +24,12 @@ import java.util.UUID;
  * DTO used for creating a new set record.
  *
  * @param parentId parent record identifier
- * @param title record title
- * @param texts set of unique string values
- * @param postAt creation/post timestamp
- * @param visible visibility flag
- * @param flags custom bit flags
- * @param tags associated tags
+ * @param title    record title
+ * @param texts    set of unique string values
+ * @param postAt   creation/post timestamp
+ * @param visible  visibility flag
+ * @param flags    custom bit flags
+ * @param tags     associated tags
  */
 @JsonPropertyOrder({"visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -37,6 +37,7 @@ public record NewSetRecord(
         @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty Set<String> texts,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty OffsetDateTime postAt,
@@ -46,7 +47,7 @@ public record NewSetRecord(
     @SuppressWarnings("ReassignedVariable")
     @Builder
     public NewSetRecord {
-        // if (texts == null) texts = new HashSet<>();
+        if (texts == null) texts = new HashSet<>();
         if (tags == null) tags = new HashSet<>();
     }
 }

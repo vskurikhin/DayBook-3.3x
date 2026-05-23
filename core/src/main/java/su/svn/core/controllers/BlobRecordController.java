@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.23 20:14 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * BlobRecordController.java
@@ -37,19 +37,19 @@ public class BlobRecordController {
     /**
      * Service responsible for Binary Large Object record business logic.
      */
-    BlobRecordService blobRecordService;
+    BlobRecordService recordService;
 
     /**
      * Creates a new Binary Large Object record.
      *
      * @param record the input data for creating a new record
      * @return {@link ResponseEntity} containing the created {@link ResourceBlobRecord}
-     *         and HTTP status {@code 201 Created}
+     * and HTTP status {@code 201 Created}
      */
     @PostMapping
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResourceBlobRecord> createBlobRecord(@RequestBody @Valid NewBlobRecord record) {
-        ResourceBlobRecord createdRecord = blobRecordService.save(record);
+        ResourceBlobRecord createdRecord = recordService.save(record);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdRecord);
     }
 
@@ -58,12 +58,11 @@ public class BlobRecordController {
      *
      * @param id the UUID of the record
      * @return {@link ResponseEntity} containing the found {@link ResourceBlobRecord}
-     *         and HTTP status {@code 200 OK}
-     * @throws ChangeSetPersister.NotFoundException if the record is not found
+     * and HTTP status {@code 200 OK}
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ResourceBlobRecord> readBlobRecord(@PathVariable UUID id) throws ChangeSetPersister.NotFoundException {
-        ResourceBlobRecord record = blobRecordService.findById(id);
+    public ResponseEntity<ResourceBlobRecord> readBlobRecord(@PathVariable UUID id) {
+        ResourceBlobRecord record = recordService.findById(id);
         return ResponseEntity.status(HttpStatus.OK).body(record);
     }
 
@@ -72,12 +71,12 @@ public class BlobRecordController {
      *
      * @param record the updated record data
      * @return {@link ResponseEntity} containing the updated {@link ResourceBlobRecord}
-     *         and HTTP status {@code 200 OK}
+     * and HTTP status {@code 200 OK}
      */
     @PutMapping
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResourceBlobRecord> updateBlobRecord(@RequestBody @Valid UpdateBlobRecord record) {
-        ResourceBlobRecord updatedRecord = blobRecordService.update(record);
+        ResourceBlobRecord updatedRecord = recordService.update(record);
         return ResponseEntity.ok(updatedRecord);
     }
 
@@ -92,7 +91,7 @@ public class BlobRecordController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Void> deleteBlobRecord(@PathVariable UUID id) {
-        blobRecordService.disable(id);
+        recordService.disable(id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -15,7 +15,7 @@ import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.repository.JsonRecordRepository;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.RecordViewRepository;
-import su.svn.api.services.mappers.JsonPostRecordMapper;
+import su.svn.api.services.mappers.JsonRecordMapper;
 import su.svn.lib.RecordType;
 
 import java.time.LocalDateTime;
@@ -36,7 +36,7 @@ class JsonRecordDataServiceTest {
     JsonRecordRepository jsonRecordRepository;
 
     @Mock
-    JsonPostRecordMapper jsonPostRecordMapper;
+    JsonRecordMapper jsonRecordMapper;
 
     @Mock
     PostRecordRepository postRecordRepository;
@@ -132,13 +132,13 @@ class JsonRecordDataServiceTest {
         when(jsonRecordRepository.put(request))
                 .thenReturn(Uni.createFrom().item(resourceJsonRecord));
 
-        when(jsonPostRecordMapper.toEntity(request))
+        when(jsonRecordMapper.toEntity(request))
                 .thenReturn(postRecord);
 
         when(postRecordRepository.update(postRecord))
                 .thenReturn(Uni.createFrom().item(postRecord));
 
-        when(jsonPostRecordMapper.toResource(postRecord))
+        when(jsonRecordMapper.toResource(postRecord))
                 .thenReturn(resourceJsonRecord);
 
         ResourceJsonRecord result = jsonRecordDataService.put(request)

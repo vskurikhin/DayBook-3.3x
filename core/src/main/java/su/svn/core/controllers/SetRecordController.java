@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 09:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * SetRecordController.java
@@ -45,32 +45,32 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SetRecordController {
 
-    SetRecordService setRecordService;
+    SetRecordService recordService;
 
     @PostMapping
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResourceSetRecord> createSetRecord(@RequestBody @Valid NewSetRecord record) {
-        ResourceSetRecord createdRecord = setRecordService.save(record);
+        ResourceSetRecord createdRecord = recordService.save(record);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdRecord);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ResourceSetRecord> readSetRecord(@PathVariable UUID id) {
-        ResourceSetRecord record = setRecordService.findById(id);
+        ResourceSetRecord record = recordService.findById(id);
         return ResponseEntity.status(HttpStatus.OK).body(record);
     }
 
     @PutMapping
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResourceSetRecord> updateSetRecord(@RequestBody @Valid UpdateSetRecord record) {
-        ResourceSetRecord updatedRecord = setRecordService.update(record);
+        ResourceSetRecord updatedRecord = recordService.update(record);
         return ResponseEntity.ok(updatedRecord);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Void> deleteSetRecord(@PathVariable UUID id) {
-        setRecordService.disable(id);
+        recordService.disable(id);
         return ResponseEntity.noContent().build();
     }
 }

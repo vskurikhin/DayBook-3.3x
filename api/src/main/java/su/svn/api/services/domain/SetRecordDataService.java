@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 09:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * SetRecordDataService.java
@@ -16,7 +16,7 @@ import su.svn.api.models.dto.ResourceSetRecord;
 import su.svn.api.models.dto.UpdateSetRecord;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.SetRecordRepository;
-import su.svn.api.services.mappers.SetPostRecordMapper;
+import su.svn.api.services.mappers.SetRecordMapper;
 
 import java.util.UUID;
 
@@ -24,30 +24,30 @@ import java.util.UUID;
 public class SetRecordDataService {
 
     @Inject
-    SetRecordRepository setRecordRepository;
+    SetRecordRepository recordRepository;
 
     @Inject
-    SetPostRecordMapper setPostRecordMapper;
+    SetRecordMapper mapper;
 
     @Inject
     PostRecordRepository postRecordRepository;
 
     public Uni<Void> delete(UUID id) {
         return Uni.combine().all().unis(
-                setRecordRepository.delete(id),
+                recordRepository.delete(id),
                 postRecordRepository.disable(id)
         ).withUni(l -> Uni.createFrom().voidItem());
     }
 
     public Uni<ResourceSetRecord> post(NewSetRecord newSetRecord) {
-        return setRecordRepository.post(newSetRecord);
+        return recordRepository.post(newSetRecord);
     }
 
     public Uni<ResourceSetRecord> put(UpdateSetRecord updateSetRecord) {
-        return setRecordRepository.put(updateSetRecord)
+        return recordRepository.put(updateSetRecord)
                 .flatMap(resourceJsonRecord ->
-                        postRecordRepository.update(setPostRecordMapper.toEntity(updateSetRecord))
-                                .map(postRecord -> setPostRecordMapper.toResource(postRecord))
+                        postRecordRepository.update(mapper.toEntity(updateSetRecord))
+                                .map(postRecord -> mapper.toResource(postRecord))
                 );
     }
 }
