@@ -25,7 +25,6 @@ public record PagedModelEntityModelResourceRecordView(
         @JsonProperty("_embedded") PagedModelEntityModelResourceRecordViewEmbedded embedded,
         @JsonProperty("_links") Map<String, Link> links,
         @JsonProperty PageMetadata page) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder
     public PagedModelEntityModelResourceRecordView {
         if (embedded == null) embedded = new PagedModelEntityModelResourceRecordViewEmbedded();

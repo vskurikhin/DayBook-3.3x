@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.24 13:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordServiceImpl.java
@@ -41,8 +41,8 @@ public class JsonRecordServiceImpl implements JsonRecordService {
 
     EntityManager entityManager;
 
-    JsonRecordMapper jsonRecordMapper;
-    JsonRecordRepository jsonRecordRepository;
+    JsonRecordMapper mapper;
+    JsonRecordRepository repository;
 
     RecordServiceHelper recordServiceHelper;
 
@@ -50,19 +50,19 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     @Transactional
     public void disable(UUID id) {
         var username = recordServiceHelper.getUserName();
-        var record = jsonRecordRepository.findByIdAndEnabledTrue(id)
+        var record = repository.findByIdAndEnabledTrue(id)
                 .orElseThrow(CustomNotFoundException::new);
         if (username.equals(record.userName())) {
             record.baseRecord().enabled(false);
             record.enabled(false);
-            jsonRecordRepository.save(record);
+            repository.save(record);
         }
     }
 
     @Override
     public ResourceJsonRecord findById(UUID id) {
-        return jsonRecordMapper.toResource(
-                jsonRecordRepository.findByIdAndEnabledTrue(id)
+        return mapper.toResource(
+                repository.findByIdAndEnabledTrue(id)
                         .orElseThrow(CustomNotFoundException::new)
         );
     }
@@ -70,8 +70,8 @@ public class JsonRecordServiceImpl implements JsonRecordService {
     @Override
     @Transactional
     public ResourceJsonRecord save(NewJsonRecord newRecord) {
-        var resourceJsonRecord = jsonRecordMapper.toResource(newRecord);
-        var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+        var resourceJsonRecord = mapper.toResource(newRecord);
+        var jsonRecord = mapper.toEntity(resourceJsonRecord);
         final String username = recordServiceHelper.getUserName();
         jsonRecord.baseRecord().type(su.svn.lib.RecordType.Json);
         jsonRecord.baseRecord().userName(username);
@@ -80,17 +80,17 @@ public class JsonRecordServiceImpl implements JsonRecordService {
         recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
         entityManager.persist(baseRecord);
         entityManager.refresh(baseRecord);
-        return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
+        return mapper.toResource(repository.save(jsonRecord));
     }
 
     @Override
     @Transactional
     public ResourceJsonRecord update(UpdateJsonRecord updateRecord) {
-        var optionalJsonRecord = jsonRecordRepository.findById(updateRecord.id());
+        var optionalJsonRecord = repository.findById(updateRecord.id());
         final String username = recordServiceHelper.getUserName();
         if (username.equals(optionalJsonRecord.orElseThrow().userName())) {
-            var resourceJsonRecord = jsonRecordMapper.toResource(updateRecord);
-            var jsonRecord = jsonRecordMapper.toEntity(resourceJsonRecord);
+            var resourceJsonRecord = mapper.toResource(updateRecord);
+            var jsonRecord = mapper.toEntity(resourceJsonRecord);
             jsonRecord.baseRecord()
                     .type(su.svn.lib.RecordType.Json);
             jsonRecord.baseRecord()
@@ -106,7 +106,7 @@ public class JsonRecordServiceImpl implements JsonRecordService {
             jsonRecord.userName(username);
             var baseRecord = jsonRecord.baseRecord();
             recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
-            return jsonRecordMapper.toResource(jsonRecordRepository.save(jsonRecord));
+            return mapper.toResource(repository.save(jsonRecord));
         }
         throw new RuntimeException("access denied");
     }

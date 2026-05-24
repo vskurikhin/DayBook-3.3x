@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.24 13:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * BlobRecordServiceImpl.java
@@ -51,8 +51,8 @@ public class BlobRecordServiceImpl implements BlobRecordService {
 
     EntityManager entityManager;
 
-    BlobRecordMapper blobRecordMapper;
-    BlobRecordRepository blobRecordRepository;
+    BlobRecordMapper mapper;
+    BlobRecordRepository repository;
 
     RecordServiceHelper recordServiceHelper;
 
@@ -70,12 +70,12 @@ public class BlobRecordServiceImpl implements BlobRecordService {
     @Transactional
     public void disable(UUID id) {
         var username = recordServiceHelper.getUserName();
-        var record = blobRecordRepository.findByIdAndEnabledTrue(id)
+        var record = repository.findByIdAndEnabledTrue(id)
                 .orElseThrow(CustomNotFoundException::new);
         if (username.equals(record.userName())) {
             record.baseRecord().enabled(false);
             record.enabled(false);
-            blobRecordRepository.save(record);
+            repository.save(record);
         }
     }
 
@@ -88,8 +88,8 @@ public class BlobRecordServiceImpl implements BlobRecordService {
      */
     @Override
     public ResourceBlobRecord findById(UUID id) {
-        return blobRecordMapper.toResource(
-                blobRecordRepository.findByIdAndEnabledTrue(id)
+        return mapper.toResource(
+                repository.findByIdAndEnabledTrue(id)
                         .orElseThrow(CustomNotFoundException::new)
         );
     }
@@ -103,8 +103,8 @@ public class BlobRecordServiceImpl implements BlobRecordService {
     @Override
     @Transactional
     public ResourceBlobRecord save(NewBlobRecord newRecord) {
-        var resourceBlobRecord = blobRecordMapper.toResource(newRecord);
-        var record = blobRecordMapper.toEntity(resourceBlobRecord);
+        var resourceBlobRecord = mapper.toResource(newRecord);
+        var record = mapper.toEntity(resourceBlobRecord);
         final String username = recordServiceHelper.getUserName();
         record.baseRecord().type(RecordType.Blob);
         record.baseRecord().userName(username);
@@ -113,7 +113,7 @@ public class BlobRecordServiceImpl implements BlobRecordService {
         recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
         entityManager.persist(baseRecord);
         entityManager.refresh(baseRecord);
-        return blobRecordMapper.toResource(blobRecordRepository.save(record));
+        return mapper.toResource(repository.save(record));
     }
 
     /**
@@ -126,11 +126,11 @@ public class BlobRecordServiceImpl implements BlobRecordService {
     @Override
     @Transactional
     public ResourceBlobRecord update(UpdateBlobRecord updateRecord) {
-        var optionalBlobRecord = blobRecordRepository.findById(updateRecord.id());
+        var optionalBlobRecord = repository.findById(updateRecord.id());
         final String username = recordServiceHelper.getUserName();
         if (username.equals(optionalBlobRecord.orElseThrow().userName())) {
-            var resourceBlobRecord = blobRecordMapper.toResource(updateRecord);
-            var record = blobRecordMapper.toEntity(resourceBlobRecord);
+            var resourceBlobRecord = mapper.toResource(updateRecord);
+            var record = mapper.toEntity(resourceBlobRecord);
             record.baseRecord()
                     .type(RecordType.Blob);
             record.baseRecord()
@@ -146,7 +146,7 @@ public class BlobRecordServiceImpl implements BlobRecordService {
             record.userName(username);
             var baseRecord = record.baseRecord();
             recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
-            return blobRecordMapper.toResource(blobRecordRepository.save(record));
+            return mapper.toResource(repository.save(record));
         }
         throw new RuntimeException("access denied");
     }

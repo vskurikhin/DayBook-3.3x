@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.24 13:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * MarkdownRecordServiceImpl.java
@@ -53,8 +53,8 @@ public class MarkdownRecordServiceImpl implements MarkdownRecordService {
 
     EntityManager entityManager;
 
-    MarkdownRecordMapper markdownRecordMapper;
-    TextRecordRepository textRecordRepository;
+    MarkdownRecordMapper mapper;
+    TextRecordRepository repository;
 
     RecordServiceHelper recordServiceHelper;
 
@@ -62,19 +62,19 @@ public class MarkdownRecordServiceImpl implements MarkdownRecordService {
     @Transactional
     public void disable(UUID id) {
         var username = recordServiceHelper.getUserName();
-        var record = textRecordRepository.findByIdAndEnabledTrue(id)
+        var record = repository.findByIdAndEnabledTrue(id)
                 .orElseThrow(CustomNotFoundException::new);
         if (username.equals(record.userName())) {
             record.baseRecord().enabled(false);
             record.enabled(false);
-            textRecordRepository.save(record);
+            repository.save(record);
         }
     }
 
     @Override
     public ResourceMarkdownRecord findById(UUID id) {
-        return markdownRecordMapper.toResource(
-                textRecordRepository.findByIdAndEnabledTrue(id)
+        return mapper.toResource(
+                repository.findByIdAndEnabledTrue(id)
                         .orElseThrow(CustomNotFoundException::new)
         );
     }
@@ -82,8 +82,8 @@ public class MarkdownRecordServiceImpl implements MarkdownRecordService {
     @Override
     @Transactional
     public ResourceMarkdownRecord save(NewMarkdownRecord newRecord) {
-        var resourceRecord = markdownRecordMapper.toResource(newRecord);
-        var record = markdownRecordMapper.toEntity(resourceRecord);
+        var resourceRecord = mapper.toResource(newRecord);
+        var record = mapper.toEntity(resourceRecord);
         final String username = recordServiceHelper.getUserName();
         record.baseRecord().type(RecordType.Text);
         record.baseRecord().userName(username);
@@ -93,17 +93,17 @@ public class MarkdownRecordServiceImpl implements MarkdownRecordService {
         recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, newRecord.tags(), username);
         entityManager.persist(baseRecord);
         entityManager.refresh(baseRecord);
-        return markdownRecordMapper.toResource(textRecordRepository.save(record));
+        return mapper.toResource(repository.save(record));
     }
 
     @Override
     @Transactional
     public ResourceMarkdownRecord update(UpdateMarkdownRecord updateRecord) {
-        var optionalRecord = textRecordRepository.findById(updateRecord.id());
+        var optionalRecord = repository.findById(updateRecord.id());
         final String username = recordServiceHelper.getUserName();
         if (username.equals(optionalRecord.orElseThrow().userName())) {
-            var resourceRecord = markdownRecordMapper.toResource(updateRecord);
-            var record = markdownRecordMapper.toEntity(resourceRecord);
+            var resourceRecord = mapper.toResource(updateRecord);
+            var record = mapper.toEntity(resourceRecord);
             record.baseRecord()
                     .type(RecordType.Text);
             record.baseRecord()
@@ -120,7 +120,7 @@ public class MarkdownRecordServiceImpl implements MarkdownRecordService {
             record.type(TextRecordType.Markdown);
             var baseRecord = record.baseRecord();
             recordServiceHelper.upTagsInBaseRecordFromDB(baseRecord, updateRecord.tags(), username);
-            return markdownRecordMapper.toResource(textRecordRepository.save(record));
+            return mapper.toResource(repository.save(record));
         }
         throw new RuntimeException("access denied");
     }

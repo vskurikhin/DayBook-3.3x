@@ -16,6 +16,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.Array;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import su.svn.api.services.mappers.PostRecordMapper;
@@ -340,6 +341,11 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
      */
     @Column(name = "value")
     String value;
+
+    @Column(name = "vector")
+    @JdbcTypeCode(SqlTypes.VECTOR)
+    @Array(length = 1024)
+    float[] vector;
 
     /**
      * Finds a post record by UUID.

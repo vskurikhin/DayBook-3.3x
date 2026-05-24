@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.24 13:27 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordView.java
@@ -173,6 +173,11 @@ public class RecordView {
 
     @Column(name = "value")
     String value;
+
+    @Column(name = "vector", nullable = false)
+    @JdbcTypeCode(SqlTypes.VECTOR)
+    @Array(length = 1024)
+    float[] vector;
 
     @Column(name = "tags")
     @JdbcTypeCode(SqlTypes.ARRAY)
