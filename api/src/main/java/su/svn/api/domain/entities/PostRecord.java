@@ -347,6 +347,12 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     @Array(length = 1024)
     float[] vector;
 
+    @Column(name = "xml")
+    String xml;
+
+    @Column(name = "tags")
+    List<String> tags;
+
     /**
      * Finds a post record by UUID.
      *

@@ -95,6 +95,7 @@ public class VectorRecordController {
         ResourceVectorRecord updatedRecord = recordService.update(record);
         return ResponseEntity.ok(updatedRecord);
     }
+
     /**
      * Disables a vector record by its identifier.
      * <p>

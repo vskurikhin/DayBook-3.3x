@@ -43,6 +43,7 @@ public record ResourceRecordView(
         @JsonProperty String markdown,
         @JsonProperty String value,
         @JsonProperty float[] vector,
+        @JsonProperty String xml,
         @JsonProperty List<String> tags
 ) implements Serializable {
     @Builder(toBuilder = true)

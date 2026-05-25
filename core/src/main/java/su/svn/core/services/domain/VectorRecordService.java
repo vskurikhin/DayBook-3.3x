@@ -39,7 +39,6 @@ public interface VectorRecordService {
      */
     void disable(UUID id);
 
-
     /**
      * Finds an active vector record by its identifier.
      *
@@ -55,7 +54,6 @@ public interface VectorRecordService {
      * @return the saved vector record as a resource DTO
      */
     ResourceVectorRecord save(NewVectorRecord newRecord);
-
 
     /**
      * Updates an existing vector record.
