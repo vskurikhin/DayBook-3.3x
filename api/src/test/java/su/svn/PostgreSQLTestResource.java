@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.util.Map;
 
 public class PostgreSQLTestResource implements QuarkusTestResourceLifecycleManager {
-    static PostgreSQLContainer<?> db = new PostgreSQLContainer<>("postgres:18");
+    static PostgreSQLContainer<?> db = new PostgreSQLContainer<>("pgvector/pgvector:pg18");
 
     @Override
     public Map<String, String> start() {
