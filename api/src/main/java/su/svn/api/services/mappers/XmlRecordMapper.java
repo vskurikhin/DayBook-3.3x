@@ -2,7 +2,7 @@
  * This file was last modified at 2026.05.22 19:39 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * VectorRecordMapper.java
+ * XmlRecordMapper.java
  * $Id$
  */
 
@@ -10,51 +10,56 @@ package su.svn.api.services.mappers;
 
 import org.mapstruct.*;
 import su.svn.api.domain.entities.PostRecord;
-import su.svn.api.models.dto.ResourceVectorRecord;
-import su.svn.api.models.dto.UpdateVectorRecord;
+import su.svn.api.models.dto.ResourceXmlRecord;
+import su.svn.api.models.dto.UpdateXmlRecord;
 
 /**
- * MapStruct mapper for converting vector DTOs and views into {@link PostRecord}.
+ * MapStruct mapper for converting XML DTOs into {@link PostRecord} entities
+ * and resource DTO representations.
  *
- * <p>This mapper centralizes transformations between:
- * DTO objects, entity models, and API resource representations.</p>
+ * <p>
+ * This mapper centralizes transformation logic between:
+ * </p>
+ * <ul>
+ *     <li>{@link UpdateXmlRecord}</li>
+ *     <li>{@link PostRecord}</li>
+ *     <li>{@link ResourceXmlRecord}</li>
+ * </ul>
  *
  * <h2>Mapping Rules</h2>
  * <ul>
- *     <li>Several persistence-only fields are ignored</li>
- *     <li>{@code userName} is always initialized with {@code root}</li>
- *     <li>Unsupported enum values are mapped to {@code null}</li>
+ *     <li>Only explicitly declared fields are mapped</li>
+ *     <li>Unmapped target fields are ignored by default</li>
+ *     <li>Unsupported enum values are converted to {@code null}</li>
  * </ul>
+ *
+ * <h2>Supported Transformations</h2>
+ * <ul>
+ *     <li>Update DTO → entity</li>
+ *     <li>Entity → resource DTO</li>
+ * </ul>
+ *
+ * @see PostRecord
+ * @see UpdateXmlRecord
+ * @see ResourceXmlRecord
  */
 @Mapper(componentModel = "cdi")
-public interface VectorRecordMapper extends DateTimeMapper {
+public interface XmlRecordMapper extends DateTimeMapper {
 
-    /**
-     * Converts an update DTO into a {@link PostRecord} entity.
-     *
-     * @param record update DTO
-     * @return mapped entity
-     */
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
     @Mapping(target = "parentId", source = "parentId")
     @Mapping(target = "type", source = "type")
     @Mapping(target = "title", source = "title")
-    @Mapping(target = "vector", source = "vector")
+    @Mapping(target = "xml", source = "xml")
     @Mapping(target = "postAt", source = "postAt")
     @Mapping(target = "refreshAt", source = "refreshAt")
     @Mapping(target = "visible", source = "visible")
     @Mapping(target = "flags", source = "flags")
     @Mapping(target = "tags", source = "tags")
-    PostRecord toEntity(UpdateVectorRecord record);
+    PostRecord toEntity(UpdateXmlRecord record);
 
-    /**
-     * Converts a {@link PostRecord} entity into a resource DTO.
-     *
-     * @param postRecord source entity
-     * @return mapped resource DTO
-     */
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
-    ResourceVectorRecord toResource(PostRecord postRecord);
+    ResourceXmlRecord toResource(PostRecord postRecord);
 }

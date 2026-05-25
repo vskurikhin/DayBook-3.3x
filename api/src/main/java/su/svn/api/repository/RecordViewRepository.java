@@ -16,6 +16,7 @@ import org.slf4j.MDC;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.Page;
 import su.svn.api.repository.client.rest.RecordViewClient;
+import su.svn.api.services.mappers.EntityModelResourceRecordMapper;
 import su.svn.api.services.mappers.JsonRecordMapper;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 
@@ -31,7 +32,10 @@ public class RecordViewRepository {
     public static String SORT_PAGE_PARAMS = "postAt%2CrefreshAt%2Cid%2Cdesc";
 
     @Inject
-    JsonRecordMapper jsonRecordMapper;
+    JsonRecordMapper mapper;
+
+    @Inject
+    EntityModelResourceRecordMapper resourceRecordMapper;
 
     @Inject
     @RestClient
@@ -47,7 +51,7 @@ public class RecordViewRepository {
                 .map(pageRecordView -> {
                     var list = pageRecordView.embedded().resourceRecordViewList()
                             .stream()
-                            .map(jsonRecordMapper::toEntity)
+                            .map(resourceRecordMapper::toEntity)
                             .toList();
                     return new Page<>(
                             list,
@@ -65,7 +69,7 @@ public class RecordViewRepository {
                 authorization, requestId, pageIndex, size, SORT_LIST_PARAMS, fromTime, true
         ).map(pageRecordView -> pageRecordView.embedded().resourceRecordViewList()
                 .stream()
-                .map(jsonRecordMapper::toEntity)
+                .map(resourceRecordMapper::toEntity)
                 .toList());
     }
 }

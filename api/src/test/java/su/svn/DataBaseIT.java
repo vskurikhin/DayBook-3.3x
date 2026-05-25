@@ -65,6 +65,7 @@ public class DataBaseIT {
         list.add(EntityModelResourceRecordView.builder()
                 .id(zeroUUID)
                 .parentId(zeroUUID)
+                .userName("root")
                 .postAt(OffsetDateTime.now())
                 .lastChangedTime(LocalDateTime.now())
                 .flags(0)
@@ -74,6 +75,7 @@ public class DataBaseIT {
             list.add(EntityModelResourceRecordView.builder()
                     .id(id)
                     .parentId(id)
+                    .userName("root")
                     .postAt(OffsetDateTime.now())
                     .lastChangedTime(LocalDateTime.now())
                     .flags(0)
@@ -202,6 +204,7 @@ public class DataBaseIT {
                                 postRecords.stream().map(PostRecord::id).toList()
                         )),
                 got -> {
+                    System.err.println("got = " + got);
                     assertEquals(ITERATION + 1, got.size());
                     for (long i = ITERATION; i < 2 * ITERATION; i++) {
                         var j = i;

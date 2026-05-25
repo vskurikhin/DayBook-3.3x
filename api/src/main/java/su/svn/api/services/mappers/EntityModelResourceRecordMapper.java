@@ -1,0 +1,29 @@
+/*
+ * This file was last modified at 2026.05.22 19:39 by Victor N. Skurikhin.
+ * This is free and unencumbered software released into the public domain.
+ * For more information, please refer to <http://unlicense.org>
+ * SetRecordMapper.java
+ * $Id$
+ */
+
+package su.svn.api.services.mappers;
+
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
+import org.mapstruct.ValueMapping;
+import su.svn.api.domain.entities.PostRecord;
+import su.svn.api.models.dto.EntityModelResourceRecordView;
+
+@Mapper(componentModel = "cdi")
+public interface EntityModelResourceRecordMapper extends DateTimeMapper {
+    @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
+    @Mapping(target = "parent", ignore = true)
+    @Mapping(target = "sequenceId", ignore = true)
+    // TODO @Mapping(target = "userName", constant = "root")
+    @Mapping(target = "createTime", ignore = true)
+    @Mapping(target = "updateTime", ignore = true)
+    @Mapping(target = "enabled", ignore = true)
+    @Mapping(target = "localChange", ignore = true)
+    PostRecord toEntity(EntityModelResourceRecordView recordView);
+}

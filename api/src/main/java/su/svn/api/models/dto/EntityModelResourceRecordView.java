@@ -42,6 +42,7 @@ public record EntityModelResourceRecordView(
         @JsonProperty String markdown,
         @JsonProperty String value,
         @JsonProperty float[] vector,
+        @JsonProperty String xml,
         @JsonProperty List<String> tags,
         @JsonProperty("_links") Map<String, Link> links) implements Serializable {
 
@@ -63,7 +64,7 @@ public record EntityModelResourceRecordView(
                 OffsetDateTime.now(), null, LocalDateTime.now(),
                 null, null,
                 new HashMap<>(), new HashSet<>(),
-                null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
                 new ArrayList<>(), new HashMap<>()
         );
     }
