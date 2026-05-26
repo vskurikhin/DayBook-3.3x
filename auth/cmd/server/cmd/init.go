@@ -225,7 +225,7 @@ func init() {
 	runCmd.Flags().Duration(FlagDBPoolHealthCheckPeriod, time.Minute, "Pgx DB pool health check period.")
 	runCmd.Flags().Duration(FlagDBPoolMaxConnIdleTime, 30*time.Minute, "Pgx DB pool max connection idle time.")
 	runCmd.Flags().Duration(FlagDBPoolMaxConnLifeTime, time.Hour, "Pgx DB pool max connection lifetime.")
-	runCmd.Flags().Duration(FlagValidPeriodAccessToken, 45*time.Second, "Valid period access token.")
+	runCmd.Flags().Duration(FlagValidPeriodAccessToken, 45*time.Minute, "Valid period access token.")
 	runCmd.Flags().Duration(FlagValidPeriodRefreshToken, 15*time.Hour, "Valid period refresh token.")
 	runCmd.Flags().Duration(FlagSchedulerJobSleepDuration, 5*time.Second, "Scheduler job sleep duration.")
 	runCmd.Flags().String(FlagAddress, "127.0.0.1:8089", "Address as host:port")

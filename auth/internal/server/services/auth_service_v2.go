@@ -95,7 +95,7 @@ func (s *AuthServiceImplV2) transactionAuth(
 	if errRolesForUser != nil {
 		slog.ErrorContext(ctx,
 			"failed to get roles for user",
-			slog.String("error", errTransaction.Error()),
+			slog.String("error", errRolesForUser.Error()),
 			slog.String("errorType", fmt.Sprintf("%T", errTransaction)),
 		)
 		return model.CredValuesV2{}, errRolesForUser

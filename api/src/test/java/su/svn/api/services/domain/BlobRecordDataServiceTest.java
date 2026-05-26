@@ -12,14 +12,14 @@ import su.svn.api.models.dto.ResourceBlobRecord;
 import su.svn.api.models.dto.UpdateBlobRecord;
 import su.svn.api.repository.BlobRecordRepository;
 import su.svn.api.repository.PostRecordRepository;
-import su.svn.api.repository.RecordViewRepository;
 import su.svn.api.services.mappers.BlobRecordMapper;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BlobRecordDataServiceTest {
@@ -35,9 +35,6 @@ class BlobRecordDataServiceTest {
 
     @Mock
     PostRecordRepository postRecordRepository;
-
-    @Mock
-    RecordViewRepository recordViewRepository;
 
     @Test
     void shouldDeleteRecord() {
@@ -102,7 +99,9 @@ class BlobRecordDataServiceTest {
         when(blobRecordRepository.put(request))
                 .thenReturn(Uni.createFrom().item(repositoryResponse));
 
-        when(blobRecordMapper.toEntity(request))
+//        when(blobRecordMapper.toEntity(request))
+//                .thenReturn(entity);
+        when(blobRecordMapper.toEntity(repositoryResponse))
                 .thenReturn(entity);
 
         when(postRecordRepository.update(entity))
@@ -117,8 +116,9 @@ class BlobRecordDataServiceTest {
         assertThat(result).isEqualTo(mappedResponse);
 
         verify(blobRecordRepository).put(request);
-        verify(blobRecordMapper).toEntity(request);
+        // verify(blobRecordMapper).toEntity(request);
         verify(postRecordRepository).update(entity);
         verify(blobRecordMapper).toResource(entity);
+        verify(blobRecordMapper).toEntity(repositoryResponse);
     }
 }

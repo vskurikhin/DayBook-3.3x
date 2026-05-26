@@ -81,7 +81,6 @@ public class JsonRecordDataService {
 
     private Uni<List<PostRecord>> syncPostRecords(@Nonnull List<PostRecord> postRecords) {
         final Map<UUID, PostRecord> map = convertToMap(postRecords);
-        System.err.println("map = " + map);
         return postRecordRepository.readIdIn(map.keySet().stream().toList())
                 .map(pr0 -> pr0.stream().peek(exsistPostRecord -> {
                     PostRecord newItem = map.get(exsistPostRecord.id());

@@ -11,13 +11,19 @@ package su.svn.api.resources;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.jboss.resteasy.reactive.RestResponse;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.models.dto.NewXmlRecord;
+import su.svn.api.models.dto.ResourceBlobRecord;
+import su.svn.api.models.dto.ResourceXmlRecord;
 import su.svn.api.models.dto.UpdateXmlRecord;
 import su.svn.api.services.domain.XmlRecordDataService;
 import su.svn.api.services.schedulers.RecordSchedulerService;
@@ -85,7 +91,13 @@ public class XmlRecordResource {
      */
     @APIResponse(
             responseCode = "201",
-            description = "Created"
+            description = "Created",
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(
+                            implementation = ResourceXmlRecord.class
+                    )
+            )
     )
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
@@ -94,11 +106,11 @@ public class XmlRecordResource {
     @Path(ResourcePath.NONE)
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Uni<Response> create(NewXmlRecord entry) {
+    public Uni<RestResponse<ResourceXmlRecord>> create(@Valid NewXmlRecord entry) {
         return service.post(entry)
-                .map(resourceJsonRecord ->
-                        Response.status(Response.Status.CREATED)
-                                .entity(resourceJsonRecord)
+                .map(record ->
+                        RestResponse.ResponseBuilder
+                                .create(Response.Status.CREATED, record)
                                 .build()
                 )
                 .onItem()
@@ -146,7 +158,16 @@ public class XmlRecordResource {
      * @return a {@link Uni} emitting HTTP 200 response
      *         with the updated XML resource
      */
-    @APIResponse(ref = "200OK")
+    @APIResponse(
+            responseCode = "200",
+            description = "OK",
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(
+                            implementation = ResourceXmlRecord.class
+                    )
+            )
+    )
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
     @Operation(summary = "Update BLOB record")
@@ -154,11 +175,11 @@ public class XmlRecordResource {
     @Path(ResourcePath.NONE)
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Uni<Response> update(UpdateXmlRecord entry) {
+    public Uni<RestResponse<ResourceXmlRecord>> update(@Valid UpdateXmlRecord entry) {
         return service.put(entry)
-                .map(resourceJsonRecord ->
-                        Response.status(Response.Status.OK)
-                                .entity(resourceJsonRecord)
+                .map(record ->
+                        RestResponse.ResponseBuilder
+                                .ok(record, MediaType.APPLICATION_JSON)
                                 .build()
                 )
                 .onItem()
