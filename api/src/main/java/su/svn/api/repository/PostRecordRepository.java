@@ -64,6 +64,7 @@ public class PostRecordRepository {
 
     @WithTransaction
     public Uni<PostRecord> update(PostRecord postRecord) {
-        return PostRecord.update(postRecord);
+        return PostRecord.update(postRecord)
+                .replaceIfNullWith(postRecord);
     }
 }

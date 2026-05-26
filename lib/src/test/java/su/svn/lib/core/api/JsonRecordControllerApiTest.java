@@ -14,11 +14,11 @@
 package su.svn.lib.core.api;
 
 import su.svn.lib.core.ApiException;
-import su.svn.lib.core.model.ErrorResponse;
-import su.svn.lib.core.model.NewJsonRecord;
-import su.svn.lib.core.model.ResourceJsonRecord;
+import su.svn.lib.core.models.ErrorResponse;
+import su.svn.lib.core.models.NewJsonRecord;
+import su.svn.lib.core.models.ResourceJsonRecord;
 import java.util.UUID;
-import su.svn.lib.core.model.UpdateJsonRecord;
+import su.svn.lib.core.models.UpdateJsonRecord;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 

@@ -13,10 +13,10 @@ import org.mapstruct.MappingConstants;
 import org.mapstruct.ValueMapping;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.Page;
-import su.svn.api.models.dto.RecordData;
+import su.svn.api.models.dto.RecordDataPage;
 
 @Mapper(componentModel = "cdi")
 public interface PageRecordDataMapper {
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
-    Page<RecordData> toPage(Page<PostRecord> record);
+    RecordDataPage toPage(Page<PostRecord> record);
 }

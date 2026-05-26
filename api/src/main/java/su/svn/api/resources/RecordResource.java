@@ -17,11 +17,15 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.jboss.logging.Logger;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.models.dto.Page;
 import su.svn.api.models.dto.RecordData;
+import su.svn.api.models.dto.RecordDataPage;
+import su.svn.api.models.dto.ResourceBlobRecord;
 import su.svn.api.services.domain.JsonRecordDataService;
 import su.svn.api.services.mappers.PageRecordDataMapper;
 
@@ -36,13 +40,22 @@ public class RecordResource {
     @Inject
     JsonRecordDataService service;
 
-    @APIResponse(ref = "200OK")
+    @APIResponse(
+            responseCode = "201",
+            description = "Created",
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(
+                            implementation = RecordDataPage.class
+                    )
+            )
+    )
     @APIResponse(ref = "500Error")
     @PermitAll
     @Operation(summary = "Get page with list of JSON record")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Uni<Page<RecordData>> page(@QueryParam("page") int page, @QueryParam("size") byte size) {
+    public Uni<RecordDataPage> page(@QueryParam("page") int page, @QueryParam("size") byte size) {
         return service.readPage(page, size)
                 .map(postRecordPage -> {
                     LOG.debugf("postRecordPage: %s", postRecordPage);

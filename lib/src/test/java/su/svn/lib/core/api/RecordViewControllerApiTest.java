@@ -14,10 +14,10 @@
 package su.svn.lib.core.api;
 
 import su.svn.lib.core.ApiException;
-import su.svn.lib.core.model.ErrorResponse;
-import su.svn.lib.core.model.Pageable;
-import su.svn.lib.core.model.PagedModelEntityModelResourceRecordView;
-import su.svn.lib.core.model.ResourceRecordViewFilter;
+import su.svn.lib.core.models.ErrorResponse;
+import su.svn.lib.core.models.Pageable;
+import su.svn.lib.core.models.PagedModelEntityModelResourceRecordView;
+import su.svn.lib.core.models.ResourceRecordViewFilter;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 

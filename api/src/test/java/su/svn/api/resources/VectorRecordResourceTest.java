@@ -53,15 +53,13 @@ class VectorRecordResourceTest {
         when(service.post(request))
                 .thenReturn(Uni.createFrom().item(responseDto));
 
-        Response response = resource.create(request)
-                .await()
-                .indefinitely();
+        try (var response = resource.create(request).await().indefinitely()) {
+            assertThat(response.getStatus())
+                    .isEqualTo(Response.Status.CREATED.getStatusCode());
 
-        assertThat(response.getStatus())
-                .isEqualTo(Response.Status.CREATED.getStatusCode());
-
-        assertThat(response.getEntity())
-                .isEqualTo(responseDto);
+            assertThat(response.getEntity())
+                    .isEqualTo(responseDto);
+        }
 
         verify(service).post(request);
         verify(schedulerService).fire(true);
@@ -74,12 +72,10 @@ class VectorRecordResourceTest {
         when(service.delete(id))
                 .thenReturn(Uni.createFrom().voidItem());
 
-        Response response = resource.delete(id)
-                .await()
-                .indefinitely();
-
-        assertThat(response.getStatus())
-                .isEqualTo(Response.Status.NO_CONTENT.getStatusCode());
+        try (var response = resource.delete(id).await().indefinitely()) {
+            assertThat(response.getStatus())
+                    .isEqualTo(Response.Status.NO_CONTENT.getStatusCode());
+        }
 
         verify(service).delete(id);
         verify(schedulerService).fire(true);
@@ -109,15 +105,13 @@ class VectorRecordResourceTest {
         when(service.put(request))
                 .thenReturn(Uni.createFrom().item(responseDto));
 
-        Response response = resource.update(request)
-                .await()
-                .indefinitely();
+        try (var response = resource.update(request).await().indefinitely()) {
+            assertThat(response.getStatus())
+                    .isEqualTo(Response.Status.OK.getStatusCode());
 
-        assertThat(response.getStatus())
-                .isEqualTo(Response.Status.OK.getStatusCode());
-
-        assertThat(response.getEntity())
-                .isEqualTo(responseDto);
+            assertThat(response.getEntity())
+                    .isEqualTo(responseDto);
+        }
 
         verify(service).put(request);
         verify(schedulerService).fire(true);

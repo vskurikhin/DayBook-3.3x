@@ -11,6 +11,7 @@ package su.svn.api.models.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 
 import java.io.Serializable;
@@ -21,14 +22,18 @@ import java.util.UUID;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record UpdateJsonRecord(
+        @NotNull(message = "Id is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID id,
-        @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull(message = "parentId is required")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
-        @JsonProperty su.svn.lib.RecordType type,
         @JsonProperty String title,
+        @NotNull(message = "JSON is required")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty Map<String, String> json,
         @JsonProperty OffsetDateTime postAt,
+        @NotNull(message = "Refresh at is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty boolean visible,

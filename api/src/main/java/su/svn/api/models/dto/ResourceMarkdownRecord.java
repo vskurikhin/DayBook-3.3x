@@ -17,6 +17,7 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,7 +50,8 @@ public record ResourceMarkdownRecord(
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty boolean visible,
-        @JsonProperty int flags) implements Serializable {
+        @JsonProperty int flags,
+        @JsonProperty Set<String> tags) implements Serializable {
     @Builder(toBuilder = true)
     public ResourceMarkdownRecord {
     }

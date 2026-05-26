@@ -10,18 +10,33 @@ package su.svn.api.models.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Builder;
+import lombok.*;
+import lombok.experimental.Accessors;
+import lombok.experimental.FieldDefaults;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
+import static lombok.AccessLevel.PRIVATE;
+
+@Accessors(fluent = true)
+@Builder
+@Data
+@EqualsAndHashCode
+@FieldDefaults(makeFinal = true, level = PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record Page<T>(
-        @JsonProperty List<T> list,
-        @JsonProperty long pageCount,
-        @JsonProperty long pageIndex,
-        @JsonProperty long pageSize) implements Serializable {
-    @Builder
-    public Page {
-    }
+@RequiredArgsConstructor
+@ToString
+public class Page<T> implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 0L;
+    @JsonProperty
+    List<T> list;
+    @JsonProperty
+    long pageCount;
+    @JsonProperty
+    long pageIndex;
+    @JsonProperty
+    long pageSize;
 }

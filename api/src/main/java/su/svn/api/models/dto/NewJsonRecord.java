@@ -12,6 +12,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 
 import java.io.Serializable;
@@ -23,11 +24,12 @@ import java.util.UUID;
 @JsonPropertyOrder({"visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NewJsonRecord(
-        @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @NotNull(message = "JSON is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty Map<String, String> json,
+        @NotNull(message = "Post at is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty boolean visible,

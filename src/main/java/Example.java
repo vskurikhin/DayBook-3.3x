@@ -3,7 +3,7 @@ import su.svn.lib.core.ApiException;
 import su.svn.lib.core.Configuration;
 import su.svn.lib.core.api.JsonRecordControllerApi;
 import su.svn.lib.core.api.RecordViewControllerApi;
-import su.svn.lib.core.model.*;
+import su.svn.lib.core.models.*;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -11,6 +11,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
+@SuppressWarnings("ALL")
 public class Example {
 
     public static UUID ZeroUUID = UUID.fromString("00000000-0000-0000-0000-000000000000");
