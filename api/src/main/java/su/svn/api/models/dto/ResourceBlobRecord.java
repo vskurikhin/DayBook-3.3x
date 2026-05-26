@@ -16,6 +16,7 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 @JsonPropertyOrder({"id", "visible", "flags"})
@@ -29,7 +30,8 @@ public record ResourceBlobRecord(
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty boolean visible,
-        @JsonProperty int flags) implements Serializable {
+        @JsonProperty int flags,
+        @JsonProperty Set<String> tags) implements Serializable {
     @Builder(toBuilder = true)
     public ResourceBlobRecord {
     }

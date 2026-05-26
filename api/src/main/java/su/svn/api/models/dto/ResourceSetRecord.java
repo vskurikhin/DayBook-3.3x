@@ -30,7 +30,8 @@ public record ResourceSetRecord(
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty boolean visible,
-        @JsonProperty int flags) implements Serializable {
+        @JsonProperty int flags,
+        @JsonProperty Set<String> tags) implements Serializable {
     @Builder(toBuilder = true)
     public ResourceSetRecord {
     }

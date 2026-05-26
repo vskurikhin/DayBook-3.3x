@@ -18,10 +18,11 @@ import su.svn.api.models.dto.UpdateBlobRecord;
 
 @Mapper(componentModel = "cdi")
 public interface BlobRecordMapper extends DateTimeMapper {
+
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
+    @Mapping(target = "type", constant = "Blob")
     @Mapping(target = "parent", ignore = true)
     @Mapping(target = "sequenceId", ignore = true)
-    @Mapping(target = "userName", constant = "root")
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     @Mapping(target = "lastChangedTime", ignore = true)
@@ -34,7 +35,30 @@ public interface BlobRecordMapper extends DateTimeMapper {
     @Mapping(target = "link", ignore = true)
     @Mapping(target = "markdown", ignore = true)
     @Mapping(target = "value", ignore = true)
-    PostRecord toEntity(UpdateBlobRecord updateBlobRecord);
+    @Mapping(target = "vector", ignore = true)
+    @Mapping(target = "xml", ignore = true)
+    PostRecord toEntity(ResourceBlobRecord record);
+
+    @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
+    @Mapping(target = "type", constant = "Blob")
+    @Mapping(target = "parent", ignore = true)
+    @Mapping(target = "userName", ignore = true)
+    @Mapping(target = "sequenceId", ignore = true)
+    @Mapping(target = "createTime", ignore = true)
+    @Mapping(target = "updateTime", ignore = true)
+    @Mapping(target = "lastChangedTime", ignore = true)
+    @Mapping(target = "enabled", ignore = true)
+    @Mapping(target = "localChange", ignore = true)
+    @Mapping(target = "json", ignore = true)
+    @Mapping(target = "texts", ignore = true)
+    @Mapping(target = "fileName", ignore = true)
+    @Mapping(target = "html", ignore = true)
+    @Mapping(target = "link", ignore = true)
+    @Mapping(target = "markdown", ignore = true)
+    @Mapping(target = "value", ignore = true)
+    @Mapping(target = "vector", ignore = true)
+    @Mapping(target = "xml", ignore = true)
+    PostRecord toEntity(UpdateBlobRecord record);
 
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     ResourceBlobRecord toResource(PostRecord postRecord);

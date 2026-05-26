@@ -14,6 +14,7 @@ import org.eclipse.microprofile.openapi.annotations.OpenAPIDefinition;
 import org.eclipse.microprofile.openapi.annotations.info.Info;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 
+@SuppressWarnings("unused")
 @OpenAPIDefinition(
         info = @Info(
                 title = "DayBook 3 API",
@@ -26,6 +27,16 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
                                 name = "200OK",
                                 responseCode = "200",
                                 description = "OK"
+                        ),
+                        @APIResponse(
+                                name = "201Created",
+                                responseCode = "201",
+                                description = "Created"
+                        ),
+                        @APIResponse(
+                                name = "204NoCont",
+                                responseCode = "204",
+                                description = "No Content"
                         ),
                         @APIResponse(
                                 name = "500Error",

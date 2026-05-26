@@ -8,11 +8,18 @@ components:
   responses:
     "200OK":
       description: OK
+    "201Created":
+      description: Created
+    "204NoCont":
+      description: No Content
     "500Error":
       description: Internal Server Error
   schemas:
     NewBlobRecord:
       type: object
+      required:
+      - blob
+      - postAt
       properties:
         visible:
           type: boolean
@@ -25,7 +32,6 @@ components:
           type: string
         blob:
           type: string
-          format: binary
         postAt:
           $ref: "#/components/schemas/OffsetDateTime"
         tags:
@@ -35,6 +41,9 @@ components:
             type: string
     NewJsonRecord:
       type: object
+      required:
+      - json
+      - postAt
       properties:
         visible:
           type: boolean
@@ -58,6 +67,9 @@ components:
             type: string
     NewMarkdownRecord:
       type: object
+      required:
+      - markdown
+      - postAt
       properties:
         visible:
           type: boolean
@@ -79,6 +91,9 @@ components:
             type: string
     NewSetRecord:
       type: object
+      required:
+      - texts
+      - postAt
       properties:
         visible:
           type: boolean
@@ -103,6 +118,9 @@ components:
             type: string
     NewValueRecord:
       type: object
+      required:
+      - value
+      - postAt
       properties:
         visible:
           type: boolean
@@ -124,6 +142,9 @@ components:
             type: string
     NewVectorRecord:
       type: object
+      required:
+      - vector
+      - postAt
       properties:
         visible:
           type: boolean
@@ -148,6 +169,9 @@ components:
             type: string
     NewXmlRecord:
       type: object
+      required:
+      - xml
+      - postAt
       properties:
         visible:
           type: boolean
@@ -172,22 +196,6 @@ components:
       format: date-time
       examples:
       - 2022-03-10T12:15:50-04:00
-    PageRecordData:
-      type: object
-      properties:
-        list:
-          type: array
-          items:
-            $ref: "#/components/schemas/RecordData"
-        pageCount:
-          type: integer
-          format: int64
-        pageIndex:
-          type: integer
-          format: int64
-        pageSize:
-          type: integer
-          format: int64
     RecordData:
       type: object
       properties:
@@ -210,7 +218,6 @@ components:
           type: string
         blob:
           type: string
-          format: binary
         json:
           type: object
           additionalProperties:
@@ -230,6 +237,22 @@ components:
           type: string
         value:
           type: string
+    RecordDataPage:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecordData"
+        pageCount:
+          type: integer
+          format: int64
+        pageIndex:
+          type: integer
+          format: int64
+        pageSize:
+          type: integer
+          format: int64
     RecordType:
       type: string
       enum:
@@ -240,24 +263,208 @@ components:
       - Text
       - Vector
       - Xml
+    ResourceBlobRecord:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        visible:
+          type: boolean
+        flags:
+          type: integer
+          format: int32
+        parentId:
+          $ref: "#/components/schemas/UUID"
+        title:
+          type: string
+        blob:
+          type: string
+        postAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        refreshAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        tags:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    ResourceJsonRecord:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        visible:
+          type: boolean
+        flags:
+          type: integer
+          format: int32
+        parentId:
+          $ref: "#/components/schemas/UUID"
+        title:
+          type: string
+        json:
+          type: object
+          additionalProperties:
+            type: string
+        postAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        refreshAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        tags:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    ResourceMarkdownRecord:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        visible:
+          type: boolean
+        flags:
+          type: integer
+          format: int32
+        parentId:
+          $ref: "#/components/schemas/UUID"
+        title:
+          type: string
+        markdown:
+          type: string
+        postAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        refreshAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        tags:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    ResourceSetRecord:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        visible:
+          type: boolean
+        flags:
+          type: integer
+          format: int32
+        parentId:
+          $ref: "#/components/schemas/UUID"
+        title:
+          type: string
+        texts:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        postAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        refreshAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        tags:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    ResourceValueRecord:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        visible:
+          type: boolean
+        flags:
+          type: integer
+          format: int32
+        parentId:
+          $ref: "#/components/schemas/UUID"
+        title:
+          type: string
+        value:
+          type: string
+        postAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        refreshAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        tags:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    ResourceVectorRecord:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        visible:
+          type: boolean
+        flags:
+          type: integer
+          format: int32
+        parentId:
+          $ref: "#/components/schemas/UUID"
+        title:
+          type: string
+        vector:
+          type: array
+          items:
+            type: number
+            format: float
+        postAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        refreshAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        tags:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    ResourceXmlRecord:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        visible:
+          type: boolean
+        flags:
+          type: integer
+          format: int32
+        parentId:
+          $ref: "#/components/schemas/UUID"
+        title:
+          type: string
+        xml:
+          type: string
+        postAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        refreshAt:
+          $ref: "#/components/schemas/OffsetDateTime"
+        tags:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
     UUID:
       type: string
       format: uuid
       pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
     UpdateBlobRecord:
       type: object
+      required:
+      - id
+      - parentId
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
         parentId:
           $ref: "#/components/schemas/UUID"
-        type:
-          $ref: "#/components/schemas/RecordType"
         title:
           type: string
         blob:
           type: string
-          format: binary
         postAt:
           $ref: "#/components/schemas/OffsetDateTime"
         refreshAt:
@@ -274,13 +481,16 @@ components:
             type: string
     UpdateJsonRecord:
       type: object
+      required:
+      - id
+      - parentId
+      - json
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
         parentId:
           $ref: "#/components/schemas/UUID"
-        type:
-          $ref: "#/components/schemas/RecordType"
         title:
           type: string
         json:
@@ -303,13 +513,16 @@ components:
             type: string
     UpdateMarkdownRecord:
       type: object
+      required:
+      - id
+      - parentId
+      - markdown
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
         parentId:
           $ref: "#/components/schemas/UUID"
-        type:
-          $ref: "#/components/schemas/RecordType"
         title:
           type: string
         markdown:
@@ -330,13 +543,16 @@ components:
             type: string
     UpdateSetRecord:
       type: object
+      required:
+      - id
+      - parentId
+      - texts
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
         parentId:
           $ref: "#/components/schemas/UUID"
-        type:
-          $ref: "#/components/schemas/RecordType"
         title:
           type: string
         texts:
@@ -360,13 +576,16 @@ components:
             type: string
     UpdateValueRecord:
       type: object
+      required:
+      - id
+      - parentId
+      - value
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
         parentId:
           $ref: "#/components/schemas/UUID"
-        type:
-          $ref: "#/components/schemas/RecordType"
         title:
           type: string
         value:
@@ -387,13 +606,16 @@ components:
             type: string
     UpdateVectorRecord:
       type: object
+      required:
+      - id
+      - parentId
+      - vector
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
         parentId:
           $ref: "#/components/schemas/UUID"
-        type:
-          $ref: "#/components/schemas/RecordType"
         title:
           type: string
         vector:
@@ -417,13 +639,16 @@ components:
             type: string
     UpdateXmlRecord:
       type: object
+      required:
+      - id
+      - parentId
+      - xml
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
         parentId:
           $ref: "#/components/schemas/UUID"
-        type:
-          $ref: "#/components/schemas/RecordType"
         title:
           type: string
         xml:
@@ -461,7 +686,10 @@ paths:
       responses:
         "200":
           description: OK
-          $ref: "#/components/responses/200OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceBlobRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -486,6 +714,10 @@ paths:
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceBlobRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -510,7 +742,7 @@ paths:
           $ref: "#/components/schemas/UUID"
       responses:
         "204":
-          description: No Content
+          $ref: "#/components/responses/204NoCont"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -534,7 +766,10 @@ paths:
       responses:
         "200":
           description: OK
-          $ref: "#/components/responses/200OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceJsonRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -559,6 +794,10 @@ paths:
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceJsonRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -583,7 +822,7 @@ paths:
           $ref: "#/components/schemas/UUID"
       responses:
         "204":
-          description: No Content
+          $ref: "#/components/responses/204NoCont"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -607,7 +846,10 @@ paths:
       responses:
         "200":
           description: OK
-          $ref: "#/components/responses/200OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceMarkdownRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -632,6 +874,10 @@ paths:
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceMarkdownRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -656,7 +902,7 @@ paths:
           $ref: "#/components/schemas/UUID"
       responses:
         "204":
-          description: No Content
+          $ref: "#/components/responses/204NoCont"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -680,7 +926,10 @@ paths:
       responses:
         "200":
           description: OK
-          $ref: "#/components/responses/200OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceSetRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -705,6 +954,10 @@ paths:
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceSetRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -753,7 +1006,10 @@ paths:
       responses:
         "200":
           description: OK
-          $ref: "#/components/responses/200OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceValueRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -778,6 +1034,10 @@ paths:
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceValueRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -826,7 +1086,10 @@ paths:
       responses:
         "200":
           description: OK
-          $ref: "#/components/responses/200OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceVectorRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -851,6 +1114,10 @@ paths:
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceVectorRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -899,7 +1166,10 @@ paths:
       responses:
         "200":
           description: OK
-          $ref: "#/components/responses/200OK"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceXmlRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -924,6 +1194,10 @@ paths:
       responses:
         "201":
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResourceXmlRecord"
         "500":
           $ref: "#/components/responses/500Error"
         "401":
@@ -975,9 +1249,12 @@ paths:
           type: integer
           format: int8
       responses:
-        "200":
-          description: OK
-          $ref: "#/components/responses/200OK"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordDataPage"
         "500":
           $ref: "#/components/responses/500Error"
       tags:

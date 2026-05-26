@@ -50,9 +50,6 @@ class UpdateBlobRecordTest {
         assertThat(restored.parentId())
                 .isEqualTo(record.parentId());
 
-        assertThat(restored.type())
-                .isEqualTo(record.type());
-
         assertThat(restored.title())
                 .isEqualTo(record.title());
 

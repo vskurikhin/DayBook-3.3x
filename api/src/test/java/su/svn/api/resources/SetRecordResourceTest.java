@@ -38,10 +38,9 @@ class SetRecordResourceTest {
         when(service.post(entry))
                 .thenReturn(Uni.createFrom().item(responseRecord));
 
-        Response response = resource.create(entry)
-                .await().indefinitely();
-
-        assertEquals(Response.Status.CREATED.getStatusCode(), response.getStatus());
+        try (var response = resource.create(entry).await().indefinitely()) {
+            assertEquals(Response.Status.CREATED.getStatusCode(), response.getStatus());
+        }
 
         verify(service).post(entry);
         verify(schedulerService).fire(true);
@@ -54,10 +53,9 @@ class SetRecordResourceTest {
         when(service.delete(id))
                 .thenReturn(Uni.createFrom().voidItem());
 
-        Response response = resource.delete(id)
-                .await().indefinitely();
-
-        assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
+        try (Response response = resource.delete(id).await().indefinitely()) {
+            assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
+        }
 
         verify(service).delete(id);
         verify(schedulerService).fire(true);
@@ -71,10 +69,9 @@ class SetRecordResourceTest {
         when(service.put(entry))
                 .thenReturn(Uni.createFrom().item(responseRecord));
 
-        Response response = resource.update(entry)
-                .await().indefinitely();
-
-        assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        try (var response = resource.update(entry).await().indefinitely()) {
+            assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        }
 
         verify(service).put(entry);
         verify(schedulerService).fire(true);

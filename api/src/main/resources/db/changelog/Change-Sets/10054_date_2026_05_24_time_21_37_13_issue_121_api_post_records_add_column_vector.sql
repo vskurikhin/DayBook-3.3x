@@ -6,7 +6,7 @@
 --
 
 --
-ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS vector vector(1024);
+ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS vector JSONB;
 
 --
 --rollback ALTER TABLE api.post_records DROP COLUMN IF EXISTS vector;

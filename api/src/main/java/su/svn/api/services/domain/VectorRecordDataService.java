@@ -8,9 +8,11 @@
 
 package su.svn.api.services.domain;
 
+import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.NewVectorRecord;
 import su.svn.api.models.dto.ResourceVectorRecord;
 import su.svn.api.models.dto.UpdateVectorRecord;
@@ -18,6 +20,7 @@ import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.VectorRecordRepository;
 import su.svn.api.services.mappers.VectorRecordMapper;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -141,5 +144,10 @@ public class VectorRecordDataService {
                         postRecordRepository.update(mapper.toEntity(updateVectorRecord))
                                 .map(postRecord -> mapper.toResource(postRecord))
                 );
+    }
+
+    @WithTransaction
+    public Uni<List<PostRecord>> persist(PostRecord record) {
+        return postRecordRepository.persistAll(List.of(record));
     }
 }

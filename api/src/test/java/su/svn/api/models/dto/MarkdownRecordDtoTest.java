@@ -1,13 +1,13 @@
 package su.svn.api.models.dto;
 
 import org.junit.jupiter.api.Test;
-import su.svn.lib.RecordType;
 
 import java.time.OffsetDateTime;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MarkdownRecordDtoTest {
 
@@ -58,12 +58,10 @@ class MarkdownRecordDtoTest {
 
         var dto = UpdateMarkdownRecord.builder()
                 .id(id)
-                .type(RecordType.Text)
                 .markdown("updated")
                 .build();
 
         assertEquals(id, dto.id());
-        assertEquals(RecordType.Text, dto.type());
         assertEquals("updated", dto.markdown());
     }
 }

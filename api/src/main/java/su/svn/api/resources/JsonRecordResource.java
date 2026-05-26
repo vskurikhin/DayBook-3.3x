@@ -11,13 +11,18 @@ package su.svn.api.resources;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.jboss.resteasy.reactive.RestResponse;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.models.dto.NewJsonRecord;
+import su.svn.api.models.dto.ResourceJsonRecord;
 import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.services.domain.JsonRecordDataService;
 import su.svn.api.services.schedulers.RecordSchedulerService;
@@ -57,7 +62,13 @@ public class JsonRecordResource {
 
     @APIResponse(
             responseCode = "201",
-            description = "Created"
+            description = "Created",
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(
+                            implementation = ResourceJsonRecord.class
+                    )
+            )
     )
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
@@ -66,21 +77,18 @@ public class JsonRecordResource {
     @Path(ResourcePath.NONE)
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Uni<Response> create(NewJsonRecord entry) {
+    public Uni<RestResponse<ResourceJsonRecord>> create(@Valid NewJsonRecord entry) {
         return service.post(entry)
-                .map(resourceJsonRecord ->
-                        Response.status(Response.Status.CREATED)
-                                .entity(resourceJsonRecord)
+                .map(record ->
+                        RestResponse.ResponseBuilder
+                                .create(Response.Status.CREATED, record)
                                 .build()
                 )
                 .onItem()
                 .invoke(() -> schedulerService.fire(true));
     }
 
-    @APIResponse(
-            responseCode = "204",
-            description = "No Content"
-    )
+    @APIResponse(ref = "204NoCont")
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
     @Operation(summary = "Delete JSON record")
@@ -96,7 +104,16 @@ public class JsonRecordResource {
                 .invoke(() -> schedulerService.fire(true));
     }
 
-    @APIResponse(ref = "200OK")
+    @APIResponse(
+            responseCode = "200",
+            description = "OK",
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(
+                            implementation = ResourceJsonRecord.class
+                    )
+            )
+    )
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
     @Operation(summary = "Update JSON record")
@@ -104,11 +121,11 @@ public class JsonRecordResource {
     @Path(ResourcePath.NONE)
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Uni<Response> update(UpdateJsonRecord entry) {
+    public Uni<RestResponse<ResourceJsonRecord>> update(@Valid UpdateJsonRecord entry) {
         return service.put(entry)
-                .map(resourceJsonRecord ->
-                        Response.status(Response.Status.OK)
-                                .entity(resourceJsonRecord)
+                .map(record ->
+                        RestResponse.ResponseBuilder
+                                .ok(record, MediaType.APPLICATION_JSON)
                                 .build()
                 )
                 .onItem()

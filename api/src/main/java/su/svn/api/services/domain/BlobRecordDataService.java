@@ -43,11 +43,10 @@ public class BlobRecordDataService {
         return recordRepository.post(newBlobRecord);
     }
 
-    public Uni<ResourceBlobRecord> put(UpdateBlobRecord updateBlobRecord) {
-        return recordRepository.put(updateBlobRecord)
-                .flatMap(resourceJsonRecord ->
-                        postRecordRepository.update(mapper.toEntity(updateBlobRecord))
-                                .map(postRecord -> mapper.toResource(postRecord))
+    public Uni<ResourceBlobRecord> put(UpdateBlobRecord updateRecord) {
+        return recordRepository.put(updateRecord)
+                .flatMap(record -> postRecordRepository.update(mapper.toEntity(record))
+                        .map(postRecord -> mapper.toResource(postRecord))
                 );
     }
 }
