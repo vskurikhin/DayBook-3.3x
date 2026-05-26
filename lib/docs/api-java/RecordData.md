@@ -23,6 +23,9 @@
 |**link** | **String** |  |  [optional] |
 |**markdown** | **String** |  |  [optional] |
 |**value** | **String** |  |  [optional] |
+|**vector** | **List&lt;Float&gt;** |  |  [optional] |
+|**xml** | **String** |  |  [optional] |
+|**tags** | **List&lt;String&gt;** |  |  [optional] |
 
 
 

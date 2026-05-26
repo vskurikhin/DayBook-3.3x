@@ -10,6 +10,7 @@ package su.svn.api.models.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.Builder;
 
 import java.io.Serializable;
@@ -68,6 +69,7 @@ import java.util.UUID;
  * @param value plain textual value
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@RegisterForReflection
 public record RecordData(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
@@ -84,7 +86,10 @@ public record RecordData(
         @JsonProperty String html,
         @JsonProperty String link,
         @JsonProperty String markdown,
-        @JsonProperty String value
+        @JsonProperty String value,
+        @JsonProperty float[] vector,
+        @JsonProperty String xml,
+        @JsonProperty List<String> tags
 ) implements Serializable {
     @Builder
     public RecordData {

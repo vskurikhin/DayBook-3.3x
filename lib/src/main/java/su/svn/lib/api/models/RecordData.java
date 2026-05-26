@@ -21,9 +21,11 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -55,7 +57,7 @@ import su.svn.lib.api.JSON;
 /**
  * RecordData
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T17:15:26.496332+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T22:07:32.679465+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class RecordData {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
@@ -136,6 +138,21 @@ public class RecordData {
   @SerializedName(SERIALIZED_NAME_VALUE)
   @jakarta.annotation.Nullable
   private String value;
+
+  public static final String SERIALIZED_NAME_VECTOR = "vector";
+  @SerializedName(SERIALIZED_NAME_VECTOR)
+  @jakarta.annotation.Nullable
+  private List<Float> vector = new ArrayList<>();
+
+  public static final String SERIALIZED_NAME_XML = "xml";
+  @SerializedName(SERIALIZED_NAME_XML)
+  @jakarta.annotation.Nullable
+  private String xml;
+
+  public static final String SERIALIZED_NAME_TAGS = "tags";
+  @SerializedName(SERIALIZED_NAME_TAGS)
+  @jakarta.annotation.Nullable
+  private List<String> tags = new ArrayList<>();
 
   public RecordData() {
   }
@@ -460,6 +477,79 @@ public class RecordData {
   }
 
 
+  public RecordData vector(@jakarta.annotation.Nullable List<Float> vector) {
+    this.vector = vector;
+    return this;
+  }
+
+  public RecordData addVectorItem(Float vectorItem) {
+    if (this.vector == null) {
+      this.vector = new ArrayList<>();
+    }
+    this.vector.add(vectorItem);
+    return this;
+  }
+
+  /**
+   * Get vector
+   * @return vector
+   */
+  @jakarta.annotation.Nullable
+  public List<Float> getVector() {
+    return vector;
+  }
+
+  public void setVector(@jakarta.annotation.Nullable List<Float> vector) {
+    this.vector = vector;
+  }
+
+
+  public RecordData xml(@jakarta.annotation.Nullable String xml) {
+    this.xml = xml;
+    return this;
+  }
+
+  /**
+   * Get xml
+   * @return xml
+   */
+  @jakarta.annotation.Nullable
+  public String getXml() {
+    return xml;
+  }
+
+  public void setXml(@jakarta.annotation.Nullable String xml) {
+    this.xml = xml;
+  }
+
+
+  public RecordData tags(@jakarta.annotation.Nullable List<String> tags) {
+    this.tags = tags;
+    return this;
+  }
+
+  public RecordData addTagsItem(String tagsItem) {
+    if (this.tags == null) {
+      this.tags = new ArrayList<>();
+    }
+    this.tags.add(tagsItem);
+    return this;
+  }
+
+  /**
+   * Get tags
+   * @return tags
+   */
+  @jakarta.annotation.Nullable
+  public List<String> getTags() {
+    return tags;
+  }
+
+  public void setTags(@jakarta.annotation.Nullable List<String> tags) {
+    this.tags = tags;
+  }
+
+
 
   @Override
   public boolean equals(Object o) {
@@ -485,12 +575,15 @@ public class RecordData {
         Objects.equals(this.html, recordData.html) &&
         Objects.equals(this.link, recordData.link) &&
         Objects.equals(this.markdown, recordData.markdown) &&
-        Objects.equals(this.value, recordData.value);
+        Objects.equals(this.value, recordData.value) &&
+        Objects.equals(this.vector, recordData.vector) &&
+        Objects.equals(this.xml, recordData.xml) &&
+        Objects.equals(this.tags, recordData.tags);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, parentId, type, postAt, refreshAt, visible, flags, title, blob, json, texts, fileName, html, link, markdown, value);
+    return Objects.hash(id, parentId, type, postAt, refreshAt, visible, flags, title, blob, json, texts, fileName, html, link, markdown, value, vector, xml, tags);
   }
 
   @Override
@@ -513,6 +606,9 @@ public class RecordData {
     sb.append("    link: ").append(toIndentedString(link)).append("\n");
     sb.append("    markdown: ").append(toIndentedString(markdown)).append("\n");
     sb.append("    value: ").append(toIndentedString(value)).append("\n");
+    sb.append("    vector: ").append(toIndentedString(vector)).append("\n");
+    sb.append("    xml: ").append(toIndentedString(xml)).append("\n");
+    sb.append("    tags: ").append(toIndentedString(tags)).append("\n");
     sb.append("}");
     return sb.toString();
   }
@@ -531,7 +627,7 @@ public class RecordData {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("id", "parentId", "type", "postAt", "refreshAt", "visible", "flags", "title", "blob", "json", "texts", "fileName", "html", "link", "markdown", "value"));
+    openapiFields = new HashSet<String>(Arrays.asList("id", "parentId", "type", "postAt", "refreshAt", "visible", "flags", "title", "blob", "json", "texts", "fileName", "html", "link", "markdown", "value", "vector", "xml", "tags"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);
@@ -592,6 +688,17 @@ public class RecordData {
       }
       if ((jsonObj.get("value") != null && !jsonObj.get("value").isJsonNull()) && !jsonObj.get("value").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `value` to be a primitive type in the JSON string but got `%s`", jsonObj.get("value").toString()));
+      }
+      // ensure the optional json data is an array if present
+      if (jsonObj.get("vector") != null && !jsonObj.get("vector").isJsonNull() && !jsonObj.get("vector").isJsonArray()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `vector` to be an array in the JSON string but got `%s`", jsonObj.get("vector").toString()));
+      }
+      if ((jsonObj.get("xml") != null && !jsonObj.get("xml").isJsonNull()) && !jsonObj.get("xml").isJsonPrimitive()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `xml` to be a primitive type in the JSON string but got `%s`", jsonObj.get("xml").toString()));
+      }
+      // ensure the optional json data is an array if present
+      if (jsonObj.get("tags") != null && !jsonObj.get("tags").isJsonNull() && !jsonObj.get("tags").isJsonArray()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `tags` to be an array in the JSON string but got `%s`", jsonObj.get("tags").toString()));
       }
   }
 

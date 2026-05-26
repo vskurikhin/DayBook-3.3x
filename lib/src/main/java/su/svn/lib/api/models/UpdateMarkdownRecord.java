@@ -52,7 +52,7 @@ import su.svn.lib.api.JSON;
 /**
  * UpdateMarkdownRecord
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T17:15:26.496332+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T22:07:32.679465+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class UpdateMarkdownRecord {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)

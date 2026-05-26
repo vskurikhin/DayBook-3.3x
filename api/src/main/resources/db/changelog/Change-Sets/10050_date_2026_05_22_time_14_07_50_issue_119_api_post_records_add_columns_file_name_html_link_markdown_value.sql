@@ -6,11 +6,11 @@
 --
 
 --
-ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS file_name TEXT;
-ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS html TEXT;
-ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS link TEXT;
-ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS markdown TEXT;
-ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS value TEXT;
+ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS file_name VARCHAR(255);
+ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS html VARCHAR(65535);
+ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS link VARCHAR(255);
+ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS markdown VARCHAR(65535);
+ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS value VARCHAR(255);
 
 --
 --rollback ALTER TABLE api.post_records DROP COLUMN IF EXISTS value;

@@ -346,7 +346,7 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     @Convert(converter = FloatArrayVectorConverter.class)
     float[] vector;
 
-    @Column(name = "xml")
+    @Column(name = "xml", columnDefinition = "xml")
     String xml;
 
     @Column(name = "tags")

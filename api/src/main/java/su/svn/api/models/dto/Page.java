@@ -10,6 +10,7 @@ package su.svn.api.models.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
@@ -26,6 +27,7 @@ import static lombok.AccessLevel.PRIVATE;
 @EqualsAndHashCode
 @FieldDefaults(makeFinal = true, level = PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@RegisterForReflection
 @RequiredArgsConstructor
 @ToString
 public class Page<T> implements Serializable {

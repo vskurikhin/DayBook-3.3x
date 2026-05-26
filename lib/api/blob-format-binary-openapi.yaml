@@ -239,6 +239,17 @@ components:
           type: string
         value:
           type: string
+        vector:
+          type: array
+          items:
+            type: number
+            format: float
+        xml:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
     RecordDataPage:
       type: object
       properties:

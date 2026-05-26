@@ -79,7 +79,7 @@ public class XmlRecordResourceApiExample {
         updateRecord.id(resourceRecord.getId());
         updateRecord.parentId(resourceRecord.getParentId());
         updateRecord.title("updated");
-        updateRecord.xml("<root><updated/></root>");
+        updateRecord.xml("<?xml version=\"1.0\" encoding=\"UTF-8\"?><root><updated/></root>");
         updateRecord.refreshAt(OffsetDateTime.now());
         try {
             ResourceXmlRecord result = resource.put(updateRecord);

@@ -14,15 +14,19 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.hibernate.reactive.mutiny.Mutiny;
+import org.jboss.logging.Logger;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.Page;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @ApplicationScoped
 public class PostRecordRepository {
+
+    private static final Logger LOG = Logger.getLogger(PostRecordRepository.class);
 
     public static int BATCH_SIZE = 1024;
 
@@ -57,9 +61,9 @@ public class PostRecordRepository {
         var query = PostRecord.readEnabledOrderByPostAtAndRefreshAtDesc();
         var page = query.page(pageIndex, size);
         var unis = Uni.combine().all().unis(page.list(), page.pageCount());
-        return unis.asTuple().map(t2 ->
+        return unis.asTuple().log("PostRecordRepository readPage unis").map(t2 ->
                 new Page<>(t2.getItem1(), t2.getItem2(), pageIndex, t2.getItem1().size())
-        );
+        ).invoke(postRecordPage -> LOG.debugf("readPage(%d, %d): %s", pageIndex, size, postRecordPage.toString()));
     }
 
     @WithTransaction
