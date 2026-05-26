@@ -14,12 +14,13 @@ dependencies {
     implementation project(':lib')
     implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
     implementation enforcedPlatform("${quarkusPlatformGroupId}:quarkus-camel-bom:${quarkusPlatformVersion}")
-    implementation 'io.quarkiverse.mapstruct:quarkus-mapstruct:1.1.0'
+    implementation "io.quarkiverse.mapstruct:quarkus-mapstruct:${VERSION_QUARKUS_MAPSTRUCT}"
     implementation 'io.quarkus:quarkus-arc'
     implementation 'io.quarkus:quarkus-cache'
     implementation 'io.quarkus:quarkus-container-image-docker'
     implementation 'io.quarkus:quarkus-grpc'
     implementation 'io.quarkus:quarkus-hibernate-reactive-panache'
+    implementation 'io.quarkus:quarkus-hibernate-validator'
     implementation 'io.quarkus:quarkus-jackson'
     implementation 'io.quarkus:quarkus-jdbc-postgresql'
     implementation 'io.quarkus:quarkus-reactive-pg-client'
@@ -32,8 +33,9 @@ dependencies {
     implementation 'io.quarkus:quarkus-smallrye-jwt-build'
     implementation 'io.quarkus:quarkus-smallrye-openapi'
     // TODO remove quarkus-openapi-generator-server in release
+    //noinspection VulnerableLibrariesLocal
     implementation 'io.quarkiverse.openapi.generator:quarkus-openapi-generator-server:2.14.0-lts'
-    implementation 'io.swagger.core.v3:swagger-annotations:2.2.46'
+    implementation "io.swagger.core.v3:swagger-annotations:${VERSION_SWAGGER_ANNOTATIONS}"
 
     implementation "org.mapstruct:mapstruct:${VERSION_MAPSTRUCT}"
 
@@ -55,8 +57,7 @@ dependencies {
     testImplementation 'io.quarkus:quarkus-junit-mockito'
     testImplementation 'io.quarkus:quarkus-junit5-mockito'
     testImplementation 'io.quarkus:quarkus-liquibase'
-    testImplementation 'io.quarkus:quarkus-panache-mock:3.33.1'
-    // testImplementation 'io.quarkus:quarkus-test-postgresql'
+    testImplementation 'io.quarkus:quarkus-panache-mock'
     testImplementation 'io.quarkus:quarkus-test-security'
     testImplementation 'io.quarkus:quarkus-test-vertx'
     testImplementation 'io.rest-assured:rest-assured'

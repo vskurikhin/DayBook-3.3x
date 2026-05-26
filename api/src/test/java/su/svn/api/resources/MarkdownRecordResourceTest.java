@@ -68,13 +68,11 @@ class MarkdownRecordResourceTest {
         when(service.post(request))
                 .thenReturn(Uni.createFrom().item(resourceRecord));
 
-        Response response = resource.create(request)
-                .await()
-                .indefinitely();
-
-        assertNotNull(response);
-        assertEquals(Response.Status.CREATED.getStatusCode(), response.getStatus());
-        assertEquals(resourceRecord, response.getEntity());
+        try (var response = resource.create(request).await().indefinitely()) {
+            assertNotNull(response);
+            assertEquals(Response.Status.CREATED.getStatusCode(), response.getStatus());
+            assertEquals(resourceRecord, response.getEntity());
+        }
 
         verify(service).post(request);
         verify(schedulerService).fire(true);
@@ -113,13 +111,11 @@ class MarkdownRecordResourceTest {
         when(service.put(request))
                 .thenReturn(Uni.createFrom().item(resourceRecord));
 
-        Response response = resource.update(request)
-                .await()
-                .indefinitely();
-
-        assertNotNull(response);
-        assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-        assertEquals(resourceRecord, response.getEntity());
+        try (var response = resource.update(request).await().indefinitely()) {
+            assertNotNull(response);
+            assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+            assertEquals(resourceRecord, response.getEntity());
+        }
 
         verify(service).put(request);
         verify(schedulerService).fire(true);

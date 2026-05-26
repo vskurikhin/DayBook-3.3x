@@ -20,6 +20,7 @@ import su.svn.api.profile.ContainersProfile;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.client.rest.RecordViewClient;
 import su.svn.api.services.domain.JsonRecordDataService;
+import su.svn.api.services.domain.VectorRecordDataService;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -28,6 +29,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -55,6 +57,9 @@ public class DataBaseIT {
 
     @Inject
     JsonRecordDataService jsonRecordDataService;
+
+    @Inject
+    VectorRecordDataService vectorRecordDataService;
 
     @BeforeEach
     void beforeEach(TestInfo testInfo) {
@@ -148,7 +153,10 @@ public class DataBaseIT {
                 }
         );
         var expectedPageIndex2 = expectedPageCount - 1;
-        var expectedPageSize2 = ITERATION * CHUNK_SIZE - expectedPageIndex2 * expectedPageSize + 1;
+        /*
+         * Function
+         * expectedPageSize2 = ITERATION * CHUNK_SIZE - expectedPageIndex2 * expectedPageSize + 1
+         */
         asserter.assertThat(
                 () -> postRecordRepository.readPage(expectedPageIndex2, (byte) expectedPageSize),
                 postRecords -> {
@@ -197,7 +205,7 @@ public class DataBaseIT {
     @Test
     @DisplayName("RecordDataService mass test")
     @RunOnVertxContext
-    void testRecordDataService(UniAsserter asserter) throws InterruptedException {
+    void testRecordDataService(UniAsserter asserter) {
         asserter.assertThat(
                 () -> jsonRecordDataService.sync(0, 2000)
                         .flatMap(postRecords -> postRecordRepository.readIdIn(
@@ -221,6 +229,31 @@ public class DataBaseIT {
         asserter.assertThat(
                 () -> postRecordRepository.findLastChangedTime(),
                 Assertions::assertNotNull
+        );
+    }
+
+    @Test
+    @DisplayName("Vector")
+    @RunOnVertxContext
+    void testVector(UniAsserter asserter) {
+        var listVector = IntStream.rangeClosed(1, 1024)
+                .mapToObj(Float::valueOf)
+                .toList();
+        var af = new float[listVector.size()];
+        for (int i = 0; i < af.length; i++) {
+            af[i] = listVector.get(i);
+        }
+        var vector = PostRecord.builder()
+                .id(UUID.randomUUID())
+                .parentId(new UUID(0, 0))
+                .vector(af)
+                .userName("root")
+                .postAt(OffsetDateTime.now())
+                .lastChangedTime(LocalDateTime.now())
+                .build();
+        asserter.assertThat(
+                () -> vectorRecordDataService.persist(vector),
+                got -> System.err.println("got = " + got)
         );
     }
 }

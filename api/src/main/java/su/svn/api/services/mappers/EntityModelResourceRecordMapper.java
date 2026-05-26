@@ -20,7 +20,6 @@ public interface EntityModelResourceRecordMapper extends DateTimeMapper {
     @ValueMapping(source = "UNRECOGNIZED", target = MappingConstants.NULL)
     @Mapping(target = "parent", ignore = true)
     @Mapping(target = "sequenceId", ignore = true)
-    // TODO @Mapping(target = "userName", constant = "root")
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     @Mapping(target = "enabled", ignore = true)

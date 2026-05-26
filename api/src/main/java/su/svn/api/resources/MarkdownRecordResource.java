@@ -11,14 +11,17 @@ package su.svn.api.resources;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.jboss.resteasy.reactive.RestResponse;
 import su.svn.api.domain.enums.ResourcePath;
-import su.svn.api.models.dto.NewMarkdownRecord;
-import su.svn.api.models.dto.UpdateMarkdownRecord;
+import su.svn.api.models.dto.*;
 import su.svn.api.services.domain.MarkdownRecordDataService;
 import su.svn.api.services.schedulers.RecordSchedulerService;
 
@@ -89,7 +92,13 @@ public class MarkdownRecordResource {
      */
     @APIResponse(
             responseCode = "201",
-            description = "Created"
+            description = "Created",
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(
+                            implementation = ResourceMarkdownRecord.class
+                    )
+            )
     )
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
@@ -98,11 +107,11 @@ public class MarkdownRecordResource {
     @Path(ResourcePath.NONE)
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Uni<Response> create(NewMarkdownRecord entry) {
+    public  Uni<RestResponse<ResourceMarkdownRecord>> create(@Valid NewMarkdownRecord entry) {
         return service.post(entry)
-                .map(resourceJsonRecord ->
-                        Response.status(Response.Status.CREATED)
-                                .entity(resourceJsonRecord)
+                .map(record ->
+                        RestResponse.ResponseBuilder
+                                .create(Response.Status.CREATED, record)
                                 .build()
                 )
                 .onItem()
@@ -124,10 +133,7 @@ public class MarkdownRecordResource {
      * @param id unique identifier of the markdown record
      * @return reactive HTTP response with no content
      */
-    @APIResponse(
-            responseCode = "204",
-            description = "No Content"
-    )
+    @APIResponse(ref = "204NoCont")
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
     @Operation(summary = "Delete markdown record")
@@ -158,7 +164,16 @@ public class MarkdownRecordResource {
      * @param entry DTO containing updated markdown record data
      * @return reactive HTTP response containing the updated markdown resource
      */
-    @APIResponse(ref = "200OK")
+    @APIResponse(
+            responseCode = "200",
+            description = "OK",
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(
+                            implementation = ResourceMarkdownRecord.class
+                    )
+            )
+    )
     @APIResponse(ref = "500Error")
     @RolesAllowed("USER")
     @Operation(summary = "Update markdown record")
@@ -166,11 +181,11 @@ public class MarkdownRecordResource {
     @Path(ResourcePath.NONE)
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Uni<Response> update(UpdateMarkdownRecord entry) {
+    public  Uni<RestResponse<ResourceMarkdownRecord>> update(@Valid UpdateMarkdownRecord entry) {
         return service.put(entry)
-                .map(resourceJsonRecord ->
-                        Response.status(Response.Status.OK)
-                                .entity(resourceJsonRecord)
+                .map(record ->
+                        RestResponse.ResponseBuilder
+                                .ok(record, MediaType.APPLICATION_JSON)
                                 .build()
                 )
                 .onItem()

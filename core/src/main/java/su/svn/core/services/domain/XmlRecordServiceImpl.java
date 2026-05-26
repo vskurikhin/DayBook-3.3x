@@ -107,7 +107,7 @@ public class XmlRecordServiceImpl implements XmlRecordService {
         var resourceRecord = mapper.toResource(newRecord);
         var record = mapper.toEntity(resourceRecord);
         final String username = recordServiceHelper.getUserName();
-        record.baseRecord().type(RecordType.Text);
+        record.baseRecord().type(RecordType.Xml);
         record.baseRecord().userName(username);
         record.userName(username);
         record.type(TextRecordType.Value);
@@ -139,7 +139,7 @@ public class XmlRecordServiceImpl implements XmlRecordService {
             var resourceRecord = mapper.toResource(updateRecord);
             var record = mapper.toEntity(resourceRecord);
             record.baseRecord()
-                    .type(RecordType.Text);
+                    .type(RecordType.Xml);
             record.baseRecord()
                     .postAt(optionalRecord.orElseThrow()
                             .baseRecord()

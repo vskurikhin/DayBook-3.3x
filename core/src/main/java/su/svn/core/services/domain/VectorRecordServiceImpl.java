@@ -106,7 +106,7 @@ public class VectorRecordServiceImpl implements VectorRecordService {
         var resourceRecord = mapper.toResource(newRecord);
         var record = mapper.toEntity(resourceRecord);
         final String username = recordServiceHelper.getUserName();
-        record.baseRecord().type(RecordType.Text);
+        record.baseRecord().type(RecordType.Vector);
         record.baseRecord().userName(username);
         record.userName(username);
         record.type(TextRecordType.Value);
@@ -137,7 +137,7 @@ public class VectorRecordServiceImpl implements VectorRecordService {
             var resourceRecord = mapper.toResource(updateRecord);
             var record = mapper.toEntity(resourceRecord);
             record.baseRecord()
-                    .type(RecordType.Text);
+                    .type(RecordType.Vector);
             record.baseRecord()
                     .postAt(optionalRecord.orElseThrow()
                             .baseRecord()

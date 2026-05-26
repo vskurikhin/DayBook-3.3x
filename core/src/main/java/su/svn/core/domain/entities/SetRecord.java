@@ -58,7 +58,7 @@ public class SetRecord {
     @Column(name = "title")
     String title;
 
-    @Column(name = "html", nullable = false)
+    @Column(name = "texts", nullable = false)
     @JdbcTypeCode(SqlTypes.ARRAY)
     Set<String> texts;
 

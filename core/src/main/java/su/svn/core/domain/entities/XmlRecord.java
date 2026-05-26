@@ -55,7 +55,7 @@ import static lombok.AccessLevel.PRIVATE;
 @Getter
 @NoArgsConstructor
 @Setter
-@Table(name = "vector_records", schema = "core")
+@Table(name = "xml_records", schema = "core")
 @ToString(exclude = "baseRecord")
 public class XmlRecord {
     @Id
