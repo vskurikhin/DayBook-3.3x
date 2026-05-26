@@ -6,7 +6,7 @@
 --
 
 --
-ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS xml XML;
+ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS xml VARCHAR(255);
 ALTER TABLE api.post_records ADD COLUMN IF NOT EXISTS tags VARCHAR(32)[];
 
 --

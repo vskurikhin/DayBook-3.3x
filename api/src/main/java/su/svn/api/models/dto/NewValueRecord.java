@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Builder;
 
 import java.io.Serializable;
@@ -44,6 +45,7 @@ public record NewValueRecord(
         @JsonProperty String title,
         @NotNull(message = "Value is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @Size(max = 255, message = "Value must be at most 255 characters")
         @JsonProperty String value,
         @NotNull(message = "Post at is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)

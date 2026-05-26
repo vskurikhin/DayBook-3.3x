@@ -179,6 +179,10 @@ public class RecordView {
     @Array(length = 1024)
     float[] vector;
 
+    @Column(name = "xml", nullable = false)
+    @JdbcTypeCode(SqlTypes.SQLXML)
+    String xml;
+
     @Column(name = "tags")
     @JdbcTypeCode(SqlTypes.ARRAY)
     List<String> tags;

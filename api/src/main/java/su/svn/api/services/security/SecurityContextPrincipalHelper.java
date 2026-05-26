@@ -100,7 +100,7 @@ public class SecurityContextPrincipalHelper {
                         .groups(identity.getRoles())
                         .claim(Claims.jti, principal.getTokenID())
                         .signWithSecret(secret);
-                LOG.infof(
+                LOG.debugf(
                         "subject=%s, JTI=%s, issuer=%s",
                         principal.getSubject(), principal.getTokenID(), principal.getIssuer()
                 );
@@ -115,7 +115,7 @@ public class SecurityContextPrincipalHelper {
                 .groups(Set.of(CustomIdentityAugmentor.GUEST))
                 .claim(Claims.jti, jti)
                 .signWithSecret(secret);
-        LOG.infof("subject=%s, JTI=%s, issuer=%s", GUEST_SUBJECT_UUID, jti, mpJwtVerifyIssuer);
+        LOG.debugf("subject=%s, JTI=%s, issuer=%s", GUEST_SUBJECT_UUID, jti, mpJwtVerifyIssuer);
         return extToken2;
     }
 }

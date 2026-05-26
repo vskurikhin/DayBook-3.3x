@@ -20,7 +20,7 @@ import su.svn.core.models.dto.ResourceRecordView;
  */
 @Mapper(
         componentModel = "spring",
-        unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE,
+//        unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE,
         uses = {BaseRecordMapper.class}
 )
 public interface RecordViewMapper {

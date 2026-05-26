@@ -20,19 +20,13 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
-import org.jboss.logging.Logger;
 import su.svn.api.domain.enums.ResourcePath;
-import su.svn.api.models.dto.Page;
-import su.svn.api.models.dto.RecordData;
 import su.svn.api.models.dto.RecordDataPage;
-import su.svn.api.models.dto.ResourceBlobRecord;
 import su.svn.api.services.domain.JsonRecordDataService;
 import su.svn.api.services.mappers.PageRecordDataMapper;
 
 @Path(ResourcePath.RECORDS)
 public class RecordResource {
-
-    private static final Logger LOG = Logger.getLogger(RecordResource.class);
 
     @Inject
     PageRecordDataMapper mapper;
@@ -57,9 +51,6 @@ public class RecordResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<RecordDataPage> page(@QueryParam("page") int page, @QueryParam("size") byte size) {
         return service.readPage(page, size)
-                .map(postRecordPage -> {
-                    LOG.debugf("postRecordPage: %s", postRecordPage);
-                    return mapper.toPage(postRecordPage);
-                });
+                .map(postRecordPage -> mapper.toPage(postRecordPage));
     }
 }
