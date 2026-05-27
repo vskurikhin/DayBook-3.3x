@@ -15,7 +15,6 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,10 +33,8 @@ public record UpdateVectorRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder
     public UpdateVectorRecord {
         if (vector == null) vector = new float[0];
-        if (tags == null) tags = new HashSet<>();
     }
 }

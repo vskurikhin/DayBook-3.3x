@@ -15,7 +15,6 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,10 +33,8 @@ public record UpdateValueRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder
     public UpdateValueRecord {
         if (value == null) value = "";
-        if (tags == null) tags = new HashSet<>();
     }
 }

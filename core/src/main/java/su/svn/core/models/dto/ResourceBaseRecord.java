@@ -16,7 +16,6 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -33,7 +32,5 @@ public record ResourceBaseRecord(
         @JsonProperty Set<Tag> tags) implements Serializable {
     @Builder(toBuilder = true)
     public ResourceBaseRecord {
-        //noinspection ReassignedVariable
-        if (tags == null) tags = new HashSet<>();
     }
 }

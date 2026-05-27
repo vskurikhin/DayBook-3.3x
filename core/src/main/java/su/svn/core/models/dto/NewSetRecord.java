@@ -44,10 +44,8 @@ public record NewSetRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder
     public NewSetRecord {
         if (texts == null) texts = new HashSet<>();
-        if (tags == null) tags = new HashSet<>();
     }
 }

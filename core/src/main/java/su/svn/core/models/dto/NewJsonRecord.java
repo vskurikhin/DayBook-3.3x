@@ -16,7 +16,10 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @JsonPropertyOrder({"visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -31,10 +34,8 @@ public record NewJsonRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder
     public NewJsonRecord {
         if (json == null) json = new HashMap<>();
-        if (tags == null) tags = new HashSet<>();
     }
 }

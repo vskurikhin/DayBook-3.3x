@@ -16,7 +16,6 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -28,12 +27,12 @@ import java.util.UUID;
  * </p>
  *
  * @param parentId parent record identifier
- * @param title optional record title
- * @param xml XML document content
- * @param postAt publication timestamp
- * @param visible visibility flag
- * @param flags custom bit flags
- * @param tags associated tags
+ * @param title    optional record title
+ * @param xml      XML document content
+ * @param postAt   publication timestamp
+ * @param visible  visibility flag
+ * @param flags    custom bit flags
+ * @param tags     associated tags
  */
 @JsonPropertyOrder({"visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -48,9 +47,7 @@ public record NewXmlRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder
     public NewXmlRecord {
-        if (tags == null) tags = new HashSet<>();
     }
 }

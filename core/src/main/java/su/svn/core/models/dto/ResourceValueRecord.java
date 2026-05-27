@@ -16,12 +16,11 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
 @JsonPropertyOrder({"id", "visible", "flags"})
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonInclude(JsonInclude.Include.NON_ABSENT)
 public record ResourceValueRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
@@ -33,10 +32,8 @@ public record ResourceValueRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder(toBuilder = true)
     public ResourceValueRecord {
         if (value == null) value = "";
-        if (tags == null) tags = new HashSet<>();
     }
 }

@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @JsonPropertyOrder({"id", "visible", "flags"})
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record ResourceRecordView(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
