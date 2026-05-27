@@ -14,7 +14,7 @@ import java.util.Set;
 @SuppressWarnings("ALL")
 public class SetRecordResourceApiExample {
 
-    public static final String BASE_PATH = "http://localhost:8080";
+    public static final String BASE_PATH = "http://localhost:8081";
 
     @SuppressWarnings("FieldCanBeLocal")
     private final ApiClient defaultClient;

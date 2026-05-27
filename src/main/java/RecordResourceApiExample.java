@@ -9,7 +9,7 @@ import su.svn.lib.api.models.RecordDataPage;
 @SuppressWarnings("ALL")
 public class RecordResourceApiExample {
 
-    public static final String BASE_PATH = "http://localhost:8080";
+    public static final String BASE_PATH = "http://localhost:8081";
 
     @SuppressWarnings("FieldCanBeLocal")
     private final ApiClient defaultClient;

@@ -16,6 +16,7 @@ import su.svn.api.repository.JsonRecordRepository;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.RecordViewRepository;
 import su.svn.api.services.mappers.JsonRecordMapper;
+import su.svn.api.services.mappers.PostRecordMapper;
 import su.svn.lib.RecordType;
 
 import java.time.LocalDateTime;
@@ -37,6 +38,9 @@ class JsonRecordDataServiceTest {
 
     @Mock
     JsonRecordMapper jsonRecordMapper;
+
+    @Mock
+    PostRecordMapper postRecordMapper;
 
     @Mock
     PostRecordRepository postRecordRepository;
@@ -179,8 +183,9 @@ class JsonRecordDataServiceTest {
         when(postRecordRepository.readIdIn(any()))
                 .thenReturn(Uni.createFrom().item(changedRecords));
 
-        when(postRecordRepository.persistAll(any()))
-                .thenReturn(Uni.createFrom().item(changedRecords));
+        doReturn(Uni.createFrom().item(changedRecords))
+                .when(postRecordRepository)
+                .persistAll(any());
 
         List<PostRecord> result = jsonRecordDataService.sync(0, 10)
                 .await().indefinitely();
@@ -192,6 +197,7 @@ class JsonRecordDataServiceTest {
         verify(recordViewRepository).readList(anyInt(), anyInt(), any());
         verify(postRecordRepository).readIdIn(any());
         verify(postRecordRepository).persistAll(any());
+        verify(postRecordMapper).updateExistingRecord(any(), any());
     }
 
     @Test

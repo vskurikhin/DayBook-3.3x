@@ -9,6 +9,7 @@
 package su.svn.core.services.excepthandler;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,6 +21,7 @@ import org.springframework.web.context.request.WebRequest;
 import su.svn.core.models.dto.ErrorResponse;
 import su.svn.core.models.exceptions.CustomNotFoundException;
 
+import java.io.IOException;
 import java.util.stream.Collectors;
 /**
  * Global exception handler for REST controllers.
@@ -84,5 +86,20 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleGlobalException(Exception e, WebRequest request) {
         log.error("Unexpected error: {} {}", e.getMessage(), request, e);
         return new ErrorResponse("An unexpected error occurred", System.currentTimeMillis());
+    }
+
+    @ExceptionHandler(ClientAbortException.class)
+    public void handleClientAbort(ClientAbortException ex) {
+        log.debug("Client disconnected: {}", ex.getMessage());
+    }
+
+    @ExceptionHandler(IOException.class)
+    public void handleIOException(IOException ex) {
+        if (ex.getMessage() != null && ex.getMessage().contains("Broken pipe")) {
+
+            log.debug("Broken pipe: client disconnected");
+            return;
+        }
+        log.error("IO error", ex);
     }
 }

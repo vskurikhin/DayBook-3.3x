@@ -16,7 +16,6 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,16 +26,16 @@ import java.util.UUID;
  * Contains XML content, metadata, and timestamps used for API responses.
  * </p>
  *
- * @param id unique record identifier
- * @param parentId parent record identifier
- * @param title record title
- * @param xml XML document content
- * @param userName owner username
- * @param postAt publication timestamp
+ * @param id        unique record identifier
+ * @param parentId  parent record identifier
+ * @param title     record title
+ * @param xml       XML document content
+ * @param userName  owner username
+ * @param postAt    publication timestamp
  * @param refreshAt refresh timestamp
- * @param visible visibility flag
- * @param flags custom bit flags
- * @param tags associated tags
+ * @param visible   visibility flag
+ * @param flags     custom bit flags
+ * @param tags      associated tags
  */
 @JsonPropertyOrder({"id", "visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -51,9 +50,7 @@ public record ResourceXmlRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder(toBuilder = true)
     public ResourceXmlRecord {
-        if (tags == null) tags = new HashSet<>();
     }
 }

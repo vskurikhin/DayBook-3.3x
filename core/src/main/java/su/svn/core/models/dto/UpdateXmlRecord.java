@@ -15,7 +15,6 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,15 +25,15 @@ import java.util.UUID;
  * Contains mutable XML record fields and update metadata.
  * </p>
  *
- * @param id unique record identifier
- * @param parentId parent record identifier
- * @param title record title
- * @param xml XML document content
- * @param postAt publication timestamp
+ * @param id        unique record identifier
+ * @param parentId  parent record identifier
+ * @param title     record title
+ * @param xml       XML document content
+ * @param postAt    publication timestamp
  * @param refreshAt refresh timestamp
- * @param visible visibility flag
- * @param flags custom bit flags
- * @param tags associated tags
+ * @param visible   visibility flag
+ * @param flags     custom bit flags
+ * @param tags      associated tags
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record UpdateXmlRecord(
@@ -51,9 +50,8 @@ public record UpdateXmlRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder
     public UpdateXmlRecord {
-        if (tags == null) tags = new HashSet<>();
+        if (xml == null) xml = "";
     }
 }

@@ -23,6 +23,7 @@ import su.svn.api.repository.JsonRecordRepository;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.RecordViewRepository;
 import su.svn.api.services.mappers.JsonRecordMapper;
+import su.svn.api.services.mappers.PostRecordMapper;
 
 import java.util.*;
 import java.util.function.Function;
@@ -41,6 +42,9 @@ public class JsonRecordDataService {
 
     @Inject
     PostRecordRepository postRecordRepository;
+
+    @Inject
+    PostRecordMapper postRecordMapper;
 
     @Inject
     RecordViewRepository recordViewRepository;
@@ -84,38 +88,9 @@ public class JsonRecordDataService {
         return postRecordRepository.readIdIn(map.keySet().stream().toList())
                 .map(pr0 -> pr0.stream().peek(exsistPostRecord -> {
                     PostRecord newItem = map.get(exsistPostRecord.id());
-                    // TODO MAPPER!!!
                     if (newItem != null) {
-                        exsistPostRecord.type(newItem.type());
-                        exsistPostRecord.userName(newItem.userName());
-                        exsistPostRecord.refreshAt(newItem.refreshAt());
-                        exsistPostRecord.lastChangedTime(newItem.lastChangedTime());
-                        exsistPostRecord.enabled(newItem.enabled());
-                        exsistPostRecord.visible(newItem.visible());
-                        exsistPostRecord.flags(newItem.flags());
-                        exsistPostRecord.title(newItem.title());
-                        if (newItem.blob() != null) {
-                            exsistPostRecord.blob(newItem.blob().clone());
-                        }
-                        if (newItem.json() != null) {
-                            exsistPostRecord.json(new HashMap<>(newItem.json()));
-                        }
-                        if (newItem.texts() != null) {
-                            exsistPostRecord.texts(new HashSet<>(newItem.texts()));
-                        }
-                        exsistPostRecord.fileName(newItem.fileName());
-                        exsistPostRecord.html(newItem.html());
-                        exsistPostRecord.link(newItem.link());
-                        exsistPostRecord.markdown(newItem.markdown());
-                        exsistPostRecord.value(newItem.value());
-                        exsistPostRecord.vector(newItem.vector());
-                        if (newItem.xml() != null) {
-                            exsistPostRecord.xml(newItem.xml());
-                        }
-                        if (newItem.tags() != null) {
-                            exsistPostRecord.tags(new ArrayList<>(newItem.tags()));
-                        }
-                        LOG.infof("exsistPostRecord = %s", exsistPostRecord);
+                        postRecordMapper.updateExistingRecord(exsistPostRecord, newItem);
+                        LOG.debugf("existingPostRecord = %s", exsistPostRecord);
                         map.put(exsistPostRecord.id(), exsistPostRecord);
                     }
                 }).toList())

@@ -12,7 +12,6 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.EntityModel;
@@ -85,7 +84,7 @@ public class RecordViewController {
      * @param filter   filter criteria for narrowing down results
      * @param pageable pagination and sorting information
      * @return {@link ResponseEntity} containing a page of {@link ResourceRecordView}
-     *         and HTTP status {@code 200 OK}
+     * and HTTP status {@code 200 OK}
      */
     @GetMapping
     public ResponseEntity<PagedModel<EntityModel<ResourceRecordView>>> getAllRecords(

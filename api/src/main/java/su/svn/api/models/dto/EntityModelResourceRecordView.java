@@ -21,7 +21,7 @@ import java.util.*;
 /**
  * EntityModelResourceRecordView
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonInclude(JsonInclude.Include.NON_ABSENT)
 public record EntityModelResourceRecordView(
         @JsonProperty UUID id,
         @JsonProperty Boolean visible,
@@ -46,26 +46,18 @@ public record EntityModelResourceRecordView(
         @JsonProperty List<String> tags,
         @JsonProperty("_links") Map<String, Link> links) implements Serializable {
 
-    @SuppressWarnings("ReassignedVariable")
     @Builder
     public EntityModelResourceRecordView {
-        if (json == null) json = new LinkedHashMap<>();
         if (links == null) links = new LinkedHashMap<>();
-        if (tags == null) tags = new ArrayList<>();
-        if (texts == null) texts = new HashSet<>();
         if (type == null) type = RecordType.Base;
     }
 
     public EntityModelResourceRecordView() {
-        this(UUID.randomUUID(), false, 0,
-                new UUID(0, 0),
-                RecordType.Base,
+        this(UUID.randomUUID(), false, 0, new UUID(0, 0), RecordType.Base,
                 null,
                 OffsetDateTime.now(), null, LocalDateTime.now(),
-                null, null,
-                new HashMap<>(), new HashSet<>(),
-                null, null, null, null, null, null, null,
-                new ArrayList<>(), new HashMap<>()
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                new HashMap<>()
         );
     }
 }

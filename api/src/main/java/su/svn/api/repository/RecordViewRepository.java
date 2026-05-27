@@ -18,12 +18,10 @@ import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.Page;
 import su.svn.api.repository.client.rest.RecordViewClient;
 import su.svn.api.services.mappers.EntityModelResourceRecordMapper;
-import su.svn.api.services.mappers.JsonRecordMapper;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.function.Consumer;
 
 import static su.svn.lib.Constants.REQUEST_ID;
 
@@ -34,9 +32,6 @@ public class RecordViewRepository {
 
     public static String SORT_LIST_PARAMS = "lastChangedTime%2Cid%2Cdesc";
     public static String SORT_PAGE_PARAMS = "postAt%2CrefreshAt%2Cid%2Cdesc";
-
-    @Inject
-    JsonRecordMapper mapper;
 
     @Inject
     EntityModelResourceRecordMapper resourceRecordMapper;
@@ -52,7 +47,6 @@ public class RecordViewRepository {
         var authorization = principalHelper.authorization();
         var requestId = MDC.get(REQUEST_ID);
         return viewClient.getByPageIndexAndSizeAsUni(authorization, requestId, pageIndex, size, SORT_PAGE_PARAMS)
-                .log("RecordViewRepository.readPage")
                 .map(pageRecordView -> {
                     var list = pageRecordView.embedded().resourceRecordViewList()
                             .stream()
@@ -72,8 +66,7 @@ public class RecordViewRepository {
         var requestId = MDC.get(REQUEST_ID);
         return viewClient.getByPageIndexAndSizeAndFromTimeAsUni(
                 authorization, requestId, pageIndex, size, SORT_LIST_PARAMS, fromTime, true
-        ).log("RecordViewRepository readList")
-                .map(pageRecordView -> pageRecordView.embedded().resourceRecordViewList()
+        ).map(pageRecordView -> pageRecordView.embedded().resourceRecordViewList()
                 .stream()
                 .map(resourceRecordMapper::toEntity)
                 .toList());

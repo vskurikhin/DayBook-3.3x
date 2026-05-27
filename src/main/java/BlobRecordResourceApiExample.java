@@ -12,7 +12,7 @@ import java.time.OffsetDateTime;
 @SuppressWarnings("ALL")
 public class BlobRecordResourceApiExample {
 
-    public static final String BASE_PATH = "http://localhost:8080";
+    public static final String BASE_PATH = "http://localhost:8081";
 
     @SuppressWarnings("FieldCanBeLocal")
     private final ApiClient defaultClient;

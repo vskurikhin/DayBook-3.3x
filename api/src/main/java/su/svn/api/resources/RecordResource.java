@@ -51,6 +51,7 @@ public class RecordResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<RecordDataPage> page(@QueryParam("page") int page, @QueryParam("size") byte size) {
         return service.readPage(page, size)
+                .log("RecordResource page")
                 .map(postRecordPage -> mapper.toPage(postRecordPage));
     }
 }

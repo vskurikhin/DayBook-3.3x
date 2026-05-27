@@ -68,8 +68,8 @@ import java.util.UUID;
  * @param markdown Markdown formatted content
  * @param value plain textual value
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 @RegisterForReflection
+@JsonInclude(JsonInclude.Include.NON_ABSENT)
 public record RecordData(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,

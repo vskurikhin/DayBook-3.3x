@@ -248,11 +248,9 @@ class RecordViewRepositoryTest {
         // then
         assertEquals(RecordType.Base, entity.type());
 
-        assertNotNull(entity.json());
-        assertTrue(entity.json().isEmpty());
+        assertNull(entity.json());
 
-        assertNotNull(entity.tags());
-        assertTrue(entity.tags().isEmpty());
+        assertNull(entity.tags());
 
         assertNotNull(entity.links());
         assertTrue(entity.links().isEmpty());
@@ -269,11 +267,9 @@ class RecordViewRepositoryTest {
 
         assertEquals(RecordType.Base, entity.type());
 
-        assertNotNull(entity.json());
-        assertTrue(entity.json().isEmpty());
+        assertNull(entity.json());
 
-        assertNotNull(entity.tags());
-        assertTrue(entity.tags().isEmpty());
+        assertNull(entity.tags());
 
         assertNotNull(entity.links());
         assertTrue(entity.links().isEmpty());

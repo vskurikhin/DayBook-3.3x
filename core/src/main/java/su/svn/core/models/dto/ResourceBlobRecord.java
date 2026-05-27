@@ -16,7 +16,6 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -33,10 +32,8 @@ public record ResourceBlobRecord(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty Set<String> tags) implements Serializable {
-    @SuppressWarnings("ReassignedVariable")
     @Builder(toBuilder = true)
     public ResourceBlobRecord {
         if (blob == null) blob = new byte[0];
-        if (tags == null) tags = new HashSet<>();
     }
 }

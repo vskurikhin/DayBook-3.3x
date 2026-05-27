@@ -18,7 +18,7 @@ public class Example {
 
     public static void main(String[] args) {
         ApiClient defaultClient = Configuration.getDefaultApiClient();
-        defaultClient.setBasePath("http://localhost:8081");
+        defaultClient.setBasePath("http://localhost:8082");
 
         OffsetDateTime odt = OffsetDateTime.now(ZoneId.systemDefault());
         ZoneOffset zoneOffset = odt.getOffset();
