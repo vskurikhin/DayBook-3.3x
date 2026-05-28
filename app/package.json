@@ -2,7 +2,7 @@
   "name": "app",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://localhost:64148",
+  "proxy": "http://localhost:38089",
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",

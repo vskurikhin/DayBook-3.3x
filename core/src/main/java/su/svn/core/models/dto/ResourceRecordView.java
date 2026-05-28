@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.24 13:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.28 18:28 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceRecordView.java
@@ -24,7 +24,9 @@ import java.util.UUID;
 @JsonPropertyOrder({"id", "visible", "flags"})
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record ResourceRecordView(
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         @JsonProperty UUID id,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         @JsonProperty UUID parentId,
         @JsonProperty su.svn.lib.RecordType type,
         @JsonProperty String userName,

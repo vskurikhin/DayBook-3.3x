@@ -15,8 +15,8 @@ import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.repository.JsonRecordRepository;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.RecordViewRepository;
+import su.svn.api.services.mappers.ExistingPostRecordMapper;
 import su.svn.api.services.mappers.JsonRecordMapper;
-import su.svn.api.services.mappers.PostRecordMapper;
 import su.svn.lib.RecordType;
 
 import java.time.LocalDateTime;
@@ -40,7 +40,7 @@ class JsonRecordDataServiceTest {
     JsonRecordMapper jsonRecordMapper;
 
     @Mock
-    PostRecordMapper postRecordMapper;
+    ExistingPostRecordMapper existingPostRecordMapper;
 
     @Mock
     PostRecordRepository postRecordRepository;
@@ -197,7 +197,7 @@ class JsonRecordDataServiceTest {
         verify(recordViewRepository).readList(anyInt(), anyInt(), any());
         verify(postRecordRepository).readIdIn(any());
         verify(postRecordRepository).persistAll(any());
-        verify(postRecordMapper).updateExistingRecord(any(), any());
+        verify(existingPostRecordMapper).updateExistingRecord(any(), any());
     }
 
     @Test

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.28 18:28 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JsonRecordDataService.java
@@ -22,10 +22,12 @@ import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.repository.JsonRecordRepository;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.RecordViewRepository;
+import su.svn.api.services.mappers.ExistingPostRecordMapper;
 import su.svn.api.services.mappers.JsonRecordMapper;
-import su.svn.api.services.mappers.PostRecordMapper;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -44,7 +46,7 @@ public class JsonRecordDataService {
     PostRecordRepository postRecordRepository;
 
     @Inject
-    PostRecordMapper postRecordMapper;
+    ExistingPostRecordMapper existingPostRecordMapper;
 
     @Inject
     RecordViewRepository recordViewRepository;
@@ -89,7 +91,7 @@ public class JsonRecordDataService {
                 .map(pr0 -> pr0.stream().peek(exsistPostRecord -> {
                     PostRecord newItem = map.get(exsistPostRecord.id());
                     if (newItem != null) {
-                        postRecordMapper.updateExistingRecord(exsistPostRecord, newItem);
+                        existingPostRecordMapper.updateExistingRecord(exsistPostRecord, newItem);
                         LOG.debugf("existingPostRecord = %s", exsistPostRecord);
                         map.put(exsistPostRecord.id(), exsistPostRecord);
                     }
