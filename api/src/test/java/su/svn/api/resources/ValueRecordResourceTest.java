@@ -11,7 +11,6 @@ import su.svn.api.models.dto.NewValueRecord;
 import su.svn.api.models.dto.ResourceValueRecord;
 import su.svn.api.models.dto.UpdateValueRecord;
 import su.svn.api.services.domain.ValueRecordDataService;
-import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.util.UUID;
 
@@ -23,9 +22,6 @@ class ValueRecordResourceTest {
 
     @Mock
     ValueRecordDataService service;
-
-    @Mock
-    RecordSchedulerService schedulerService;
 
     @InjectMocks
     ValueRecordResource resource;
@@ -43,7 +39,6 @@ class ValueRecordResourceTest {
         }
 
         verify(service).post(entry);
-        verify(schedulerService).fire(true);
     }
 
     @Test
@@ -58,7 +53,6 @@ class ValueRecordResourceTest {
         }
 
         verify(service).delete(id);
-        verify(schedulerService).fire(true);
     }
 
     @Test
@@ -74,6 +68,5 @@ class ValueRecordResourceTest {
         }
 
         verify(service).put(entry);
-        verify(schedulerService).fire(true);
     }
 }

@@ -1,124 +1,82 @@
 package su.svn.api.services.domain;
 
 import io.smallrye.mutiny.Uni;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import su.svn.api.domain.entities.PostRecord;
+import org.mockito.Mockito;
 import su.svn.api.models.dto.NewBlobRecord;
 import su.svn.api.models.dto.ResourceBlobRecord;
 import su.svn.api.models.dto.UpdateBlobRecord;
 import su.svn.api.repository.BlobRecordRepository;
-import su.svn.api.repository.PostRecordRepository;
-import su.svn.api.services.mappers.BlobRecordMapper;
 
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-@ExtendWith(MockitoExtension.class)
 class BlobRecordDataServiceTest {
 
-    @InjectMocks
-    BlobRecordDataService service;
+    private BlobRecordRepository repository;
+    private BlobRecordSyncTrigger trigger;
+    private BlobRecordDataService service;
 
-    @Mock
-    BlobRecordRepository blobRecordRepository;
+    @BeforeEach
+    void setUp() {
+        repository = Mockito.mock(BlobRecordRepository.class);
+        trigger = Mockito.mock(BlobRecordSyncTrigger.class);
 
-    @Mock
-    BlobRecordMapper blobRecordMapper;
-
-    @Mock
-    PostRecordRepository postRecordRepository;
+        service = new BlobRecordDataService();
+        service.repository = repository;
+        service.trigger = trigger;
+    }
 
     @Test
-    void shouldDeleteRecord() {
-        var id = UUID.randomUUID();
+    void shouldPostAndTriggerSync() {
+        NewBlobRecord request = Mockito.mock(NewBlobRecord.class);
+        ResourceBlobRecord response = Mockito.mock(ResourceBlobRecord.class);
 
-        when(blobRecordRepository.delete(id))
-                .thenReturn(Uni.createFrom().voidItem());
+        Mockito.when(repository.post(request))
+                .thenReturn(Uni.createFrom().item(response));
 
-        when(postRecordRepository.disable(id))
+        ResourceBlobRecord result = service.post(request)
+                .await()
+                .indefinitely();
+
+        assertNotNull(result);
+
+        Mockito.verify(trigger)
+                .accept(response);
+    }
+
+    @Test
+    void shouldPutAndTriggerSync() {
+        UpdateBlobRecord request = Mockito.mock(UpdateBlobRecord.class);
+        ResourceBlobRecord response = Mockito.mock(ResourceBlobRecord.class);
+
+        Mockito.when(repository.put(request))
+                .thenReturn(Uni.createFrom().item(response));
+
+        ResourceBlobRecord result = service.put(request)
+                .await()
+                .indefinitely();
+
+        assertNotNull(result);
+
+        Mockito.verify(trigger)
+                .accept(response);
+    }
+
+    @Test
+    void shouldDeleteAndTriggerSync() {
+        UUID id = UUID.randomUUID();
+
+        Mockito.when(repository.delete(id))
                 .thenReturn(Uni.createFrom().voidItem());
 
         service.delete(id)
-                .await().indefinitely();
+                .await()
+                .indefinitely();
 
-        verify(blobRecordRepository).delete(id);
-        verify(postRecordRepository).disable(id);
-    }
-
-    @Test
-    void shouldPostRecord() {
-        var request = NewBlobRecord.builder()
-                .title("test")
-                .postAt(OffsetDateTime.now())
-                .build();
-
-        var response = ResourceBlobRecord.builder()
-                .id(UUID.randomUUID())
-                .title("test")
-                .build();
-
-        when(blobRecordRepository.post(request))
-                .thenReturn(Uni.createFrom().item(response));
-
-        var result = service.post(request)
-                .await().indefinitely();
-
-        assertThat(result).isEqualTo(response);
-
-        verify(blobRecordRepository).post(request);
-    }
-
-    @Test
-    void shouldPutRecord() {
-        var id = UUID.randomUUID();
-
-        var request = UpdateBlobRecord.builder()
-                .id(id)
-                .refreshAt(OffsetDateTime.now())
-                .build();
-
-        var repositoryResponse = ResourceBlobRecord.builder()
-                .id(id)
-                .build();
-
-        var entity = PostRecord.builder().build();
-
-        var mappedResponse = ResourceBlobRecord.builder()
-                .id(id)
-                .title("updated")
-                .build();
-
-        when(blobRecordRepository.put(request))
-                .thenReturn(Uni.createFrom().item(repositoryResponse));
-
-//        when(blobRecordMapper.toEntity(request))
-//                .thenReturn(entity);
-        when(blobRecordMapper.toEntity(repositoryResponse))
-                .thenReturn(entity);
-
-        when(postRecordRepository.update(entity))
-                .thenReturn(Uni.createFrom().item(entity));
-
-        when(blobRecordMapper.toResource(entity))
-                .thenReturn(mappedResponse);
-
-        var result = service.put(request)
-                .await().indefinitely();
-
-        assertThat(result).isEqualTo(mappedResponse);
-
-        verify(blobRecordRepository).put(request);
-        // verify(blobRecordMapper).toEntity(request);
-        verify(postRecordRepository).update(entity);
-        verify(blobRecordMapper).toResource(entity);
-        verify(blobRecordMapper).toEntity(repositoryResponse);
+        Mockito.verify(trigger)
+                .accept(id);
     }
 }

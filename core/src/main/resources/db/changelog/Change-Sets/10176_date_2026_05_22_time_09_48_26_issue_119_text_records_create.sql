@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS core.text_records (
       FOREIGN KEY (id)
       REFERENCES  core.base_records (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
-    title         TEXT,
-    value         TEXT                          NOT NULL,
+    title         VARCHAR(4096),
+    value         VARCHAR(10485760)             NOT NULL,
     type          SMALLINT                      NOT NULL    DEFAULT 0      CHECK (type BETWEEN 0 AND 3),
     user_name     VARCHAR(64)                   NOT NULL,
       CONSTRAINT  FK_1877_core_text_records_security_user_name

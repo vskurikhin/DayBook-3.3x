@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * VectorRecordDataService.java
@@ -20,6 +20,7 @@ import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.VectorRecordRepository;
 import su.svn.api.services.mappers.VectorRecordMapper;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -66,13 +67,10 @@ public class VectorRecordDataService {
      * Repository responsible for remote vector record operations.
      */
     @Inject
-    VectorRecordRepository recordRepository;
+    VectorRecordRepository repository;
 
-    /**
-     * Mapper used for converting between DTOs and {@code PostRecord} entities.
-     */
     @Inject
-    VectorRecordMapper mapper;
+    VectorRecordSyncTrigger trigger;
 
     /**
      * Repository responsible for local post record persistence and synchronization.
@@ -99,10 +97,9 @@ public class VectorRecordDataService {
      * @return a {@link Uni} emitting completion notification
      */
     public Uni<Void> delete(UUID id) {
-        return Uni.combine().all().unis(
-                recordRepository.delete(id),
-                postRecordRepository.disable(id)
-        ).withUni(l -> Uni.createFrom().voidItem());
+        return repository.delete(id)
+                .onItem()
+                .invoke(unused -> trigger.accept(id));
     }
 
     /**
@@ -112,11 +109,13 @@ public class VectorRecordDataService {
      * The request is delegated to the remote vector repository.
      * </p>
      *
-     * @param newVectorRecord DTO containing data for the new vector record
+     * @param record DTO containing data for the new vector record
      * @return a {@link Uni} emitting the created vector resource
      */
-    public Uni<ResourceVectorRecord> post(NewVectorRecord newVectorRecord) {
-        return recordRepository.post(newVectorRecord);
+    public Uni<ResourceVectorRecord> post(NewVectorRecord record) {
+        return repository.post(record)
+                .onItem()
+                .invoke(trigger);
     }
 
     /**
@@ -135,19 +134,17 @@ public class VectorRecordDataService {
      * The resulting resource reflects the synchronized local post state.
      * </p>
      *
-     * @param updateVectorRecord DTO containing updated vector data
+     * @param record DTO containing updated vector data
      * @return a {@link Uni} emitting the updated vector resource
      */
-    public Uni<ResourceVectorRecord> put(UpdateVectorRecord updateVectorRecord) {
-        return recordRepository.put(updateVectorRecord)
-                .flatMap(resourceJsonRecord ->
-                        postRecordRepository.update(mapper.toEntity(updateVectorRecord))
-                                .map(postRecord -> mapper.toResource(postRecord))
-                );
+    public Uni<ResourceVectorRecord> put(UpdateVectorRecord record) {
+        return repository.put(record)
+                .onItem()
+                .invoke(trigger);
     }
 
     @WithTransaction
     public Uni<List<PostRecord>> persist(PostRecord record) {
-        return postRecordRepository.persistAll(List.of(record));
+        return postRecordRepository.persistAll(Collections.singletonList(record));
     }
 }

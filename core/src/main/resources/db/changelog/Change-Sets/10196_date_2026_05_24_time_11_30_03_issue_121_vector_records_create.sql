@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS core.vector_records (
       FOREIGN KEY (id)
       REFERENCES  core.base_records (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
-    title         TEXT,
+    title         VARCHAR(4096),
     vector        vector(1024)                  NOT NULL,
     type          SMALLINT                      NOT NULL    DEFAULT 0      CHECK (0 <= type AND type <= 4),
     user_name     VARCHAR(64)                   NOT NULL,

@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * XmlRecordResource.java
@@ -22,7 +22,6 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.jboss.resteasy.reactive.RestResponse;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.models.dto.NewXmlRecord;
-import su.svn.api.models.dto.ResourceBlobRecord;
 import su.svn.api.models.dto.ResourceXmlRecord;
 import su.svn.api.models.dto.UpdateXmlRecord;
 import su.svn.api.services.domain.XmlRecordDataService;
@@ -74,9 +73,6 @@ public class XmlRecordResource {
     @Inject
     XmlRecordDataService service;
 
-    @Inject
-    RecordSchedulerService schedulerService;
-
     /**
      * Creates a new XML record.
      *
@@ -87,7 +83,7 @@ public class XmlRecordResource {
      *
      * @param entry DTO containing XML creation data
      * @return a {@link Uni} emitting HTTP 201 response
-     *         with the created XML resource
+     * with the created XML resource
      */
     @APIResponse(
             responseCode = "201",
@@ -112,9 +108,7 @@ public class XmlRecordResource {
                         RestResponse.ResponseBuilder
                                 .create(Response.Status.CREATED, record)
                                 .build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 
     /**
@@ -141,9 +135,7 @@ public class XmlRecordResource {
         return service.delete(id)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.NO_CONTENT).build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 
     /**
@@ -156,7 +148,7 @@ public class XmlRecordResource {
      *
      * @param entry DTO containing XML update data
      * @return a {@link Uni} emitting HTTP 200 response
-     *         with the updated XML resource
+     * with the updated XML resource
      */
     @APIResponse(
             responseCode = "200",
@@ -181,8 +173,6 @@ public class XmlRecordResource {
                         RestResponse.ResponseBuilder
                                 .ok(record, MediaType.APPLICATION_JSON)
                                 .build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 }

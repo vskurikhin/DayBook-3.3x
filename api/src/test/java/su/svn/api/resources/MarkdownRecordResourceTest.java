@@ -12,23 +12,21 @@ import su.svn.api.models.dto.NewMarkdownRecord;
 import su.svn.api.models.dto.ResourceMarkdownRecord;
 import su.svn.api.models.dto.UpdateMarkdownRecord;
 import su.svn.api.services.domain.MarkdownRecordDataService;
-import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.time.OffsetDateTime;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MarkdownRecordResourceTest {
 
     @Mock
     MarkdownRecordDataService service;
-
-    @Mock
-    RecordSchedulerService schedulerService;
 
     @InjectMocks
     MarkdownRecordResource resource;
@@ -75,7 +73,6 @@ class MarkdownRecordResourceTest {
         }
 
         verify(service).post(request);
-        verify(schedulerService).fire(true);
     }
 
     @Test
@@ -91,7 +88,6 @@ class MarkdownRecordResourceTest {
         assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
 
         verify(service).delete(id);
-        verify(schedulerService).fire(true);
     }
 
     @Test
@@ -118,6 +114,5 @@ class MarkdownRecordResourceTest {
         }
 
         verify(service).put(request);
-        verify(schedulerService).fire(true);
     }
 }

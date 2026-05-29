@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * NewMarkdownRecord.java
@@ -41,6 +41,7 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NewMarkdownRecord(
         @JsonProperty UUID parentId,
+        @Size(max = 4096, message = "Title must be at most 4096 characters")
         @JsonProperty String title,
         @NotNull(message = "Markdown is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)

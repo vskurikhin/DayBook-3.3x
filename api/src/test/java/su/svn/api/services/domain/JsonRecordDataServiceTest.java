@@ -9,47 +9,32 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.NewJsonRecord;
-import su.svn.api.models.dto.Page;
 import su.svn.api.models.dto.ResourceJsonRecord;
 import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.repository.JsonRecordRepository;
-import su.svn.api.repository.PostRecordRepository;
-import su.svn.api.repository.RecordViewRepository;
-import su.svn.api.services.mappers.ExistingPostRecordMapper;
-import su.svn.api.services.mappers.JsonRecordMapper;
 import su.svn.lib.RecordType;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class JsonRecordDataServiceTest {
+
+    @InjectMocks
+    JsonRecordDataService jsonRecordDataService;
 
     @Mock
     JsonRecordRepository jsonRecordRepository;
 
     @Mock
-    JsonRecordMapper jsonRecordMapper;
-
-    @Mock
-    ExistingPostRecordMapper existingPostRecordMapper;
-
-    @Mock
-    PostRecordRepository postRecordRepository;
-
-    @Mock
-    RecordViewRepository recordViewRepository;
-
-    @InjectMocks
-    JsonRecordDataService jsonRecordDataService;
+    JsonRecordSyncTrigger trigger;
 
     UUID id;
     PostRecord postRecord;
@@ -88,30 +73,35 @@ class JsonRecordDataServiceTest {
         when(jsonRecordRepository.delete(id))
                 .thenReturn(Uni.createFrom().voidItem());
 
-        when(postRecordRepository.disable(id))
-                .thenReturn(Uni.createFrom().voidItem());
-
         Void result = jsonRecordDataService.delete(id)
                 .await().indefinitely();
 
         assertThat(result).isNull();
 
         verify(jsonRecordRepository).delete(id);
-        verify(postRecordRepository).disable(id);
     }
 
     @Test
     void shouldPostRecord() {
+        var id = UUID.randomUUID();
+        var dateTime = OffsetDateTime.now();
 
         NewJsonRecord request = NewJsonRecord.builder()
-                .parentId(UUID.randomUUID())
+                .parentId(id)
                 .title("title")
                 .json(Map.of("key", "value"))
-                .postAt(OffsetDateTime.now())
+                .postAt(dateTime)
+                .build();
+        var response = ResourceJsonRecord.builder()
+                .id(id)
+                .parentId(id)
+                .title("title")
+                .json(Map.of("key", "value"))
+                .postAt(dateTime)
                 .build();
 
         when(jsonRecordRepository.post(request))
-                .thenReturn(Uni.createFrom().item(resourceJsonRecord));
+                .thenReturn(Uni.createFrom().item(response));
 
         ResourceJsonRecord result = jsonRecordDataService.post(request)
                 .await().indefinitely();
@@ -121,29 +111,31 @@ class JsonRecordDataServiceTest {
         assertThat(result.title()).isEqualTo("title");
 
         verify(jsonRecordRepository).post(request);
+        verify(trigger).accept(response);
     }
 
     @Test
     void shouldUpdateRecord() {
+        var id = UUID.randomUUID();
+        var dateTime = OffsetDateTime.now();
 
         UpdateJsonRecord request = UpdateJsonRecord.builder()
                 .id(id)
-                .parentId(UUID.randomUUID())
+                .parentId(id)
                 .title("updated")
-                .refreshAt(OffsetDateTime.now())
+                .json(Map.of("key", "value"))
+                .refreshAt(dateTime)
+                .build();
+        var response = ResourceJsonRecord.builder()
+                .id(id)
+                .parentId(id)
+                .title("updated")
+                .json(Map.of("key", "value"))
+                .postAt(dateTime)
                 .build();
 
         when(jsonRecordRepository.put(request))
-                .thenReturn(Uni.createFrom().item(resourceJsonRecord));
-
-        when(jsonRecordMapper.toEntity(request))
-                .thenReturn(postRecord);
-
-        when(postRecordRepository.update(postRecord))
-                .thenReturn(Uni.createFrom().item(postRecord));
-
-        when(jsonRecordMapper.toResource(postRecord))
-                .thenReturn(resourceJsonRecord);
+                .thenReturn(Uni.createFrom().item(response));
 
         ResourceJsonRecord result = jsonRecordDataService.put(request)
                 .await().indefinitely();
@@ -152,52 +144,7 @@ class JsonRecordDataServiceTest {
         assertThat(result.id()).isEqualTo(id);
 
         verify(jsonRecordRepository).put(request);
-        verify(postRecordRepository).update(postRecord);
-    }
-
-    @Test
-    void shouldReadPage() {
-
-        Page<PostRecord> expectedPage = mock(Page.class);
-
-        when(postRecordRepository.readPage(0, (byte) 10))
-                .thenReturn(Uni.createFrom().item(expectedPage));
-
-        Page<PostRecord> result = jsonRecordDataService.readPage(0, (byte) 10)
-                .await().indefinitely();
-
-        assertThat(result).isNotNull();
-    }
-
-    @Test
-    void shouldSyncRecords() {
-
-        List<PostRecord> changedRecords = List.of(postRecord);
-
-        when(postRecordRepository.findLastChangedTime())
-                .thenReturn(Uni.createFrom().item(LocalDateTime.now()));
-
-        when(recordViewRepository.readList(anyInt(), anyInt(), any()))
-                .thenReturn(Uni.createFrom().item(changedRecords));
-
-        when(postRecordRepository.readIdIn(any()))
-                .thenReturn(Uni.createFrom().item(changedRecords));
-
-        doReturn(Uni.createFrom().item(changedRecords))
-                .when(postRecordRepository)
-                .persistAll(any());
-
-        List<PostRecord> result = jsonRecordDataService.sync(0, 10)
-                .await().indefinitely();
-
-        assertThat(result).isNotNull();
-        assertThat(result).hasSize(1);
-
-        verify(postRecordRepository).findLastChangedTime();
-        verify(recordViewRepository).readList(anyInt(), anyInt(), any());
-        verify(postRecordRepository).readIdIn(any());
-        verify(postRecordRepository).persistAll(any());
-        verify(existingPostRecordMapper).updateExistingRecord(any(), any());
+        verify(trigger).accept(response);
     }
 
     @Test

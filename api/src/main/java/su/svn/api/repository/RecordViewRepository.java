@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:09 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewRepository.java
@@ -52,7 +52,8 @@ public class RecordViewRepository {
                             .stream()
                             .map(resourceRecordMapper::toEntity)
                             .toList();
-                    return new Page<>(
+                    //noinspection Convert2Diamond
+                    return new Page<PostRecord>(
                             list,
                             pageRecordView.page().totalPages(),
                             pageRecordView.page().number(),

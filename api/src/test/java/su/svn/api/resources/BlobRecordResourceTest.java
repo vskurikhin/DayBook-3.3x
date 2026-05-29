@@ -11,7 +11,6 @@ import su.svn.api.models.dto.NewBlobRecord;
 import su.svn.api.models.dto.ResourceBlobRecord;
 import su.svn.api.models.dto.UpdateBlobRecord;
 import su.svn.api.services.domain.BlobRecordDataService;
-import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -26,10 +25,7 @@ class BlobRecordResourceTest {
     BlobRecordResource resource;
 
     @Mock
-    BlobRecordDataService blobRecordDataService;
-
-    @Mock
-    RecordSchedulerService recordSchedulerService;
+    BlobRecordDataService service;
 
     @Test
     void shouldCreateRecord() {
@@ -43,37 +39,39 @@ class BlobRecordResourceTest {
                 .title("test")
                 .build();
 
-        when(blobRecordDataService.post(request))
+        when(service.post(request))
                 .thenReturn(Uni.createFrom().item(responseDto));
 
-        var response = resource.create(request)
-                .await().indefinitely();
+        try (var response = resource.create(request)
+                .await().indefinitely()) {
 
-        assertThat(response.getStatus())
-                .isEqualTo(Response.Status.CREATED.getStatusCode());
+            assertThat(response.getStatus())
+                    .isEqualTo(Response.Status.CREATED.getStatusCode());
 
-        assertThat(response.getEntity())
-                .isEqualTo(responseDto);
+            assertThat(response.getEntity())
+                    .isEqualTo(responseDto);
+        }
 
-        verify(blobRecordDataService).post(request);
-        verify(recordSchedulerService).fire(true);
+        verify(service).post(request);
+//        verify(recordSchedulerService).fire(true);
     }
 
     @Test
     void shouldDeleteRecord() {
         var id = UUID.randomUUID();
 
-        when(blobRecordDataService.delete(id))
+        when(service.delete(id))
                 .thenReturn(Uni.createFrom().voidItem());
 
-        var response = resource.delete(id)
-                .await().indefinitely();
+        try (var response = resource.delete(id)
+                .await().indefinitely()) {
 
-        assertThat(response.getStatus())
-                .isEqualTo(Response.Status.NO_CONTENT.getStatusCode());
+            assertThat(response.getStatus())
+                    .isEqualTo(Response.Status.NO_CONTENT.getStatusCode());
+        }
 
-        verify(blobRecordDataService).delete(id);
-        verify(recordSchedulerService).fire(true);
+        verify(service).delete(id);
+//        verify(recordSchedulerService).fire(true);
     }
 
     @Test
@@ -88,19 +86,20 @@ class BlobRecordResourceTest {
                 .title("updated")
                 .build();
 
-        when(blobRecordDataService.put(request))
+        when(service.put(request))
                 .thenReturn(Uni.createFrom().item(responseDto));
 
-        var response = resource.update(request)
-                .await().indefinitely();
+        try (var response = resource.update(request)
+                .await().indefinitely()) {
 
-        assertThat(response.getStatus())
-                .isEqualTo(Response.Status.OK.getStatusCode());
+            assertThat(response.getStatus())
+                    .isEqualTo(Response.Status.OK.getStatusCode());
 
-        assertThat(response.getEntity())
-                .isEqualTo(responseDto);
+            assertThat(response.getEntity())
+                    .isEqualTo(responseDto);
+        }
 
-        verify(blobRecordDataService).put(request);
-        verify(recordSchedulerService).fire(true);
+        verify(service).put(request);
+//        verify(recordSchedulerService).fire(true);
     }
 }

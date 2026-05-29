@@ -10,7 +10,7 @@ DROP VIEW IF EXISTS core.records_view;
 CREATE OR REPLACE VIEW core.records_view AS
 SELECT  Br.*,
         COALESCE(Br.update_time, Br.create_time) last_changed_time,
-        COALESCE(Bl.title, Jr.title, Sr.title, Tr.title, Vr.title, Xr.title) coalesce_title,
+        COALESCE(Bl.title, Jr.title, Sr.title, Tr.title, Vr.title, Xr.title)::VARCHAR(4096) coalesce_title,
         Jr.json json,
         Bl.blob blob,
         Sr.texts texts,
@@ -52,7 +52,9 @@ FROM core.base_records Br
     LEFT JOIN core.xml_records Xr ON Br.id = Xr.id AND Br.type = 6 -- RecordType.Xml
     LEFT JOIN core.base_records_has_tags brht ON Br.id = brht.base_records_id
     LEFT JOIN core.tags ON brht.tag_id = core.tags.id
-    GROUP BY Br.id, last_changed_time, coalesce_title, blob, json, texts, file_name, html, link, markdown, value, vector, xr.id;
+    GROUP BY Br.id, COALESCE(Br.update_time, Br.create_time),
+                 COALESCE(Bl.title, Jr.title, Sr.title, Tr.title, Vr.title, Xr.title),
+                 blob, json, texts, file_name, html, link, markdown, value, vector, xr.id;
 
 --
 --rollback DROP VIEW IF EXISTS core.records_view;

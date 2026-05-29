@@ -5,8 +5,6 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.security.TestSecurity;
-import io.quarkus.test.vertx.RunOnVertxContext;
-import io.quarkus.test.vertx.UniAsserter;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
@@ -14,9 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.NewJsonRecord;
-import su.svn.api.models.dto.Page;
 import su.svn.api.models.dto.ResourceJsonRecord;
 import su.svn.api.models.dto.UpdateJsonRecord;
 import su.svn.api.profile.ContainersProfile;
@@ -27,7 +23,6 @@ import su.svn.api.services.schedulers.RecordSchedulerService;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -36,9 +31,6 @@ import static org.mockito.Mockito.*;
 @QuarkusTestResource(value = PostgreSQLTestResource.class, restrictToAnnotatedClass = true)
 @TestProfile(ContainersProfile.class)
 public class ApiIT {
-
-    @Inject
-    JsonRecordDataService recordViewRepository;
 
     @Inject
     JsonRecordResource resource;
@@ -52,16 +44,6 @@ public class ApiIT {
     @BeforeEach
     void beforeEach(TestInfo testInfo) {
         System.err.println("Running: " + testInfo.getDisplayName());
-    }
-
-    @Test
-    @DisplayName("RecordViewRepository read page")
-    @RunOnVertxContext
-    void tests(UniAsserter asserter) {
-        asserter.assertThat(
-                () -> recordViewRepository.readPage(0, (byte) 127),
-                System.out::println
-        );
     }
 
     @TestSecurity(user = "john", roles = {"USER"})
@@ -99,11 +81,12 @@ public class ApiIT {
                 .thenReturn(Uni.createFrom().voidItem());
 
         // when
-        Response response = resource.delete(id)
-                .await().indefinitely();
+        try (Response response = resource.delete(id)
+                .await().indefinitely()) {
 
-        // then
-        assertThat(response.getStatus()).isEqualTo(Response.Status.NO_CONTENT.getStatusCode());
+            // then
+            assertThat(response.getStatus()).isEqualTo(Response.Status.NO_CONTENT.getStatusCode());
+        }
 
         verify(recordSchedulerService).fire(true);
     }
@@ -148,6 +131,7 @@ public class ApiIT {
                 .thenReturn(Uni.createFrom().item(ResourceJsonRecord.builder().build()));
 
         // when
+        //noinspection resource
         resource.create(request).await().indefinitely();
 
         // then
@@ -169,7 +153,7 @@ public class ApiIT {
 
         // when / then
         //noinspection EmptyTryBlock
-        try (var result = resource.create(request).await().indefinitely()) {
+        try (var ignored = resource.create(request).await().indefinitely()) {
         } catch (RuntimeException ignored) {
         }
 
