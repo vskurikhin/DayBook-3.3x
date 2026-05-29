@@ -1,98 +1,129 @@
 package su.svn.api.services.domain;
 
 import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.NewMarkdownRecord;
 import su.svn.api.models.dto.ResourceMarkdownRecord;
 import su.svn.api.models.dto.UpdateMarkdownRecord;
 import su.svn.api.repository.MarkdownRecordRepository;
-import su.svn.api.repository.PostRecordRepository;
-import su.svn.api.services.mappers.MarkdownRecordMapper;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class MarkdownRecordDataServiceTest {
 
-    @Mock
-    MarkdownRecordRepository recordRepository;
-
-    @Mock
-    MarkdownRecordMapper mapper;
-
-    @Mock
-    PostRecordRepository postRecordRepository;
-
     @InjectMocks
     MarkdownRecordDataService service;
 
+    @Mock
+    MarkdownRecordRepository repository;
+
+    @Mock
+    MarkdownRecordSyncTrigger trigger;
+
     @Test
-    void shouldDeleteRecord() {
-        var id = UUID.randomUUID();
+    void shouldPostMarkdownRecord() {
 
-        when(recordRepository.delete(id))
-                .thenReturn(Uni.createFrom().voidItem());
+        NewMarkdownRecord request = mock(NewMarkdownRecord.class);
+        ResourceMarkdownRecord response = mock(ResourceMarkdownRecord.class);
 
-        when(postRecordRepository.disable(id))
+        when(repository.post(request))
+                .thenReturn(Uni.createFrom().item(response));
+
+        ResourceMarkdownRecord result = service.post(request)
+                .await()
+                .indefinitely();
+
+        assertThat(result).isNotNull();
+        assertThat(result).isEqualTo(response);
+
+        verify(repository).post(request);
+        verify(trigger).accept(response);
+    }
+
+    @Test
+    void shouldUpdateMarkdownRecord() {
+
+        UpdateMarkdownRecord request = mock(UpdateMarkdownRecord.class);
+        ResourceMarkdownRecord response = mock(ResourceMarkdownRecord.class);
+
+        when(repository.put(request))
+                .thenReturn(Uni.createFrom().item(response));
+
+        ResourceMarkdownRecord result = service.put(request)
+                .await()
+                .indefinitely();
+
+        assertThat(result).isNotNull();
+        assertThat(result).isEqualTo(response);
+
+        verify(repository).put(request);
+        verify(trigger).accept(response);
+    }
+
+    @Test
+    void shouldDeleteMarkdownRecord() {
+
+        UUID id = UUID.randomUUID();
+
+        when(repository.delete(id))
                 .thenReturn(Uni.createFrom().voidItem());
 
         service.delete(id)
-                .subscribe()
-                .withSubscriber(UniAssertSubscriber.create())
-                .assertCompleted();
+                .await()
+                .indefinitely();
 
-        verify(recordRepository).delete(id);
-        verify(postRecordRepository).disable(id);
+        verify(repository).delete(id);
     }
 
     @Test
-    void shouldPostRecord() {
-        var dto = mock(NewMarkdownRecord.class);
-        var response = mock(ResourceMarkdownRecord.class);
+    void shouldFailWhenPostFails() {
 
-        when(recordRepository.post(dto))
-                .thenReturn(Uni.createFrom().item(response));
+        RuntimeException exception =
+                new RuntimeException("remote failure");
 
-        service.post(dto)
-                .subscribe()
-                .withSubscriber(UniAssertSubscriber.create())
-                .assertCompleted();
+        NewMarkdownRecord request = mock(NewMarkdownRecord.class);
 
-        verify(recordRepository).post(dto);
+        when(repository.post(request))
+                .thenReturn(Uni.createFrom().failure(exception));
+
+        assertThatThrownBy(() ->
+                service.post(request)
+                        .await()
+                        .indefinitely()
+        ).isEqualTo(exception);
+
+        verify(repository).post(request);
+        verifyNoInteractions(trigger);
     }
 
     @Test
-    void shouldPutRecord() {
-        var update = mock(UpdateMarkdownRecord.class);
-        var resource = mock(ResourceMarkdownRecord.class);
-        var postRecord = mock(PostRecord.class);
+    void shouldFailWhenPutFails() {
 
-        when(recordRepository.put(update))
-                .thenReturn(Uni.createFrom().item(resource));
+        RuntimeException exception =
+                new RuntimeException("remote failure");
 
-        when(mapper.toEntity(update))
-                .thenReturn(postRecord);
+        UpdateMarkdownRecord request =
+                mock(UpdateMarkdownRecord.class);
 
-        when(postRecordRepository.update(postRecord))
-                .thenReturn(Uni.createFrom().item(postRecord));
+        when(repository.put(request))
+                .thenReturn(Uni.createFrom().failure(exception));
 
-        when(mapper.toResource(postRecord))
-                .thenReturn(resource);
+        assertThatThrownBy(() ->
+                service.put(request)
+                        .await()
+                        .indefinitely()
+        ).isEqualTo(exception);
 
-        service.put(update)
-                .subscribe()
-                .withSubscriber(UniAssertSubscriber.create())
-                .assertCompleted();
-
-        verify(recordRepository).put(update);
-        verify(postRecordRepository).update(postRecord);
+        verify(repository).put(request);
+        verifyNoInteractions(trigger);
     }
 }

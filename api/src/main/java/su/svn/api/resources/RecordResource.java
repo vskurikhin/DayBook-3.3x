@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordResource.java
@@ -22,7 +22,7 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.models.dto.RecordDataPage;
-import su.svn.api.services.domain.JsonRecordDataService;
+import su.svn.api.services.domain.PostRecordDataSyncService;
 import su.svn.api.services.mappers.PageRecordDataMapper;
 
 @Path(ResourcePath.RECORDS)
@@ -32,7 +32,7 @@ public class RecordResource {
     PageRecordDataMapper mapper;
 
     @Inject
-    JsonRecordDataService service;
+    PostRecordDataSyncService service;
 
     @APIResponse(
             responseCode = "201",
@@ -46,7 +46,7 @@ public class RecordResource {
     )
     @APIResponse(ref = "500Error")
     @PermitAll
-    @Operation(summary = "Get page with list of JSON record")
+    @Operation(summary = "Get page with list of records")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<RecordDataPage> page(@QueryParam("page") int page, @QueryParam("size") byte size) {

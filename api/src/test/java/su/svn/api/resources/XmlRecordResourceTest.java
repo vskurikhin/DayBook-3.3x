@@ -11,13 +11,13 @@ import su.svn.api.models.dto.NewXmlRecord;
 import su.svn.api.models.dto.ResourceXmlRecord;
 import su.svn.api.models.dto.UpdateXmlRecord;
 import su.svn.api.services.domain.XmlRecordDataService;
-import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class XmlRecordResourceTest {
@@ -27,9 +27,6 @@ class XmlRecordResourceTest {
 
     @Mock
     XmlRecordDataService service;
-
-    @Mock
-    RecordSchedulerService schedulerService;
 
     @Test
     void shouldCreateXmlRecord() {
@@ -62,7 +59,6 @@ class XmlRecordResourceTest {
         }
 
         verify(service).post(request);
-        verify(schedulerService).fire(true);
     }
 
     @Test
@@ -78,7 +74,6 @@ class XmlRecordResourceTest {
         }
 
         verify(service).delete(id);
-        verify(schedulerService).fire(true);
     }
 
     @Test
@@ -114,6 +109,5 @@ class XmlRecordResourceTest {
         }
 
         verify(service).put(request);
-        verify(schedulerService).fire(true);
     }
 }

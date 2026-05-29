@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS api.post_records (
     local_change        BOOLEAN                       NOT NULL    DEFAULT true,
     visible             BOOLEAN                                   DEFAULT true,
     flags               INT                           NOT NULL    DEFAULT 0,
-    title               TEXT,
+    title               VARCHAR(4096),
     values              JSONB
     );
 

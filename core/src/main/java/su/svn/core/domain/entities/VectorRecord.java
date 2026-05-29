@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.24 13:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * VectorRecord.java
@@ -72,7 +72,7 @@ public class VectorRecord {
     @Column(name = "title")
     String title;
 
-    @Column(name = "vector", nullable = false)
+    @Column(name = "vector", columnDefinition = "core.vector(1024)", nullable = false)
     @JdbcTypeCode(SqlTypes.VECTOR)
     @Array(length = 1024)
     float[] vector;

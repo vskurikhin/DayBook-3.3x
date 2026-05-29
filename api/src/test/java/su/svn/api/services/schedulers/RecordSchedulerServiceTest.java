@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.profile.NoContainersProfile;
-import su.svn.api.services.domain.JsonRecordDataService;
+import su.svn.api.services.domain.PostRecordDataSyncService;
 
 import java.util.List;
 
@@ -23,19 +23,19 @@ import static org.mockito.Mockito.when;
 class RecordSchedulerServiceTest {
 
     @InjectMock
-    JsonRecordDataService mockJsonRecordDataService;
+    PostRecordDataSyncService mockPostRecordDataSyncService;
 
     @Inject
     RecordSchedulerService recordSchedulerService;
 
     @BeforeEach
     void beforeEach(TestInfo testInfo) {
-        when(mockJsonRecordDataService.sync(anyInt(), anyInt())).thenReturn(Uni.createFrom().item(List.of(PostRecord.builder().build())));
+        when(mockPostRecordDataSyncService.sync(anyInt(), anyInt())).thenReturn(Uni.createFrom().item(List.of(PostRecord.builder().build())));
         System.err.println("Running: " + testInfo.getDisplayName());
     }
 
     @Test
-    void tests(UniAsserter asserter) throws InterruptedException {
+    void tests(UniAsserter ignored) throws InterruptedException {
         recordSchedulerService.fire(true);
         Thread.sleep(15 * 1000);
     }

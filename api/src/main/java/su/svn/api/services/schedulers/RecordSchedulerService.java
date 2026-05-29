@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordSchedulerService.java
@@ -11,7 +11,7 @@ package su.svn.api.services.schedulers;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import su.svn.api.services.domain.JsonRecordDataService;
+import su.svn.api.services.domain.PostRecordDataSyncService;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -23,16 +23,16 @@ public class RecordSchedulerService {
     private final AtomicBoolean fire = new AtomicBoolean(false);
 
     @Inject
-    JsonRecordDataService jsonRecordDataService;
+    PostRecordDataSyncService syncService;
 
     @Inject
     io.vertx.core.Vertx vertx;
 
-    @Scheduled(every = "13s")
+    @Scheduled(every = "7s")
     void job() {
         if (this.fire.get() && this.done.compareAndSet(true, false)) {
             vertx.runOnContext(v -> {
-                jsonRecordDataService.sync(0, SYNC_SIZE)
+                syncService.sync(0, SYNC_SIZE)
                         .subscribe().with(
                                 result -> {},
                                 Throwable::printStackTrace

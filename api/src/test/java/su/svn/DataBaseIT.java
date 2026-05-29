@@ -19,7 +19,7 @@ import su.svn.api.models.dto.PagedModelEntityModelResourceRecordViewEmbedded;
 import su.svn.api.profile.ContainersProfile;
 import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.client.rest.RecordViewClient;
-import su.svn.api.services.domain.JsonRecordDataService;
+import su.svn.api.services.domain.PostRecordDataSyncService;
 import su.svn.api.services.domain.VectorRecordDataService;
 
 import java.time.LocalDateTime;
@@ -51,12 +51,12 @@ public class DataBaseIT {
     @Inject
     PostRecordRepository postRecordRepository;
 
+    @Inject
+    PostRecordDataSyncService postRecordDataSyncService;
+
     @InjectMock
     @RestClient
     RecordViewClient mockRecordViewClient;
-
-    @Inject
-    JsonRecordDataService jsonRecordDataService;
 
     @Inject
     VectorRecordDataService vectorRecordDataService;
@@ -207,7 +207,7 @@ public class DataBaseIT {
     @RunOnVertxContext
     void testRecordDataService(UniAsserter asserter) {
         asserter.assertThat(
-                () -> jsonRecordDataService.sync(0, 2000)
+                () -> postRecordDataSyncService.sync(0, 2000)
                         .flatMap(postRecords -> postRecordRepository.readIdIn(
                                 postRecords.stream().map(PostRecord::id).toList()
                         )),

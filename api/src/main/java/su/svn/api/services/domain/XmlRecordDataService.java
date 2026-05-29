@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * XmlRecordDataService.java
@@ -53,14 +53,14 @@ import java.util.UUID;
 @ApplicationScoped
 public class XmlRecordDataService {
 
+    /**
+     * Repository responsible for remote markdown record operations.
+     */
     @Inject
-    XmlRecordRepository recordRepository;
+    XmlRecordRepository repository;
 
     @Inject
-    XmlRecordMapper mapper;
-
-    @Inject
-    PostRecordRepository postRecordRepository;
+    XmlRecordSyncTrigger trigger;
 
     /**
      * Deletes an XML record and disables the corresponding local post.
@@ -73,34 +73,33 @@ public class XmlRecordDataService {
      * @return completion notification
      */
     public Uni<Void> delete(UUID id) {
-        return Uni.combine().all().unis(
-                recordRepository.delete(id),
-                postRecordRepository.disable(id)
-        ).withUni(l -> Uni.createFrom().voidItem());
+        return repository.delete(id)
+                .onItem()
+                .invoke(unused -> trigger.accept(id));
     }
 
     /**
      * Creates a new XML record.
      *
-     * @param newXmlRecord XML creation DTO
+     * @param record XML creation DTO
      * @return created XML resource
      */
-    public Uni<ResourceXmlRecord> post(NewXmlRecord newXmlRecord) {
-        return recordRepository.post(newXmlRecord);
+    public Uni<ResourceXmlRecord> post(NewXmlRecord record) {
+        return repository.post(record)
+                .onItem()
+                .invoke(trigger);
     }
 
     /**
      * Updates an existing XML record and synchronizes
      * the corresponding local post entity.
      *
-     * @param updateXmlRecord XML update DTO
+     * @param record XML update DTO
      * @return updated XML resource
      */
-    public Uni<ResourceXmlRecord> put(UpdateXmlRecord updateXmlRecord) {
-        return recordRepository.put(updateXmlRecord)
-                .flatMap(resourceJsonRecord ->
-                        postRecordRepository.update(mapper.toEntity(updateXmlRecord))
-                                .map(postRecord -> mapper.toResource(postRecord))
-                );
+    public Uni<ResourceXmlRecord> put(UpdateXmlRecord record) {
+        return repository.put(record)
+                .onItem()
+                .invoke(trigger);
     }
 }

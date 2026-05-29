@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS core.json_records (
       FOREIGN KEY (id)
       REFERENCES  core.base_records (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
-    title         TEXT,
+    title         VARCHAR(4096),
     values        JSONB,
     user_name     VARCHAR(64)                   NOT NULL,
       CONSTRAINT  FK_a412_core_json_records_security_user_name

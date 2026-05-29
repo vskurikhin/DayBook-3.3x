@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS core.set_records (
       FOREIGN KEY (id)
       REFERENCES  core.base_records (id)
         ON DELETE CASCADE ON UPDATE CASCADE,
-    title         TEXT,
+    title         VARCHAR(4096),
     texts         TEXT[]                        NOT NULL,
     user_name     VARCHAR(64)                   NOT NULL,
       CONSTRAINT  FK_4a13_core_set_records_security_user_name

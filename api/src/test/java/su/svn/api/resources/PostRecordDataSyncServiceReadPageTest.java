@@ -10,7 +10,7 @@ import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.domain.enums.ResourcePath;
 import su.svn.api.models.dto.Page;
 import su.svn.api.profile.NoContainersProfile;
-import su.svn.api.services.domain.JsonRecordDataService;
+import su.svn.api.services.domain.PostRecordDataSyncService;
 
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
@@ -25,10 +25,10 @@ import static org.mockito.Mockito.when;
 
 @QuarkusTest
 @TestProfile(NoContainersProfile.class)
-class JsonRecordResourceTest {
+class PostRecordDataSyncServiceReadPageTest {
 
     @InjectMock
-    JsonRecordDataService mockJsonRecordDataService;
+    PostRecordDataSyncService mockPostRecordDataSyncService;
 
     @TestSecurity(user = "john", roles = {"USER"})
     @Test
@@ -42,7 +42,7 @@ class JsonRecordResourceTest {
         var p2 = Page.<PostRecord>builder()
                 .list(List.of(p1))
                 .build();
-        when(mockJsonRecordDataService.readPage(anyInt(), anyByte())).thenReturn(Uni.createFrom().item(p2));
+        when(mockPostRecordDataSyncService.readPage(anyInt(), anyByte())).thenReturn(Uni.createFrom().item(p2));
 
         @SuppressWarnings("unchecked") Page<LinkedHashMap<String, Object>> resp = given()
                 .when().get(ResourcePath.RECORDS)

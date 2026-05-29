@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * VectorRecordResource.java
@@ -78,12 +78,6 @@ public class VectorRecordResource {
     VectorRecordDataService service;
 
     /**
-     * Scheduler service responsible for propagating record updates.
-     */
-    @Inject
-    RecordSchedulerService schedulerService;
-
-    /**
      * Creates a new vector record.
      *
      * <p>
@@ -118,9 +112,7 @@ public class VectorRecordResource {
                         RestResponse.ResponseBuilder
                                 .create(Response.Status.CREATED, record)
                                 .build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 
     /**
@@ -149,9 +141,7 @@ public class VectorRecordResource {
         return service.delete(id)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.NO_CONTENT).build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 
     /**
@@ -189,8 +179,6 @@ public class VectorRecordResource {
                         RestResponse.ResponseBuilder
                                 .ok(record, MediaType.APPLICATION_JSON)
                                 .build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 }

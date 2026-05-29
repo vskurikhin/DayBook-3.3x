@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ValueRecordResource.java
@@ -25,7 +25,6 @@ import su.svn.api.models.dto.NewValueRecord;
 import su.svn.api.models.dto.ResourceValueRecord;
 import su.svn.api.models.dto.UpdateValueRecord;
 import su.svn.api.services.domain.ValueRecordDataService;
-import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.util.UUID;
 
@@ -57,12 +56,6 @@ public class ValueRecordResource {
     ValueRecordDataService service;
 
     /**
-     * Scheduler service responsible for propagating record updates.
-     */
-    @Inject
-    RecordSchedulerService schedulerService;
-
-    /**
      * Creates a new value record.
      *
      * @param entry DTO containing data for the new value record
@@ -92,9 +85,7 @@ public class ValueRecordResource {
                         RestResponse.ResponseBuilder
                                 .create(Response.Status.CREATED, record)
                                 .build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 
     /**
@@ -123,9 +114,7 @@ public class ValueRecordResource {
         return service.delete(id)
                 .map(resourceJsonRecord ->
                         Response.status(Response.Status.NO_CONTENT).build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 
     /**
@@ -158,8 +147,6 @@ public class ValueRecordResource {
                         RestResponse.ResponseBuilder
                                 .ok(record, MediaType.APPLICATION_JSON)
                                 .build()
-                )
-                .onItem()
-                .invoke(() -> schedulerService.fire(true));
+                );
     }
 }

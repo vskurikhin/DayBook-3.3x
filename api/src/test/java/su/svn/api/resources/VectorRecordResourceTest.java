@@ -11,13 +11,13 @@ import su.svn.api.models.dto.NewVectorRecord;
 import su.svn.api.models.dto.ResourceVectorRecord;
 import su.svn.api.models.dto.UpdateVectorRecord;
 import su.svn.api.services.domain.VectorRecordDataService;
-import su.svn.api.services.schedulers.RecordSchedulerService;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class VectorRecordResourceTest {
@@ -27,9 +27,6 @@ class VectorRecordResourceTest {
 
     @Mock
     VectorRecordDataService service;
-
-    @Mock
-    RecordSchedulerService schedulerService;
 
     @Test
     void shouldCreateRecord() {
@@ -62,7 +59,6 @@ class VectorRecordResourceTest {
         }
 
         verify(service).post(request);
-        verify(schedulerService).fire(true);
     }
 
     @Test
@@ -78,7 +74,6 @@ class VectorRecordResourceTest {
         }
 
         verify(service).delete(id);
-        verify(schedulerService).fire(true);
     }
 
     @Test
@@ -114,6 +109,5 @@ class VectorRecordResourceTest {
         }
 
         verify(service).put(request);
-        verify(schedulerService).fire(true);
     }
 }

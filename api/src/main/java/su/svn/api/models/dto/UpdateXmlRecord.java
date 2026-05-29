@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * UpdateXmlRecord.java
@@ -54,10 +54,11 @@ public record UpdateXmlRecord(
         @NotNull(message = "parentId at is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
+        @Size(max = 4096, message = "Title must be at most 4096 characters")
         @JsonProperty String title,
         @NotNull(message = "XML is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-        @Size(max = 255, message = "XML must be at most 255 characters")
+        @Size(max = 10485760, message = "XML must be at most 10485760 characters")
         @JsonProperty String xml,
         @JsonProperty OffsetDateTime postAt,
         @NotNull(message = "Refresh at is required")
