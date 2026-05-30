@@ -1,22 +1,34 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   createBrowserRouter,
   RouterProvider,
   useLocation,
   Navigate,
 } from "react-router-dom";
+
 import PropTypes from "prop-types";
 import axios from "axios";
+import reactLogo from "./assets/react.svg";
+import viteLogo from "/vite.svg";
+import { Button } from "primereact/button";
+import { InputText } from "primereact/inputtext";
+import { ReactNode } from "react";
 
-import Signup from "./components/Signup/Signup";
-import Login from "./components/Login/Login";
+import AddRecordForm from "./components/AddRecordForm/AddRecordForm"
 import Home from "./components/Home/Home";
-import Users from "./components/Users/Users";
+import IntersectionObserverRecordsPage from "./components/IntersectionObserverRecordsPage/IntersectionObserverRecordsPage"
 import Layout from "./components/Layout/Layout";
+import Login from "./components/Login/Login";
+import Signup from "./components/Signup/Signup";
 import SplashScreen from "./components/SplashScreen/SplashScreen";
-
-import { useAuth } from "./contexts/auth-context";
+import Users from "./components/Users/Users";
 import { STATUS } from "./utils/utils";
+import { useAuth } from "./contexts/AuthContext";
+
+type RouteGuardProps = {
+  children: ReactNode;
+  redirectTo: string;
+};
 
 function App() {
   const { login, logout, isAuthenticated, expires_at } = useAuth();
@@ -51,12 +63,12 @@ function App() {
   }, [refreshAccessToken]);
 
   useEffect(() => {
-    let refreshAccessTokenTimerId;
+    let refreshAccessTokenTimerId: ReturnType<typeof setTimeout>;
 
-    if (isAuthenticated) {
+    if (isAuthenticated && expires_at) {
       refreshAccessTokenTimerId = setTimeout(() => {
         refreshAccessToken();
-      }, new Date(expires_at).getTime() - Date.now() - 10 * 1000);
+      }, new Date(expires_at).getTime() - Date.now() - 10_000);
     }
 
     return () => {
@@ -74,9 +86,7 @@ function App() {
         {
           path: "/",
           element: (
-            <RequireAuth redirectTo="/sign-up">
-              <Home />
-            </RequireAuth>
+              <IntersectionObserverRecordsPage />
           ),
         },
         {
@@ -96,10 +106,10 @@ function App() {
           ),
         },
         {
-          path: "users",
+          path: "post",
           element: (
             <RequireAuth redirectTo="/sign-up">
-              <Users />
+              <AddRecordForm />
             </RequireAuth>
           ),
         }
@@ -115,7 +125,9 @@ function App() {
 }
 
 // New code
-const RequireAuth = ({ children, redirectTo }) => {
+
+// const RequireAuth = ({ children, redirectTo }) => {
+const RequireAuth = ({ children, redirectTo }: RouteGuardProps) => {
   const { isAuthenticated, status } = useAuth();
   const location = useLocation();
   console.log("status: " + status)
@@ -130,7 +142,7 @@ const RequireAuth = ({ children, redirectTo }) => {
 };
 
 // New code
-const RedirectIfLoggedIn = ({ children, redirectTo }) => {
+const RedirectIfLoggedIn = ({ children, redirectTo }: { children: React.ReactNode; redirectTo: string; }) => {
   const { isAuthenticated, status } = useAuth();
   const location = useLocation();
 
@@ -152,5 +164,34 @@ RedirectIfLoggedIn.propTypes = {
   children: PropTypes.element.isRequired,
   redirectTo: PropTypes.string.isRequired,
 };
+
+// function App() {
+//   const [count, setCount] = useState(0);
+//
+//   return (
+//     <>
+//       <p>
+//         <a href="https://vitejs.dev" target="_blank">
+//           <img src={viteLogo} className="logo inline-block" alt="Vite logo" />
+//         </a>
+//         <a href="https://react.dev" target="_blank">
+//           <img src={reactLogo} className="logo react inline-block" alt="React logo" />
+//         </a>
+//       </p>
+//       <h1>Vite + PrimeReact + TailwindCSS</h1>
+//       <div>
+//         <h2>Demo app showing PrimeReact + Tailwind CSS in styled mode with PrimeReact Theme!</h2>
+//       </div>
+//       <div className="card">
+//         <Button icon="pi pi-plus" className="mr-2" label="Increment" onClick={() => setCount((count) => count + 1)}></Button>
+//         <InputText value={count.toString()} />
+//         <p>
+//           Edit <code>src/App.jsx</code> and save to test HMR
+//         </p>
+//       </div>
+//       <p className="read-the-docs">Click on the Vite and React logos to learn more</p>
+//     </>
+//   );
+// }
 
 export default App;

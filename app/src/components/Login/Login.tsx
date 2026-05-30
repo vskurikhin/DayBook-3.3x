@@ -1,11 +1,16 @@
+import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import axios from "axios";
 
-import { useAuth } from "../../contexts/auth-context";
+import { useAuth } from "../../contexts/AuthContext";
 import { STATUS } from "../../utils/utils";
 
 import styles from "./Login.module.scss";
+
+type FormValues = {
+  username: string;
+  password: string;
+};
 
 const Login = () => {
   const {
@@ -24,7 +29,7 @@ const Login = () => {
 
   const { login, setAuthenticationStatus } = useAuth();
 
-  const onSubmit = async (values) => {
+  const onSubmit = async (values: FormValues) => {
     const user = {
       user_name: values.username,
       password: values.password,
@@ -38,8 +43,9 @@ const Login = () => {
       const { user: userObj, token, expires_at } = response.data.data;
       login(userObj, token, expires_at);
       navigate('/');
-    } catch (error) {
-      alert(error.response.data.error.message);
+    } catch (error: unknown) {
+      const err = error as any;
+      alert(err?.response?.data?.error?.message ?? "Login failed");
     }
   };
 
@@ -52,7 +58,6 @@ const Login = () => {
             <input
               className={styles.input}
               type="text"
-              name="username"
               id="username"
               aria-label="Username or Email"
               required
@@ -62,14 +67,15 @@ const Login = () => {
               })}
             />
             <div className={styles.validationError}>
-              <span>{touchedFields.name && errors.name?.message}</span>
+              <span>
+                {touchedFields.username && errors.username?.message}
+              </span>
             </div>
           </div>
           <div className={styles.formGroup}>
             <input
               className={styles.input}
               type="password"
-              name="password"
               id="password"
               required
               placeholder="Password"
@@ -78,7 +84,9 @@ const Login = () => {
               })}
             />
             <div className={styles.validationError}>
-              <span>{touchedFields.password && errors.password?.message}</span>
+              <span>
+                {touchedFields.password && errors.password?.message}
+              </span>
             </div>
           </div>
           <div className={styles.formGroup}>

@@ -1,0 +1,41 @@
+services:
+  postgres-db:
+    image: 'pgvector/pgvector:pg18'
+    environment:
+      - POSTGRES_USER=dbuser
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=db
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./volumes/pgsql-data:/var/lib/postgresql
+
+  golang-auth:
+    image: 'golang-auth'
+    environment:
+      AUTH_SERVER_JWT_HS256_SIGN_KEY: cd8f5f9f-e3e8-569f-87ef-f03c6cfc29bc
+    ports:
+      - '38089:8089'
+
+  spring-3-5-core:
+    image: 'spring-3-5-core'
+    environment:
+      CORE_SERVER_DB_URL: jdbc:postgresql://postgres-db:5432/db
+      CORE_SERVER_DB_USERNAME: dbuser
+      CORE_SERVER_DB_PASSWORD: password
+      CORE_SERVER_TOKEN_SIGNING_KEY: Y2Q4ZjVmOWYtZTNlOC01NjlmLTg3ZWYtZjAzYzZjZmMyOWJj
+    ports:
+      - '38082:8082'
+
+  quarkus-api:
+    image: 'quarkus-api'
+    environment:
+      API_SERVER_AUTH_SERVER_ADDRESS: http://golang-auth:8089
+      API_SERVER_DB_REACTIVE_URL: vertx-reactive:postgresql://postgres-db:5432/db?application_name=api&currentSchema=api&loggerLevel=TRACE
+      API_SERVER_DB_USERNAME: dbuser
+      API_SERVER_DB_PASSWORD: password
+      API_SERVER_CORE_SERVER_ADDRESS: http://spring-3-5-core:8082
+      API_SERVER_CORE_VERIFY_ISSUER: cd8f5f9f-e3e8-569f-87ef-f03c6cfc29bc
+      API_SERVER_JWT_EXTERNAL_VERIFY_KEY_HMAC: cd8f5f9f-e3e8-569f-87ef-f03c6cfc29bc
+    ports:
+      - '38081:8081'

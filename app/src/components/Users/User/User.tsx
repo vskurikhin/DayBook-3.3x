@@ -1,6 +1,15 @@
 import styles from './User.module.scss';
 
-const User = ({ user }) => {
+type UserType = {
+  id: string | number;
+  name: string;
+};
+
+type Props = {
+  user: UserType;
+};
+
+const User = ({ user }: Props) => {
   return (
     <div className={styles.container}>
       <div className={styles.imageContainer}>
