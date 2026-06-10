@@ -7,9 +7,12 @@
   font-family: inherit;
 }
 
+html,
 body {
-  margin: 0;
-  font-family: 'Urbanist', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    background-color: rgb(0 128 128 / 10%);
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Urbanist', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }

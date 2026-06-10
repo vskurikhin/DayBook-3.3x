@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 
-import { useAuth } from "../../contexts/auth-context";
+import { useAuth } from "../../contexts/AuthContext";
 
 import styles from "./Navbar.module.scss";
 
@@ -32,7 +32,7 @@ const Navbar = () => {
       <nav className={styles.navigation}>
         <div>
           <Link className={styles.brand} to="/">
-            Demo App
+            SVN
           </Link>
         </div>
         <div className={styles.navigationListContainer}>
@@ -44,18 +44,13 @@ const Navbar = () => {
                     Login
                   </Link>
                 </li>
-                <li className={styles.navigationItem}>
-                  <Link className={styles.navigationLink} to="/sign-up">
-                    Sign Up
-                  </Link>
-                </li>
               </>
             )}
             {isAuthenticated && (
               <>
                 <li className={styles.navigationItem}>
-                  <Link className={styles.navigationLink} to="/users">
-                    Users
+                  <Link className={styles.navigationLink} to="/post">
+                    Post
                   </Link>
                 </li>
                 <li className={styles.navigationItem}>

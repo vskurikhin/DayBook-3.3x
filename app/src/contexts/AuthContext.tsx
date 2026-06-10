@@ -3,23 +3,91 @@ import PropTypes from 'prop-types';
 
 import { STATUS } from '../utils/utils';
 
-const initialState = {
-  user: {},
+interface AuthState {
+  user: User;
+  token: string | null;
+  expires_at: string | null;
+  isAuthenticated: boolean;
+  status: string;
+  verifyingToken: boolean;
+}
+
+interface AuthContextType extends AuthState {
+    login: (
+        user: User,
+        token: string,
+        expires_at: string
+    ) => void;
+
+    logout: () => void;
+
+    updateUser: (
+        user: User
+    ) => void;
+
+    setAuthenticationStatus: (
+        status: string
+    ) => void;
+}
+
+interface User {
+  name: string;
+  email?: string;
+}
+
+type AuthAction =
+  | {
+      type: "login";
+      payload: {
+        data: {
+          user: User;
+          token: string;
+          expires_at: string;
+        };
+      };
+    }
+  | {
+      type: "logout";
+    }
+  | {
+      type: "updateUser";
+      payload: {
+        data: {
+          user: User;
+        };
+      };
+    }
+  | {
+      type: "status";
+      payload: {
+        data: {
+          status: string;
+        };
+      };
+    };
+
+type Props = {
+  children: React.ReactNode;
+};
+
+const initialState: AuthState = {
+  user: {} as User,
   token: null,
   expires_at: null,
   isAuthenticated: false,
   status: STATUS.IDLE,
+  verifyingToken: false,
 };
 
-const AuthContext = React.createContext({
+const AuthContext = React.createContext<AuthContextType>({
   ...initialState,
-  login: (user = {}, token = '', expires_at = '') => {},
+  login: (user: User, token: string, expires_at: string) => {},
   logout: () => {},
   updateUser: () => {},
   setAuthenticationStatus: () => {},
 });
 
-const authReducer = (state, action) => {
+const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 console.log("authReducer() state: " + state + " action: " + action)
   switch (action.type) {
     case 'login': {
@@ -51,15 +119,16 @@ console.log("authReducer() state: " + state + " action: " + action)
       };
     }
     default: {
-      throw new Error(`Unhandled action type: ${action.type}`);
+      const _exhaustiveCheck: never = action;
+      throw new Error(`Unhandled action type`);
     }
   }
 };
 
-const AuthProvider = ({ children }) => {
+const AuthProvider = ({ children }: Props) => {
   const [state, dispatch] = React.useReducer(authReducer, initialState);
 
-  const login = React.useCallback((user, token, expires_at) => {
+  const login = React.useCallback((user: User, token: string, expires_at: string) => {
     dispatch({
       type: 'login',
       payload: {
@@ -78,7 +147,7 @@ const AuthProvider = ({ children }) => {
     });
   }, []);
 
-  const updateUser = React.useCallback((user) => {
+  const updateUser = React.useCallback((user: User) => {
     dispatch({
       type: 'updateUser',
       payload: {
@@ -89,7 +158,7 @@ const AuthProvider = ({ children }) => {
     });
   }, []);
 
-  const setAuthenticationStatus = React.useCallback((status) => {
+  const setAuthenticationStatus = React.useCallback((status: string) => {
       console.log("setAuthenticationStatus: " + status)
     dispatch({
       type: 'status',

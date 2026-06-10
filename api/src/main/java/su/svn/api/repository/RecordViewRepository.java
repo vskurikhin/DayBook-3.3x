@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.29 19:09 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.31 00:28 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewRepository.java
@@ -57,7 +57,8 @@ public class RecordViewRepository {
                             list,
                             pageRecordView.page().totalPages(),
                             pageRecordView.page().number(),
-                            pageRecordView.page().size()
+                            pageRecordView.page().size(),
+                            pageRecordView.page().totalElements()
                     );
                 }).invoke(postRecordPage -> LOG.debugf("readPage(%d, %d): %s", pageIndex, size, postRecordPage.toString()));
     }
