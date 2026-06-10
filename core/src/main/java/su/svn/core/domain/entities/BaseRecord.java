@@ -95,6 +95,9 @@ public class BaseRecord {
     @Column(name = "flags")
     int flags;
 
+    @Column(name = "title")
+    String title;
+
     @ManyToMany
     @JoinTable(
             schema = "core",

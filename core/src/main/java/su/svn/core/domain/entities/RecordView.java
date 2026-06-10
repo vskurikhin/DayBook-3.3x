@@ -145,7 +145,7 @@ public class RecordView {
     @Column(name = "flags")
     int flags;
 
-    @Column(name = "coalesce_title")
+    @Column(name = "title")
     String title;
 
     @Column(name = "blob")

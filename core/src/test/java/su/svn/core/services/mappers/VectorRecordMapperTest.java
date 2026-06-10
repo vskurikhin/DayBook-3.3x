@@ -31,11 +31,11 @@ class VectorRecordMapperTest {
                 .tags(Lists.list(Tag.builder().tag("vector").build()))
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
+                .title("title")
                 .build();
 
         VectorRecord entity = VectorRecord.builder()
                 .id(id)
-                .title("title")
                 .vector(new float[]{1.0f, 2.0f})
                 .baseRecord(baseRecord)
                 .userName("root")
@@ -44,7 +44,7 @@ class VectorRecordMapperTest {
         ResourceVectorRecord result = mapper.toResource(entity);
 
         assertEquals(entity.id(), result.id());
-        assertEquals(entity.title(), result.title());
+        assertEquals(entity.baseRecord().title(), result.title());
         assertArrayEquals(entity.vector(), result.vector());
         assertArrayEquals(new String[]{"vector"}, result.tags().toArray());
     }
@@ -81,7 +81,7 @@ class VectorRecordMapperTest {
         VectorRecord entity = mapper.toEntity(resource);
 
         assertEquals(resource.id(), entity.id());
-        assertEquals(resource.title(), entity.title());
+        assertEquals(resource.title(), entity.baseRecord().title());
         assertArrayEquals(resource.vector(), entity.vector());
 
         assertNotNull(entity.baseRecord());

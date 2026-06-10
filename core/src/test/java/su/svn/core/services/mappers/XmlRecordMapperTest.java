@@ -37,12 +37,12 @@ class XmlRecordMapperTest {
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
                 .tags(Lists.list(Tag.builder().tag("xml").build()))
+                .title("title")
                 .build();
 
         XmlRecord entity = XmlRecord.builder()
                 .id(id)
                 .baseRecord(baseRecord)
-                .title("title")
                 .xml("<root/>")
                 .userName("user")
                 .visible(true)
@@ -133,7 +133,7 @@ class XmlRecordMapperTest {
 
         assertNotNull(entity);
         assertEquals(resource.id(), entity.id());
-        assertEquals(resource.title(), entity.title());
+        assertEquals(resource.title(), entity.baseRecord().title());
         assertEquals(resource.xml(), entity.xml());
         assertTrue(entity.visible());
         assertEquals(resource.flags(), entity.flags());

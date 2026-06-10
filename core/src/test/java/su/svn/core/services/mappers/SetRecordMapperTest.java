@@ -31,11 +31,11 @@ class SetRecordMapperTest {
                 ).stream().toList())
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
+                .title("title")
                 .build();
 
         SetRecord entity = SetRecord.builder()
                 .id(id)
-                .title("title")
                 .userName("user")
                 .texts(Set.of("a", "b"))
                 .baseRecord(baseRecord)
@@ -45,7 +45,7 @@ class SetRecordMapperTest {
 
         assertNotNull(result);
         assertEquals(entity.id(), result.id());
-        assertEquals(entity.title(), result.title());
+        assertEquals(entity.baseRecord().title(), result.title());
         assertEquals(entity.texts(), result.texts());
     }
 
@@ -97,7 +97,7 @@ class SetRecordMapperTest {
 
         assertNotNull(result);
         assertEquals(dto.id(), result.id());
-        assertEquals(dto.title(), result.title());
+        assertEquals(dto.title(), result.baseRecord().title());
         assertEquals(dto.texts(), result.texts());
     }
 }
