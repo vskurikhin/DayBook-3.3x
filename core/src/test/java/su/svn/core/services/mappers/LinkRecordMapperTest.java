@@ -34,12 +34,12 @@ class LinkRecordMapperTest {
                 .tags(List.of())
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
+                .title("title")
                 .build();
 
         TextRecord entity = TextRecord.builder()
                 .id(id)
                 .baseRecord(baseRecord)
-                .title("title")
                 .value("# link")
                 .type(TextRecordType.Markdown)
                 .userName("root")
@@ -50,7 +50,7 @@ class LinkRecordMapperTest {
         ResourceLinkRecord result = mapper.toResource(entity);
 
         assertEquals(entity.id(), result.id());
-        assertEquals(entity.title(), result.title());
+        assertEquals(entity.baseRecord().title(), result.title());
         assertEquals(entity.value(), result.link());
         assertEquals(entity.visible(), result.visible());
     }
@@ -102,7 +102,7 @@ class LinkRecordMapperTest {
         TextRecord result = mapper.toEntity(dto);
 
         assertEquals(id, result.id());
-        assertEquals("title", result.title());
+        assertEquals("title", result.baseRecord().title());
         assertEquals("# link", result.value());
         assertTrue(result.visible());
         assertEquals(10, result.flags());

@@ -69,9 +69,6 @@ public class VectorRecord {
             nullable = false)
     BaseRecord baseRecord;
 
-    @Column(name = "title")
-    String title;
-
     @Column(name = "vector", columnDefinition = "core.vector(1024)", nullable = false)
     @JdbcTypeCode(SqlTypes.VECTOR)
     @Array(length = 1024)

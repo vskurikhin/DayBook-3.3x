@@ -63,9 +63,6 @@ public class TextRecord {
             nullable = false)
     BaseRecord baseRecord;
 
-    @Column(name = "title")
-    String title;
-
     @Column(name = "value", nullable = false)
     String value;
 

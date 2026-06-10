@@ -45,6 +45,7 @@ public interface VectorRecordMapper extends TagMapper {
     @Mapping(source = "baseRecord.postAt", target = "postAt")
     @Mapping(source = "baseRecord.refreshAt", target = "refreshAt")
     @Mapping(source = "baseRecord.tags", target = "tags")
+    @Mapping(source = "baseRecord.title", target = "title")
     ResourceVectorRecord toResource(VectorRecord record);
 
     @Mapping(target = "id", ignore = true)
@@ -66,5 +67,6 @@ public interface VectorRecordMapper extends TagMapper {
     @Mapping(source = "postAt", target = "baseRecord.postAt")
     @Mapping(source = "refreshAt", target = "baseRecord.refreshAt")
     @Mapping(source = "tags", target = "baseRecord.tags")
+    @Mapping(source = "title", target = "baseRecord.title")
     VectorRecord toEntity(ResourceVectorRecord record);
 }

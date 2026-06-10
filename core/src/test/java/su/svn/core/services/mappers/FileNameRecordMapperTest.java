@@ -34,12 +34,12 @@ class FileNameRecordMapperTest {
                 .tags(List.of())
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
+                .title("title")
                 .build();
 
         TextRecord entity = TextRecord.builder()
                 .id(id)
                 .baseRecord(baseRecord)
-                .title("title")
                 .value("# file_name")
                 .type(TextRecordType.Markdown)
                 .userName("root")
@@ -50,7 +50,7 @@ class FileNameRecordMapperTest {
         ResourceFileNameRecord result = mapper.toResource(entity);
 
         assertEquals(entity.id(), result.id());
-        assertEquals(entity.title(), result.title());
+        assertEquals(entity.baseRecord().title(), result.title());
         assertEquals(entity.value(), result.fileName());
         assertEquals(entity.visible(), result.visible());
     }
@@ -102,7 +102,7 @@ class FileNameRecordMapperTest {
         TextRecord result = mapper.toEntity(dto);
 
         assertEquals(id, result.id());
-        assertEquals("title", result.title());
+        assertEquals("title", result.baseRecord().title());
         assertEquals("# file_name", result.value());
         assertTrue(result.visible());
         assertEquals(10, result.flags());

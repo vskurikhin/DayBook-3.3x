@@ -44,9 +44,6 @@ public class BlobRecord {
             nullable = false)
     BaseRecord baseRecord;
 
-    @Column(name = "title")
-    String title;
-
     @Column(name = "blob", nullable = false)
     byte[] blob;
 

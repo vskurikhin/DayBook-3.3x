@@ -68,9 +68,6 @@ public class JsonRecord {
             nullable = false)
     BaseRecord baseRecord;
 
-    @Column(name = "title")
-    String title;
-
     @Column(name = "json", nullable = false)
     @JdbcTypeCode(SqlTypes.JSON)
     Map<String, String> json;

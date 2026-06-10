@@ -36,6 +36,7 @@ public interface MarkdownRecordMapper extends TagMapper {
     @Mapping(source = "baseRecord.postAt", target = "postAt")
     @Mapping(source = "baseRecord.refreshAt", target = "refreshAt")
     @Mapping(source = "baseRecord.tags", target = "tags")
+    @Mapping(source = "baseRecord.title", target = "title")
     @Mapping(source = "value", target = "markdown")
     ResourceMarkdownRecord toResource(TextRecord record);
 
@@ -58,6 +59,7 @@ public interface MarkdownRecordMapper extends TagMapper {
     @Mapping(source = "postAt", target = "baseRecord.postAt")
     @Mapping(source = "refreshAt", target = "baseRecord.refreshAt")
     @Mapping(source = "tags", target = "baseRecord.tags")
+    @Mapping(source = "title", target = "baseRecord.title")
     @Mapping(source = "markdown", target = "value")
     TextRecord toEntity(ResourceMarkdownRecord record);
 }

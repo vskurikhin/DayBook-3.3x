@@ -70,9 +70,6 @@ public class XmlRecord {
             nullable = false)
     BaseRecord baseRecord;
 
-    @Column(name = "title")
-    String title;
-
     @Column(name = "xml", nullable = false)
     @JdbcTypeCode(SqlTypes.SQLXML)
     String xml;

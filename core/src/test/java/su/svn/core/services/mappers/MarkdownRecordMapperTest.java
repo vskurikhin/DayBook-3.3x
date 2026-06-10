@@ -33,12 +33,12 @@ class MarkdownRecordMapperTest {
                 .tags(List.of())
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
+                .title("title")
                 .build();
 
         TextRecord entity = TextRecord.builder()
                 .id(id)
                 .baseRecord(baseRecord)
-                .title("title")
                 .value("# markdown")
                 .type(TextRecordType.Markdown)
                 .userName("root")
@@ -49,7 +49,7 @@ class MarkdownRecordMapperTest {
         ResourceMarkdownRecord result = mapper.toResource(entity);
 
         assertEquals(entity.id(), result.id());
-        assertEquals(entity.title(), result.title());
+        assertEquals(entity.baseRecord().title(), result.title());
         assertEquals(entity.value(), result.markdown());
         assertEquals(entity.visible(), result.visible());
     }
@@ -101,7 +101,7 @@ class MarkdownRecordMapperTest {
         TextRecord result = mapper.toEntity(dto);
 
         assertEquals(id, result.id());
-        assertEquals("title", result.title());
+        assertEquals("title", result.baseRecord().title());
         assertEquals("# markdown", result.value());
         assertTrue(result.visible());
         assertEquals(10, result.flags());

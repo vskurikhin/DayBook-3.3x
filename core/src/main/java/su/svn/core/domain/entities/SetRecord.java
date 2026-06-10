@@ -55,9 +55,6 @@ public class SetRecord {
             nullable = false)
     BaseRecord baseRecord;
 
-    @Column(name = "title")
-    String title;
-
     @Column(name = "texts", nullable = false)
     @JdbcTypeCode(SqlTypes.ARRAY)
     Set<String> texts;
