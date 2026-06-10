@@ -2,10 +2,18 @@ import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import axios from "axios";
 
-import { useAuth } from "../../contexts/auth-context";
+import { useAuth } from "../../contexts/AuthContext";
 import { STATUS } from "../../utils/utils";
 
 import styles from "./Signup.module.scss";
+
+type SignupForm = {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
 
 const Signup = () => {
   // Existing code
@@ -13,7 +21,7 @@ const Signup = () => {
     handleSubmit,
     register,
     formState: { errors, touchedFields },
-  } = useForm({
+  } = useForm<SignupForm>({
     defaultValues: {
       name: "",
       username: "",
@@ -29,7 +37,7 @@ const Signup = () => {
 
   const { login, setAuthenticationStatus } = useAuth();
 
-  const onSubmit = async (values) => {
+  const onSubmit = async (values: SignupForm) => {
     const newUser = {
       name: values.name,
       user_name: values.username,
@@ -45,8 +53,12 @@ const Signup = () => {
       const { user, token, expires_at } = response.data.data;
       login(user, token, expires_at);
       navigate("/");
-    } catch (error) {
-      alert(error.response.data.error.message);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.error?.message ?? "Error");
+      } else {
+        alert("Unknown error");
+      }
       setAuthenticationStatus(STATUS.FAILED);
     }
   };
@@ -61,7 +73,6 @@ const Signup = () => {
             <input
               className={styles.input}
               type="text"
-              name="name"
               id="name"
               placeholder="Name"
               {...register("name", {
@@ -77,14 +88,13 @@ const Signup = () => {
               })}
             />
             <div className={styles.validationError}>
-              <span>{touchedFields.name && errors.name?.message}</span>
+              <span>{touchedFields.username && errors.username?.message}</span>
             </div>
           </div>
           <div className={styles.formGroup}>
             <input
               className={styles.input}
               type="text"
-              name="username"
               id="username"
               placeholder="Username"
               {...register("username", {
@@ -103,7 +113,6 @@ const Signup = () => {
             <input
               className={styles.input}
               type="email"
-              name="email"
               id="email"
               autoComplete="email"
               placeholder="Email"
@@ -123,7 +132,6 @@ const Signup = () => {
             <input
               className={styles.input}
               type="password"
-              name="password"
               id="password"
               autoComplete="new-password"
               placeholder="Password"
@@ -147,7 +155,6 @@ const Signup = () => {
             <input
               className={styles.input}
               type="password"
-              name="confirmPassword"
               id="confirmPassword"
               autoComplete="new-password"
               placeholder="Confirm Password"

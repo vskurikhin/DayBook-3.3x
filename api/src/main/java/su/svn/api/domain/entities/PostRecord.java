@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.22 18:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.05.31 00:28 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -351,6 +351,11 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
 
     @Column(name = "tags")
     List<String> tags;
+
+    // Count using a query string with positional parameters
+    public static Uni<Long> countEnabled() {
+        return count("enabled = ?1", true);
+    }
 
     /**
      * Finds a post record by UUID.
