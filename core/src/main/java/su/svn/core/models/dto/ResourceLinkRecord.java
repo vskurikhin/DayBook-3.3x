@@ -25,6 +25,7 @@ public record ResourceLinkRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty String link,
         @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,

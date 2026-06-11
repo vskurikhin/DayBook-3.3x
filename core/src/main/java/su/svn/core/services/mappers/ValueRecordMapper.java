@@ -29,6 +29,7 @@ public interface ValueRecordMapper extends TagMapper {
     @Mapping(source = "baseRecord.refreshAt", target = "refreshAt")
     @Mapping(source = "baseRecord.tags", target = "tags")
     @Mapping(source = "baseRecord.title", target = "title")
+    @Mapping(source = "baseRecord.aHref", target = "aHref")
     ResourceValueRecord toResource(TextRecord record);
 
     @Mapping(target = "id", ignore = true)
@@ -51,5 +52,6 @@ public interface ValueRecordMapper extends TagMapper {
     @Mapping(source = "refreshAt", target = "baseRecord.refreshAt")
     @Mapping(source = "tags", target = "baseRecord.tags")
     @Mapping(source = "title", target = "baseRecord.title")
+    @Mapping(source = "aHref", target = "baseRecord.aHref")
     TextRecord toEntity(ResourceValueRecord record);
 }

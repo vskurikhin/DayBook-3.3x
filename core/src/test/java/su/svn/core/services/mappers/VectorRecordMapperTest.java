@@ -32,6 +32,7 @@ class VectorRecordMapperTest {
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
                 .title("title")
+                .aHref("<a href=''></a>")
                 .build();
 
         VectorRecord entity = VectorRecord.builder()
@@ -45,6 +46,7 @@ class VectorRecordMapperTest {
 
         assertEquals(entity.id(), result.id());
         assertEquals(entity.baseRecord().title(), result.title());
+        assertEquals(entity.baseRecord().aHref(), result.aHref());
         assertArrayEquals(entity.vector(), result.vector());
         assertArrayEquals(new String[]{"vector"}, result.tags().toArray());
     }
@@ -54,6 +56,7 @@ class VectorRecordMapperTest {
 
         NewVectorRecord record = NewVectorRecord.builder()
                 .title("vector")
+                .aHref("<a href=''></a>")
                 .vector(new float[]{3.0f})
                 .tags(Set.of("vector"))
                 .build();
@@ -61,6 +64,7 @@ class VectorRecordMapperTest {
         ResourceVectorRecord result = mapper.toResource(record);
 
         assertEquals(record.title(), result.title());
+        assertEquals("<a href=''></a>", result.aHref());
         assertArrayEquals(record.vector(), result.vector());
         assertEquals(record.tags(), result.tags());
     }
@@ -74,17 +78,19 @@ class VectorRecordMapperTest {
                 .id(id)
                 .parentId(UUID.randomUUID())
                 .title("vector")
+                .aHref("<a href=''></a>")
                 .vector(new float[]{5.0f})
                 .tags(Set.of("vector"))
                 .build();
 
-        VectorRecord entity = mapper.toEntity(resource);
+        VectorRecord result = mapper.toEntity(resource);
 
-        assertEquals(resource.id(), entity.id());
-        assertEquals(resource.title(), entity.baseRecord().title());
-        assertArrayEquals(resource.vector(), entity.vector());
+        assertEquals(resource.id(), result.id());
+        assertEquals(resource.title(), result.baseRecord().title());
+        assertEquals("<a href=''></a>", result.baseRecord().aHref());
+        assertArrayEquals(resource.vector(), result.vector());
 
-        assertNotNull(entity.baseRecord());
-        assertEquals(resource.parentId(), entity.baseRecord().parentId());
+        assertNotNull(result.baseRecord());
+        assertEquals(resource.parentId(), result.baseRecord().parentId());
     }
 }

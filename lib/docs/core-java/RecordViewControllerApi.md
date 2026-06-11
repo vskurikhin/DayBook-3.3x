@@ -1,6 +1,6 @@
 # RecordViewControllerApi
 
-All URIs are relative to *http://localhost:8081*
+All URIs are relative to *http://localhost:8082*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
@@ -25,7 +25,7 @@ import su.svn.lib.core.api.RecordViewControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     RecordViewControllerApi apiInstance = new RecordViewControllerApi(defaultClient);
     ResourceRecordViewFilter filter = new ResourceRecordViewFilter(); // ResourceRecordViewFilter | 
@@ -67,8 +67,8 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 

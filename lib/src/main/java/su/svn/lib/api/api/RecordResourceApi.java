@@ -146,7 +146,7 @@ public class RecordResourceApi {
     }
 
     /**
-     * Get page with list of JSON record
+     * Get page with list of records
      * 
      * @param page  (optional)
      * @param size  (optional)
@@ -166,7 +166,7 @@ public class RecordResourceApi {
     }
 
     /**
-     * Get page with list of JSON record
+     * Get page with list of records
      * 
      * @param page  (optional)
      * @param size  (optional)
@@ -187,7 +187,7 @@ public class RecordResourceApi {
     }
 
     /**
-     * Get page with list of JSON record (asynchronously)
+     * Get page with list of records (asynchronously)
      * 
      * @param page  (optional)
      * @param size  (optional)

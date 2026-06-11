@@ -12,6 +12,7 @@
 |**flags** | **Integer** |  |  [optional] |
 |**parentId** | **UUID** |  |  [optional] |
 |**title** | **String** |  |  [optional] |
+|**aHref** | **String** |  |  [optional] |
 |**blob** | **byte[]** |  |  [optional] |
 |**postAt** | **OffsetDateTime** |  |  [optional] |
 |**refreshAt** | **OffsetDateTime** |  |  [optional] |

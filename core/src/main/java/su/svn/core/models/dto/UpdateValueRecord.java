@@ -27,6 +27,7 @@ public record UpdateValueRecord(
         @JsonProperty String title,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty String value,
+        @JsonProperty String aHref,
         @JsonProperty OffsetDateTime postAt,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty OffsetDateTime refreshAt,

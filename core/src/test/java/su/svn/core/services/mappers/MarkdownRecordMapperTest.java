@@ -34,6 +34,7 @@ class MarkdownRecordMapperTest {
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
                 .title("title")
+                .aHref("<a href=''></a>")
                 .build();
 
         TextRecord entity = TextRecord.builder()
@@ -50,6 +51,7 @@ class MarkdownRecordMapperTest {
 
         assertEquals(entity.id(), result.id());
         assertEquals(entity.baseRecord().title(), result.title());
+        assertEquals(entity.baseRecord().aHref(), result.aHref());
         assertEquals(entity.value(), result.markdown());
         assertEquals(entity.visible(), result.visible());
     }
@@ -59,12 +61,14 @@ class MarkdownRecordMapperTest {
         NewMarkdownRecord dto = NewMarkdownRecord.builder()
                 .title("title")
                 .markdown("# text")
+                .aHref("<a href=''></a>")
                 .tags(Set.of("one"))
                 .build();
 
         ResourceMarkdownRecord result = mapper.toResource(dto);
 
         assertEquals("title", result.title());
+        assertEquals("<a href=''></a>", result.aHref());
         assertEquals("# text", result.markdown());
         assertEquals(Set.of("one"), result.tags());
     }
@@ -76,6 +80,7 @@ class MarkdownRecordMapperTest {
         UpdateMarkdownRecord dto = UpdateMarkdownRecord.builder()
                 .id(id)
                 .title("updated")
+                .aHref("<a href='updated'></a>")
                 .markdown("content")
                 .build();
 
@@ -83,6 +88,7 @@ class MarkdownRecordMapperTest {
 
         assertEquals(id, result.id());
         assertEquals("updated", result.title());
+        assertEquals("<a href='updated'></a>", result.aHref());
         assertEquals("content", result.markdown());
     }
 
@@ -93,6 +99,7 @@ class MarkdownRecordMapperTest {
         ResourceMarkdownRecord dto = ResourceMarkdownRecord.builder()
                 .id(id)
                 .title("title")
+                .aHref("<a href=''></a>")
                 .markdown("# markdown")
                 .visible(true)
                 .flags(10)
@@ -102,6 +109,7 @@ class MarkdownRecordMapperTest {
 
         assertEquals(id, result.id());
         assertEquals("title", result.baseRecord().title());
+        assertEquals("<a href=''></a>", result.baseRecord().aHref());
         assertEquals("# markdown", result.value());
         assertTrue(result.visible());
         assertEquals(10, result.flags());

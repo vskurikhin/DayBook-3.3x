@@ -10,6 +10,7 @@
 |**id** | **UUID** |  |  |
 |**parentId** | **UUID** |  |  |
 |**title** | **String** |  |  [optional] |
+|**aHref** | **String** |  |  [optional] |
 |**blob** | **String** |  |  [optional] |
 |**postAt** | **OffsetDateTime** |  |  [optional] |
 |**refreshAt** | **OffsetDateTime** |  |  |

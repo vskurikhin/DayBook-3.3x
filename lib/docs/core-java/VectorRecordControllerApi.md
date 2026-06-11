@@ -1,6 +1,6 @@
 # VectorRecordControllerApi
 
-All URIs are relative to *http://localhost:8081*
+All URIs are relative to *http://localhost:8082*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
@@ -28,7 +28,7 @@ import su.svn.lib.core.api.VectorRecordControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     VectorRecordControllerApi apiInstance = new VectorRecordControllerApi(defaultClient);
     NewVectorRecord newVectorRecord = new NewVectorRecord(); // NewVectorRecord | 
@@ -68,9 +68,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="deleteVectorRecord"></a>
@@ -91,7 +91,7 @@ import su.svn.lib.core.api.VectorRecordControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     VectorRecordControllerApi apiInstance = new VectorRecordControllerApi(defaultClient);
     UUID id = UUID.randomUUID(); // UUID | 
@@ -130,9 +130,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="readVectorRecord"></a>
@@ -153,7 +153,7 @@ import su.svn.lib.core.api.VectorRecordControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     VectorRecordControllerApi apiInstance = new VectorRecordControllerApi(defaultClient);
     UUID id = UUID.randomUUID(); // UUID | 
@@ -193,9 +193,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="updateVectorRecord"></a>
@@ -216,7 +216,7 @@ import su.svn.lib.core.api.VectorRecordControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     VectorRecordControllerApi apiInstance = new VectorRecordControllerApi(defaultClient);
     UpdateVectorRecord updateVectorRecord = new UpdateVectorRecord(); // UpdateVectorRecord | 
@@ -256,8 +256,8 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 

@@ -25,6 +25,7 @@ public record ResourceVectorRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty float[] vector,
         @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,

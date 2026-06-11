@@ -35,6 +35,7 @@ class LinkRecordMapperTest {
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
                 .title("title")
+                .aHref("<a href=''></a>")
                 .build();
 
         TextRecord entity = TextRecord.builder()
@@ -51,6 +52,7 @@ class LinkRecordMapperTest {
 
         assertEquals(entity.id(), result.id());
         assertEquals(entity.baseRecord().title(), result.title());
+        assertEquals(entity.baseRecord().aHref(), result.aHref());
         assertEquals(entity.value(), result.link());
         assertEquals(entity.visible(), result.visible());
     }
@@ -59,6 +61,7 @@ class LinkRecordMapperTest {
     void shouldMapNewRecordToResource() {
         NewLinkRecord dto = NewLinkRecord.builder()
                 .title("title")
+                .aHref("<a href=''></a>")
                 .link("# text")
                 .tags(Set.of("one"))
                 .build();
@@ -66,6 +69,7 @@ class LinkRecordMapperTest {
         ResourceLinkRecord result = mapper.toResource(dto);
 
         assertEquals("title", result.title());
+        assertEquals("<a href=''></a>", result.aHref());
         assertEquals("# text", result.link());
         assertEquals(Set.of("one"), result.tags());
     }
@@ -77,6 +81,7 @@ class LinkRecordMapperTest {
         UpdateLinkRecord dto = UpdateLinkRecord.builder()
                 .id(id)
                 .title("updated")
+                .aHref("<a href='updated'></a>")
                 .link("content")
                 .build();
 
@@ -84,6 +89,7 @@ class LinkRecordMapperTest {
 
         assertEquals(id, result.id());
         assertEquals("updated", result.title());
+        assertEquals("<a href='updated'></a>", result.aHref());
         assertEquals("content", result.link());
     }
 
@@ -94,6 +100,7 @@ class LinkRecordMapperTest {
         ResourceLinkRecord dto = ResourceLinkRecord.builder()
                 .id(id)
                 .title("title")
+                .aHref("<a href=''></a>")
                 .link("# link")
                 .visible(true)
                 .flags(10)
@@ -103,6 +110,7 @@ class LinkRecordMapperTest {
 
         assertEquals(id, result.id());
         assertEquals("title", result.baseRecord().title());
+        assertEquals("<a href=''></a>", result.baseRecord().aHref());
         assertEquals("# link", result.value());
         assertTrue(result.visible());
         assertEquals(10, result.flags());

@@ -52,7 +52,7 @@ import su.svn.lib.core.JSON;
 /**
  * NewBlobRecord
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T10:23:02.479693+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-06-11T14:08:32.067798+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class NewBlobRecord {
   public static final String SERIALIZED_NAME_VISIBLE = "visible";
   @SerializedName(SERIALIZED_NAME_VISIBLE)
@@ -73,6 +73,11 @@ public class NewBlobRecord {
   @SerializedName(SERIALIZED_NAME_TITLE)
   @jakarta.annotation.Nullable
   private String title;
+
+  public static final String SERIALIZED_NAME_A_HREF = "aHref";
+  @SerializedName(SERIALIZED_NAME_A_HREF)
+  @jakarta.annotation.Nullable
+  private String aHref;
 
   public static final String SERIALIZED_NAME_BLOB = "blob";
   @SerializedName(SERIALIZED_NAME_BLOB)
@@ -168,6 +173,25 @@ public class NewBlobRecord {
   }
 
 
+  public NewBlobRecord aHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
+    return this;
+  }
+
+  /**
+   * Get aHref
+   * @return aHref
+   */
+  @jakarta.annotation.Nullable
+  public String getaHref() {
+    return aHref;
+  }
+
+  public void setaHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
+  }
+
+
   public NewBlobRecord blob(@jakarta.annotation.Nullable byte[] blob) {
     this.blob = blob;
     return this;
@@ -247,6 +271,7 @@ public class NewBlobRecord {
         Objects.equals(this.flags, newBlobRecord.flags) &&
         Objects.equals(this.parentId, newBlobRecord.parentId) &&
         Objects.equals(this.title, newBlobRecord.title) &&
+        Objects.equals(this.aHref, newBlobRecord.aHref) &&
         Arrays.equals(this.blob, newBlobRecord.blob) &&
         Objects.equals(this.postAt, newBlobRecord.postAt) &&
         Objects.equals(this.tags, newBlobRecord.tags);
@@ -254,7 +279,7 @@ public class NewBlobRecord {
 
   @Override
   public int hashCode() {
-    return Objects.hash(visible, flags, parentId, title, Arrays.hashCode(blob), postAt, tags);
+    return Objects.hash(visible, flags, parentId, title, aHref, Arrays.hashCode(blob), postAt, tags);
   }
 
   @Override
@@ -265,6 +290,7 @@ public class NewBlobRecord {
     sb.append("    flags: ").append(toIndentedString(flags)).append("\n");
     sb.append("    parentId: ").append(toIndentedString(parentId)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
+    sb.append("    aHref: ").append(toIndentedString(aHref)).append("\n");
     sb.append("    blob: ").append(toIndentedString(blob)).append("\n");
     sb.append("    postAt: ").append(toIndentedString(postAt)).append("\n");
     sb.append("    tags: ").append(toIndentedString(tags)).append("\n");
@@ -286,7 +312,7 @@ public class NewBlobRecord {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("visible", "flags", "parentId", "title", "blob", "postAt", "tags"));
+    openapiFields = new HashSet<String>(Arrays.asList("visible", "flags", "parentId", "title", "aHref", "blob", "postAt", "tags"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(Arrays.asList("parentId", "postAt"));
@@ -325,6 +351,9 @@ public class NewBlobRecord {
       }
       if ((jsonObj.get("title") != null && !jsonObj.get("title").isJsonNull()) && !jsonObj.get("title").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `title` to be a primitive type in the JSON string but got `%s`", jsonObj.get("title").toString()));
+      }
+      if ((jsonObj.get("aHref") != null && !jsonObj.get("aHref").isJsonNull()) && !jsonObj.get("aHref").isJsonPrimitive()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `aHref` to be a primitive type in the JSON string but got `%s`", jsonObj.get("aHref").toString()));
       }
       // ensure the optional json data is an array if present
       if (jsonObj.get("tags") != null && !jsonObj.get("tags").isJsonNull() && !jsonObj.get("tags").isJsonArray()) {

@@ -27,6 +27,7 @@ public record UpdateJsonRecord(
         @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty Map<String, String> json,
         @JsonProperty OffsetDateTime postAt,

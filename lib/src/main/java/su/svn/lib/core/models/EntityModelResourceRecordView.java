@@ -57,7 +57,7 @@ import su.svn.lib.core.JSON;
 /**
  * EntityModelResourceRecordView
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T10:23:02.479693+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-06-11T14:08:32.067798+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class EntityModelResourceRecordView {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
@@ -170,6 +170,11 @@ public class EntityModelResourceRecordView {
   @SerializedName(SERIALIZED_NAME_TITLE)
   @jakarta.annotation.Nullable
   private String title;
+
+  public static final String SERIALIZED_NAME_A_HREF = "aHref";
+  @SerializedName(SERIALIZED_NAME_A_HREF)
+  @jakarta.annotation.Nullable
+  private String aHref;
 
   public static final String SERIALIZED_NAME_BLOB = "blob";
   @SerializedName(SERIALIZED_NAME_BLOB)
@@ -421,6 +426,25 @@ public class EntityModelResourceRecordView {
 
   public void setTitle(@jakarta.annotation.Nullable String title) {
     this.title = title;
+  }
+
+
+  public EntityModelResourceRecordView aHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
+    return this;
+  }
+
+  /**
+   * Get aHref
+   * @return aHref
+   */
+  @jakarta.annotation.Nullable
+  public String getaHref() {
+    return aHref;
+  }
+
+  public void setaHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
   }
 
 
@@ -712,6 +736,7 @@ public class EntityModelResourceRecordView {
         Objects.equals(this.refreshAt, entityModelResourceRecordView.refreshAt) &&
         Objects.equals(this.lastChangedTime, entityModelResourceRecordView.lastChangedTime) &&
         Objects.equals(this.title, entityModelResourceRecordView.title) &&
+        Objects.equals(this.aHref, entityModelResourceRecordView.aHref) &&
         Arrays.equals(this.blob, entityModelResourceRecordView.blob) &&
         Objects.equals(this.json, entityModelResourceRecordView.json) &&
         Objects.equals(this.texts, entityModelResourceRecordView.texts) &&
@@ -728,7 +753,7 @@ public class EntityModelResourceRecordView {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, visible, flags, parentId, type, userName, postAt, refreshAt, lastChangedTime, title, Arrays.hashCode(blob), json, texts, fileName, html, link, markdown, value, vector, xml, tags, links);
+    return Objects.hash(id, visible, flags, parentId, type, userName, postAt, refreshAt, lastChangedTime, title, aHref, Arrays.hashCode(blob), json, texts, fileName, html, link, markdown, value, vector, xml, tags, links);
   }
 
   @Override
@@ -745,6 +770,7 @@ public class EntityModelResourceRecordView {
     sb.append("    refreshAt: ").append(toIndentedString(refreshAt)).append("\n");
     sb.append("    lastChangedTime: ").append(toIndentedString(lastChangedTime)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
+    sb.append("    aHref: ").append(toIndentedString(aHref)).append("\n");
     sb.append("    blob: ").append(toIndentedString(blob)).append("\n");
     sb.append("    json: ").append(toIndentedString(json)).append("\n");
     sb.append("    texts: ").append(toIndentedString(texts)).append("\n");
@@ -775,7 +801,7 @@ public class EntityModelResourceRecordView {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "type", "userName", "postAt", "refreshAt", "lastChangedTime", "title", "blob", "json", "texts", "fileName", "html", "link", "markdown", "value", "vector", "xml", "tags", "_links"));
+    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "type", "userName", "postAt", "refreshAt", "lastChangedTime", "title", "aHref", "blob", "json", "texts", "fileName", "html", "link", "markdown", "value", "vector", "xml", "tags", "_links"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);
@@ -820,6 +846,9 @@ public class EntityModelResourceRecordView {
       }
       if ((jsonObj.get("title") != null && !jsonObj.get("title").isJsonNull()) && !jsonObj.get("title").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `title` to be a primitive type in the JSON string but got `%s`", jsonObj.get("title").toString()));
+      }
+      if ((jsonObj.get("aHref") != null && !jsonObj.get("aHref").isJsonNull()) && !jsonObj.get("aHref").isJsonPrimitive()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `aHref` to be a primitive type in the JSON string but got `%s`", jsonObj.get("aHref").toString()));
       }
       // ensure the optional json data is an array if present
       if (jsonObj.get("texts") != null && !jsonObj.get("texts").isJsonNull() && !jsonObj.get("texts").isJsonArray()) {

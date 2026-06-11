@@ -43,6 +43,7 @@ public record ResourceXmlRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty String xml,
         @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,

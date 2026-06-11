@@ -52,7 +52,7 @@ import su.svn.lib.api.JSON;
 /**
  * ResourceXmlRecord
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T22:07:32.679465+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-06-11T14:08:39.546047+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class ResourceXmlRecord {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
@@ -78,6 +78,11 @@ public class ResourceXmlRecord {
   @SerializedName(SERIALIZED_NAME_TITLE)
   @jakarta.annotation.Nullable
   private String title;
+
+  public static final String SERIALIZED_NAME_A_HREF = "aHref";
+  @SerializedName(SERIALIZED_NAME_A_HREF)
+  @jakarta.annotation.Nullable
+  private String aHref;
 
   public static final String SERIALIZED_NAME_XML = "xml";
   @SerializedName(SERIALIZED_NAME_XML)
@@ -197,6 +202,25 @@ public class ResourceXmlRecord {
   }
 
 
+  public ResourceXmlRecord aHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
+    return this;
+  }
+
+  /**
+   * Get aHref
+   * @return aHref
+   */
+  @jakarta.annotation.Nullable
+  public String getaHref() {
+    return aHref;
+  }
+
+  public void setaHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
+  }
+
+
   public ResourceXmlRecord xml(@jakarta.annotation.Nullable String xml) {
     this.xml = xml;
     return this;
@@ -296,6 +320,7 @@ public class ResourceXmlRecord {
         Objects.equals(this.flags, resourceXmlRecord.flags) &&
         Objects.equals(this.parentId, resourceXmlRecord.parentId) &&
         Objects.equals(this.title, resourceXmlRecord.title) &&
+        Objects.equals(this.aHref, resourceXmlRecord.aHref) &&
         Objects.equals(this.xml, resourceXmlRecord.xml) &&
         Objects.equals(this.postAt, resourceXmlRecord.postAt) &&
         Objects.equals(this.refreshAt, resourceXmlRecord.refreshAt) &&
@@ -304,7 +329,7 @@ public class ResourceXmlRecord {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, visible, flags, parentId, title, xml, postAt, refreshAt, tags);
+    return Objects.hash(id, visible, flags, parentId, title, aHref, xml, postAt, refreshAt, tags);
   }
 
   @Override
@@ -316,6 +341,7 @@ public class ResourceXmlRecord {
     sb.append("    flags: ").append(toIndentedString(flags)).append("\n");
     sb.append("    parentId: ").append(toIndentedString(parentId)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
+    sb.append("    aHref: ").append(toIndentedString(aHref)).append("\n");
     sb.append("    xml: ").append(toIndentedString(xml)).append("\n");
     sb.append("    postAt: ").append(toIndentedString(postAt)).append("\n");
     sb.append("    refreshAt: ").append(toIndentedString(refreshAt)).append("\n");
@@ -338,7 +364,7 @@ public class ResourceXmlRecord {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "title", "xml", "postAt", "refreshAt", "tags"));
+    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "title", "aHref", "xml", "postAt", "refreshAt", "tags"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);
@@ -373,6 +399,9 @@ public class ResourceXmlRecord {
       }
       if ((jsonObj.get("title") != null && !jsonObj.get("title").isJsonNull()) && !jsonObj.get("title").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `title` to be a primitive type in the JSON string but got `%s`", jsonObj.get("title").toString()));
+      }
+      if ((jsonObj.get("aHref") != null && !jsonObj.get("aHref").isJsonNull()) && !jsonObj.get("aHref").isJsonPrimitive()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `aHref` to be a primitive type in the JSON string but got `%s`", jsonObj.get("aHref").toString()));
       }
       if ((jsonObj.get("xml") != null && !jsonObj.get("xml").isJsonNull()) && !jsonObj.get("xml").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `xml` to be a primitive type in the JSON string but got `%s`", jsonObj.get("xml").toString()));

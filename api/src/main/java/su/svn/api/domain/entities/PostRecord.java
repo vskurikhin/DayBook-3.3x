@@ -292,6 +292,9 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     @Column(name = "title", columnDefinition = "TEXT")
     String title;
 
+    @Column(name = "ahref", columnDefinition = "TEXT")
+    String aHref;
+
     /**
      * Binary content.
      */

@@ -98,6 +98,9 @@ public class BaseRecord {
     @Column(name = "title")
     String title;
 
+    @Column(name = "ahref")
+    String aHref;
+
     @ManyToMany
     @JoinTable(
             schema = "core",

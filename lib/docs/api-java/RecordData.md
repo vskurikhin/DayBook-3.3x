@@ -15,6 +15,7 @@
 |**visible** | **Boolean** |  |  [optional] |
 |**flags** | **Integer** |  |  [optional] |
 |**title** | **String** |  |  [optional] |
+|**aHref** | **String** |  |  [optional] |
 |**blob** | **String** |  |  [optional] |
 |**json** | **Map&lt;String, String&gt;** |  |  [optional] |
 |**texts** | **Set&lt;String&gt;** |  |  [optional] |

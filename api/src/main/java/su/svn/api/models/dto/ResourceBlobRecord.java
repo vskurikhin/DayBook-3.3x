@@ -25,6 +25,7 @@ public record ResourceBlobRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty byte[] blob,
         @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,

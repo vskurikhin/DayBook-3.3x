@@ -11,6 +11,7 @@
 |**flags** | **Integer** |  |  [optional] |
 |**parentId** | **UUID** |  |  [optional] |
 |**title** | **String** |  |  [optional] |
+|**aHref** | **String** |  |  [optional] |
 |**vector** | **List&lt;Float&gt;** |  |  |
 |**postAt** | **OffsetDateTime** |  |  |
 |**tags** | **Set&lt;String&gt;** |  |  [optional] |

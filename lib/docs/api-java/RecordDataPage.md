@@ -11,6 +11,7 @@
 |**pageCount** | **Long** |  |  [optional] |
 |**pageIndex** | **Long** |  |  [optional] |
 |**pageSize** | **Long** |  |  [optional] |
+|**totalRecords** | **Long** |  |  [optional] |
 
 
 

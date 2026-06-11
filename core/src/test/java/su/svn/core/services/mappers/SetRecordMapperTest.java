@@ -32,6 +32,7 @@ class SetRecordMapperTest {
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
                 .title("title")
+                .aHref("<a href=''></a>")
                 .build();
 
         SetRecord entity = SetRecord.builder()
@@ -46,6 +47,7 @@ class SetRecordMapperTest {
         assertNotNull(result);
         assertEquals(entity.id(), result.id());
         assertEquals(entity.baseRecord().title(), result.title());
+        assertEquals(entity.baseRecord().aHref(), result.aHref());
         assertEquals(entity.texts(), result.texts());
     }
 
@@ -53,6 +55,7 @@ class SetRecordMapperTest {
     void shouldMapNewRecordToResource() {
         NewSetRecord dto = NewSetRecord.builder()
                 .title("title")
+                .aHref("<a href=''></a>")
                 .texts(Set.of("one"))
                 .tags(Set.of("tag"))
                 .build();
@@ -61,6 +64,7 @@ class SetRecordMapperTest {
 
         assertNotNull(result);
         assertEquals(dto.title(), result.title());
+        assertEquals("<a href=''></a>", result.aHref());
         assertEquals(dto.texts(), result.texts());
     }
 
@@ -71,6 +75,7 @@ class SetRecordMapperTest {
         UpdateSetRecord dto = UpdateSetRecord.builder()
                 .id(id)
                 .title("updated")
+                .aHref("<a href='updated'></a>")
                 .texts(Set.of("value"))
                 .build();
 
@@ -79,6 +84,7 @@ class SetRecordMapperTest {
         assertNotNull(result);
         assertEquals(id, result.id());
         assertEquals("updated", result.title());
+        assertEquals("<a href='updated'></a>", result.aHref());
     }
 
     @Test
@@ -89,6 +95,7 @@ class SetRecordMapperTest {
                 .id(id)
                 .parentId(UUID.randomUUID())
                 .title("resource")
+                .aHref("<a href=''></a>")
                 .texts(Set.of("a"))
                 .tags(Set.of("tag"))
                 .build();
@@ -98,6 +105,7 @@ class SetRecordMapperTest {
         assertNotNull(result);
         assertEquals(dto.id(), result.id());
         assertEquals(dto.title(), result.baseRecord().title());
+        assertEquals("<a href=''></a>", result.baseRecord().aHref());
         assertEquals(dto.texts(), result.texts());
     }
 }

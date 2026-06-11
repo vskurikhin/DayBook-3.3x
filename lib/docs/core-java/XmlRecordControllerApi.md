@@ -1,6 +1,6 @@
 # XmlRecordControllerApi
 
-All URIs are relative to *http://localhost:8081*
+All URIs are relative to *http://localhost:8082*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
@@ -28,7 +28,7 @@ import su.svn.lib.core.api.XmlRecordControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     XmlRecordControllerApi apiInstance = new XmlRecordControllerApi(defaultClient);
     NewXmlRecord newXmlRecord = new NewXmlRecord(); // NewXmlRecord | 
@@ -68,9 +68,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="deleteXmlRecord"></a>
@@ -91,7 +91,7 @@ import su.svn.lib.core.api.XmlRecordControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     XmlRecordControllerApi apiInstance = new XmlRecordControllerApi(defaultClient);
     UUID id = UUID.randomUUID(); // UUID | 
@@ -130,9 +130,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="readXmlRecord"></a>
@@ -153,7 +153,7 @@ import su.svn.lib.core.api.XmlRecordControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     XmlRecordControllerApi apiInstance = new XmlRecordControllerApi(defaultClient);
     UUID id = UUID.randomUUID(); // UUID | 
@@ -193,9 +193,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="updateXmlRecord"></a>
@@ -216,7 +216,7 @@ import su.svn.lib.core.api.XmlRecordControllerApi;
 public class Example {
   public static void main(String[] args) {
     ApiClient defaultClient = Configuration.getDefaultApiClient();
-    defaultClient.setBasePath("http://localhost:8081");
+    defaultClient.setBasePath("http://localhost:8082");
 
     XmlRecordControllerApi apiInstance = new XmlRecordControllerApi(defaultClient);
     UpdateXmlRecord updateXmlRecord = new UpdateXmlRecord(); // UpdateXmlRecord | 
@@ -256,8 +256,8 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
+| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 

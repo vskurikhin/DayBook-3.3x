@@ -30,6 +30,8 @@ public record UpdateBlobRecord(
         @JsonProperty UUID parentId,
         @Size(max = 4096, message = "Title must be at most 4096 characters")
         @JsonProperty String title,
+        @Size(max = 4096, message = "a-href must be at most 4096 characters")
+        @JsonProperty String aHref,
         @JsonProperty byte[] blob,
         @JsonProperty OffsetDateTime postAt,
         @NotNull(message = "Refresh at is required")

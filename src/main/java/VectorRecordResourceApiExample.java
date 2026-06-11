@@ -83,6 +83,7 @@ public class VectorRecordResourceApiExample {
         updateRecord.id(resourceRecord.getId());
         updateRecord.parentId(resourceRecord.getParentId());
         updateRecord.title("updated");
+        updateRecord.setaHref("<a href='/'>updated</a>");
         updateRecord.vector(resourceRecord.getVector());
         updateRecord.refreshAt(OffsetDateTime.now());
         try {

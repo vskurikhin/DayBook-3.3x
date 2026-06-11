@@ -36,6 +36,7 @@ public record ResourceRecordView(
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty byte[] blob,
         @JsonProperty Map<String, String> json,
         @JsonProperty Set<String> texts,

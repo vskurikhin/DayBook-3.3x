@@ -50,6 +50,7 @@ public record ResourceXmlRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty String xml,
         @JsonIgnore String userName,

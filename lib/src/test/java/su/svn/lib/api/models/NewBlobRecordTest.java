@@ -74,6 +74,14 @@ public class NewBlobRecordTest {
     }
 
     /**
+     * Test the property 'aHref'
+     */
+    @Test
+    public void aHrefTest() {
+        // TODO: test aHref
+    }
+
+    /**
      * Test the property 'blob'
      */
     @Test

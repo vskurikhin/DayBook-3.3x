@@ -74,6 +74,14 @@ public class NewValueRecordTest {
     }
 
     /**
+     * Test the property 'aHref'
+     */
+    @Test
+    public void aHrefTest() {
+        // TODO: test aHref
+    }
+
+    /**
      * Test the property 'value'
      */
     @Test

@@ -79,6 +79,7 @@ public class ValueRecordResourceApiExample {
         updateRecord.id(resourceRecord.getId());
         updateRecord.parentId(resourceRecord.getParentId());
         updateRecord.title("updated");
+        updateRecord.setaHref("<a href='/'>updated</a>");
         updateRecord.value("value updated");
         updateRecord.refreshAt(OffsetDateTime.now());
         try {

@@ -79,6 +79,7 @@ public class MarkdownRecordResourceApiExample {
         updateRecord.id(resourceRecord.getId());
         updateRecord.parentId(resourceRecord.getParentId());
         updateRecord.title("updated");
+        updateRecord.setaHref("<a href='/'>updated</a>");
         updateRecord.markdown(resourceRecord.getMarkdown() + " updated");
         updateRecord.refreshAt(OffsetDateTime.now());
         try {

@@ -11,6 +11,7 @@
 |**parentId** | **UUID** |  |  |
 |**title** | **String** |  |  [optional] |
 |**value** | **String** |  |  |
+|**aHref** | **String** |  |  [optional] |
 |**postAt** | **OffsetDateTime** |  |  [optional] |
 |**refreshAt** | **OffsetDateTime** |  |  |
 |**visible** | **Boolean** |  |  [optional] |

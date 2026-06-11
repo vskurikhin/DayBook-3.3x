@@ -61,10 +61,10 @@ import su.svn.lib.core.auth.ApiKeyAuth;
  */
 public class ApiClient {
 
-    protected String basePath = "http://localhost:8081";
+    protected String basePath = "http://localhost:8082";
     protected List<ServerConfiguration> servers = new ArrayList<ServerConfiguration>(Arrays.asList(
     new ServerConfiguration(
-      "http://localhost:8081",
+      "http://localhost:8082",
       "Generated server url",
       new HashMap<String, ServerVariable>()
     )
@@ -157,7 +157,7 @@ public class ApiClient {
     /**
      * Set base path
      *
-     * @param basePath Base path of the URL (e.g http://localhost:8081)
+     * @param basePath Base path of the URL (e.g http://localhost:8082)
      * @return An instance of ApiClient
      */
     public ApiClient setBasePath(String basePath) {
