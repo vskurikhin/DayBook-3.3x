@@ -17,6 +17,7 @@
 |**refreshAt** | **OffsetDateTime** |  |  [optional] |
 |**lastChangedTime** | **OffsetDateTime** |  |  [optional] |
 |**title** | **String** |  |  [optional] |
+|**aHref** | **String** |  |  [optional] |
 |**blob** | **byte[]** |  |  [optional] |
 |**json** | **Map&lt;String, String&gt;** |  |  [optional] |
 |**texts** | **Set&lt;String&gt;** |  |  [optional] |

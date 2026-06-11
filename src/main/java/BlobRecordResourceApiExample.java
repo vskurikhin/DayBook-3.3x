@@ -79,6 +79,7 @@ public class BlobRecordResourceApiExample {
         updateRecord.id(resourceRecord.getId());
         updateRecord.parentId(resourceRecord.getParentId());
         updateRecord.title("updated");
+        updateRecord.setaHref("<a href='/'>updated</a>");
         updateRecord.blob(resourceRecord.getBlob());
         updateRecord.refreshAt(OffsetDateTime.now());
         try {

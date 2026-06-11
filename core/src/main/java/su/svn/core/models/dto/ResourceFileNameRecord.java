@@ -25,6 +25,7 @@ public record ResourceFileNameRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty String fileName,
         @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,

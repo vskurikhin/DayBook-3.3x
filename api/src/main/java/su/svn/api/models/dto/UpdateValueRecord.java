@@ -48,6 +48,8 @@ public record UpdateValueRecord(
         @JsonProperty UUID parentId,
         @Size(max = 4096, message = "Title must be at most 4096 characters")
         @JsonProperty String title,
+        @Size(max = 4096, message = "a-href must be at most 4096 characters")
+        @JsonProperty String aHref,
         @NotNull(message = "Value is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @Size(max = 4096, message = "Value must be at most 255 characters")

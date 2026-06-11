@@ -42,6 +42,7 @@ public record UpdateXmlRecord(
         @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty String xml,
         @JsonProperty OffsetDateTime postAt,

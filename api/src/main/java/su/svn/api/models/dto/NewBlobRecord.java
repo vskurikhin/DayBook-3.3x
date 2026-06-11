@@ -27,6 +27,8 @@ public record NewBlobRecord(
         @JsonProperty UUID parentId,
         @Size(max = 4096, message = "Title must be at most 4096 characters")
         @JsonProperty String title,
+        @Size(max = 4096, message = "a-href must be at most 4096 characters")
+        @JsonProperty String aHref,
         @NotNull(message = "blob at is required")
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty byte[] blob,

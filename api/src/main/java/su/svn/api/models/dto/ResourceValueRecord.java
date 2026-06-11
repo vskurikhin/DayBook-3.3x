@@ -44,6 +44,7 @@ public record ResourceValueRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty String value,
         @JsonIgnore String userName,

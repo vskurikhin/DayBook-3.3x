@@ -52,7 +52,7 @@ import su.svn.lib.api.JSON;
 /**
  * NewMarkdownRecord
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T22:07:32.679465+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-06-11T14:08:39.546047+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class NewMarkdownRecord {
   public static final String SERIALIZED_NAME_VISIBLE = "visible";
   @SerializedName(SERIALIZED_NAME_VISIBLE)
@@ -73,6 +73,11 @@ public class NewMarkdownRecord {
   @SerializedName(SERIALIZED_NAME_TITLE)
   @jakarta.annotation.Nullable
   private String title;
+
+  public static final String SERIALIZED_NAME_A_HREF = "aHref";
+  @SerializedName(SERIALIZED_NAME_A_HREF)
+  @jakarta.annotation.Nullable
+  private String aHref;
 
   public static final String SERIALIZED_NAME_MARKDOWN = "markdown";
   @SerializedName(SERIALIZED_NAME_MARKDOWN)
@@ -168,6 +173,25 @@ public class NewMarkdownRecord {
   }
 
 
+  public NewMarkdownRecord aHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
+    return this;
+  }
+
+  /**
+   * Get aHref
+   * @return aHref
+   */
+  @jakarta.annotation.Nullable
+  public String getaHref() {
+    return aHref;
+  }
+
+  public void setaHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
+  }
+
+
   public NewMarkdownRecord markdown(@jakarta.annotation.Nonnull String markdown) {
     this.markdown = markdown;
     return this;
@@ -247,6 +271,7 @@ public class NewMarkdownRecord {
         Objects.equals(this.flags, newMarkdownRecord.flags) &&
         Objects.equals(this.parentId, newMarkdownRecord.parentId) &&
         Objects.equals(this.title, newMarkdownRecord.title) &&
+        Objects.equals(this.aHref, newMarkdownRecord.aHref) &&
         Objects.equals(this.markdown, newMarkdownRecord.markdown) &&
         Objects.equals(this.postAt, newMarkdownRecord.postAt) &&
         Objects.equals(this.tags, newMarkdownRecord.tags);
@@ -254,7 +279,7 @@ public class NewMarkdownRecord {
 
   @Override
   public int hashCode() {
-    return Objects.hash(visible, flags, parentId, title, markdown, postAt, tags);
+    return Objects.hash(visible, flags, parentId, title, aHref, markdown, postAt, tags);
   }
 
   @Override
@@ -265,6 +290,7 @@ public class NewMarkdownRecord {
     sb.append("    flags: ").append(toIndentedString(flags)).append("\n");
     sb.append("    parentId: ").append(toIndentedString(parentId)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
+    sb.append("    aHref: ").append(toIndentedString(aHref)).append("\n");
     sb.append("    markdown: ").append(toIndentedString(markdown)).append("\n");
     sb.append("    postAt: ").append(toIndentedString(postAt)).append("\n");
     sb.append("    tags: ").append(toIndentedString(tags)).append("\n");
@@ -286,7 +312,7 @@ public class NewMarkdownRecord {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("visible", "flags", "parentId", "title", "markdown", "postAt", "tags"));
+    openapiFields = new HashSet<String>(Arrays.asList("visible", "flags", "parentId", "title", "aHref", "markdown", "postAt", "tags"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(Arrays.asList("markdown", "postAt"));
@@ -325,6 +351,9 @@ public class NewMarkdownRecord {
       }
       if ((jsonObj.get("title") != null && !jsonObj.get("title").isJsonNull()) && !jsonObj.get("title").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `title` to be a primitive type in the JSON string but got `%s`", jsonObj.get("title").toString()));
+      }
+      if ((jsonObj.get("aHref") != null && !jsonObj.get("aHref").isJsonNull()) && !jsonObj.get("aHref").isJsonPrimitive()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `aHref` to be a primitive type in the JSON string but got `%s`", jsonObj.get("aHref").toString()));
       }
       if (!jsonObj.get("markdown").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `markdown` to be a primitive type in the JSON string but got `%s`", jsonObj.get("markdown").toString()));

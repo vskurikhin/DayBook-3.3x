@@ -148,6 +148,9 @@ public class RecordView {
     @Column(name = "title")
     String title;
 
+    @Column(name = "ahref")
+    String aHref;
+
     @Column(name = "blob")
     byte[] blob;
 

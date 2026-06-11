@@ -52,7 +52,7 @@ import su.svn.lib.core.JSON;
 /**
  * UpdateValueRecord
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T10:23:02.479693+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-06-11T14:08:32.067798+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class UpdateValueRecord {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
@@ -73,6 +73,11 @@ public class UpdateValueRecord {
   @SerializedName(SERIALIZED_NAME_VALUE)
   @jakarta.annotation.Nonnull
   private String value;
+
+  public static final String SERIALIZED_NAME_A_HREF = "aHref";
+  @SerializedName(SERIALIZED_NAME_A_HREF)
+  @jakarta.annotation.Nullable
+  private String aHref;
 
   public static final String SERIALIZED_NAME_POST_AT = "postAt";
   @SerializedName(SERIALIZED_NAME_POST_AT)
@@ -175,6 +180,25 @@ public class UpdateValueRecord {
 
   public void setValue(@jakarta.annotation.Nonnull String value) {
     this.value = value;
+  }
+
+
+  public UpdateValueRecord aHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
+    return this;
+  }
+
+  /**
+   * Get aHref
+   * @return aHref
+   */
+  @jakarta.annotation.Nullable
+  public String getaHref() {
+    return aHref;
+  }
+
+  public void setaHref(@jakarta.annotation.Nullable String aHref) {
+    this.aHref = aHref;
   }
 
 
@@ -295,6 +319,7 @@ public class UpdateValueRecord {
         Objects.equals(this.parentId, updateValueRecord.parentId) &&
         Objects.equals(this.title, updateValueRecord.title) &&
         Objects.equals(this.value, updateValueRecord.value) &&
+        Objects.equals(this.aHref, updateValueRecord.aHref) &&
         Objects.equals(this.postAt, updateValueRecord.postAt) &&
         Objects.equals(this.refreshAt, updateValueRecord.refreshAt) &&
         Objects.equals(this.visible, updateValueRecord.visible) &&
@@ -304,7 +329,7 @@ public class UpdateValueRecord {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, parentId, title, value, postAt, refreshAt, visible, flags, tags);
+    return Objects.hash(id, parentId, title, value, aHref, postAt, refreshAt, visible, flags, tags);
   }
 
   @Override
@@ -315,6 +340,7 @@ public class UpdateValueRecord {
     sb.append("    parentId: ").append(toIndentedString(parentId)).append("\n");
     sb.append("    title: ").append(toIndentedString(title)).append("\n");
     sb.append("    value: ").append(toIndentedString(value)).append("\n");
+    sb.append("    aHref: ").append(toIndentedString(aHref)).append("\n");
     sb.append("    postAt: ").append(toIndentedString(postAt)).append("\n");
     sb.append("    refreshAt: ").append(toIndentedString(refreshAt)).append("\n");
     sb.append("    visible: ").append(toIndentedString(visible)).append("\n");
@@ -338,7 +364,7 @@ public class UpdateValueRecord {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("id", "parentId", "title", "value", "postAt", "refreshAt", "visible", "flags", "tags"));
+    openapiFields = new HashSet<String>(Arrays.asList("id", "parentId", "title", "value", "aHref", "postAt", "refreshAt", "visible", "flags", "tags"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(Arrays.asList("id", "parentId", "value", "refreshAt"));
@@ -383,6 +409,9 @@ public class UpdateValueRecord {
       }
       if (!jsonObj.get("value").isJsonPrimitive()) {
         throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `value` to be a primitive type in the JSON string but got `%s`", jsonObj.get("value").toString()));
+      }
+      if ((jsonObj.get("aHref") != null && !jsonObj.get("aHref").isJsonNull()) && !jsonObj.get("aHref").isJsonPrimitive()) {
+        throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "Expected the field `aHref` to be a primitive type in the JSON string but got `%s`", jsonObj.get("aHref").toString()));
       }
       // ensure the optional json data is an array if present
       if (jsonObj.get("tags") != null && !jsonObj.get("tags").isJsonNull() && !jsonObj.get("tags").isJsonArray()) {

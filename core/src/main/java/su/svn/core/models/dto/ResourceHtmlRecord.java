@@ -25,6 +25,7 @@ public record ResourceHtmlRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty String html,
         @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,

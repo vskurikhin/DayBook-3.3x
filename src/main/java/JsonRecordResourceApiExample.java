@@ -82,6 +82,7 @@ public class JsonRecordResourceApiExample {
         updateRecord.id(resourceRecord.getId());
         updateRecord.parentId(resourceRecord.getParentId());
         updateRecord.title("updated");
+        updateRecord.setaHref("<a href='/'>updated</a>");
         updateRecord.json(Map.of("json", "updated"));
         updateRecord.refreshAt(OffsetDateTime.now());
         try {

@@ -51,7 +51,7 @@ import su.svn.lib.api.JSON;
 /**
  * RecordDataPage
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-05-26T22:07:32.679465+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-06-11T14:08:39.546047+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class RecordDataPage {
   public static final String SERIALIZED_NAME_LIST = "list";
   @SerializedName(SERIALIZED_NAME_LIST)
@@ -72,6 +72,11 @@ public class RecordDataPage {
   @SerializedName(SERIALIZED_NAME_PAGE_SIZE)
   @jakarta.annotation.Nullable
   private Long pageSize;
+
+  public static final String SERIALIZED_NAME_TOTAL_RECORDS = "totalRecords";
+  @SerializedName(SERIALIZED_NAME_TOTAL_RECORDS)
+  @jakarta.annotation.Nullable
+  private Long totalRecords;
 
   public RecordDataPage() {
   }
@@ -160,6 +165,25 @@ public class RecordDataPage {
   }
 
 
+  public RecordDataPage totalRecords(@jakarta.annotation.Nullable Long totalRecords) {
+    this.totalRecords = totalRecords;
+    return this;
+  }
+
+  /**
+   * Get totalRecords
+   * @return totalRecords
+   */
+  @jakarta.annotation.Nullable
+  public Long getTotalRecords() {
+    return totalRecords;
+  }
+
+  public void setTotalRecords(@jakarta.annotation.Nullable Long totalRecords) {
+    this.totalRecords = totalRecords;
+  }
+
+
 
   @Override
   public boolean equals(Object o) {
@@ -173,12 +197,13 @@ public class RecordDataPage {
     return Objects.equals(this._list, recordDataPage._list) &&
         Objects.equals(this.pageCount, recordDataPage.pageCount) &&
         Objects.equals(this.pageIndex, recordDataPage.pageIndex) &&
-        Objects.equals(this.pageSize, recordDataPage.pageSize);
+        Objects.equals(this.pageSize, recordDataPage.pageSize) &&
+        Objects.equals(this.totalRecords, recordDataPage.totalRecords);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_list, pageCount, pageIndex, pageSize);
+    return Objects.hash(_list, pageCount, pageIndex, pageSize, totalRecords);
   }
 
   @Override
@@ -189,6 +214,7 @@ public class RecordDataPage {
     sb.append("    pageCount: ").append(toIndentedString(pageCount)).append("\n");
     sb.append("    pageIndex: ").append(toIndentedString(pageIndex)).append("\n");
     sb.append("    pageSize: ").append(toIndentedString(pageSize)).append("\n");
+    sb.append("    totalRecords: ").append(toIndentedString(totalRecords)).append("\n");
     sb.append("}");
     return sb.toString();
   }
@@ -207,7 +233,7 @@ public class RecordDataPage {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("list", "pageCount", "pageIndex", "pageSize"));
+    openapiFields = new HashSet<String>(Arrays.asList("list", "pageCount", "pageIndex", "pageSize", "totalRecords"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);

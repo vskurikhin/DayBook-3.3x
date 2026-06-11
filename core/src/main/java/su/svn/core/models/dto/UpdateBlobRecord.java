@@ -25,6 +25,7 @@ public record UpdateBlobRecord(
         @Schema(defaultValue = "00000000-0000-0000-0000-000000000000", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty byte[] blob,
         @JsonProperty OffsetDateTime postAt,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)

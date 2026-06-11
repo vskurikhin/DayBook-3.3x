@@ -74,6 +74,14 @@ public class NewXmlRecordTest {
     }
 
     /**
+     * Test the property 'aHref'
+     */
+    @Test
+    public void aHrefTest() {
+        // TODO: test aHref
+    }
+
+    /**
      * Test the property 'xml'
      */
     @Test

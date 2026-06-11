@@ -32,7 +32,7 @@ public class RecordResourceApiTest {
     private final RecordResourceApi api = new RecordResourceApi();
 
     /**
-     * Get page with list of JSON record
+     * Get page with list of records
      *
      * @throws ApiException if the Api call fails
      */

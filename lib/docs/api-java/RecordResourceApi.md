@@ -4,14 +4,14 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
-| [**apiV2RecordsGet**](RecordResourceApi.md#apiV2RecordsGet) | **GET** /api/v2/records | Get page with list of JSON record |
+| [**apiV2RecordsGet**](RecordResourceApi.md#apiV2RecordsGet) | **GET** /api/v2/records | Get page with list of records |
 
 
 <a id="apiV2RecordsGet"></a>
 # **apiV2RecordsGet**
 > RecordDataPage apiV2RecordsGet(page, size)
 
-Get page with list of JSON record
+Get page with list of records
 
 ### Example
 ```java

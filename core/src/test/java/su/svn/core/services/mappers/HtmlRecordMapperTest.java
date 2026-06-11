@@ -35,6 +35,7 @@ class HtmlRecordMapperTest {
                 .postAt(OffsetDateTime.now())
                 .refreshAt(OffsetDateTime.now())
                 .title("title")
+                .aHref("<a href=''></a>")
                 .build();
 
         TextRecord entity = TextRecord.builder()
@@ -51,6 +52,7 @@ class HtmlRecordMapperTest {
 
         assertEquals(entity.id(), result.id());
         assertEquals(entity.baseRecord().title(), result.title());
+        assertEquals(entity.baseRecord().aHref(), result.aHref());
         assertEquals(entity.value(), result.html());
         assertEquals(entity.visible(), result.visible());
     }
@@ -59,6 +61,7 @@ class HtmlRecordMapperTest {
     void shouldMapNewRecordToResource() {
         NewHtmlRecord dto = NewHtmlRecord.builder()
                 .title("title")
+                .aHref("<a href=''></a>")
                 .html("# text")
                 .tags(Set.of("one"))
                 .build();
@@ -66,6 +69,7 @@ class HtmlRecordMapperTest {
         ResourceHtmlRecord result = mapper.toResource(dto);
 
         assertEquals("title", result.title());
+        assertEquals("<a href=''></a>", result.aHref());
         assertEquals("# text", result.html());
         assertEquals(Set.of("one"), result.tags());
     }
@@ -77,6 +81,7 @@ class HtmlRecordMapperTest {
         UpdateHtmlRecord dto = UpdateHtmlRecord.builder()
                 .id(id)
                 .title("updated")
+                .aHref("<a href='updated'></a>")
                 .html("content")
                 .build();
 
@@ -84,6 +89,7 @@ class HtmlRecordMapperTest {
 
         assertEquals(id, result.id());
         assertEquals("updated", result.title());
+        assertEquals("<a href='updated'></a>", result.aHref());
         assertEquals("content", result.html());
     }
 
@@ -94,6 +100,7 @@ class HtmlRecordMapperTest {
         ResourceHtmlRecord dto = ResourceHtmlRecord.builder()
                 .id(id)
                 .title("title")
+                .aHref("<a href=''></a>")
                 .html("# html")
                 .visible(true)
                 .flags(10)
@@ -103,6 +110,7 @@ class HtmlRecordMapperTest {
 
         assertEquals(id, result.id());
         assertEquals("title", result.baseRecord().title());
+        assertEquals("<a href=''></a>", result.baseRecord().aHref());
         assertEquals("# html", result.value());
         assertTrue(result.visible());
         assertEquals(10, result.flags());

@@ -82,6 +82,14 @@ public class ResourceMarkdownRecordTest {
     }
 
     /**
+     * Test the property 'aHref'
+     */
+    @Test
+    public void aHrefTest() {
+        // TODO: test aHref
+    }
+
+    /**
      * Test the property 'markdown'
      */
     @Test

@@ -48,6 +48,7 @@ public record ResourceVectorRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonProperty float[] vector,
         @JsonIgnore String userName,

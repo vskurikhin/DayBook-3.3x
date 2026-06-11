@@ -33,6 +33,7 @@ public record EntityModelResourceRecordView(
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty LocalDateTime lastChangedTime,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty byte[] blob,
         @JsonProperty Map<String, String> json,
         @JsonProperty Set<String> texts,
@@ -56,7 +57,7 @@ public record EntityModelResourceRecordView(
         this(UUID.randomUUID(), false, 0, new UUID(0, 0), RecordType.Base,
                 null,
                 OffsetDateTime.now(), null, LocalDateTime.now(),
-                null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
                 new HashMap<>()
         );
     }

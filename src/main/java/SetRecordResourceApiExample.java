@@ -82,6 +82,7 @@ public class SetRecordResourceApiExample {
         updateRecord.id(resourceRecord.getId());
         updateRecord.parentId(resourceRecord.getParentId());
         updateRecord.title("updated");
+        updateRecord.setaHref("<a href='/'>updated</a>");
         updateRecord.texts(Set.of("set", "updated"));
         updateRecord.refreshAt(OffsetDateTime.now());
         try {

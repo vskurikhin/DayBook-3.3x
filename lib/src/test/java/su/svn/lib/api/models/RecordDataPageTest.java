@@ -72,4 +72,12 @@ public class RecordDataPageTest {
         // TODO: test pageSize
     }
 
+    /**
+     * Test the property 'totalRecords'
+     */
+    @Test
+    public void totalRecordsTest() {
+        // TODO: test totalRecords
+    }
+
 }

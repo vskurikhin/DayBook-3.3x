@@ -25,6 +25,7 @@ public record ResourceSetRecord(
         @JsonProperty UUID id,
         @JsonProperty UUID parentId,
         @JsonProperty String title,
+        @JsonProperty String aHref,
         @JsonProperty Set<String> texts,
         @JsonIgnore String userName,
         @JsonProperty OffsetDateTime postAt,
