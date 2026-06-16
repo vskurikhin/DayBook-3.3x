@@ -10,11 +10,11 @@
 #
 # Then, build the image with:
 #
-# docker build -f Dockerfile -t quarkus-api .
+# docker build -f Dockerfile -t quarkus/api .
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 8080:8080 quarkus/api
+# docker run -i --rm -p 8081:8081 quarkus/api
 #
 # The `quay.io/quarkus/ubi9-quarkus-micro-image:2.0` base image is based on UBI 9.
 # To use UBI 8, switch to `quay.io/quarkus/quarkus-micro-image:2.0`.
@@ -24,10 +24,10 @@ WORKDIR /work/
 RUN chown 1001 /work \
     && chmod "g+rwX" /work \
     && chown 1001:root /work
-COPY --chown=1001:root --chmod=0755 *-runner /work/application
-COPY --chown=1001:root --chmod=0755 *.properties /work/
+COPY --chown=1001:root build/api-*-runner /work/application
+COPY --chown=1001:root build/resources/main/*.properties /work/
 
-EXPOSE 8080
+EXPOSE 8081
 USER 1001
 
 ENTRYPOINT ["./application", "-Dquarkus.http.host=0.0.0.0"]
