@@ -13,10 +13,10 @@ WORKDIR /app
 RUN mkdir -p /app/config /app/logs
 
 # Copy compiled Spring Boot jar
-COPY core-0.0.1.jar /app/app.jar
+COPY build/libs/core-*.jar /app/app.jar
 
 # Copy Spring configuration
-COPY application.yaml /app/config/application.yaml
+COPY build/resources/main/*.yaml /app/config/
 
 # Spring Boot external configuration
 ENV SPRING_CONFIG_LOCATION=file:/app/config/application.yaml
@@ -25,7 +25,7 @@ ENV SPRING_CONFIG_LOCATION=file:/app/config/application.yaml
 ENV JAVA_OPTS=""
 
 # Application port
-EXPOSE 8081
+EXPOSE 8082
 
 # Optional healthcheck
 #HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

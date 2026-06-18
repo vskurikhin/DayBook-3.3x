@@ -15,7 +15,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy executable binary
-COPY auth-server /app/auth-server
+COPY cmd/server/auth-server /app/auth-server
 
 # Copy configuration file
 COPY .auth-server.yaml /app/.auth-server.yaml
@@ -24,7 +24,7 @@ COPY .auth-server.yaml /app/.auth-server.yaml
 RUN chmod +x /app/auth-server
 
 # Expose application port (change if needed)
-EXPOSE 8080
+EXPOSE 8089
 
 # Start application
 ENTRYPOINT ["/app/auth-server", "run", "--config", "/app/.auth-server.yaml"]
