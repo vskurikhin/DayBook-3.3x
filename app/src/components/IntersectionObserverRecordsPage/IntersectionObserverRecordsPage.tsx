@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { getRecords } from "../service/records-api";
 import styles from './IntersectionObserverRecordsPage.module.scss';
 import Record from "./Record/Record";
@@ -11,44 +11,64 @@ interface RecordDto {
 
 export default function RecordsPage() {
     const [records, setRecords] = useState<RecordDto[]>([]);
-    const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
+
     const loaderRef = useRef<HTMLDivElement | null>(null);
+
+    const pageRef = useRef(0);
     const loadingRef = useRef(false);
+    const initialLoadRef = useRef(false);
 
-    const loadPage = async (p: number) => {
-        if (loadingRef.current || !hasMore) return;
-
-        loadingRef.current = true;
-
-        const data = await getRecords(p, 10);
-
-        setRecords(prev => [...prev, ...(data.list || [])]);
-
-        const total = data.totalRecords || 0;
-        if ((p + 1) * 10 >= total) {
-            setHasMore(false);
+    const loadPage = useCallback(async () => {
+        if (loadingRef.current || !hasMore) {
+            return;
         }
+        loadingRef.current = true;
+        const currentPage = pageRef.current;
+        try {
+            const data = await getRecords(currentPage, 10);
+            setRecords(prev => [
+                ...prev,
+                ...(data.list || [])
+            ]);
+            const total = data.totalRecords || 0;
+            if ((currentPage + 1) * 10 >= total) {
+                setHasMore(false);
+            }
+            pageRef.current++;
 
-        setPage(p + 1);
-        loadingRef.current = false;
-    };
+        } finally {
+            loadingRef.current = false;
+        }
+    }, [hasMore]);
 
+
+    // первая загрузка
     useEffect(() => {
-        loadPage(0);
-    }, []);
+        if (initialLoadRef.current) {
+            return;
+        }
+        initialLoadRef.current = true;
+        loadPage();
+    }, [loadPage]);
 
+
+    // observer
     useEffect(() => {
-        const observer = new IntersectionObserver((entries) => {
+        const observer = new IntersectionObserver(entries => {
             if (entries[0].isIntersecting) {
-                loadPage(page);
+                loadPage();
             }
         });
+        const loader = loaderRef.current;
+        if (loader) {
+            observer.observe(loader);
+        }
+        return () => {
+            observer.disconnect();
+        };
+    }, [loadPage]);
 
-        if (loaderRef.current) observer.observe(loaderRef.current);
-
-        return () => observer.disconnect();
-    }, [page]);
 
     return (
         <div className={styles.container}>
@@ -59,7 +79,6 @@ export default function RecordsPage() {
                     <Record record={record}/>
                 </div>
             ))}
-
             <div ref={loaderRef} style={{ height: 40 }} />
         </div>
     );

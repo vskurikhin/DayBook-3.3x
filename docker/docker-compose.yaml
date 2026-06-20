@@ -57,3 +57,7 @@ services:
       - quarkus-3-33-api
     ports:
       - '30080:80'
+    volumes:
+      - ./volumes/nginx-react-app/2019:/usr/share/nginx/html/2019
+      - ./volumes/nginx-react-app/2023:/usr/share/nginx/html/2023
+      - ./volumes/nginx-react-app/2026:/usr/share/nginx/html/2026

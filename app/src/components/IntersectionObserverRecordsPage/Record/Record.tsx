@@ -36,7 +36,7 @@ const User = ({ record }: { record: any }) => {
         />
       </div>
       <div>
-        <h2>Title: {record.title}</h2>
+        <h2>{record.title}</h2>
         <p>
           { record.type === "Text" && (
             <div
