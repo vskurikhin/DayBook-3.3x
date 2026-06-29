@@ -68,9 +68,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
+| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
-| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="deleteBlobRecord"></a>
@@ -130,9 +130,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
+| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
-| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="readBlobRecord"></a>
@@ -193,9 +193,9 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
+| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
-| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 
 <a id="updateBlobRecord"></a>
@@ -256,8 +256,8 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
+| **400** | Bad Request |  -  |
 | **404** | Not Found |  -  |
 | **500** | Internal Server Error |  -  |
-| **400** | Bad Request |  -  |
 | **200** | OK |  -  |
 

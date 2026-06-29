@@ -12,7 +12,6 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.*;
 import su.svn.api.domain.entities.PostRecord;
-import su.svn.api.models.dto.EntityModelResourceRecordView;
 import su.svn.api.models.dto.PageMetadata;
 import su.svn.api.models.dto.PagedModelEntityModelResourceRecordView;
 import su.svn.api.models.dto.PagedModelEntityModelResourceRecordViewEmbedded;
@@ -21,6 +20,7 @@ import su.svn.api.repository.PostRecordRepository;
 import su.svn.api.repository.client.rest.RecordViewClient;
 import su.svn.api.services.domain.PostRecordDataSyncService;
 import su.svn.api.services.domain.VectorRecordDataService;
+import su.svn.lib.models.dto.EntityModelResourceRecordView;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -102,6 +102,17 @@ public class DataBaseIT {
                 .build();
         when(mockRecordViewClient.getByPageIndexAndSizeAndFromTimeAsUni(any(), any(), anyInt(), anyInt(), any(), any(), any()))
                 .thenReturn(Uni.createFrom().item(pagedModelEntityModelResourceRecordViewStub));
+    }
+
+
+    @Test
+    @DisplayName("PostRecord findLastChangedTime")
+    @RunOnVertxContext
+    void testPostRecord_findByUUID1(UniAsserter asserter) {
+        asserter.assertThat(
+                () -> Panache.withTransaction(PostRecord::findLastChangedTime),
+                Assertions::assertNotNull
+        );
     }
 
     @Test

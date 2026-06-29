@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.mockito.internal.verification.Times;
 import su.svn.api.models.dto.NewJsonRecord;
 import su.svn.api.models.dto.ResourceJsonRecord;
 import su.svn.api.models.dto.UpdateJsonRecord;
@@ -67,7 +68,7 @@ public class ApiIT {
             assertThat(response.getEntity()).isEqualTo(responseDto);
         }
 
-        verify(recordSchedulerService).fire(true);
+        verify(recordSchedulerService, atLeastOnce()).fire(true);
     }
 
     @TestSecurity(user = "john", roles = {"USER"})

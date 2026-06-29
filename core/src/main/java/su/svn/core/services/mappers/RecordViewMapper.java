@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.28 18:28 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 16:59 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewMapper.java
@@ -12,11 +12,11 @@ import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.ValueMapping;
 import su.svn.core.domain.entities.RecordView;
-import su.svn.core.models.dto.ResourceRecordView;
+import su.svn.lib.models.dto.ResourceRecordView;
 
 /**
  * Mapper for converting {@link su.svn.core.domain.entities.RecordView}
- * to {@link su.svn.core.models.dto.ResourceRecordView}.
+ * to {@link ResourceRecordView}.
  */
 @Mapper(
         componentModel = "spring",

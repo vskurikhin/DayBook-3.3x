@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.31 00:28 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 17:39 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecordRepository.java
@@ -21,7 +21,6 @@ import su.svn.api.models.dto.Page;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 @ApplicationScoped
 public class PostRecordRepository {
@@ -53,7 +52,7 @@ public class PostRecordRepository {
 
     @WithTransaction
     public Uni<List<PostRecord>> readIdIn(List<UUID> ids) {
-        return PostRecord.readEnabledAndIdIn(ids);
+        return PostRecord.readIdIn(ids);
     }
 
     @WithSession

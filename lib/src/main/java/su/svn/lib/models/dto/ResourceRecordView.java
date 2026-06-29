@@ -1,12 +1,12 @@
 /*
- * This file was last modified at 2026.05.28 18:28 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 16:59 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceRecordView.java
  * $Id$
  */
 
-package su.svn.core.models.dto;
+package su.svn.lib.models.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -33,6 +33,7 @@ public record ResourceRecordView(
         @JsonProperty OffsetDateTime postAt,
         @JsonProperty OffsetDateTime refreshAt,
         @JsonProperty LocalDateTime lastChangedTime,
+        @JsonProperty boolean enabled,
         @JsonProperty boolean visible,
         @JsonProperty int flags,
         @JsonProperty String title,
@@ -53,3 +54,15 @@ public record ResourceRecordView(
     public ResourceRecordView {
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+

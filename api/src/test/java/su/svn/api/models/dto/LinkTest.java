@@ -2,6 +2,7 @@ package su.svn.api.models.dto;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import su.svn.lib.models.dto.Link;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

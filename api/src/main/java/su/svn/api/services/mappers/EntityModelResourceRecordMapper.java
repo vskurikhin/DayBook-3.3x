@@ -1,8 +1,8 @@
 /*
- * This file was last modified at 2026.05.22 19:39 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 16:59 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * SetRecordMapper.java
+ * EntityModelResourceRecordMapper.java
  * $Id$
  */
 
@@ -13,7 +13,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.ValueMapping;
 import su.svn.api.domain.entities.PostRecord;
-import su.svn.api.models.dto.EntityModelResourceRecordView;
+import su.svn.lib.models.dto.EntityModelResourceRecordView;
 
 @Mapper(componentModel = "cdi")
 public interface EntityModelResourceRecordMapper extends DateTimeMapper {
@@ -22,7 +22,6 @@ public interface EntityModelResourceRecordMapper extends DateTimeMapper {
     @Mapping(target = "sequenceId", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
-    @Mapping(target = "enabled", ignore = true)
     @Mapping(target = "localChange", ignore = true)
     PostRecord toEntity(EntityModelResourceRecordView recordView);
 }

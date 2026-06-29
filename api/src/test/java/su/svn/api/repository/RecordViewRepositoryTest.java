@@ -15,6 +15,7 @@ import su.svn.api.services.mappers.EntityModelResourceRecordMapper;
 import su.svn.api.services.mappers.JsonRecordMapper;
 import su.svn.api.services.security.SecurityContextPrincipalHelper;
 import su.svn.lib.RecordType;
+import su.svn.lib.models.dto.EntityModelResourceRecordView;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;

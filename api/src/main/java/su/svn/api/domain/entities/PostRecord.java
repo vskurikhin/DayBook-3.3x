@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.31 00:28 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 17:58 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -127,6 +127,14 @@ import static lombok.AccessLevel.PRIVATE;
                         """
         ),
         @NamedQuery(
+                name = PostRecord.READ_ID_IN,
+                query = """
+                        FROM PostRecord
+                        WHERE id IN :ids
+                        ORDER BY postAt DESC, refreshAt DESC, id DESC
+                        """
+        ),
+        @NamedQuery(
                 name = PostRecord.READ_ENABLED_AND_ID_IN,
                 query = """
                         FROM PostRecord
@@ -160,6 +168,12 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
      */
     public static final String FIND_LAST_CHANGED_TIME_POST_RECORD =
             "PostRecord.findLastChangedTimePostRecord";
+
+    /**
+     * Named query for reading records by identifiers.
+     */
+    public static final String READ_ID_IN =
+            "PostRecord.readIdIn";
 
     /**
      * Named query for reading enabled records by identifiers.
@@ -377,7 +391,9 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
      */
     public static Uni<LocalDateTime> findLastChangedTime() {
         return PostRecord.findLastChangedTimePostRecord()
-                .map(postRecord -> postRecord.lastChangedTime);
+                .replaceIfNullWith(new PostRecord())
+                .map(postRecord -> postRecord.lastChangedTime)
+                .replaceIfNullWith(LocalDateTime.MIN);
     }
 
     /**
@@ -419,6 +435,16 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
                 .fail()
                 .onFailure()
                 .recoverWithUni(Uni.createFrom().voidItem());
+    }
+
+    /**
+     * Reads enabled records by identifier list.
+     *
+     * @param ids list of record identifiers
+     * @return reactive result containing matching records
+     */
+    public static Uni<List<PostRecord>> readIdIn(List<UUID> ids) {
+        return PostRecord.find("#" + READ_ID_IN, Map.of("ids", ids)).list();
     }
 
     /**

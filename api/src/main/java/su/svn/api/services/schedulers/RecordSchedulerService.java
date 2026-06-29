@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 18:35 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordSchedulerService.java
@@ -11,12 +11,15 @@ package su.svn.api.services.schedulers;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
 import su.svn.api.services.domain.PostRecordDataSyncService;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @ApplicationScoped
 public class RecordSchedulerService {
+
+    private static final Logger LOG = Logger.getLogger(RecordSchedulerService.class);
 
     public static final int SYNC_SIZE = 2000;
     private final AtomicBoolean done = new AtomicBoolean(true);
@@ -34,13 +37,15 @@ public class RecordSchedulerService {
             vertx.runOnContext(v -> {
                 syncService.sync(0, SYNC_SIZE)
                         .subscribe().with(
-                                result -> {},
+                                result -> LOG.infof(
+                                        "page: %d, result.size(): %d",
+                                        0, result.size()
+                                ),
                                 Throwable::printStackTrace
                         );
-
-                this.fire.set(false);
-                this.done.set(true);
             });
+            this.fire.set(false);
+            this.done.set(true);
         }
     }
 
