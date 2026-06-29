@@ -16,6 +16,7 @@
 |**postAt** | **OffsetDateTime** |  |  [optional] |
 |**refreshAt** | **OffsetDateTime** |  |  [optional] |
 |**lastChangedTime** | **OffsetDateTime** |  |  [optional] |
+|**enabled** | **Boolean** |  |  [optional] |
 |**title** | **String** |  |  [optional] |
 |**aHref** | **String** |  |  [optional] |
 |**blob** | **byte[]** |  |  [optional] |

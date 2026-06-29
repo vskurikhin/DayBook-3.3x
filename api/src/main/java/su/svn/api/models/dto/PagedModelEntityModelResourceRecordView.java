@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 16:49 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 16:59 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PagedModelEntityModelResourceRecordView.java
@@ -11,6 +11,7 @@ package su.svn.api.models.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
+import su.svn.lib.models.dto.Link;
 
 import java.io.Serializable;
 import java.util.HashMap;

@@ -1,12 +1,12 @@
 /*
- * This file was last modified at 2026.05.21 16:48 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 16:59 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * Link.java
  * $Id$
  */
 
-package su.svn.api.models.dto;
+package su.svn.lib.models.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;

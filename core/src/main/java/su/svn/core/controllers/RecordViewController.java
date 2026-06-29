@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.07 14:57 by Victor N. Skurikhin.
+ * This file was last modified at 2026.06.29 16:59 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewController.java
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import su.svn.core.models.dto.ResourceRecordView;
+import su.svn.lib.models.dto.ResourceRecordView;
 import su.svn.core.models.dto.ResourceRecordViewFilter;
 import su.svn.core.services.domain.RecordViewService;
 

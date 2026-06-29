@@ -16,6 +16,12 @@ paths:
               $ref: "#/components/schemas/NewXmlRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -28,12 +34,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -54,6 +54,12 @@ paths:
               $ref: "#/components/schemas/UpdateXmlRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -66,12 +72,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -93,6 +93,12 @@ paths:
               $ref: "#/components/schemas/NewVectorRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -105,12 +111,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -131,6 +131,12 @@ paths:
               $ref: "#/components/schemas/UpdateVectorRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -143,12 +149,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -170,6 +170,12 @@ paths:
               $ref: "#/components/schemas/NewValueRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -182,12 +188,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -208,6 +208,12 @@ paths:
               $ref: "#/components/schemas/UpdateValueRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -220,12 +226,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -247,6 +247,12 @@ paths:
               $ref: "#/components/schemas/NewSetRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -259,12 +265,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -285,6 +285,12 @@ paths:
               $ref: "#/components/schemas/UpdateSetRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -297,12 +303,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -324,6 +324,12 @@ paths:
               $ref: "#/components/schemas/NewMarkdownRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -336,12 +342,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -362,6 +362,12 @@ paths:
               $ref: "#/components/schemas/UpdateMarkdownRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -374,12 +380,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -401,6 +401,12 @@ paths:
               $ref: "#/components/schemas/NewJsonRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -413,12 +419,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -439,6 +439,12 @@ paths:
               $ref: "#/components/schemas/UpdateJsonRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -451,12 +457,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -478,6 +478,12 @@ paths:
               $ref: "#/components/schemas/NewBlobRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -490,12 +496,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -516,6 +516,12 @@ paths:
               $ref: "#/components/schemas/UpdateBlobRecord"
         required: true
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -528,12 +534,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -558,6 +558,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -570,12 +576,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           description: OK
       tags:
@@ -594,6 +594,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -606,12 +612,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -635,6 +635,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -647,12 +653,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           description: OK
       tags:
@@ -671,6 +671,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -683,12 +689,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -712,6 +712,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -724,12 +730,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           description: OK
       tags:
@@ -748,6 +748,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -760,12 +766,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -789,6 +789,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -801,12 +807,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           description: OK
       tags:
@@ -825,6 +825,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -837,12 +843,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -872,6 +872,12 @@ paths:
           $ref: "#/components/schemas/Pageable"
         style: form
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -884,12 +890,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -913,6 +913,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -925,12 +931,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           description: OK
       tags:
@@ -949,6 +949,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -961,12 +967,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -990,6 +990,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -1002,12 +1008,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           description: OK
       tags:
@@ -1026,6 +1026,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -1038,12 +1044,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -1067,6 +1067,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -1079,12 +1085,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           description: OK
       tags:
@@ -1103,6 +1103,12 @@ paths:
           type: string
         style: simple
       responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
         "404":
           content:
             '*/*':
@@ -1115,12 +1121,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
           description: Internal Server Error
-        "400":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-          description: Bad Request
         "200":
           content:
             '*/*':
@@ -2153,6 +2153,7 @@ components:
         userName: userName
         title: title
         parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        enabled: true
         tags:
         - tags
         - tags
@@ -2206,6 +2207,8 @@ components:
         lastChangedTime:
           format: date-time
           type: string
+        enabled:
+          type: boolean
         title:
           type: string
         aHref:
@@ -2287,6 +2290,7 @@ components:
             userName: userName
             title: title
             parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+            enabled: true
             tags:
             - tags
             - tags
@@ -2326,6 +2330,7 @@ components:
             userName: userName
             title: title
             parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+            enabled: true
             tags:
             - tags
             - tags
@@ -2421,6 +2426,7 @@ components:
           userName: userName
           title: title
           parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          enabled: true
           tags:
           - tags
           - tags
@@ -2460,6 +2466,7 @@ components:
           userName: userName
           title: title
           parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          enabled: true
           tags:
           - tags
           - tags
