@@ -6,6 +6,10 @@ FROM eclipse-temurin:21-jre
 LABEL maintainer="svn"
 LABEL description="Spring Boot application runtime"
 
+ENV TZ=Europe/Moscow
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Working directory
 WORKDIR /app
 

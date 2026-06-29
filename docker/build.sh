@@ -13,7 +13,7 @@ build_api() {
       -Dquarkus.package.jar.enabled=false \
       -Dquarkus.native.enabled=true \
       -Dquarkus.native.container-build=true \
-      -Dquarkus.container-image.build=true ||
+      -Dquarkus.container-image.build=true  ||
       exit 2
 
   ./gradlew properties -q | grep "^version:" | awk '{print $2}' |
