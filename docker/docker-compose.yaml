@@ -5,6 +5,8 @@ services:
       - POSTGRES_USER=dbuser
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=db
+      - PGTZ=Europe/Moscow
+      - TZ=Europe/Moscow
     ports:
       - '35432:5432'
 

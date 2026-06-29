@@ -22,6 +22,9 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+          env:
+            - name: TZ
+              value: 'Europe/Moscow'
           resources:
             requests:
               cpu: "100m"

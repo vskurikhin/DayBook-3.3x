@@ -20,6 +20,7 @@
 # To use UBI 8, switch to `quay.io/quarkus/quarkus-micro-image:2.0`.
 ###
 FROM quay.io/quarkus/ubi9-quarkus-micro-image:2.0
+
 WORKDIR /work/
 RUN chown 1001 /work \
     && chmod "g+rwX" /work \

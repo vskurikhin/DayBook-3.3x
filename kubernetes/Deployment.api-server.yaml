@@ -9,6 +9,7 @@ data:
   API_SERVER_AUTH_EXTERNAL_JWT_API_KEY_PREFIX: 'Bearer'
   API_SERVER_CORE_SERVER_ADDRESS: 'http://core-server:8082'
   API_SERVER_AUTH_SERVER_ADDRESS: 'http://auth-server:8089'
+  TZ: 'Europe/Moscow'
 ---
 apiVersion: v1
 kind: Secret

@@ -35,6 +35,7 @@ metadata:
 type: Opaque
 stringData:
   AUTH_SERVER_JWT_HS256_SIGN_KEY: '<change-me-jwt-hs256-sign-key>'
+  TZ: 'Europe/Moscow'
 ---
 apiVersion: apps/v1
 kind: Deployment
