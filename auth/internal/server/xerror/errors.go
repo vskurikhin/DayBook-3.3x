@@ -2,6 +2,10 @@ package xerror
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -19,6 +23,7 @@ const (
 	IsNotPgError                            = "isn't pg error"
 	LimitExceeded                           = "limit exceeded"
 	Logout                                  = "logout"
+	NoRowsInResultSet                       = "no rows in result set"
 	PasswordNotValidError                   = "password not valid"
 	SerializationFailure                    = "serialization failure"
 	SessionTimeExpired                      = "session time expired"
@@ -56,6 +61,7 @@ var (
 	ErrLimitExceeded                                 = errors.New(LimitExceeded)
 	ErrLogout                                        = errors.New(Logout)
 	ErrNil                                     error = nil
+	ErrNoRows                                        = errors.New(NoRowsInResultSet)
 	ErrPasswordNotValid                              = errors.New(PasswordNotValidError)
 	ErrSerializationFailure                          = errors.New(SerializationFailure)
 	ErrSessionTimeExpired                            = errors.New(SessionTimeExpired)
@@ -80,7 +86,15 @@ func IsPgError(err error) bool {
 
 func ClassingPgError(err error) error {
 	var pgError PgError
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNoRows
+	}
 	if !errors.As(err, &pgError) {
+		slog.Error(
+			"error classing pg",
+			slog.String("errorType", fmt.Sprintf("%T", err)),
+			slog.String("error", err.Error()),
+		)
 		return ErrIsNotPgError
 	}
 	switch pgError.SQLState() {

@@ -91,6 +91,8 @@ func (fn APISyncHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
 			case isStatusForbidden(err):
 				w.WriteHeader(http.StatusForbidden)
+			case isStatusNotFound(err):
+				w.WriteHeader(http.StatusNotFound)
 			case isStatusConflict(err):
 				w.WriteHeader(http.StatusConflict)
 			case isStatusServiceUnavailable(err):
@@ -125,6 +127,10 @@ func isStatusUnauthorized(err error) bool {
 
 func isStatusForbidden(err error) bool {
 	return errors.Is(err, xerror.ErrForbidden)
+}
+
+func isStatusNotFound(err error) bool {
+	return errors.Is(err, xerror.ErrNoRows)
 }
 
 func isStatusConflict(err error) bool {
