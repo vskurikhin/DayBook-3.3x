@@ -15,6 +15,7 @@ services:
     pull_policy: never
     environment:
       AUTH_SERVER_JWT_HS256_SIGN_KEY: cd8f5f9f-e3e8-569f-87ef-f03c6cfc29bc
+      TZ: Europe/Moscow
     depends_on:
       - postgres-db
     ports:
@@ -28,6 +29,7 @@ services:
       CORE_SERVER_DB_USERNAME: dbuser
       CORE_SERVER_DB_PASSWORD: password
       CORE_SERVER_TOKEN_SIGNING_KEY: Y2Q4ZjVmOWYtZTNlOC01NjlmLTg3ZWYtZjAzYzZjZmMyOWJj
+      TZ: Europe/Moscow
     depends_on:
       - postgres-db
     ports:
@@ -44,6 +46,7 @@ services:
       API_SERVER_CORE_SERVER_ADDRESS: http://spring-3-5-core:8082
       API_SERVER_CORE_VERIFY_ISSUER: cd8f5f9f-e3e8-569f-87ef-f03c6cfc29bc
       API_SERVER_JWT_EXTERNAL_VERIFY_KEY_HMAC: cd8f5f9f-e3e8-569f-87ef-f03c6cfc29bc
+      TZ: Europe/Moscow
     depends_on:
       - postgres-db
       - golang-auth
@@ -54,6 +57,8 @@ services:
   nginx-react-app:
     image: 'svn/app'
     pull_policy: never
+    environment:
+      - TZ=Europe/Moscow
     depends_on:
       - golang-auth
       - quarkus-3-33-api
@@ -62,5 +67,7 @@ services:
     volumes:
       - ./volumes/nginx-react-app/2019:/usr/share/nginx/html/2019
       - ./volumes/nginx-react-app/2020:/usr/share/nginx/html/2020
+      - ./volumes/nginx-react-app/2021:/usr/share/nginx/html/2021
+      - ./volumes/nginx-react-app/2022:/usr/share/nginx/html/2022
       - ./volumes/nginx-react-app/2023:/usr/share/nginx/html/2023
       - ./volumes/nginx-react-app/2026:/usr/share/nginx/html/2026
