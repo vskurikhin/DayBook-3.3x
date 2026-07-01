@@ -122,7 +122,8 @@ func isStatusNoContent(err error) bool {
 }
 
 func isStatusUnauthorized(err error) bool {
-	return errors.Is(err, xerror.ErrInvalidPassword)
+	return errors.Is(err, xerror.ErrNoCookie) ||
+		errors.Is(err, xerror.ErrInvalidPassword)
 }
 
 func isStatusForbidden(err error) bool {

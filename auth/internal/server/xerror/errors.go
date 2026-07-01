@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -61,6 +62,7 @@ var (
 	ErrLimitExceeded                                 = errors.New(LimitExceeded)
 	ErrLogout                                        = errors.New(Logout)
 	ErrNil                                     error = nil
+	ErrNoCookie                                      = errors.New("no cookie")
 	ErrNoRows                                        = errors.New(NoRowsInResultSet)
 	ErrPasswordNotValid                              = errors.New(PasswordNotValidError)
 	ErrSerializationFailure                          = errors.New(SerializationFailure)
@@ -84,11 +86,18 @@ func IsPgError(err error) bool {
 	return errors.As(err, &pgError)
 }
 
+func ClassingHTTPError(err error) error {
+	if errors.Is(err, http.ErrNoCookie) {
+		return ErrNoCookie
+	}
+	return ErrUnclassifiedPgError
+}
+
 func ClassingPgError(err error) error {
-	var pgError PgError
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNoRows
 	}
+	var pgError PgError
 	if !errors.As(err, &pgError) {
 		slog.Error(
 			"error classing pg",
