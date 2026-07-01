@@ -15,7 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -29,10 +28,10 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.cors.CorsConfiguration;
 import su.svn.core.domain.entities.UserName;
-import su.svn.lib.models.dto.ResourceRecordView;
 import su.svn.core.services.domain.RecordViewService;
 import su.svn.core.services.domain.UserNameService;
 import su.svn.core.services.security.JwtService;
+import su.svn.lib.models.dto.ResourceRecordView;
 
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -45,6 +44,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@SuppressWarnings("NullableProblems")
 @ContextConfiguration
 @ExtendWith(SpringExtension.class)
 @Import({RecordViewControllerTest.TestConfig.class})
@@ -60,9 +60,6 @@ class RecordViewControllerTest {
 
     @Autowired
     RecordViewService recordViewService;
-
-    @Autowired
-    PagedResourcesAssembler<ResourceRecordView> assembler;
 
     @Autowired
     JwtService jwtService;
@@ -82,7 +79,7 @@ class RecordViewControllerTest {
     // GET
     // -----------------------------
     @Test
-    void shouldReturnRecordById() throws Exception {
+    void shouldReturnRecordByIdInPage() throws Exception {
 
         UUID id = UUID.randomUUID();
 
@@ -97,12 +94,6 @@ class RecordViewControllerTest {
 
         Page<ResourceRecordView> page =
                 new PageImpl<>(List.of(response));
-
-        PagedModel<EntityModel<ResourceRecordView>> pagedModel =
-                PagedModel.of(
-                        List.of(EntityModel.of(response)),
-                        new PagedModel.PageMetadata(1, 0, 1)
-                );
 
         when(recordViewService.getFilteredRecords(any(), any()))
                 .thenReturn(page);
@@ -126,7 +117,7 @@ class RecordViewControllerTest {
     }
 
     private static @NotNull Page<ResourceRecordView> getResourceRecordViews(ResourceRecordView response) {
-        Page<ResourceRecordView> page = new Page<ResourceRecordView>() {
+        @SuppressWarnings("UnnecessaryLocalVariable") Page<ResourceRecordView> page = new Page<>() {
             @Override
             public int getTotalPages() {
                 return 1;
@@ -204,7 +195,7 @@ class RecordViewControllerTest {
 
             @Override
             public @NotNull Iterator<ResourceRecordView> iterator() {
-                return new Iterator<ResourceRecordView>() {
+                return new Iterator<>() {
                     @Override
                     public boolean hasNext() {
                         return false;
@@ -238,6 +229,43 @@ class RecordViewControllerTest {
         }
     }
 
+    @Test
+    void shouldReturnRecordById() throws Exception {
+
+        UUID id = UUID.randomUUID();
+
+        ResourceRecordView record = ResourceRecordView.builder()
+                .id(id)
+                .title("test record")
+                .json(Map.of("key", "value"))
+                .postAt(OffsetDateTime.now())
+                .visible(true)
+                .flags(1)
+                .build();
+
+
+        when(recordViewService.getRecord(id))
+                .thenReturn(Optional.of(record));
+
+
+        mockMvc.perform(
+                        get("/core/api/v2/records-view/{id}", id)
+                )
+                .andExpect(status().isOk())
+
+                .andExpect(jsonPath("$.id")
+                        .value(id.toString()))
+
+                .andExpect(jsonPath("$.title")
+                        .value("test record"))
+
+                .andExpect(jsonPath("$.visible")
+                        .value(true));
+
+
+        verify(recordViewService)
+                .getRecord(id);
+    }
 
     @EnableWebSecurity
     @EnableMethodSecurity

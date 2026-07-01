@@ -2,7 +2,7 @@
  * This file was last modified at 2026.07.01 22:56 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
- * EntityModelResourceRecordView.java
+ * ResourceRecordView.java
  * $Id$
  */
 
@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import su.svn.lib.core.models.Link;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -63,10 +62,10 @@ import java.util.Set;
 import su.svn.lib.core.JSON;
 
 /**
- * EntityModelResourceRecordView
+ * ResourceRecordView
  */
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-07-01T22:38:06.881138+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
-public class EntityModelResourceRecordView {
+public class ResourceRecordView {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
   @jakarta.annotation.Nullable
@@ -244,15 +243,10 @@ public class EntityModelResourceRecordView {
   @jakarta.annotation.Nullable
   private List<String> tags = new ArrayList<>();
 
-  public static final String SERIALIZED_NAME_LINKS = "_links";
-  @SerializedName(SERIALIZED_NAME_LINKS)
-  @jakarta.annotation.Nullable
-  private Map<String, Link> links = new HashMap<>();
-
-  public EntityModelResourceRecordView() {
+  public ResourceRecordView() {
   }
 
-  public EntityModelResourceRecordView id(@jakarta.annotation.Nullable UUID id) {
+  public ResourceRecordView id(@jakarta.annotation.Nullable UUID id) {
     this.id = id;
     return this;
   }
@@ -271,7 +265,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView visible(@jakarta.annotation.Nullable Boolean visible) {
+  public ResourceRecordView visible(@jakarta.annotation.Nullable Boolean visible) {
     this.visible = visible;
     return this;
   }
@@ -290,7 +284,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView flags(@jakarta.annotation.Nullable Integer flags) {
+  public ResourceRecordView flags(@jakarta.annotation.Nullable Integer flags) {
     this.flags = flags;
     return this;
   }
@@ -309,7 +303,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView parentId(@jakarta.annotation.Nullable UUID parentId) {
+  public ResourceRecordView parentId(@jakarta.annotation.Nullable UUID parentId) {
     this.parentId = parentId;
     return this;
   }
@@ -328,7 +322,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView type(@jakarta.annotation.Nullable TypeEnum type) {
+  public ResourceRecordView type(@jakarta.annotation.Nullable TypeEnum type) {
     this.type = type;
     return this;
   }
@@ -347,7 +341,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView userName(@jakarta.annotation.Nullable String userName) {
+  public ResourceRecordView userName(@jakarta.annotation.Nullable String userName) {
     this.userName = userName;
     return this;
   }
@@ -366,7 +360,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView postAt(@jakarta.annotation.Nullable OffsetDateTime postAt) {
+  public ResourceRecordView postAt(@jakarta.annotation.Nullable OffsetDateTime postAt) {
     this.postAt = postAt;
     return this;
   }
@@ -385,7 +379,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView refreshAt(@jakarta.annotation.Nullable OffsetDateTime refreshAt) {
+  public ResourceRecordView refreshAt(@jakarta.annotation.Nullable OffsetDateTime refreshAt) {
     this.refreshAt = refreshAt;
     return this;
   }
@@ -404,7 +398,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView lastChangedTime(@jakarta.annotation.Nullable OffsetDateTime lastChangedTime) {
+  public ResourceRecordView lastChangedTime(@jakarta.annotation.Nullable OffsetDateTime lastChangedTime) {
     this.lastChangedTime = lastChangedTime;
     return this;
   }
@@ -423,7 +417,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView enabled(@jakarta.annotation.Nullable Boolean enabled) {
+  public ResourceRecordView enabled(@jakarta.annotation.Nullable Boolean enabled) {
     this.enabled = enabled;
     return this;
   }
@@ -442,7 +436,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView title(@jakarta.annotation.Nullable String title) {
+  public ResourceRecordView title(@jakarta.annotation.Nullable String title) {
     this.title = title;
     return this;
   }
@@ -461,7 +455,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView aHref(@jakarta.annotation.Nullable String aHref) {
+  public ResourceRecordView aHref(@jakarta.annotation.Nullable String aHref) {
     this.aHref = aHref;
     return this;
   }
@@ -480,7 +474,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView blob(@jakarta.annotation.Nullable byte[] blob) {
+  public ResourceRecordView blob(@jakarta.annotation.Nullable byte[] blob) {
     this.blob = blob;
     return this;
   }
@@ -499,12 +493,12 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView json(@jakarta.annotation.Nullable Map<String, String> json) {
+  public ResourceRecordView json(@jakarta.annotation.Nullable Map<String, String> json) {
     this.json = json;
     return this;
   }
 
-  public EntityModelResourceRecordView putJsonItem(String key, String jsonItem) {
+  public ResourceRecordView putJsonItem(String key, String jsonItem) {
     if (this.json == null) {
       this.json = new HashMap<>();
     }
@@ -526,12 +520,12 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView texts(@jakarta.annotation.Nullable Set<String> texts) {
+  public ResourceRecordView texts(@jakarta.annotation.Nullable Set<String> texts) {
     this.texts = texts;
     return this;
   }
 
-  public EntityModelResourceRecordView addTextsItem(String textsItem) {
+  public ResourceRecordView addTextsItem(String textsItem) {
     if (this.texts == null) {
       this.texts = new LinkedHashSet<>();
     }
@@ -553,7 +547,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView fileName(@jakarta.annotation.Nullable String fileName) {
+  public ResourceRecordView fileName(@jakarta.annotation.Nullable String fileName) {
     this.fileName = fileName;
     return this;
   }
@@ -572,7 +566,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView html(@jakarta.annotation.Nullable String html) {
+  public ResourceRecordView html(@jakarta.annotation.Nullable String html) {
     this.html = html;
     return this;
   }
@@ -591,7 +585,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView link(@jakarta.annotation.Nullable String link) {
+  public ResourceRecordView link(@jakarta.annotation.Nullable String link) {
     this.link = link;
     return this;
   }
@@ -610,7 +604,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView markdown(@jakarta.annotation.Nullable String markdown) {
+  public ResourceRecordView markdown(@jakarta.annotation.Nullable String markdown) {
     this.markdown = markdown;
     return this;
   }
@@ -629,7 +623,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView value(@jakarta.annotation.Nullable String value) {
+  public ResourceRecordView value(@jakarta.annotation.Nullable String value) {
     this.value = value;
     return this;
   }
@@ -648,12 +642,12 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView vector(@jakarta.annotation.Nullable List<Float> vector) {
+  public ResourceRecordView vector(@jakarta.annotation.Nullable List<Float> vector) {
     this.vector = vector;
     return this;
   }
 
-  public EntityModelResourceRecordView addVectorItem(Float vectorItem) {
+  public ResourceRecordView addVectorItem(Float vectorItem) {
     if (this.vector == null) {
       this.vector = new ArrayList<>();
     }
@@ -675,7 +669,7 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView xml(@jakarta.annotation.Nullable String xml) {
+  public ResourceRecordView xml(@jakarta.annotation.Nullable String xml) {
     this.xml = xml;
     return this;
   }
@@ -694,12 +688,12 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView tags(@jakarta.annotation.Nullable List<String> tags) {
+  public ResourceRecordView tags(@jakarta.annotation.Nullable List<String> tags) {
     this.tags = tags;
     return this;
   }
 
-  public EntityModelResourceRecordView addTagsItem(String tagsItem) {
+  public ResourceRecordView addTagsItem(String tagsItem) {
     if (this.tags == null) {
       this.tags = new ArrayList<>();
     }
@@ -721,33 +715,6 @@ public class EntityModelResourceRecordView {
   }
 
 
-  public EntityModelResourceRecordView links(@jakarta.annotation.Nullable Map<String, Link> links) {
-    this.links = links;
-    return this;
-  }
-
-  public EntityModelResourceRecordView putLinksItem(String key, Link linksItem) {
-    if (this.links == null) {
-      this.links = new HashMap<>();
-    }
-    this.links.put(key, linksItem);
-    return this;
-  }
-
-  /**
-   * Get links
-   * @return links
-   */
-  @jakarta.annotation.Nullable
-  public Map<String, Link> getLinks() {
-    return links;
-  }
-
-  public void setLinks(@jakarta.annotation.Nullable Map<String, Link> links) {
-    this.links = links;
-  }
-
-
 
   @Override
   public boolean equals(Object o) {
@@ -757,42 +724,41 @@ public class EntityModelResourceRecordView {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    EntityModelResourceRecordView entityModelResourceRecordView = (EntityModelResourceRecordView) o;
-    return Objects.equals(this.id, entityModelResourceRecordView.id) &&
-        Objects.equals(this.visible, entityModelResourceRecordView.visible) &&
-        Objects.equals(this.flags, entityModelResourceRecordView.flags) &&
-        Objects.equals(this.parentId, entityModelResourceRecordView.parentId) &&
-        Objects.equals(this.type, entityModelResourceRecordView.type) &&
-        Objects.equals(this.userName, entityModelResourceRecordView.userName) &&
-        Objects.equals(this.postAt, entityModelResourceRecordView.postAt) &&
-        Objects.equals(this.refreshAt, entityModelResourceRecordView.refreshAt) &&
-        Objects.equals(this.lastChangedTime, entityModelResourceRecordView.lastChangedTime) &&
-        Objects.equals(this.enabled, entityModelResourceRecordView.enabled) &&
-        Objects.equals(this.title, entityModelResourceRecordView.title) &&
-        Objects.equals(this.aHref, entityModelResourceRecordView.aHref) &&
-        Arrays.equals(this.blob, entityModelResourceRecordView.blob) &&
-        Objects.equals(this.json, entityModelResourceRecordView.json) &&
-        Objects.equals(this.texts, entityModelResourceRecordView.texts) &&
-        Objects.equals(this.fileName, entityModelResourceRecordView.fileName) &&
-        Objects.equals(this.html, entityModelResourceRecordView.html) &&
-        Objects.equals(this.link, entityModelResourceRecordView.link) &&
-        Objects.equals(this.markdown, entityModelResourceRecordView.markdown) &&
-        Objects.equals(this.value, entityModelResourceRecordView.value) &&
-        Objects.equals(this.vector, entityModelResourceRecordView.vector) &&
-        Objects.equals(this.xml, entityModelResourceRecordView.xml) &&
-        Objects.equals(this.tags, entityModelResourceRecordView.tags) &&
-        Objects.equals(this.links, entityModelResourceRecordView.links);
+    ResourceRecordView resourceRecordView = (ResourceRecordView) o;
+    return Objects.equals(this.id, resourceRecordView.id) &&
+        Objects.equals(this.visible, resourceRecordView.visible) &&
+        Objects.equals(this.flags, resourceRecordView.flags) &&
+        Objects.equals(this.parentId, resourceRecordView.parentId) &&
+        Objects.equals(this.type, resourceRecordView.type) &&
+        Objects.equals(this.userName, resourceRecordView.userName) &&
+        Objects.equals(this.postAt, resourceRecordView.postAt) &&
+        Objects.equals(this.refreshAt, resourceRecordView.refreshAt) &&
+        Objects.equals(this.lastChangedTime, resourceRecordView.lastChangedTime) &&
+        Objects.equals(this.enabled, resourceRecordView.enabled) &&
+        Objects.equals(this.title, resourceRecordView.title) &&
+        Objects.equals(this.aHref, resourceRecordView.aHref) &&
+        Arrays.equals(this.blob, resourceRecordView.blob) &&
+        Objects.equals(this.json, resourceRecordView.json) &&
+        Objects.equals(this.texts, resourceRecordView.texts) &&
+        Objects.equals(this.fileName, resourceRecordView.fileName) &&
+        Objects.equals(this.html, resourceRecordView.html) &&
+        Objects.equals(this.link, resourceRecordView.link) &&
+        Objects.equals(this.markdown, resourceRecordView.markdown) &&
+        Objects.equals(this.value, resourceRecordView.value) &&
+        Objects.equals(this.vector, resourceRecordView.vector) &&
+        Objects.equals(this.xml, resourceRecordView.xml) &&
+        Objects.equals(this.tags, resourceRecordView.tags);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, visible, flags, parentId, type, userName, postAt, refreshAt, lastChangedTime, enabled, title, aHref, Arrays.hashCode(blob), json, texts, fileName, html, link, markdown, value, vector, xml, tags, links);
+    return Objects.hash(id, visible, flags, parentId, type, userName, postAt, refreshAt, lastChangedTime, enabled, title, aHref, Arrays.hashCode(blob), json, texts, fileName, html, link, markdown, value, vector, xml, tags);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class EntityModelResourceRecordView {\n");
+    sb.append("class ResourceRecordView {\n");
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    visible: ").append(toIndentedString(visible)).append("\n");
     sb.append("    flags: ").append(toIndentedString(flags)).append("\n");
@@ -816,7 +782,6 @@ public class EntityModelResourceRecordView {
     sb.append("    vector: ").append(toIndentedString(vector)).append("\n");
     sb.append("    xml: ").append(toIndentedString(xml)).append("\n");
     sb.append("    tags: ").append(toIndentedString(tags)).append("\n");
-    sb.append("    links: ").append(toIndentedString(links)).append("\n");
     sb.append("}");
     return sb.toString();
   }
@@ -835,7 +800,7 @@ public class EntityModelResourceRecordView {
 
   static {
     // a set of all properties/fields (JSON key names)
-    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "type", "userName", "postAt", "refreshAt", "lastChangedTime", "enabled", "title", "aHref", "blob", "json", "texts", "fileName", "html", "link", "markdown", "value", "vector", "xml", "tags", "_links"));
+    openapiFields = new HashSet<String>(Arrays.asList("id", "visible", "flags", "parentId", "type", "userName", "postAt", "refreshAt", "lastChangedTime", "enabled", "title", "aHref", "blob", "json", "texts", "fileName", "html", "link", "markdown", "value", "vector", "xml", "tags"));
 
     // a set of required properties/fields (JSON key names)
     openapiRequiredFields = new HashSet<String>(0);
@@ -845,20 +810,20 @@ public class EntityModelResourceRecordView {
    * Validates the JSON Element and throws an exception if issues found
    *
    * @param jsonElement JSON Element
-   * @throws IOException if the JSON Element is invalid with respect to EntityModelResourceRecordView
+   * @throws IOException if the JSON Element is invalid with respect to ResourceRecordView
    */
   public static void validateJsonElement(JsonElement jsonElement) throws IOException {
       if (jsonElement == null) {
-        if (!EntityModelResourceRecordView.openapiRequiredFields.isEmpty()) { // has required fields but JSON element is null
-          throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "The required field(s) %s in EntityModelResourceRecordView is not found in the empty JSON string", EntityModelResourceRecordView.openapiRequiredFields.toString()));
+        if (!ResourceRecordView.openapiRequiredFields.isEmpty()) { // has required fields but JSON element is null
+          throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "The required field(s) %s in ResourceRecordView is not found in the empty JSON string", ResourceRecordView.openapiRequiredFields.toString()));
         }
       }
 
       Set<Map.Entry<String, JsonElement>> entries = jsonElement.getAsJsonObject().entrySet();
       // check to see if the JSON string contains additional fields
       for (Map.Entry<String, JsonElement> entry : entries) {
-        if (!EntityModelResourceRecordView.openapiFields.contains(entry.getKey())) {
-          throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "The field `%s` in the JSON string is not defined in the `EntityModelResourceRecordView` properties. JSON: %s", entry.getKey(), jsonElement.toString()));
+        if (!ResourceRecordView.openapiFields.contains(entry.getKey())) {
+          throw new IllegalArgumentException(String.format(java.util.Locale.ROOT, "The field `%s` in the JSON string is not defined in the `ResourceRecordView` properties. JSON: %s", entry.getKey(), jsonElement.toString()));
         }
       }
         JsonObject jsonObj = jsonElement.getAsJsonObject();
@@ -920,22 +885,22 @@ public class EntityModelResourceRecordView {
     @SuppressWarnings("unchecked")
     @Override
     public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
-       if (!EntityModelResourceRecordView.class.isAssignableFrom(type.getRawType())) {
-         return null; // this class only serializes 'EntityModelResourceRecordView' and its subtypes
+       if (!ResourceRecordView.class.isAssignableFrom(type.getRawType())) {
+         return null; // this class only serializes 'ResourceRecordView' and its subtypes
        }
        final TypeAdapter<JsonElement> elementAdapter = gson.getAdapter(JsonElement.class);
-       final TypeAdapter<EntityModelResourceRecordView> thisAdapter
-                        = gson.getDelegateAdapter(this, TypeToken.get(EntityModelResourceRecordView.class));
+       final TypeAdapter<ResourceRecordView> thisAdapter
+                        = gson.getDelegateAdapter(this, TypeToken.get(ResourceRecordView.class));
 
-       return (TypeAdapter<T>) new TypeAdapter<EntityModelResourceRecordView>() {
+       return (TypeAdapter<T>) new TypeAdapter<ResourceRecordView>() {
            @Override
-           public void write(JsonWriter out, EntityModelResourceRecordView value) throws IOException {
+           public void write(JsonWriter out, ResourceRecordView value) throws IOException {
              JsonObject obj = thisAdapter.toJsonTree(value).getAsJsonObject();
              elementAdapter.write(out, obj);
            }
 
            @Override
-           public EntityModelResourceRecordView read(JsonReader in) throws IOException {
+           public ResourceRecordView read(JsonReader in) throws IOException {
              JsonElement jsonElement = elementAdapter.read(in);
              validateJsonElement(jsonElement);
              return thisAdapter.fromJsonTree(jsonElement);
@@ -946,18 +911,18 @@ public class EntityModelResourceRecordView {
   }
 
   /**
-   * Create an instance of EntityModelResourceRecordView given an JSON string
+   * Create an instance of ResourceRecordView given an JSON string
    *
    * @param jsonString JSON string
-   * @return An instance of EntityModelResourceRecordView
-   * @throws IOException if the JSON string is invalid with respect to EntityModelResourceRecordView
+   * @return An instance of ResourceRecordView
+   * @throws IOException if the JSON string is invalid with respect to ResourceRecordView
    */
-  public static EntityModelResourceRecordView fromJson(String jsonString) throws IOException {
-    return JSON.getGson().fromJson(jsonString, EntityModelResourceRecordView.class);
+  public static ResourceRecordView fromJson(String jsonString) throws IOException {
+    return JSON.getGson().fromJson(jsonString, ResourceRecordView.class);
   }
 
   /**
-   * Convert an instance of EntityModelResourceRecordView to an JSON string
+   * Convert an instance of ResourceRecordView to an JSON string
    *
    * @return JSON string
    */

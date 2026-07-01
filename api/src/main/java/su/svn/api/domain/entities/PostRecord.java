@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.06.29 17:58 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.01 23:05 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecord.java
@@ -19,7 +19,6 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import su.svn.api.services.converters.FloatArrayVectorConverter;
-import su.svn.api.services.mappers.PostRecordMapper;
 
 import java.io.Serializable;
 import java.time.Duration;
@@ -63,17 +62,17 @@ import static lombok.AccessLevel.PRIVATE;
  * <h2>Reactive Features</h2>
  * <ul>
  *     <li>{@link #findByUUID(UUID)} — find record by UUID</li>
- *     <li>{@link #findLastChangedTime()} — get latest change timestamp</li>
+ *     <li>{@link su.svn.api.repository.PostRecordRepository#findLastChangedTime()} — get latest change timestamp</li>
  *     <li>{@link #findLastChangedTimePostRecord()} — get latest changed record</li>
- *     <li>{@link #disable(UUID)} — perform soft deletion</li>
+ *     <li>{@link su.svn.api.repository.PostRecordRepository#disable(UUID)} — perform soft deletion</li>
  *     <li>{@link #readEnabledAndIdIn(List)} — load enabled records by identifiers</li>
  *     <li>{@link #readEnabledOrderByPostAtAndRefreshAtDesc()} — load ordered enabled records</li>
- *     <li>{@link #update(PostRecord)} — update mutable entity fields</li>
+ *     <li>{@link su.svn.api.repository.PostRecordRepository#update(PostRecord)} — update mutable entity fields</li>
  * </ul>
  *
  * <h2>Named Queries</h2>
  * <ul>
- *     <li>{@value #FIND_FIND_BY_UUID} – find record by UUID</li>
+ *     <li>{@value #FIND_BY_UUID} – find record by UUID</li>
  *     <li>{@value #FIND_LAST_CHANGED_TIME_POST_RECORD} – fetch latest changed record</li>
  *     <li>{@value #READ_ENABLED_AND_ID_IN} – fetch enabled records by ID list</li>
  *     <li>{@value #READ_ENABLED_ORDER_POST_REFRESH_DESC} – fetch enabled records ordered by timestamps</li>
@@ -95,7 +94,7 @@ import static lombok.AccessLevel.PRIVATE;
  *
  * <h2>Concurrency and Timeout</h2>
  * <p>
- * Operations such as {@link #disable(UUID)} and {@link #update(PostRecord)} include timeout
+ * Operations such as {@link su.svn.api.repository.PostRecordRepository#disable(UUID)} and {@link su.svn.api.repository.PostRecordRepository#update(PostRecord)} include timeout
  * handling via {@link #TIMEOUT_DURATION} to prevent indefinite waiting.
  * </p>
  *
@@ -116,7 +115,7 @@ import static lombok.AccessLevel.PRIVATE;
 @ToString(exclude = "parent")
 @NamedQueries({
         @NamedQuery(
-                name = PostRecord.FIND_FIND_BY_UUID,
+                name = PostRecord.FIND_BY_UUID,
                 query = "FROM PostRecord WHERE id = :id"
         ),
         @NamedQuery(
@@ -161,7 +160,7 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
     /**
      * Named query for finding a record by UUID.
      */
-    public static final String FIND_FIND_BY_UUID = "PostRecord.findByUUID";
+    public static final String FIND_BY_UUID = "PostRecord.findByUUID";
 
     /**
      * Named query for retrieving the latest changed record.
@@ -381,19 +380,7 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
      * @return reactive result containing the found record
      */
     public static Uni<PostRecord> findByUUID(@Nonnull UUID id) {
-        return find("#" + FIND_FIND_BY_UUID, Map.of("id", id)).firstResult();
-    }
-
-    /**
-     * Retrieves the timestamp of the latest changed record.
-     *
-     * @return reactive result containing the latest change timestamp
-     */
-    public static Uni<LocalDateTime> findLastChangedTime() {
-        return PostRecord.findLastChangedTimePostRecord()
-                .replaceIfNullWith(new PostRecord())
-                .map(postRecord -> postRecord.lastChangedTime)
-                .replaceIfNullWith(LocalDateTime.MIN);
+        return find("#" + FIND_BY_UUID, Map.of("id", id)).firstResult();
     }
 
     /**
@@ -405,36 +392,6 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
         return PostRecord.find("#" + FIND_LAST_CHANGED_TIME_POST_RECORD)
                 .page(0, 1)
                 .firstResult();
-    }
-
-    /**
-     * Performs soft deletion of a record.
-     *
-     * <p>
-     * The record is marked as disabled and its
-     * {@code lastChangedTime} field is updated.
-     * </p>
-     *
-     * @param id record identifier
-     * @return reactive completion signal
-     */
-    public static Uni<Void> disable(@Nonnull UUID id) {
-        return findByUUID(id)
-                .onItem()
-                .ifNotNull()
-                .transform(entity -> {
-                    entity.enabled = false;
-                    entity.lastChangedTime(LocalDateTime.now());
-                    return entity;
-                })
-                .flatMap(postRecord -> persist(postRecord))
-                .onItem()
-                .transformToUni(postRecord -> Uni.createFrom().voidItem())
-                .ifNoItem()
-                .after(TIMEOUT_DURATION)
-                .fail()
-                .onFailure()
-                .recoverWithUni(Uni.createFrom().voidItem());
     }
 
     /**
@@ -453,10 +410,12 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
      * @param ids list of record identifiers
      * @return reactive result containing matching records
      */
+    @SuppressWarnings("unused")
     public static Uni<List<PostRecord>> readEnabledAndIdIn(List<UUID> ids) {
-        var params = new HashMap<>(PostRecord.ENABLED);
-        params.put("ids", ids);
-        return PostRecord.find("#" + READ_ENABLED_AND_ID_IN, params).list();
+        return PostRecord.find(
+                "#" + READ_ENABLED_AND_ID_IN,
+                Map.of("enabled", Boolean.TRUE, "ids", ids)
+        ).list();
     }
 
     /**
@@ -466,26 +425,5 @@ public class PostRecord extends PanacheEntityBase implements Serializable {
      */
     public static PanacheQuery<PostRecord> readEnabledOrderByPostAtAndRefreshAtDesc() {
         return PostRecord.find("#" + READ_ENABLED_ORDER_POST_REFRESH_DESC, PostRecord.ENABLED);
-    }
-
-    /**
-     * Updates mutable fields of an existing post record.
-     *
-     * @param postRecord source entity containing updated values
-     * @return reactive result containing updated entity
-     */
-    public static Uni<PostRecord> update(@Nonnull PostRecord postRecord) {
-        return findByUUID(postRecord.id)
-                .onItem()
-                .ifNotNull()
-                .transform(entity -> {
-                    PostRecordMapper.INSTANCE.update(entity, postRecord);
-                    return entity;
-                })
-                .ifNoItem()
-                .after(TIMEOUT_DURATION)
-                .fail()
-                .onFailure()
-                .transform(IllegalStateException::new);
     }
 }

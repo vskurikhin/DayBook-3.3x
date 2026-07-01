@@ -18,8 +18,8 @@ components:
     NewBlobRecord:
       type: object
       required:
-        - blob
-        - postAt
+      - blob
+      - postAt
       properties:
         visible:
           type: boolean
@@ -47,8 +47,8 @@ components:
     NewJsonRecord:
       type: object
       required:
-        - json
-        - postAt
+      - json
+      - postAt
       properties:
         visible:
           type: boolean
@@ -77,8 +77,8 @@ components:
     NewMarkdownRecord:
       type: object
       required:
-        - markdown
-        - postAt
+      - markdown
+      - postAt
       properties:
         visible:
           type: boolean
@@ -106,8 +106,8 @@ components:
     NewSetRecord:
       type: object
       required:
-        - texts
-        - postAt
+      - texts
+      - postAt
       properties:
         visible:
           type: boolean
@@ -137,8 +137,8 @@ components:
     NewValueRecord:
       type: object
       required:
-        - value
-        - postAt
+      - value
+      - postAt
       properties:
         visible:
           type: boolean
@@ -166,8 +166,8 @@ components:
     NewVectorRecord:
       type: object
       required:
-        - vector
-        - postAt
+      - vector
+      - postAt
       properties:
         visible:
           type: boolean
@@ -199,8 +199,8 @@ components:
     NewXmlRecord:
       type: object
       required:
-        - xml
-        - postAt
+      - xml
+      - postAt
       properties:
         visible:
           type: boolean
@@ -229,7 +229,7 @@ components:
       type: string
       format: date-time
       examples:
-        - 2022-03-10T12:15:50-04:00
+      - 2022-03-10T12:15:50-04:00
     RecordData:
       type: object
       properties:
@@ -307,13 +307,13 @@ components:
     RecordType:
       type: string
       enum:
-        - Base
-        - Blob
-        - Json
-        - Set
-        - Text
-        - Vector
-        - Xml
+      - Base
+      - Blob
+      - Json
+      - Set
+      - Text
+      - Vector
+      - Xml
     ResourceBlobRecord:
       type: object
       properties:
@@ -519,9 +519,9 @@ components:
     UpdateBlobRecord:
       type: object
       required:
-        - id
-        - parentId
-        - refreshAt
+      - id
+      - parentId
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -553,10 +553,10 @@ components:
     UpdateJsonRecord:
       type: object
       required:
-        - id
-        - parentId
-        - json
-        - refreshAt
+      - id
+      - parentId
+      - json
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -589,10 +589,10 @@ components:
     UpdateMarkdownRecord:
       type: object
       required:
-        - id
-        - parentId
-        - markdown
-        - refreshAt
+      - id
+      - parentId
+      - markdown
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -624,10 +624,10 @@ components:
     UpdateSetRecord:
       type: object
       required:
-        - id
-        - parentId
-        - texts
-        - refreshAt
+      - id
+      - parentId
+      - texts
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -661,10 +661,10 @@ components:
     UpdateValueRecord:
       type: object
       required:
-        - id
-        - parentId
-        - value
-        - refreshAt
+      - id
+      - parentId
+      - value
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -696,10 +696,10 @@ components:
     UpdateVectorRecord:
       type: object
       required:
-        - id
-        - parentId
-        - vector
-        - refreshAt
+      - id
+      - parentId
+      - vector
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -735,10 +735,10 @@ components:
     UpdateXmlRecord:
       type: object
       required:
-        - id
-        - parentId
-        - xml
-        - refreshAt
+      - id
+      - parentId
+      - xml
+      - refreshAt
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -799,10 +799,10 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Blob Record Resource
+      - Blob Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
     post:
       summary: Create BLOB record
       requestBody:
@@ -827,19 +827,19 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Blob Record Resource
+      - Blob Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/blob/{id}:
     delete:
       summary: Delete BLOB record
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
       responses:
         "204":
           $ref: "#/components/responses/204NoCont"
@@ -850,10 +850,10 @@ paths:
         "403":
           description: Not Allowed
       tags:
-        - Blob Record Resource
+      - Blob Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/json:
     put:
       summary: Update JSON record
@@ -879,10 +879,10 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Json Record Resource
+      - Json Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
     post:
       summary: Create JSON record
       requestBody:
@@ -907,19 +907,19 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Json Record Resource
+      - Json Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/json/{id}:
     delete:
       summary: Delete JSON record
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
       responses:
         "204":
           $ref: "#/components/responses/204NoCont"
@@ -930,10 +930,10 @@ paths:
         "403":
           description: Not Allowed
       tags:
-        - Json Record Resource
+      - Json Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/markdown:
     put:
       summary: Update markdown record
@@ -959,10 +959,10 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Markdown Record Resource
+      - Markdown Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
     post:
       summary: Create markdown record
       requestBody:
@@ -987,19 +987,19 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Markdown Record Resource
+      - Markdown Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/markdown/{id}:
     delete:
       summary: Delete markdown record
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
       responses:
         "204":
           $ref: "#/components/responses/204NoCont"
@@ -1010,10 +1010,10 @@ paths:
         "403":
           description: Not Allowed
       tags:
-        - Markdown Record Resource
+      - Markdown Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/set:
     put:
       summary: Update BLOB record
@@ -1039,10 +1039,10 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Set Record Resource
+      - Set Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
     post:
       summary: Create BLOB record
       requestBody:
@@ -1067,19 +1067,19 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Set Record Resource
+      - Set Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/set/{id}:
     delete:
       summary: Delete BLOB record
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
       responses:
         "204":
           description: No Content
@@ -1090,10 +1090,10 @@ paths:
         "403":
           description: Not Allowed
       tags:
-        - Set Record Resource
+      - Set Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/value:
     put:
       summary: Update BLOB record
@@ -1119,10 +1119,10 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Value Record Resource
+      - Value Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
     post:
       summary: Create BLOB record
       requestBody:
@@ -1147,19 +1147,19 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Value Record Resource
+      - Value Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/value/{id}:
     delete:
       summary: Delete BLOB record
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
       responses:
         "204":
           description: No Content
@@ -1170,10 +1170,10 @@ paths:
         "403":
           description: Not Allowed
       tags:
-        - Value Record Resource
+      - Value Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/vector:
     put:
       summary: Update BLOB record
@@ -1199,10 +1199,10 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Vector Record Resource
+      - Vector Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
     post:
       summary: Create BLOB record
       requestBody:
@@ -1227,19 +1227,19 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Vector Record Resource
+      - Vector Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/vector/{id}:
     delete:
       summary: Delete BLOB record
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
       responses:
         "204":
           description: No Content
@@ -1250,10 +1250,10 @@ paths:
         "403":
           description: Not Allowed
       tags:
-        - Vector Record Resource
+      - Vector Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/xml:
     put:
       summary: Update BLOB record
@@ -1279,10 +1279,10 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Xml Record Resource
+      - Xml Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
     post:
       summary: Create BLOB record
       requestBody:
@@ -1307,19 +1307,19 @@ paths:
         "400":
           description: Bad Request
       tags:
-        - Xml Record Resource
+      - Xml Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/record/xml/{id}:
     delete:
       summary: Delete BLOB record
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
       responses:
         "204":
           description: No Content
@@ -1330,24 +1330,24 @@ paths:
         "403":
           description: Not Allowed
       tags:
-        - Xml Record Resource
+      - Xml Record Resource
       security:
-        - SecurityScheme:
-            - USER
+      - SecurityScheme:
+        - USER
   /api/v2/records:
     get:
       summary: Get page with list of records
       parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            format: int32
-        - name: size
-          in: query
-          schema:
-            type: integer
-            format: int8
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int8
       responses:
         "201":
           description: Created
@@ -1358,7 +1358,27 @@ paths:
         "500":
           $ref: "#/components/responses/500Error"
       tags:
-        - Record Resource
+      - Record Resource
+  /api/v2/records/{id}:
+    get:
+      summary: Retrieves a single record by its unique identifier
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordData"
+        "500":
+          $ref: "#/components/responses/500Error"
+      tags:
+      - Record Resource
   /health:
     get:
       responses:
@@ -1370,4 +1390,4 @@ paths:
                 type: string
       summary: Hello
       tags:
-        - Health Check Resource
+      - Health Check Resource

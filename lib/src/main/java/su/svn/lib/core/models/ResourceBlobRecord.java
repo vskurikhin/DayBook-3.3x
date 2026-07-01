@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.06.29 16:59 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.01 22:56 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * ResourceBlobRecord.java
@@ -60,7 +60,7 @@ import su.svn.lib.core.JSON;
 /**
  * ResourceBlobRecord
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-06-29T16:37:54.918196+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-07-01T22:38:06.881138+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class ResourceBlobRecord {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)

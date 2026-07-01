@@ -1,13 +1,21 @@
 package su.svn.api.domain.entities;
 
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.Test;
+import su.svn.PostgreSQLTestResource;
+import su.svn.api.profile.ContainersProfile;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@QuarkusTest
+@QuarkusTestResource(value = PostgreSQLTestResource.class)
+@TestProfile(ContainersProfile.class)
 class PostRecordTest {
 
     @Test

@@ -5,19 +5,24 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class PostgreSQLTestResource implements QuarkusTestResourceLifecycleManager {
-    static PostgreSQLContainer<?> db = new PostgreSQLContainer<>("pgvector/pgvector:pg18");
+    static PostgreSQLContainer<?> db;
+    private static final AtomicInteger COUNTER = new AtomicInteger();
 
     @Override
     public Map<String, String> start() {
+        db = new PostgreSQLContainer<>("pgvector/pgvector:pg18");
         db.start();
-        var url = String.format("vertx-reactive:postgresql://%s:%d/%s?%s",
+        int id = COUNTER.incrementAndGet();
+        System.err.printf("START %d %s%n", id, db);
+        var url = String.format(
+                "postgresql://%s:%d/%s",
                 db.getHost(),
                 db.getMappedPort(5432),
-                db.getDatabaseName(),
-                "currentSchema=api"
-        );
+                db.getDatabaseName());
+
         System.setProperty("quarkus.datasource.reactive.url",
                 String.format("postgresql://%s:%d/%s",
                         db.getHost(),
@@ -39,11 +44,17 @@ public class PostgreSQLTestResource implements QuarkusTestResourceLifecycleManag
         System.out.println("db.getFirstMappedPort() = " + db.getFirstMappedPort());
         System.out.println("db.getUsername() = " + db.getUsername());
         System.out.println("url = " + url);
+        System.out.println("db.isRunning() = " + db.isRunning());
 
         // Pass container properties to Quarkus
         return Map.of(
                 "quarkus.datasource.jdbc.url", jdbcUrl,
-                "quarkus.datasource.reactive.url", url,
+                "quarkus.datasource.reactive.url",
+                String.format(
+                        "postgresql://%s:%d/%s",
+                        db.getHost(),
+                        db.getMappedPort(5432),
+                        db.getDatabaseName()),
                 "quarkus.datasource.username", db.getUsername(),
                 "quarkus.datasource.password", db.getPassword()
         );
@@ -51,6 +62,9 @@ public class PostgreSQLTestResource implements QuarkusTestResourceLifecycleManag
 
     @Override
     public void stop() {
+        System.out.println("db.isRunning() = " + db.isRunning());
+        System.err.printf("STOP %s running=%s%n", db, db.isRunning());
+        System.out.println("STOP TEST RESOURCE");
         db.stop();
     }
 }

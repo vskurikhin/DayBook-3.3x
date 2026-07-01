@@ -12,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.mockito.internal.verification.Times;
 import su.svn.api.models.dto.NewJsonRecord;
 import su.svn.api.models.dto.ResourceJsonRecord;
 import su.svn.api.models.dto.UpdateJsonRecord;
@@ -29,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @QuarkusTest
-@QuarkusTestResource(value = PostgreSQLTestResource.class, restrictToAnnotatedClass = true)
+@QuarkusTestResource(value = PostgreSQLTestResource.class)
 @TestProfile(ContainersProfile.class)
 public class ApiIT {
 

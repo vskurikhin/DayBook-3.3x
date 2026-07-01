@@ -900,6 +900,47 @@ paths:
       - record-view-controller
       x-accepts:
       - '*/*'
+  /core/api/v2/records-view/{id}:
+    get:
+      operationId: getRecord
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "400":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Bad Request
+        "404":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not Found
+        "500":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal Server Error
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ResourceRecordView"
+          description: OK
+      tags:
+      - record-view-controller
+      x-accepts:
+      - '*/*'
   /core/api/v2/markdown-record/{id}:
     delete:
       operationId: deleteMarkdownRecord
@@ -2374,6 +2415,109 @@ components:
             $ref: "#/components/schemas/Link"
         page:
           $ref: "#/components/schemas/PageMetadata"
+    ResourceRecordView:
+      example:
+        fileName: fileName
+        visible: true
+        postAt: 2000-01-23T04:56:07.000+00:00
+        flags: 0
+        link: link
+        type: Base
+        userName: userName
+        title: title
+        parentId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        enabled: true
+        tags:
+        - tags
+        - tags
+        lastChangedTime: 2000-01-23T04:56:07.000+00:00
+        blob: blob
+        texts:
+        - texts
+        - texts
+        aHref: aHref
+        xml: xml
+        refreshAt: 2000-01-23T04:56:07.000+00:00
+        markdown: markdown
+        json:
+          key: json
+        html: html
+        vector:
+        - 6.0274563
+        - 6.0274563
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        value: value
+      properties:
+        id:
+          format: uuid
+          type: string
+        visible:
+          type: boolean
+        flags:
+          format: int32
+          type: integer
+        parentId:
+          format: uuid
+          type: string
+        type:
+          enum:
+          - Base
+          - Blob
+          - Json
+          - Set
+          - Text
+          - Vector
+          - Xml
+          type: string
+        userName:
+          type: string
+        postAt:
+          format: date-time
+          type: string
+        refreshAt:
+          format: date-time
+          type: string
+        lastChangedTime:
+          format: date-time
+          type: string
+        enabled:
+          type: boolean
+        title:
+          type: string
+        aHref:
+          type: string
+        blob:
+          format: byte
+          type: string
+        json:
+          additionalProperties:
+            type: string
+        texts:
+          items:
+            type: string
+          type: array
+          uniqueItems: true
+        fileName:
+          type: string
+        html:
+          type: string
+        link:
+          type: string
+        markdown:
+          type: string
+        value:
+          type: string
+        vector:
+          items:
+            format: float
+            type: number
+          type: array
+        xml:
+          type: string
+        tags:
+          items:
+            type: string
+          type: array
     Link:
       example:
         hreflang: hreflang

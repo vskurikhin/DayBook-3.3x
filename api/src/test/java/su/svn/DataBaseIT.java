@@ -110,7 +110,7 @@ public class DataBaseIT {
     @RunOnVertxContext
     void testPostRecord_findByUUID1(UniAsserter asserter) {
         asserter.assertThat(
-                () -> Panache.withTransaction(PostRecord::findLastChangedTime),
+                () -> postRecordRepository.findLastChangedTime(),
                 Assertions::assertNotNull
         );
     }

@@ -1,7 +1,6 @@
-package su.svn.core.services;
+package su.svn.core.services.domain;
 
 import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,17 +13,19 @@ import su.svn.core.models.dto.ResourceMarkdownRecord;
 import su.svn.core.models.dto.UpdateMarkdownRecord;
 import su.svn.core.models.exceptions.CustomNotFoundException;
 import su.svn.core.repository.TextRecordRepository;
-import su.svn.core.services.domain.MarkdownRecordServiceImpl;
-import su.svn.core.services.domain.RecordServiceHelper;
 import su.svn.core.services.mappers.MarkdownRecordMapper;
 import su.svn.lib.RecordType;
 import su.svn.lib.TextRecordType;
 
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MarkdownRecordServiceImplTest {

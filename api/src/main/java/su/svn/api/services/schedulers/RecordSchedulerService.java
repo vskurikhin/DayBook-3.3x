@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.06.29 18:35 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.01 23:05 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordSchedulerService.java
@@ -9,6 +9,7 @@
 package su.svn.api.services.schedulers;
 
 import io.quarkus.scheduler.Scheduled;
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
@@ -28,25 +29,34 @@ public class RecordSchedulerService {
     @Inject
     PostRecordDataSyncService syncService;
 
-    @Inject
-    io.vertx.core.Vertx vertx;
-
     @Scheduled(every = "7s")
-    void job() {
-        if (this.fire.get() && this.done.compareAndSet(true, false)) {
-            vertx.runOnContext(v -> {
-                syncService.sync(0, SYNC_SIZE)
-                        .subscribe().with(
-                                result -> LOG.infof(
-                                        "page: %d, result.size(): %d",
-                                        0, result.size()
-                                ),
-                                Throwable::printStackTrace
-                        );
-            });
-            this.fire.set(false);
-            this.done.set(true);
+    Uni<Void> job() {
+        if (!fire.get() || !done.compareAndSet(true, false)) {
+            return Uni.createFrom().voidItem();
         }
+
+        return syncPage(0)
+                .eventually(() -> {
+                    fire.set(false);
+                    done.set(true);
+                    return Uni.createFrom().voidItem();
+                });
+    }
+
+    private Uni<Void> syncPage(int pageIndex) {
+        return syncService.sync(pageIndex, SYNC_SIZE)
+                .invoke(result ->
+                        LOG.infof("page=%d size=%d", pageIndex, result.size())
+                )
+                .flatMap(result -> {
+                    if (!result.isEmpty()) {
+                        return syncPage(pageIndex + 1);
+                    }
+                    return Uni.createFrom().voidItem();
+                })
+                .onFailure().invoke(t ->
+                        LOG.errorf(t, "Synchronization failed on page %d", pageIndex)
+                );
     }
 
     public void fire(boolean fire) {

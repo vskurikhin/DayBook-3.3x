@@ -1357,6 +1357,67 @@
         }
       }
     },
+    "/core/api/v2/records-view/{id}": {
+      "get": {
+        "tags": [
+          "record-view-controller"
+        ],
+        "operationId": "getRecord",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceRecordView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/core/api/v2/markdown-record/{id}": {
       "get": {
         "tags": [
@@ -1488,8 +1549,8 @@
           }
         ],
         "responses": {
-          "400": {
-            "description": "Bad Request",
+          "404": {
+            "description": "Not Found",
             "content": {
               "*/*": {
                 "schema": {
@@ -1498,8 +1559,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found",
+          "400": {
+            "description": "Bad Request",
             "content": {
               "*/*": {
                 "schema": {
@@ -2894,6 +2955,110 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMetadata"
+          }
+        }
+      },
+      "ResourceRecordView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "flags": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Base",
+              "Blob",
+              "Json",
+              "Set",
+              "Text",
+              "Vector",
+              "Xml"
+            ]
+          },
+          "userName": {
+            "type": "string"
+          },
+          "postAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastChangedTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          },
+          "aHref": {
+            "type": "string"
+          },
+          "blob": {
+            "type": "string",
+            "format": "byte"
+          },
+          "json": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "texts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          },
+          "markdown": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "vector": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "xml": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
