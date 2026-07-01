@@ -1,8 +1,11 @@
 import styles from './Record.module.scss';
+import { Link } from "react-router-dom";
 import { marked } from "marked";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const User = ({ record }: { record: any }) => {
     const date = new Date(record.refreshAt || record.postAt);
+    const { isAuthenticated } = useAuth();
 
     const months = [
         "январь",
@@ -52,6 +55,19 @@ const User = ({ record }: { record: any }) => {
         </p>
       </div>
         <p className={styles.date}>
+          {isAuthenticated && (
+            <>
+              <Link to={`/post/${record.id}/edit`} className={styles.editLink}><span
+                className={styles.editIcon}>✏&nbsp;</span>
+              </Link>
+            </>
+          ) || (
+            <>
+              <span
+                className={styles.editIcon}>✏&nbsp;
+              </span>
+            </>
+          )}
           <span>{formatted}</span>
         </p>
     </div>

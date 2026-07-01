@@ -15,6 +15,7 @@ import { InputText } from "primereact/inputtext";
 import { ReactNode } from "react";
 
 import AddRecordForm from "./components/AddRecordForm/AddRecordForm"
+import EditRecordForm from "./components/EditRecordForm/EditRecordForm"
 import Home from "./components/Home/Home";
 import IntersectionObserverRecordsPage from "./components/IntersectionObserverRecordsPage/IntersectionObserverRecordsPage"
 import Layout from "./components/Layout/Layout";
@@ -112,7 +113,15 @@ function App() {
               <AddRecordForm />
             </RequireAuth>
           ),
-        }
+        },
+        {
+          path: "post/:id/edit",
+          element: (
+            <RequireAuth redirectTo="/login">
+                <EditRecordForm />
+            </RequireAuth>
+          ),
+        },
       ],
     },
   ]);
@@ -164,34 +173,5 @@ RedirectIfLoggedIn.propTypes = {
   children: PropTypes.element.isRequired,
   redirectTo: PropTypes.string.isRequired,
 };
-
-// function App() {
-//   const [count, setCount] = useState(0);
-//
-//   return (
-//     <>
-//       <p>
-//         <a href="https://vitejs.dev" target="_blank">
-//           <img src={viteLogo} className="logo inline-block" alt="Vite logo" />
-//         </a>
-//         <a href="https://react.dev" target="_blank">
-//           <img src={reactLogo} className="logo react inline-block" alt="React logo" />
-//         </a>
-//       </p>
-//       <h1>Vite + PrimeReact + TailwindCSS</h1>
-//       <div>
-//         <h2>Demo app showing PrimeReact + Tailwind CSS in styled mode with PrimeReact Theme!</h2>
-//       </div>
-//       <div className="card">
-//         <Button icon="pi pi-plus" className="mr-2" label="Increment" onClick={() => setCount((count) => count + 1)}></Button>
-//         <InputText value={count.toString()} />
-//         <p>
-//           Edit <code>src/App.jsx</code> and save to test HMR
-//         </p>
-//       </div>
-//       <p className="read-the-docs">Click on the Vite and React logos to learn more</p>
-//     </>
-//   );
-// }
 
 export default App;
