@@ -10,6 +10,7 @@ import (
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
 )
 
@@ -137,6 +138,7 @@ func (v V2) Ok(w http.ResponseWriter, _ *http.Request) error {
 // @Success 206
 // @Failure 400 {object} APIResponse{error=string,success=bool} "bad request"
 // @Failure 401 {object} string "unauthorized"
+// @Failure 404 {object} APIResponse{error=string,success=bool} "no rows in result set"
 // @Failure 500 {object} APIResponse{error=string,success=bool} "server error 'success': false"
 // @Failure 503 {object} APIResponse{error=string,success=bool} "service unavailable"
 // @Failure 504 {object} APIResponse{error=string,success=bool} "gateway timeout"
@@ -149,7 +151,7 @@ func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
 			slog.String("error", err.Error()),
 			slog.String("errorType", fmt.Sprintf("%T", err)),
 		)
-		return err
+		return xerror.ClassingHTTPError(err)
 	}
 	body := http.MaxBytesReader(w, r.Body, int64(v.cfg.Values().RequestMaxBytes))
 	decoder := json.NewDecoder(body)
@@ -161,6 +163,11 @@ func (v V2) Refresh(w http.ResponseWriter, r *http.Request) error {
 	_ = login
 	creds, err := v.refreshService.Refresh(r.Context(), cookie.Value)
 	if err != nil {
+		slog.ErrorContext(r.Context(),
+			"failed refresh",
+			slog.String("error", err.Error()),
+			slog.String("errorType", fmt.Sprintf("%T", err)),
+		)
 		return err
 	}
 	refreshCookie := creds.RefreshTokenCookie()

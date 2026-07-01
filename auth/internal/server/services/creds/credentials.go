@@ -2,6 +2,8 @@ package creds
 
 import (
 	"encoding/base64"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -58,6 +60,11 @@ func (c *CredentialsMethodFactoryV2) MakeCredentials(credValues model.CredValues
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	signedRefreshToken, errSigRefreshToken := refreshToken.SignedString(c.cfg.Values().JWThs256SignKey)
 	if errSigRefreshToken != nil {
+		slog.Error(
+			"failed make credentials",
+			slog.String("error", errSigRefreshToken.Error()),
+			slog.String("errorType", fmt.Sprintf("%T", errSigRefreshToken)),
+		)
 		return model.Credentials{}, errSigRefreshToken
 	}
 	// Define the cookie
