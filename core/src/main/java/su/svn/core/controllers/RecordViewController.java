@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.06.29 16:59 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.01 23:05 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewController.java
@@ -18,48 +18,69 @@ import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import su.svn.lib.models.dto.ResourceRecordView;
+import org.springframework.web.bind.annotation.*;
 import su.svn.core.models.dto.ResourceRecordViewFilter;
 import su.svn.core.services.domain.RecordViewService;
+import su.svn.lib.models.dto.ResourceRecordView;
+
+import java.util.UUID;
 
 /**
- * REST controller for retrieving and filtering record views.
+ * REST controller for accessing resource record views.
  *
- * <p>This controller exposes a read-only endpoint for querying {@link ResourceRecordView}
- * data with optional filtering and pagination support. It delegates the business logic
- * to the {@link RecordViewService}.</p>
+ * <p>This controller provides read-only REST endpoints for retrieving
+ * {@link ResourceRecordView} entities. It supports retrieving a paginated list
+ * of records with filtering capabilities and retrieving a single record by its
+ * unique identifier.</p>
+ *
+ * <p>The controller delegates all business operations to {@link RecordViewService}
+ * and is responsible only for handling HTTP requests, request validation,
+ * pagination parameters, and response mapping.</p>
  *
  * <p>Base URL: <b>/core/api/v2/records-view</b></p>
  *
- * <h2>Endpoints</h2>
+ * <h2>Available endpoints</h2>
+ *
  * <ul>
- *     <li><b>GET /</b> — Retrieve a paginated list of records with optional filters</li>
+ *     <li>
+ *         <b>GET /</b> — Retrieves a paginated list of record views with optional filtering.
+ *     </li>
+ *     <li>
+ *         <b>GET /{id}</b> — Retrieves a single record view by its unique identifier.
+ *     </li>
  * </ul>
  *
  * <h2>Filtering</h2>
- * <p>Filtering is supported via {@link ResourceRecordViewFilter}, which can be passed
- * as query parameters. Supported filters may include fields such as title and date range.</p>
  *
- * <h2>Pagination</h2>
- * <p>Pagination is handled באמצעות Spring's {@link org.springframework.data.domain.Pageable}.
- * Clients can control paging using standard query parameters such as:</p>
+ * <p>The list endpoint supports filtering through {@link ResourceRecordViewFilter}.
+ * Filter parameters are provided as HTTP query parameters and may be used to narrow
+ * down the result set.</p>
+ *
+ * <h2>Pagination and sorting</h2>
+ *
+ * <p>Pagination is implemented using Spring Data's {@link Pageable}.
+ * Clients can control pagination using standard query parameters:</p>
+ *
  * <ul>
- *     <li><b>page</b> — page number (0-based)</li>
- *     <li><b>size</b> — number of items per page</li>
- *     <li><b>sort</b> — sorting criteria</li>
+ *     <li><b>page</b> — zero-based page index</li>
+ *     <li><b>size</b> — number of records per page</li>
+ *     <li><b>sort</b> — sorting properties and direction</li>
  * </ul>
  *
- * <h2>Validation</h2>
- * <p>The controller is annotated with {@link org.springframework.validation.annotation.Validated}
- * to support validation of incoming request parameters.</p>
+ * <h2>Responses</h2>
  *
- * <h2>Response</h2>
- * <p>Returns a {@link org.springframework.data.domain.Page} of {@link ResourceRecordView}
- * wrapped in a {@link org.springframework.http.ResponseEntity} with HTTP status {@code 200 OK}.</p>
+ * <p>The collection endpoint returns a HAL-based paginated representation using
+ * {@link PagedModel} and {@link EntityModel}.</p>
+ *
+ * <p>The single record endpoint returns the requested
+ * {@link ResourceRecordView} wrapped in {@link ResponseEntity}.
+ * If the record does not exist, an empty response is returned with HTTP status
+ * {@code 404 NOT_FOUND}.</p>
+ *
+ * <h2>Validation</h2>
+ *
+ * <p>The controller is annotated with {@link Validated} to enable validation
+ * support for incoming request parameters and filter objects.</p>
  *
  * @author Victor N. Skurikhin
  */
@@ -92,5 +113,21 @@ public class RecordViewController {
         var records = recordViewService.getFilteredRecords(filter, pageable);
         var model = assembler.toModel(records);
         return ResponseEntity.ok(model);
+    }
+
+    /**
+     * Retrieves a single record by its unique identifier.
+     *
+     * <p>The method loads a record from the record view service using the provided UUID.
+     * If the record exists and the current user has access to it, the record is returned
+     * as a response body. Otherwise, an appropriate HTTP error response is returned.</p>
+     *
+     * @param id unique identifier of the requested record
+     * @return {@link ResponseEntity} containing the requested record or an error status
+     */
+    @SuppressWarnings("unused")
+    @GetMapping("/{id}")
+    public ResponseEntity<ResourceRecordView> getRecord(@PathVariable UUID id) {
+        return ResponseEntity.of(recordViewService.getRecord(id));
     }
 }

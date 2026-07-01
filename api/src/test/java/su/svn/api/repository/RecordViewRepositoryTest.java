@@ -1,6 +1,7 @@
 package su.svn.api.repository;
 
 import io.smallrye.mutiny.Uni;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,9 +33,6 @@ import static su.svn.lib.Constants.REQUEST_ID;
 class RecordViewRepositoryTest {
 
     @Mock
-    private JsonRecordMapper jsonRecordMapper;
-
-    @Mock
     private EntityModelResourceRecordMapper resourceRecordMapper;
 
     @Mock
@@ -51,7 +49,13 @@ class RecordViewRepositoryTest {
         MDC.put(REQUEST_ID, "request-id");
     }
 
+    @AfterEach
+    void tearDown() {
+        MDC.clear();
+    }
+
     // TODO @Test
+    @SuppressWarnings("unused")
     void shouldReadPage() {
         // given
         int pageIndex = 0;
@@ -306,5 +310,117 @@ class RecordViewRepositoryTest {
         assertEquals(100L, metadata.totalElements());
         assertEquals(5L, metadata.totalPages());
         assertEquals(1L, metadata.number());
+    }
+
+    @Test
+    void shouldReadRecord() {
+
+        // given
+        UUID id = UUID.randomUUID();
+
+
+        EntityModelResourceRecordView entityModel =
+                EntityModelResourceRecordView.builder()
+                        .id(id)
+                        .type(RecordType.Json)
+                        .title("record-title")
+                        .postAt(OffsetDateTime.now())
+                        .lastChangedTime(LocalDateTime.now())
+                        .json(Map.of("key", "value"))
+                        .build();
+
+
+        PostRecord postRecord =
+                PostRecord.builder()
+                        .id(id)
+                        .title("record-title")
+                        .type(RecordType.Json)
+                        .build();
+
+
+
+        when(principalHelper.authorization())
+                .thenReturn("Bearer token");
+
+
+        when(recordViewClient.getRecord(
+                eq("Bearer token"),
+                eq("request-id"),
+                eq(id)
+        ))
+                .thenReturn(Uni.createFrom().item(entityModel));
+
+
+        when(resourceRecordMapper.toEntity(entityModel))
+                .thenReturn(postRecord);
+
+
+
+        // when
+        PostRecord result =
+                repository.readRecord(id)
+                        .await()
+                        .indefinitely();
+
+
+
+        // then
+        assertNotNull(result);
+
+        assertEquals(postRecord, result);
+
+        assertEquals(id, result.id());
+
+        assertEquals("record-title", result.title());
+
+
+
+        verify(principalHelper)
+                .authorization();
+
+
+        verify(recordViewClient)
+                .getRecord(
+                        "Bearer token",
+                        "request-id",
+                        id
+                );
+
+
+        verify(resourceRecordMapper)
+                .toEntity(entityModel);
+    }
+
+    @Test
+    void shouldFailWhenRecordViewClientFails() {
+
+        UUID id = UUID.randomUUID();
+
+
+        when(principalHelper.authorization())
+                .thenReturn("Bearer token");
+
+
+        when(recordViewClient.getRecord(
+                eq("Bearer token"),
+                eq("request-id"),
+                eq(id)
+        ))
+                .thenReturn(
+                        Uni.createFrom()
+                                .failure(new RuntimeException("client error"))
+                );
+
+
+        assertThrows(
+                RuntimeException.class,
+                () -> repository.readRecord(id)
+                        .await()
+                        .indefinitely()
+        );
+
+
+        verify(resourceRecordMapper, never())
+                .toEntity(any());
     }
 }

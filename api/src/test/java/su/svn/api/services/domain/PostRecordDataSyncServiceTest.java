@@ -120,4 +120,35 @@ class PostRecordDataSyncServiceTest {
         verify(postRecordRepository)
                 .persistAll(anyList());
     }
+
+    @Test
+    void shouldReadPostRecord() {
+
+        UUID id = UUID.randomUUID();
+
+        PostRecord record = mock(PostRecord.class);
+
+
+        when(postRecordRepository.findById(id))
+                .thenReturn(Uni.createFrom().item(record));
+
+
+        when(recordViewRepository.readRecord(id))
+                .thenReturn(Uni.createFrom().item(record));
+
+
+        PostRecord result =
+                service.readPostRecord(id)
+                        .await()
+                        .indefinitely();
+
+
+        assertNotNull(result);
+
+        verify(postRecordRepository)
+                .findById(id);
+
+        verify(recordViewRepository)
+                .readRecord(id);
+    }
 }

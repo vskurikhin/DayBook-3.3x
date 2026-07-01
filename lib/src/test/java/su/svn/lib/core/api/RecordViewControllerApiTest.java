@@ -17,7 +17,9 @@ import su.svn.lib.core.ApiException;
 import su.svn.lib.core.models.ErrorResponse;
 import su.svn.lib.core.models.Pageable;
 import su.svn.lib.core.models.PagedModelEntityModelResourceRecordView;
+import su.svn.lib.core.models.ResourceRecordView;
 import su.svn.lib.core.models.ResourceRecordViewFilter;
+import java.util.UUID;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +44,16 @@ public class RecordViewControllerApiTest {
         ResourceRecordViewFilter filter = null;
         Pageable pageable = null;
         PagedModelEntityModelResourceRecordView response = api.getAllRecords(filter, pageable);
+        // TODO: test validations
+    }
+
+    /**
+     * @throws ApiException if the Api call fails
+     */
+    @Test
+    public void getRecordTest() throws ApiException {
+        UUID id = null;
+        ResourceRecordView response = api.getRecord(id);
         // TODO: test validations
     }
 

@@ -23,23 +23,37 @@ export default function RecordsPage() {
         if (loadingRef.current || !hasMore) {
             return;
         }
+
         loadingRef.current = true;
-        const currentPage = pageRef.current;
+
         try {
+            const currentPage = pageRef.current;
+
             const data = await getRecords(currentPage, 10);
-            setRecords(prev => [
-                ...prev,
-                ...(data.list || [])
-            ]);
-            const total = data.totalRecords || 0;
-            if ((currentPage + 1) * 10 >= total) {
-                setHasMore(false);
-            }
+
+            setRecords(prev => [...prev, ...(data.list ?? [])]);
+
             pageRef.current++;
+
+            const total = data.totalRecords ?? 0;
+            const more = (currentPage + 1) * 10 < total;
+            setHasMore(more);
+
+            // если после рендера нет вертикального скролла —
+            // сразу грузим ещё
+            requestAnimationFrame(() => {
+                if (
+                    more &&
+                    document.documentElement.scrollHeight <= window.innerHeight
+                ) {
+                    loadPage();
+                }
+            });
 
         } finally {
             loadingRef.current = false;
         }
+
     }, [hasMore]);
 
 
@@ -57,6 +71,7 @@ export default function RecordsPage() {
     useEffect(() => {
         const observer = new IntersectionObserver(entries => {
             if (entries[0].isIntersecting) {
+                console.log("LOAD NEXT");
                 loadPage();
             }
         });

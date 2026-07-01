@@ -14,7 +14,9 @@
 package su.svn.lib.api.api;
 
 import su.svn.lib.api.ApiException;
+import su.svn.lib.api.models.RecordData;
 import su.svn.lib.api.models.RecordDataPage;
+import java.util.UUID;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +43,18 @@ public class RecordResourceApiTest {
         Integer page = null;
         Integer size = null;
         RecordDataPage response = api.apiV2RecordsGet(page, size);
+        // TODO: test validations
+    }
+
+    /**
+     * Retrieves a single record by its unique identifier
+     *
+     * @throws ApiException if the Api call fails
+     */
+    @Test
+    public void apiV2RecordsIdGetTest() throws ApiException {
+        UUID id = null;
+        RecordData response = api.apiV2RecordsIdGet(id);
         // TODO: test validations
     }
 

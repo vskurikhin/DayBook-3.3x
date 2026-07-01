@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.29 19:00 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.01 22:56 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecordDataSyncService.java
@@ -71,6 +71,30 @@ public class PostRecordDataSyncService {
 
     @Inject
     RecordViewRepository recordViewRepository;
+
+    /**
+     * Reads a single post record by its unique identifier.
+     *
+     * <p>
+     * The method attempts to retrieve the record from both the local
+     * {@link PostRecordRepository} and the external
+     * {@link RecordViewRepository} concurrently.
+     * The first successfully completed result is returned.
+     * </p>
+     *
+     * <p>
+     * This approach allows the service to combine data sources using
+     * reactive execution without blocking the calling thread.
+     * </p>
+     *
+     * @param id unique identifier of the requested post record
+     * @return a {@link Uni} emitting the retrieved {@link PostRecord}
+     */
+    public Uni<PostRecord> readPostRecord(UUID id) {
+        return Uni.combine()
+                .any()
+                .of(postRecordRepository.findById(id), recordViewRepository.readRecord(id));
+    }
 
     /**
      * Reads a page of post records.

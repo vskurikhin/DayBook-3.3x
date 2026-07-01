@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.06.29 17:39 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.01 23:05 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecordRepository.java
@@ -8,15 +8,18 @@
 
 package su.svn.api.repository;
 
+import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
+import jakarta.annotation.Nonnull;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.hibernate.reactive.mutiny.Mutiny;
 import org.jboss.logging.Logger;
 import su.svn.api.domain.entities.PostRecord;
 import su.svn.api.models.dto.Page;
+import su.svn.api.services.mappers.PostRecordMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,14 +35,53 @@ public class PostRecordRepository {
     @Inject
     Mutiny.SessionFactory mutinySessionFactory;
 
+    /**
+     * Performs soft deletion of a record.
+     *
+     * <p>
+     * The record is marked as disabled and its
+     * {@code lastChangedTime} field is updated.
+     * </p>
+     *
+     * @param id record identifier
+     * @return reactive completion signal
+     */
     @WithTransaction
-    public Uni<Void> disable(UUID id) {
-        return PostRecord.disable(id);
+    public Uni<Void> disable(@Nonnull UUID id) {
+        return PostRecord.findByUUID(id)
+                .onItem()
+                .ifNotNull()
+                .transform(entity -> {
+                    entity.enabled(false);
+                    entity.lastChangedTime(LocalDateTime.now());
+                    return entity;
+                })
+                .flatMap(postRecord -> PanacheEntityBase.persist(postRecord))
+                .onItem()
+                .transformToUni(postRecord -> Uni.createFrom().voidItem())
+                .ifNoItem()
+                .after(PostRecord.TIMEOUT_DURATION)
+                .fail()
+                .onFailure()
+                .recoverWithUni(Uni.createFrom().voidItem());
     }
 
     @WithSession
+    public Uni<PostRecord> findById(UUID id) {
+        return PostRecord.findByUUID(id);
+    }
+
+    /**
+     * Retrieves the timestamp of the latest changed record.
+     *
+     * @return reactive result containing the latest change timestamp
+     */
+    @WithSession
     public Uni<LocalDateTime> findLastChangedTime() {
-        return PostRecord.findLastChangedTime();
+        return PostRecord.findLastChangedTimePostRecord()
+                .replaceIfNullWith(new PostRecord())
+                .map(PostRecord::lastChangedTime)
+                .replaceIfNullWith(LocalDateTime.MIN);
     }
 
     @WithTransaction
@@ -65,9 +107,26 @@ public class PostRecordRepository {
         ).invoke(postRecordPage -> LOG.debugf("readPage(%d, %d): %s", pageIndex, size, postRecordPage.toString()));
     }
 
+    /**
+     * Updates mutable fields of an existing post record.
+     *
+     * @param postRecord source entity containing updated values
+     * @return reactive result containing updated entity
+     */
     @WithTransaction
-    public Uni<PostRecord> update(PostRecord postRecord) {
-        return PostRecord.update(postRecord)
+    public Uni<PostRecord> update(@Nonnull PostRecord postRecord) {
+        return PostRecord.findByUUID(postRecord.id())
+                .onItem()
+                .ifNotNull()
+                .transform(entity -> {
+                    PostRecordMapper.INSTANCE.update(entity, postRecord);
+                    return entity;
+                })
+                .ifNoItem()
+                .after(PostRecord.TIMEOUT_DURATION)
+                .fail()
+                .onFailure()
+                .transform(IllegalStateException::new)
                 .replaceIfNullWith(postRecord);
     }
 }

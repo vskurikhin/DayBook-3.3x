@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.31 00:28 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.01 22:56 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordViewRepository.java
@@ -22,6 +22,7 @@ import su.svn.api.services.security.SecurityContextPrincipalHelper;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import static su.svn.lib.Constants.REQUEST_ID;
 
@@ -42,6 +43,12 @@ public class RecordViewRepository {
 
     @Inject
     SecurityContextPrincipalHelper principalHelper;
+
+    public Uni<PostRecord> readRecord(UUID id) {
+        var authorization = principalHelper.authorization();
+        var requestId = MDC.get(REQUEST_ID);
+        return viewClient.getRecord(authorization, requestId, id).map(resourceRecordMapper::toEntity);
+    }
 
     public Uni<Page<PostRecord>> readPage(int pageIndex, byte size) {
         var authorization = principalHelper.authorization();

@@ -1,4 +1,12 @@
 /*
+ * This file was last modified at 2026.07.01 22:56 by Victor N. Skurikhin.
+ * This is free and unencumbered software released into the public domain.
+ * For more information, please refer to <http://unlicense.org>
+ * ResourceXmlRecord.java
+ * $Id$
+ */
+
+/*
  * DayBook 3 API
  * API Documentation
  *
@@ -52,7 +60,7 @@ import su.svn.lib.api.JSON;
 /**
  * ResourceXmlRecord
  */
-@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-06-11T14:08:39.546047+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
+@jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-07-01T22:50:32.413868+03:00[Europe/Moscow]", comments = "Generator version: 7.21.0")
 public class ResourceXmlRecord {
   public static final String SERIALIZED_NAME_ID = "id";
   @SerializedName(SERIALIZED_NAME_ID)
