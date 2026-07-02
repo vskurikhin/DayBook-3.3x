@@ -41,7 +41,7 @@ func TestMakeSessionID(t *testing.T) {
 
 			// deterministic SHA1
 			expectedIssuer := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(tt.hostname))
-			expectedUser := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(tt.username))
+			expectedUser := uuid.NewSHA1(uuid.NameSpaceOID, []byte(tt.username))
 
 			require.Equal(t, expectedIssuer, sid.issuerUUID)
 			require.Equal(t, expectedUser, sid.userNameUUID)

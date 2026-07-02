@@ -529,6 +529,10 @@ func TestAuthServiceImplV2_auth2(t *testing.T) {
 	}
 }
 
+func TestIssuerUUIDPrint(t *testing.T) {
+	_, _ = fmt.Fprintf(os.Stderr, "%s\n", uuid.NewSHA1(uuid.NameSpaceDNS, []byte("localhost.svn.su")).String())
+}
+
 func TestSubjectUUIDPrint(t *testing.T) {
-	_, _ = fmt.Fprintf(os.Stderr, "%s\n", uuid.NewSHA1(uuid.NameSpaceDNS, []byte("guest")).String())
+	_, _ = fmt.Fprintf(os.Stderr, "%s\n", uuid.NewSHA1(uuid.NameSpaceOID, []byte("guest")).String())
 }
