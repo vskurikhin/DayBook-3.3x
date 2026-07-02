@@ -1,13 +1,11 @@
-import Badge from "react-bootstrap/Badge";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
-import { Checkbox } from 'primereact/checkbox';
 import { marked } from "marked";
-import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../contexts/AuthContext";
 
-import styles from "./AddRecordForm.module.scss";
+import styles from "../AddRecordForm/AddRecordForm.module.scss";
 
 const RECORD_TYPES = [
     "Text",
@@ -25,6 +23,7 @@ interface FormData {
     visible: boolean;
     flags: number;
     postAt: string;
+    refreshAt: string;
 
     value: string;
     markdown: string;
@@ -37,136 +36,317 @@ interface FormData {
     tags: string;
 }
 
-interface RecordConfig {
-    endpoint: string;
-    buildPayload: (form: FormData) => object;
-}
-
 interface Payload {
+    id?: string;
+
     title: string;
     visible: boolean;
     flags: number;
     postAt: string;
+    refreshAt: string;
+
     parentId?: string;
-    tags?: string[];
+    tags: string[];
+
     [key: string]: unknown;
 }
 
+interface RecordConfig {
+    endpoint: string;
+    deleteEndpoint: string;
+    buildPayload: (form: FormData) => object;
+}
 
-export default function AddRecordForm() {
+interface RecordData {
+    id: string;
+    type: string;
+    title: string;
+    parentId?: string;
+    visible: boolean;
+    flags: number;
+    postAt: string;
+    refreshAt?: string;
+    markdown?: string;
+    json?: unknown;
+    xml?: string;
+    texts?: string[];
+    vector?: number[];
+    value?: string;
+    tags?: string[];
+}
+
+const EMPTY_FORM: FormData = {
+    title: "",
+    parentId: "",
+    visible: true,
+    flags: 0,
+    postAt: new Date().toISOString(),
+    refreshAt: new Date().toISOString(),
+
+    value: "",
+    markdown: "",
+    xml: "",
+    json: "{}",
+    texts: "",
+    vector: "",
+    blob: null,
+
+    tags: ""
+};
+
+function parseTags(tags: string): string[] {
+    return tags
+        .split(",")
+        .map(tag => tag.trim())
+        .filter(Boolean);
+}
+
+export default function EditRecordForm() {
+
+    const { id } = useParams();
     const navigate = useNavigate();
     const { token } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [recordId, setRecordId] = useState("");
     const [type, setType] = useState<RecordType>("Text");
-    const [form, setForm] = useState<FormData>({
-        title: "",
-        parentId: "",
-        visible: true,
-        flags: 0,
-        postAt: new Date().toISOString(),
+    const [form, setForm] = useState<FormData>(EMPTY_FORM);
 
-        value: "",
-        markdown: "",
-        xml: "",
-        json: "{}",
-        texts: "",
-        vector: "",
-        blob: null,
-
-        tags: ""
-    });
-    const update = (
-        field: keyof FormData,
-        value: FormData[keyof FormData]
-    ) => {
-        setForm(prev => ({
-            ...prev,
-            [field]: value
-        }));
-    };
     const RECORD_CONFIG: Record<RecordType, RecordConfig> = {
         Text: {
             endpoint: "/api/v2/record/markdown",
-            buildPayload: (form) => ({
+            deleteEndpoint: "/api/v2/record/markdown",
+            buildPayload: form => ({
                 markdown: form.markdown
             })
         },
-
         Json: {
             endpoint: "/api/v2/record/json",
-            buildPayload: (form) => ({
+            deleteEndpoint: "/api/v2/record/json",
+            buildPayload: form => ({
                 json: JSON.parse(form.json)
             })
         },
-
         Xml: {
             endpoint: "/api/v2/record/xml",
-            buildPayload: (form) => ({
+            deleteEndpoint: "/api/v2/record/xml",
+            buildPayload: form => ({
                 xml: form.xml
             })
         },
-
         Set: {
             endpoint: "/api/v2/record/set",
-            buildPayload: (form) => ({
+            deleteEndpoint: "/api/v2/record/set",
+            buildPayload: form => ({
                 texts: form.texts
                     .split("\n")
                     .map(x => x.trim())
                     .filter(Boolean)
             })
         },
-
         Vector: {
             endpoint: "/api/v2/record/vector",
-            buildPayload: (form) => ({
+            deleteEndpoint: "/api/v2/record/vector",
+            buildPayload: form => ({
                 vector: form.vector
                     .split(",")
                     .map(x => Number(x.trim()))
             })
         }
     };
+
+    const update = (
+        field: keyof FormData,
+        value: FormData[keyof FormData]
+    ) => {
+
+        setForm(prev => ({
+            ...prev,
+            [field]: value
+        }));
+
+    };
+
+    function recordTypeFromServer(type: string): RecordType {
+        switch (type.toLowerCase()) {
+            case "markdown":
+            case "text":
+                return "Text";
+            case "json":
+                return "Json";
+            case "xml":
+                return "Xml";
+            case "set":
+                return "Set";
+            case "vector":
+                return "Vector";
+            default:
+                return "Text";
+        }
+    }
+
+    function recordToForm(record: RecordData): FormData {
+        return {
+            title: record.title,
+            parentId: record.parentId ?? "",
+            visible: record.visible,
+            flags: record.flags,
+            postAt: record.postAt,
+            refreshAt: record.refreshAt ?? new Date().toISOString(),
+            markdown: record.markdown ?? "",
+            json: record.json
+                ? JSON.stringify(record.json, null, 2)
+                : "{}",
+            xml: record.xml ?? "",
+            texts: record.texts?.join("\n") ?? "",
+            vector: record.vector?.join(", ") ?? "",
+            value: record.value ?? "",
+            blob: null,
+            tags: record.tags?.join(", ") ?? ""
+        };
+    }
+
+    useEffect(() => {
+        async function loadRecord() {
+            try {
+                const response = await axios.get(
+                    `/api/v2/records/${id}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+                const record: RecordData = response.data;
+                console.log(response);
+                console.log(response.data);
+                setRecordId(record.id);
+                setType(recordTypeFromServer(record.type));
+                setForm(recordToForm(record));
+            } catch (e) {
+                console.error(e);
+                alert("Не удалось загрузить запись.");
+                navigate("/");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        if (id && token) {
+            loadRecord();
+        }
+    }, [id, token, navigate]);
+
+    if (loading) {
+        return (
+            <div className={styles.container}>
+                <h2>Загрузка...</h2>
+            </div>
+        );
+    }
+
     const submit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-
-        const config = RECORD_CONFIG[type];
-
-        let payload: Payload = {
-            title: form.title,
-            visible: form.visible,
-            flags: Number(form.flags),
-            postAt: form.postAt,
-
-            ...config.buildPayload(form)
-        };
-
-        if (form.parentId) {
-            payload.parentId = form.parentId;
-        }
-
-        if (form.tags.trim()) {
-            payload.tags = form.tags
-                .split(",")
-                .map(x => x.trim())
-                .filter(Boolean);
-        }
-
-        const response = await axios.post(
-            config.endpoint,
-            payload,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`
+        try {
+            const config = RECORD_CONFIG[type];
+            const refreshAt =
+                form.refreshAt && form.refreshAt.length > 0
+                    ? form.refreshAt
+                    : new Date().toISOString();
+            let payload: Payload = {
+                id: recordId,
+                title: form.title,
+                visible: form.visible,
+                flags: Number(form.flags),
+                postAt: form.postAt,
+                refreshAt,
+                tags: form.tags
+                        .split(",")
+                        .map(tag => tag.trim())
+                        .filter(Boolean),
+                ...config.buildPayload(form)
+            };
+            if (form.parentId.trim()) {
+                payload.parentId = form.parentId.trim();
+            }
+            /* payload.tags = parseTags(form.tags); */
+            await axios.put(
+                config.endpoint,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+            alert("Запись успешно сохранена.");
+            navigate("/");
+        } catch (error) {
+            console.error(error);
+            if (axios.isAxiosError(error)) {
+                if (error.response?.status === 400) {
+                    alert("Некорректные данные.");
+                    return;
+                }
+                if (error.response?.status === 401) {
+                    alert("Необходимо выполнить вход.");
+                    return;
+                }
+                if (error.response?.status === 403) {
+                    alert("Недостаточно прав.");
+                    return;
+                }
+                if (error.response?.status === 404) {
+                    alert("Запись не найдена.");
+                    return;
                 }
             }
-        );
+            alert("Ошибка сохранения записи.");
+        }
+    };
 
-        console.log(response.data);
+    const remove = async () => {
+        if (!window.confirm("Удалить запись?")) {
+            return;
+        }
+        try {
+            const config = RECORD_CONFIG[type];
+            await axios.delete(
+                `${config.deleteEndpoint}/${recordId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+            alert("Запись успешно удалена.");
+            navigate("/");
+        } catch (error) {
+            console.error(error);
+            if (axios.isAxiosError(error)) {
+                switch (error.response?.status) {
+                    case 400:
+                        alert("Некорректный запрос.");
+                        return;
+                    case 401:
+                        alert("Необходимо выполнить вход.");
+                        return;
+                    case 403:
+                        alert("Недостаточно прав.");
+                        return;
+                    case 404:
+                        alert("Запись не найдена.");
+                        return;
+                }
+            }
+            alert("Ошибка удаления записи.");
+        }
     };
 
     return (
         <div className={styles.container}>
             <div className={styles.formWrapper}>
                 <form className={styles.form} onSubmit={submit}>
-                    <h1 className={styles.formTitle}>Добавить запись</h1>
+                    <h1 className={styles.formTitle}>Редактировать запись</h1>
                     <table className={styles.blueTable}>
                     <tbody>
                     <tr>
@@ -175,10 +355,7 @@ export default function AddRecordForm() {
                         <select
                             className={styles.input}
                             value={type}
-                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                                const value = e.target.value as RecordType;
-                                setType(value);
-                            }}
+                            disabled
                         >
                             {RECORD_TYPES.map(t => (
                                 <option key={t}>{t}</option>
@@ -216,13 +393,13 @@ export default function AddRecordForm() {
                     <div className={styles.formGroup}>
                         <input
                             className={styles.input}
-                            name="postAt"
-                            id="postAt"
-                            placeholder="Post at"
+                            name="refreshAt"
+                            id="refreshAt"
                             type="datetime-local"
+                            value={form.refreshAt ? form.refreshAt.substring(0, 16) : ""}
                             onChange={e =>
                                 update(
-                                    "postAt",
+                                    "refreshAt",
                                     new Date(e.target.value).toISOString()
                                 )
                             }
@@ -349,6 +526,14 @@ export default function AddRecordForm() {
                     <div className={styles.buttonGroup}>
                         <button className={styles.submitButton} type="submit">
                             Сохранить
+                        </button>
+
+                        <button
+                            type="button"
+                            className={styles.submitButton}
+                            onClick={remove}
+                        >
+                            Удалить
                         </button>
 
                         <button

@@ -36,3 +36,28 @@
   color: #666;
   font-size: 0.9rem;
 }
+
+.editIcon {
+    display: inline-block;
+    font-size: 13px;
+    color: #000000;
+    border-radius: 2px;
+    /* всегда выглядит как подчеркнутый карандаш */
+    text-decoration: underline;
+}
+
+.editLink {
+    display: inline-block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.editLink .editIcon {
+    cursor: pointer;
+}
+
+.editLink:hover .editIcon {/*none*/}
+
+.editLink:active .editIcon {/*none*/}
+
+.editLink:focus-visible .editIcon {/*none*/}
