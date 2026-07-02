@@ -40,7 +40,7 @@ func MakeSessionID(hostname, UserName string) (SessionID, error) {
 	}
 	return SessionID{
 		issuerUUID:     uuid.NewSHA1(uuid.NameSpaceDNS, []byte(hostname)),
-		userNameUUID:   uuid.NewSHA1(uuid.NameSpaceDNS, []byte(UserName)),
+		userNameUUID:   uuid.NewSHA1(uuid.NameSpaceOID, []byte(UserName)),
 		sessionJTIUUID: sessionJTIUUID,
 	}, nil
 }

@@ -28,7 +28,7 @@ func Test_makeCredV2(t *testing.T) {
 
 	issuer := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(hostname))
 	jti := sid.SessionJTIUUID()
-	sub := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(username))
+	sub := uuid.NewSHA1(uuid.NameSpaceOID, []byte(username))
 
 	cred := model.MakeCredValuesV2(sid, model.MakeValidTimeTokens(time.Hour, 2*time.Hour), model.User{})
 
