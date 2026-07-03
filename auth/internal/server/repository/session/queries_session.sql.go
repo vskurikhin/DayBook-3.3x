@@ -72,6 +72,15 @@ func (q *Queries) DeleteSession(ctx context.Context, arg DeleteSessionParams) er
 	return err
 }
 
+const deleteSessionWhereValidTimeLessThanNow = `-- name: DeleteSessionWhereValidTimeLessThanNow :exec
+DELETE FROM session WHERE valid_time < now()
+`
+
+func (q *Queries) DeleteSessionWhereValidTimeLessThanNow(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteSessionWhereValidTimeLessThanNow)
+	return err
+}
+
 const getSession = `-- name: GetSession :one
 SELECT iss, jti, sub, user_name, roles, valid_time, create_time, update_time, enabled, local_change, visible, flags FROM session
 WHERE iss = $1 AND jti = $2 AND sub = $3 AND enabled

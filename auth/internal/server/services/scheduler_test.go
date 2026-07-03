@@ -214,7 +214,7 @@ func TestScheduler_RunScheduler(t *testing.T) {
 	var job = func(config.Config, db.DB) error { return nil }
 
 	err := RunScheduler(ctx, mockCfg, mockDB, job)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 type testJob struct {

@@ -62,7 +62,9 @@ func RunScheduler(ctx context.Context, cfg config.Config, db db.DB, fs ...func(c
 			fs:                   fs,
 			jobSleepDuration:     values.SchedulerJobSleepDuration,
 		}
-		err = s.job(ctx)
+		go func() {
+			err = s.job(ctx)
+		}()
 	})
 	return err
 }

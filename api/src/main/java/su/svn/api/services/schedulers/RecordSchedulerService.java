@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.07.01 23:05 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.03 12:04 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * RecordSchedulerService.java
@@ -29,7 +29,7 @@ public class RecordSchedulerService {
     @Inject
     PostRecordDataSyncService syncService;
 
-    @Scheduled(every = "7s")
+    @Scheduled(every = "5s")
     Uni<Void> job() {
         if (!fire.get() || !done.compareAndSet(true, false)) {
             return Uni.createFrom().voidItem();
@@ -49,10 +49,10 @@ public class RecordSchedulerService {
                         LOG.infof("page=%d size=%d", pageIndex, result.size())
                 )
                 .flatMap(result -> {
-                    if (!result.isEmpty()) {
-                        return syncPage(pageIndex + 1);
+                    if (result.isEmpty()) {
+                        return Uni.createFrom().voidItem();
                     }
-                    return Uni.createFrom().voidItem();
+                    return syncPage(pageIndex + 1);
                 })
                 .onFailure().invoke(t ->
                         LOG.errorf(t, "Synchronization failed on page %d", pageIndex)

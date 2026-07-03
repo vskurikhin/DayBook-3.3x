@@ -65,6 +65,10 @@ public class MarkdownRecordResourceApiExample {
         var record = new NewMarkdownRecord();
         record.markdown("markdown");
         record.postAt(OffsetDateTime.now());
+        record.title(null);
+        record.aHref(null);
+        record.parentId(null);
+        record.setTags(null);
         ResourceMarkdownRecord resourceRecord;
         try {
             resourceRecord = resource.post(record);
@@ -78,10 +82,11 @@ public class MarkdownRecordResourceApiExample {
         UpdateMarkdownRecord updateRecord = new UpdateMarkdownRecord();
         updateRecord.id(resourceRecord.getId());
         updateRecord.parentId(resourceRecord.getParentId());
-        updateRecord.title("updated");
-        updateRecord.setaHref("<a href='/'>updated</a>");
         updateRecord.markdown(resourceRecord.getMarkdown() + " updated");
         updateRecord.refreshAt(OffsetDateTime.now());
+        updateRecord.title(null);
+        updateRecord.aHref(null);
+        updateRecord.setTags(null);
         try {
             ResourceMarkdownRecord result = resource.put(updateRecord);
             System.out.println("put result = " + result);

@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/spf13/cobra"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions"
+	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
 
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
 	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
@@ -67,6 +69,11 @@ using the obtained configuration.`,
 		}
 		if dbp == nil {
 			return ErrDBPoolIsNil
+		}
+
+		errRunScheduler := services.RunScheduler(cmd.Context(), cfg, dbp, (&actions.SessionCleaner{}).Clean)
+		if errRunScheduler != nil {
+			return errRunScheduler
 		}
 
 		srv, err := newAuthServer(cfg, env)

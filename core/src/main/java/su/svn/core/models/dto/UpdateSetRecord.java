@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.21 23:42 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.03 12:04 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * UpdateSetRecord.java
@@ -49,6 +49,6 @@ public record UpdateSetRecord(
         @JsonProperty Set<String> tags) implements Serializable {
     @Builder
     public UpdateSetRecord {
-        if (texts == null) texts = new HashSet<>();
+        if (tags == null) tags = new HashSet<>();
     }
 }
