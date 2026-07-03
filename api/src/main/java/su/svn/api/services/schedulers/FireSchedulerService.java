@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.06.28 12:20 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.03 12:04 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * FireSchedulerService.java
@@ -18,7 +18,7 @@ public class FireSchedulerService {
     @Inject
     RecordSchedulerService schedulerService;
 
-    @Scheduled(every = "17s")
+    @Scheduled(every = "19s")
     void job() {
         schedulerService.fire(true);
     }

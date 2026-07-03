@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.05.24 13:27 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.03 12:04 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * UpdateXmlRecord.java
@@ -15,6 +15,7 @@ import lombok.Builder;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -53,6 +54,6 @@ public record UpdateXmlRecord(
         @JsonProperty Set<String> tags) implements Serializable {
     @Builder
     public UpdateXmlRecord {
-        if (xml == null) xml = "";
+        if (tags == null) tags = new HashSet<>();
     }
 }

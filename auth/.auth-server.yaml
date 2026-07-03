@@ -18,6 +18,6 @@ hostname: localhost
 insecure_skip_verify: false
 request_max_bytes: 1048576
 scheduler_job_sleep_duration: 5s
-valid_period_access_token: 41m0s
-valid_period_refresh_token: 17h0m0s
+valid_period_access_token: 7m0s
+valid_period_refresh_token: 11h0m0s
 verbose: false

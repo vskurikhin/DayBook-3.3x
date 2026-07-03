@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.04.23 20:14 by Victor N. Skurikhin.
+ * This file was last modified at 2026.07.03 12:04 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * JwtAuthenticationFilter.java
@@ -62,11 +62,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Обрезаем префикс и получаем имя пользователя из токена
         var jwt = authHeader.substring(BEARER_PREFIX.length());
-        log.info("JWT: {}", jwt);
         var upn = jwtService.extractUserName(jwt);
-        log.info("UPN: {}", upn);
         var groups = jwtService.extractGroups(jwt);
-        log.info("GROUPS: {}", groups);
 
         // Если токен валиден, то аутентифицируем пользователя
         if (jwtService.isTokenValid(jwt, upn)) {

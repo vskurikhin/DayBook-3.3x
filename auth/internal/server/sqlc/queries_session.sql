@@ -27,4 +27,4 @@ DELETE FROM session
 WHERE iss = $1 AND jti = $2 AND sub = $3;
 
 -- name: DeleteSessionWhereValidTimeLessThanNow :exec
-DELETE FROM auth.session WHERE valid_time < now();
+DELETE FROM session WHERE valid_time < now();
