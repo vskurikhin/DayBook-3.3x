@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
-	al "github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/advisory_lock"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/db"
+	al "github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/advisory_lock"
 )
 
 const KeyLock = 13041976

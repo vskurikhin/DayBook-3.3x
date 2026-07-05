@@ -1,4 +1,4 @@
-module github.com/vskurikhin/DayBook-3.3x/auth/v2
+module github.com/vskurikhin/DayBook3/auth/v2
 
 go 1.26.0
 

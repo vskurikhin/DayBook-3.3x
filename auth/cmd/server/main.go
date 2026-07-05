@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd"
+	"github.com/vskurikhin/DayBook3/auth/v2/cmd/server/cmd"
 )
 
 // @title			DayBook Auth API

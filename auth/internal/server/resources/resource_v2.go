@@ -6,12 +6,12 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/dto"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/model"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/xerror"
+	"github.com/vskurikhin/DayBook3/auth/v2/pkg/tool"
 )
 
 type ResourceV2 interface {

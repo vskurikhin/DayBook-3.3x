@@ -5,27 +5,27 @@ import (
 	"errors"
 
 	"github.com/spf13/cobra"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/wire"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/actions"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services"
+	"github.com/vskurikhin/DayBook3/auth/v2/cmd/server/wire"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/env"
 )
 
-//go:generate mockgen -destination=run_mock_config_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd Config
+//go:generate mockgen -destination=run_mock_config_test.go -package=cmd github.com/vskurikhin/DayBook3/auth/v2/cmd/server/cmd Config
 type Config interface {
 	JWThs256SignKey(string)
 	Values() config.Values
 }
 
-//go:generate mockgen -destination=run_mock_environments_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/cmd/server/cmd Environments
+//go:generate mockgen -destination=run_mock_environments_test.go -package=cmd github.com/vskurikhin/DayBook3/auth/v2/cmd/server/cmd Environments
 type Environments interface {
 	Values() env.Values
 }
 
-//go:generate mockgen -destination=run_mock_server_test.go -package=cmd github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
+//go:generate mockgen -destination=run_mock_server_test.go -package=cmd github.com/vskurikhin/DayBook3/auth/v2/internal/server Server
 type Server interface {
 	Run(ctx context.Context) error
 }

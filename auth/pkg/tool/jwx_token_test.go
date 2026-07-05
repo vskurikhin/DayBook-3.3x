@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/lestrrat-go/jwx/v3/jwt"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/xerror"
 )
 
 func TestJwxTokenSubject(t *testing.T) {

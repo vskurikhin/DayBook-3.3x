@@ -9,13 +9,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_view"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/creds"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/model"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/xerror"
+	"github.com/vskurikhin/DayBook3/auth/v2/pkg/tool"
 )
 
 type RefreshServiceV2 interface {

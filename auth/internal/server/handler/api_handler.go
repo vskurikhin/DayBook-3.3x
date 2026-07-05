@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/resources"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/xerror"
 )
 
 // APIHandler wraps handlers to provide consistent error handling

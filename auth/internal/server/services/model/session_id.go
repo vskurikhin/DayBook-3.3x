@@ -6,7 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	jwx "github.com/lestrrat-go/jwx/v3/jwt"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+	"github.com/vskurikhin/DayBook3/auth/v2/pkg/tool"
 )
 
 type SessionPrimaryKey struct {

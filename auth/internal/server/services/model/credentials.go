@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/dto"
 )
 
 type Token struct {

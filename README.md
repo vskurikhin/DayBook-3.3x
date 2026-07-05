@@ -1,79 +1,397 @@
-# auth
+# DayBook
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+DayBook is a microservice-based personal publishing platform designed for storing, organizing, and publishing various types of records. The system is built around a modern architecture using Java, Go, React, and PostgreSQL.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+The backend consists of three independent microservices, while the frontend is a standalone React application communicating with the API Gateway.
 
-## Running the application in dev mode
+---
 
-You can run your application in dev mode that enables live coding using:
+# Features
 
-```shell script
+* JWT authentication with automatic access token refresh
+* User registration and login
+* Create, edit, and delete records
+* Infinite scrolling record feed
+* Live Markdown preview
+* Multiple record types
+* Parent-child relationships
+* Tags
+* Visibility control
+* Scheduled publication and refresh timestamps
+* REST API documented with OpenAPI
+
+---
+
+# Architecture
+
+```text
+                        +----------------------+
+                        |        Web UI        |
+                        |         app/         |
+                        | TypeScript + React   |
+                        +----------+-----------+
+                                   |
+                                   |
+                                   v
+                     +---------------------------+
+                     |       API Gateway         |
+                     |          api/             |
+                     | Java + Quarkus            |<----------------------------------+
+                     | PostgreSQL Cache          |                                   |
+                     | Port: 8081                |                                   v
+                     +------------+--------------+                    +--------------------------------+
+                                  |                                   |              Etcd              |
+              +-------------------+-----------------+       +-------->| (Key-Value State and Metadata) |
+              |                   |                 |       |         +--------------------------------+
+              |                   |                 |       |                          ^
+              v                   |                 v       v                          |
+ +----------------------------+   |   +-----------------------------+   +-----------------------------+
+ | Authentication Service     |   |   | Core Business Service       |   | Change Data Capture Service |
+ | auth/                      |   |   | core/                       |   | cdc/                        |
+ | Go                         |   |   | Java + Spring Boot          |   | Go                          |
+ | Port: 64148                |   |   | Port: 8082                  |   | Port: 8083                  |
+ +----------------------------+   |   +-----------------------------+   +-----------------------------+
+               |                  |                |                                 ^
+               +---------+        |        +-------+                                 |
+                         |        |        |         +-------------------------------+          
+                         |        |        |         |          
+                         v        v        v         |          
+             +-----------------------------------------+
+             |                PostgreSQL               |
+             | (persistent cache and application data) |
+             +-----------------------------------------+
+```
+
+---
+
+# Project Structure
+
+```text
+.
+├── api/          # API Gateway (Quarkus)
+├── auth/         # Authentication Service (Go)
+├── core/         # Business Logic Service (Spring Boot)
+├── app/          # React + Vite frontend
+├── gradle/
+└── README.md
+```
+
+---
+
+# Components
+
+## app
+
+The frontend application is implemented using:
+
+* React
+* TypeScript
+* Vite
+* React Router
+* Axios
+* SCSS Modules
+* PrimeReact
+* React Bootstrap
+* Marked
+
+Main responsibilities:
+
+* user authentication
+* browsing records
+* infinite scrolling
+* Markdown preview
+* record creation
+* record editing
+* record deletion
+
+---
+
+## api
+
+API Gateway.
+
+Technology stack:
+
+* Java LTS 21+
+* Quarkus
+* Hibernate ORM
+* RESTEasy Reactive
+* PostgreSQL persistent cache
+
+Default port:
+
+```text
+8081
+```
+
+Responsibilities:
+
+* public REST API
+* request routing
+* persistent PostgreSQL cache
+* aggregation of backend services
+* JWT validation
+* OpenAPI documentation
+
+Run in development mode:
+
+```bash
+cd api
 ./gradlew quarkusDev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+---
 
-## Packaging and running the application
+## auth
 
-The application can be packaged using:
+Authentication and Authorization Service.
 
-```shell script
-./gradlew build
+Technology stack:
+
+* Go
+* JWT
+* Refresh Tokens
+
+Default port:
+
+```text
+64148
 ```
 
-It produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `build/quarkus-app/lib/` directory.
+Responsibilities:
 
-The application is now runnable using `java -jar build/quarkus-app/quarkus-run.jar`.
+* user registration
+* login
+* logout
+* JWT generation
+* refresh token management
+* access token renewal
 
-If you want to build an _über-jar_, execute the following command:
+Build:
 
-```shell script
-./gradlew build -Dquarkus.package.jar.type=uber-jar
+```bash
+cd auth
+make
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar build/*-runner.jar`.
+---
 
-## Creating a native executable
+## core
 
-You can create a native executable using:
+Main business logic service.
 
-```shell script
-./gradlew build -Dquarkus.native.enabled=true
+Technology stack:
+
+* Java LTS 21+
+* Spring Boot
+* Spring Data
+* PostgreSQL
+
+Default port:
+
+```text
+8082
 ```
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
+Responsibilities:
 
-```shell script
-./gradlew build -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
+* record CRUD
+* business rules
+* tags
+* parent-child records
+* Markdown records
+* JSON records
+* XML records
+* Set records
+* Vector records
+
+Run:
+
+```bash
+cd core
+./gradlew bootRun
 ```
 
-You can then execute your native executable with: `./build/auth-1.0.0-SNAPSHOT-runner`
+(or use the project's preferred Spring Boot startup command.)
 
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/gradle-tooling>.
+---
 
-## Related Guides
+# Requirements
 
-- REST ([guide](https://quarkus.io/guides/rest)): A Jakarta REST implementation utilizing build time processing and Vert.x. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it.
-- REST Jackson ([guide](https://quarkus.io/guides/rest#json-serialisation)): Jackson serialization support for Quarkus REST. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it
-- Hibernate ORM with Panache ([guide](https://quarkus.io/guides/hibernate-orm-panache)): Simplify your persistence code for Hibernate ORM via the active record or the repository pattern
-- JDBC Driver - PostgreSQL ([guide](https://quarkus.io/guides/datasource)): Connect to the PostgreSQL database via JDBC
+## Backend
 
-## Provided Code
+* Java LTS 21+
+* Go 1.22+
+* Gradle
+* GNU Make
+* PostgreSQL
 
-### Hibernate ORM
+## Frontend
 
-Create your first JPA entity
+* Node.js 20+
+* npm
 
-[Related guide section...](https://quarkus.io/guides/hibernate-orm)
+---
 
+# Running the Project
 
-[Related Hibernate with Panache section...](https://quarkus.io/guides/hibernate-orm-panache)
+Start the services in the following order.
 
+## 1. Authentication Service
 
-### REST
+```bash
+cd auth
+make build start
+```
 
-Easily start your REST Web Services
+Runs on:
 
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
+```text
+http://localhost:64148
+```
+
+---
+
+## 2. Core Service
+
+```bash
+cd core
+./gradlew bootRun
+```
+
+Runs on:
+
+```text
+http://localhost:8082
+```
+
+---
+
+## 3. API Gateway
+
+```bash
+cd api
+./gradlew quarkusDev
+```
+
+Runs on:
+
+```text
+http://localhost:8081
+```
+
+---
+
+## 4. Frontend
+
+```bash
+cd app
+npm install
+npm run dev
+```
+
+The frontend communicates exclusively with the API Gateway.
+
+---
+
+# Record Types
+
+The platform currently supports:
+
+* Markdown
+* JSON
+* XML
+* Set
+* Vector
+
+Markdown records include a live HTML preview while editing.
+
+---
+
+# Authentication Flow
+
+1. User authenticates through the Authentication Service.
+2. JWT access token is issued.
+3. Refresh token is stored as an HTTP-only cookie.
+4. The frontend automatically renews expired access tokens.
+5. API Gateway validates JWT tokens before forwarding requests.
+
+---
+
+# REST API
+
+The API Gateway exposes REST endpoints for:
+
+* authentication
+* users
+* records
+* search
+* tags
+* CRUD operations
+
+The OpenAPI specification is available through the API Gateway while running in development mode.
+
+---
+
+# Technology Stack
+
+## Frontend
+
+* React
+* TypeScript
+* Vite
+* React Router
+* Axios
+* SCSS Modules
+* PrimeReact
+* React Bootstrap
+* Marked
+
+## API Gateway
+
+* Java
+* Quarkus
+* Hibernate ORM
+* RESTEasy Reactive
+
+## Authentication Service
+
+* Go
+* JWT
+
+## Core Service
+
+* Java
+* Spring Boot
+* Spring Data
+
+## Database
+
+* PostgreSQL
+
+---
+
+# Development Status
+
+Implemented features include:
+
+* JWT authentication
+* automatic access token refresh
+* API Gateway
+* persistent PostgreSQL cache
+* microservice architecture
+* infinite scrolling
+* record CRUD
+* Markdown live preview
+* record editing
+* record deletion
+* multiple record types
+* protected routes
+
+The project is actively under development, and additional features will continue to be added.
+
+---
+
+# License
+
+This project is distributed under the license selected by the repository owner.
