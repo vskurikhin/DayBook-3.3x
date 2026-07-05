@@ -9,7 +9,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/spf13/cobra"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/db"
 )
 
 const (

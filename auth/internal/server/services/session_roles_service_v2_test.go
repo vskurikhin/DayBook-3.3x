@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/session"
 )
 
 func TestSessionRoles(t *testing.T) {

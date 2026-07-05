@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/jwtauth/v5"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/model"
 )
 
 type SessionRolesV2 interface {

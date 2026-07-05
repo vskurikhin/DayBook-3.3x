@@ -7,9 +7,9 @@ import (
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/model"
+	"github.com/vskurikhin/DayBook3/auth/v2/pkg/tool"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 	Sub     = "sub"
 )
 
-//go:generate mockgen -destination=mock_config_test.go -package=creds github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds Config
+//go:generate mockgen -destination=mock_config_test.go -package=creds github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/creds Config
 type Config interface {
 	JWThs256SignKey(string)
 	Values() config.Values

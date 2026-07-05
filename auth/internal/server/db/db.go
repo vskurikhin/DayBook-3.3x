@@ -96,7 +96,7 @@
 //
 // Database settings are obtained from the server configuration package:
 //
-//	github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config
+//	github.com/vskurikhin/DayBook3/auth/v2/internal/server/config
 //
 // Configuration values include:
 //
@@ -188,8 +188,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/env"
 )
 
 type DB interface {
@@ -200,7 +200,7 @@ type DB interface {
 	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
 }
 
-//go:generate mockgen -destination=mock_pgx_conn_test.go -package=services github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services PgxConn
+//go:generate mockgen -destination=mock_pgx_conn_test.go -package=services github.com/vskurikhin/DayBook3/auth/v2/internal/server/services PgxConn
 type PgxConn interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)

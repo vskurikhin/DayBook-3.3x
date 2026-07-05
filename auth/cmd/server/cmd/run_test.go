@@ -9,10 +9,10 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/mock/gomock"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/db"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/env"
 )
 
 var testDefaultConfigValues = config.Values{

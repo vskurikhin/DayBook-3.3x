@@ -9,7 +9,7 @@ import (
 	jwx "github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+	"github.com/vskurikhin/DayBook3/auth/v2/pkg/tool"
 )
 
 func TestMakeSessionID(t *testing.T) {

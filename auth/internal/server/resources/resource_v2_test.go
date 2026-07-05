@@ -8,12 +8,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
 	"go.uber.org/mock/gomock"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/dto"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/model"
 )
 
 func TestV2_Ok(t *testing.T) {

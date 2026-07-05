@@ -23,7 +23,7 @@ static def getEnv(key, defaultValue) {
 
 allprojects {
     group = 'su.svn'
-    version = '0.0.1'
+    version = '0.2.1'
 
     repositories {
         mavenCentral()

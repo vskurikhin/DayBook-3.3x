@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-//go:generate mockgen -destination=db_mock_test.go -package=user_has_roles github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_has_roles DBTX
+//go:generate mockgen -destination=db_mock_test.go -package=user_has_roles github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_has_roles DBTX
 
 var _ Repo = (*Queries)(nil)
 
@@ -28,7 +28,7 @@ type Repo interface {
 	WithTx(tx pgx.Tx) *Queries
 }
 
-//go:generate mockgen -destination=rows_mock_test.go -package=user_has_roles github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_has_roles Rows
+//go:generate mockgen -destination=rows_mock_test.go -package=user_has_roles github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_has_roles Rows
 type Rows interface {
 	Close()
 	Err() error
@@ -41,7 +41,7 @@ type Rows interface {
 	Conn() *pgx.Conn
 }
 
-//go:generate mockgen -destination=row_mock_test.go -package=user_has_roles github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_has_roles Row
+//go:generate mockgen -destination=row_mock_test.go -package=user_has_roles github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_has_roles Row
 type Row interface {
 	Scan(dest ...any) error
 }
