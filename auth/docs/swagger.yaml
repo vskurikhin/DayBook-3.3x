@@ -69,7 +69,7 @@ info:
   contact: {}
   description: API for authentication in DayBook
   title: DayBook Auth API
-  version: 0.0.1
+  version: 0.2.1
 paths:
   /v1/ok:
     get:

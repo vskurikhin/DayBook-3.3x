@@ -8,7 +8,7 @@ import (
 )
 
 // @title			DayBook Auth API
-// @version			0.0.1
+// @version			0.2.1
 // @description		API for authentication in DayBook
 
 // @host			localhost:8089
