@@ -1,3 +1,109 @@
+/examples
+/expvarhandler
+/fasthttp
+/fasthttpadaptor
+/fasthttpproxy
+/fasthttputil
+/pprofhandler
+/prefork
+/reuseport
+/stackless
+/tcplisten
+/testdata
+/*.go
+http-server
+fasthttpproxy-server
+tags
+*.pprof
+*.fasthttp.br
+*.fasthttp.zst
+*.fasthttp.gz
+vendor/
+testdata/fuzz
+
+# IntelliJ
+.idea
+*.iml
+*.ipr
+*.iws
+
+*.local
+*.log
+*.nar
+*.orig
+*.rar
+*.rej
+
+# Vim
+*.swo
+*.swp
+
+*.tar.gz
+*.war
+*.zip
+
+# OSX
+.DS_Store
+.DS_Store?
+
+.certs/
+.env
+
+# Visual Studio Code
+.factorypath
+.vscode
+.vscode/
+
+# NetBeans
+/.nb-gradle/
+/nbbuild/
+/nbdist/
+/nbproject/private/
+nb-configuration.xml
+
+/.quarkus/cli/plugins/
+/dist/
+
+# dependencies
+/.pnp
+.pnp.js
+/node_modules
+
+api/.gradle/
+api/bin/
+api/build/
+api/src/main/resources/*.csr
+api/src/main/resources/*.keystore
+api/src/main/resources/*.pem
+api/src/main/resources/META-INF/img/
+api/src/main/resources/META-INF/resources/
+api/src/test/resources/db/*.zip
+api/src/test/resources/db/changelog/db/*sql
+api/src/test/resources/db/word/
+api/src/tmp-templates/
+
+bin/
+build/
+dist-ssr
+dist/
+docker/
+hs_err_pid*
+lerna-debug.log*HELP.md
+logs/
+node_modules/
+npm-debug.log*
+out/
+pnpm-debug.log*
+replay_pid*
+test.keystore
+test.truststore
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+/AGENTS.md
+
+# GoLang template
+#
 # If you prefer the allow list template instead of the deny list, see community template:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
@@ -5,28 +111,107 @@
 *.exe
 *.exe~
 *.dll
-*.so
 *.dylib
+go-cp
+go-envdir
+go-telnet
+# C extensions
+*.so
 
-# Test binary, built with `go test -c`
+# Test binary, build with `go test -c`
 *.test
 
-# Code coverage profiles and other test artifacts
+# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
-coverage.*
-*.coverprofile
-profile.cov
+
+### User defined
+.idea/
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.bak
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
 # Go workspace file
 go.work
-go.work.sum
+auth/cmd/server/auth-server
+auth/PR*.diff
+auth/vendor/
+auth/coverage.*
 
-# env file
-.env
+# testing
+/coverage
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# production
+/build
+
+# misc
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+env/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
+venv/
+.venv/
+.python-version
+.pytest_cache
+
+# Translations
+*.mo
+*.pot
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Ipython Notebook
+.ipynb_checkpoints
+
+.history
+.psql_history
