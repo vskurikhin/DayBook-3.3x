@@ -1,171 +1,212 @@
-# Module vskurikhin/raft
+# :rowboat: Raft
 
-`vskurikhin/raft` — Go 1.26.4, единственная зависимость `github.com/fortytw2/leaktest` (vendored).
+Это реализация алгоритма распределённого консенсуса **Raft** на языке Go. Она сопровождается серией статями:
 
-## Текущая структура каталогов
+* [Часть 0: Введение](https://svn.su/2020/2020-02-22-implementing-raft-part-0-introduction.html)
+* [Часть 1: Выборы](https://svn.su/2020/2020-02-24-implementing-raft-part-1-elections.html)
+* [Part 2: Commands and log replication](https://svn.su/2020/2020-02-29-implementing-raft-part-2-commands-and-log-replication.html)
+* [Part 3: Persistence and optimizations](https://svn.su/2020/2020-05-05-implementing-raft-part-3-persistence-and-optimizations.html)
+* **Часть 4. База данных «ключ-значение»**
+* **Часть 5. Доставка сообщений «ровно один раз» (Exactly-Once Delivery)**
+
+Каждый каталог `partN` в этом репозитории содержит полный исходный код, соответствующий **части N** серии статей (за исключением части 0, которая является вводной и не содержит кода).
+
+Между различными каталогами `partN` присутствует значительное количество повторяющегося кода. Это сделано намеренно. Вместо выделения общих компонентов и повторного использования реализации я предпочёл сохранить код максимально простым и понятным. Каждый каталог полностью самодостаточен, поэтому его можно изучать отдельно от остальных. Для понимания эволюции реализации полезно использовать графический инструмент сравнения файлов (diff), чтобы увидеть изменения между частями.
+
+## Использование репозитория
+
+Можно просто читать исходный код, однако я также рекомендую запускать тесты и анализировать выводимые ими журналы. 
+
+## Изменение и тестирование кода
+
+Каждый каталог `partN` полностью независим от остальных и представляет собой отдельный модуль Go.
+
+Сама реализация Raft не имеет внешних зависимостей. Единственная запись в файле `go.mod` относится к библиотеке, предназначенной для обнаружения утечек горутин, которая используется только при выполнении тестов.
+
+Например, чтобы поработать с кодом из `part2`:
+
+```sh
+$ cd part2
+... внесите изменения в код
+$ go test -race ./...
+```
+
+В зависимости от части проекта и производительности компьютера выполнение тестов может занимать до одной минуты.
+
+При необходимости можно включить подробный вывод с помощью параметра `-v`, а также воспользоваться прилагаемым сценарием `make dotest`, который позволяет запускать отдельные тесты с последующей визуализацией журналов.
+
+**Примечание.** В части `part3` реализация Raft расположена в подкаталоге `part3/raft`, чтобы её можно было импортировать в последующих частях проекта. Все приведённые выше инструкции остаются актуальными и для `part3` — необходимо лишь перейти на один уровень каталога глубже.
+
+## Module github.com/vskurikhin/raft
+
+`github.com/vskurikhin/raft` — Go 1.26.4, единственная зависимость `github.com/fortytw2/leaktest` (vendored).
+
+## 1. Project Overview
+
+### Packages
 
 ```
 raft/
-├── .golangci.yml
-├── AGENTS.md
-├── go.mod / go.sum
 ├── cmd/
-│   ├── main.go                (49 строк)  ← создаёт storage, передаёт в NewServer
-│   └── main_test.go           (109 строк)
+│   ├── main.go              — Точка входа CLI (runWith, main)
+│   └── main_test.go         — Тесты CLI
 ├── internal/
-│   └── config/
-│       ├── config.go          (100 строк)
-│       └── config_test.go     (170 строк)
-├── pkg/raft/                  ← АКТИВНАЯ полная реализация (2397 строк)
-│   ├── raft.go                (779 строк)  ← +persistence, fast conflict, triggerAE
-│   ├── server.go              (267 строк)  ← +Storage, RPCProxy drop simulation
-│   ├── storage.go             (47 строк)   ← NEW: Storage interface + MapStorage
-│   ├── testharness.go         (370 строк)  ← +CrashPeer/RestartPeer
-│   └── raft_test.go           (934 строк)  ← 25 тестов (+11 новых)
-├── part1/raft/                ← ЛЕГАСИ (только election, 905 строк, без изменений)
-│   ├── raft.go                (382 строк)
-│   ├── server.go              (196 строк)
-│   ├── testharness.go         (159 строк)
-│   └── raft_test.go           (168 строк)
-└── part2/raft/                ← NEW: снепшот Part 2 (1468 строк, для справки)
-    ├── raft.go                (599 строк)
-    ├── server.go              (198 строк)
-    ├── testharness.go         (294 строк)
-    └── raft_test.go           (377 строк)
+│   └── config/              — Разбор аргументов командной строки
+├── pkg/
+│   ├── api/                 — Типы запросов и ответов REST API
+│   ├── kvclient/            — Клиентская библиотека KV (логика повторных попыток, поиск лидера)
+│   ├── kvservice/
+│   │   ├── kvservice.go     — KVService (HTTP-сервер + клиент Raft + горутина обновления)
+│   │   ├── command.go       — Типы команд (Get, Put, Append, CAS)
+│   │   ├── datastore.go     — Потокобезопасное хранилище «ключ-значение» (DataStore)
+│   │   ├── datastore_test.go
+│   │   └── json.go          — Вспомогательные функции для работы с JSON
+│   ├── raft/
+│   │   ├── raft.go          — ConsensusModule (основной алгоритм Raft)
+│   │   ├── server.go        — Server (RPC-сервер + RPCProxy)
+│   │   ├── storage.go       — Интерфейс Storage и реализация MapStorage
+│   │   ├── testharness.go   — Тестовый Harness для модульных тестов Raft
+│   │   └── raft_test.go     — Модульные тесты Raft
+│   ├── system_test.go       — Системные тесты (сквозное тестирование KV-сервиса)
+│   └── testharness.go       — Системный Harness (управление жизненным циклом кластера KVService)
+└── README.md
 ```
 
-**Всего**: 18 .go файлов, 5351 строка.
+### Основные файлы и их назначение
 
-Part 3 (коммит `be4176f`, PR #9) добавил **2483 вставки, 77 удалений**:
+| Файл                         | Назначение                                                                                            |
+|------------------------------|-------------------------------------------------------------------------------------------------------|
+| `pkg/raft/raft.go`           | Основной алгоритм Raft: ConsensusModule, выборы лидера, репликация журнала, фиксация (commit) записей |
+| `pkg/raft/server.go`         | Обёртка над RPC-сервером: Server, RPCProxy (перенаправление RPC и моделирование сбоев)                |
+| `pkg/raft/storage.go`        | Интерфейс Storage и его реализация MapStorage, работающая в памяти                                    |
+| `pkg/raft/testharness.go`    | Harness для модульных тестов уровня Raft (управление жизненным циклом кластера серверов)              |
+| `pkg/kvservice/kvservice.go` | KV-сервис: HTTP API + реплицируемый автомат состояний на основе Raft                                  |
+| `pkg/system_test.go`         | Системные тесты, проверяющие работу всего стека KVService + Raft                                      |
+| `pkg/testharness.go`         | Harness для системных тестов (управление жизненным циклом кластера KVService)                         |
 
-| Файл                          | Было | Стало | Изменения                                       |
-|-------------------------------|------|-------|--------------------------------------------------|
-| `pkg/raft/raft.go`            | 591  | 779   | +persistence, fast conflict, triggerAE, Stop fix  |
-| `pkg/raft/server.go`          | 198  | 267   | +Storage, RPCProxy drop simulation               |
-| `pkg/raft/storage.go`         | —    | 47    | NEW: Storage interface + MapStorage              |
-| `pkg/raft/testharness.go`     | 294  | 370   | +CrashPeer/RestartPeer, alive[], storage[]        |
-| `pkg/raft/raft_test.go`       | 378  | 934   | 14→25 тестов (+11 новых)                          |
-| `cmd/main.go`                 | 48   | 49    | +storage, передача в NewServer                   |
-| `cmd/main_test.go`            | 108  | 109   | +storage в TestRunWithPeerConnect                |
-| `part2/raft/*`                | —    | 4 файла | NEW: снепшот Part 2 для справки                |
+---
 
-## Новые возможности (Part 3)
+## 2. Архитектура модуля консенсуса Raft
 
-### 1. Персистентность (`Storage` interface)
-**`pkg/raft/storage.go:1-47`**
-```go
-type Storage interface {
-    Put(key string, value []byte) error
-    Get(key string) ([]byte, bool, error)
-    HasData() bool
-}
-```
-- `MapStorage` — in-memory реализация через `sync.Map`
-- Все три persistent state (`currentTerm`, `votedFor`, `log`) кодируются через `gob` и сохраняются после каждой мутации
-- `restoreFromStorage()` — восстанавливает состояние при старте, если `HasData() == true`
-- `persistToStorage()` — вызывается после каждого изменения term/votedFor/log
-
-### 2. Crash/Restart в тестовом harness
-- `CrashPeer(id)` — дисконнект + shutdown, очистка commit history, storage сохраняется
-- `RestartPeer(id)` — новый `Server` + `ConsensusModule` с тем же `MapStorage`
-- `alive []bool` — отслеживание живых/упавших узлов
-
-### 3. Fast Log Conflict Resolution (Section 5.3)
-- `AppendEntriesReply` теперь содержит `ConflictIndex` и `ConflictTerm`
-- Follower при несовпадении лога возвращает: терм конфликтующей записи и первый индекс этого терма
-- Лидер использует эту информацию чтобы перепрыгнуть к последнему записи совпадающего терма (вместо декремента `nextIndex` по одной записи)
-
-### 4. Trigger-based AppendEntries
-- Добавлен `triggerAEChan` (буфер 1)
-- Лидер отправляет AE немедленно при:
-    - `Submit()` — новый entry
-    - `AppendEntries` reply — `matchIndex` / `commitIndex` изменился
-    - `RequestVote` — стал лидером
-- Горутина лидера использует `select` на `triggerAEChan` + таймер 50ms
-
-### 5. RPC Drop Simulation
-- `RPCProxy` получил `numCallsBeforeDrop` счётчик
-- `DropCallsAfterN(n)` / `DontDropCalls()` — для тестирования сценариев потери RPC
-- `TestCommitAfterCallDrops` — лидер дропает 2 вызова, потом восстанавливается
-
-### 6. Safety Fixes
-- `becomeFollower` теперь сохраняет `votedFor` при переходе в тот же term (был баг: сбрасывал `votedFor = -1` всегда)
-- `becomeFollower` сбрасывает `votedFor = -1` только если `term > cm.currentTerm`
-- `TestBecomeFollowerSameTermPreservesVotedFor` — верификация
-- `TestBecomeFollowerHigherTermResetsVotedFor` — верификация
-
-### 7. Submit возвращает int
-- `Submit(command) (int, bool)` — возвращает индекс в логе вместо `bool`
-
-## Ключевые типы (обновлённые)
-
-```go
-// Storage — интерфейс персистентности
-type Storage interface {
-    Put(key string, value []byte) error
-    Get(key string) ([]byte, bool, error)
-    HasData() bool
-}
-
-// AppendEntriesReply — расширен для fast conflict resolution
-type AppendEntriesReply struct {
-    Term          int
-    Success       bool
-    ConflictIndex int    // NEW: первый индекс конфликтующего терма
-    ConflictTerm  int    // NEW: терм конфликтующей записи
-}
-
-// ConsensusModule — добавлены поля:
-//   storage Storage
-//   triggerAEChan chan struct{}
-//   newCommitReadyChanWg sync.WaitGroup
-```
-
-## Полный поток исполнения
+### Слои
 
 ```
-cmd/main.go
-  → config.ParseFlags() → Values{Address, Number, Peers}
-  → storage := raft.NewMapStorage()
-  → raft.NewServer(id, peers, ready, storage)
-      → NewConsensusModule(id, peers, server, ready, storage)
-          → если storage.HasData(): restoreFromStorage()
-          → goroutine: runElectionTimer()
-          → goroutine: leaderSendAEs()  [triggerAEChan + timer]
-          → goroutine: commitChanSender()
-      → rpc.RegisterName("ConsensusModule", RPCProxy{cm})
-      → net.Listen + accept loop
-  → ConnectToPeer(peerId, addr) [retry 9 раз]
+┌─────────────────────────────────────────────────────────────┐
+│                KVService (pkg/kvservice)                    │
+│                                                             │
+│  ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌───────────┐  │
+│  │ HTTP API │  │ Горутина   │  │ Клиент   │  │ DataStore │  │
+│  │ (Serve)  │  │ обновления │  │ Raft     │  │           │  │
+│  └──────────┘  └────────────┘  └──────────┘  └───────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────┐
+│                 Server (pkg/raft/server.go)              │
+│                                                          │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐  │
+│  │ RPC-     │  │ RPCProxy │  │ Клиенты узлов          │  │
+│  │ сервер   │  │ (сбои)   │  │ (rpc.Client на узел)   │  │
+│  │ (net/rpc)│  │          │  │                        │  │
+│  └──────────┘  └──────────┘  └────────────────────────┘  │
+└──────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────────┐
+│          ConsensusModule (pkg/raft/raft.go)                │
+│                                                            │
+│  ┌───────────┐  ┌──────────┐  ┌───────────┐  ┌──────────┐  │
+│  │ Состояние │  │ Журнал   │  │ Таймеры   │  │ Каналы   │  │
+│  │ (F/C/L/D) │  │ записей  │  │ выборов   │  │ commit   │  │
+│  └───────────┘  └──────────┘  └───────────┘  └──────────┘  │
+└────────────────────────────────────────────────────────────┘
 ```
 
-## Замечания по качеству кода
+### Автомат состояний ConsensusModule
 
-### Сильные стороны
-- Идиоматичный Go: мьютексы, каналы, горутины, правильные defer
-- Чистое разделение: алгоритм ↔ сеть ↔ симуляция ↔ персистентность
-- 25 тестов покрывают elections, commits, persistence, crash/recovery, safety
-- Safety-critical баги исправлены (votedFor reset, startElection persist)
-- Fast conflict resolution из Section 5.3 реализован и протестирован
+```
+           тайм-аут / startElection()
+Follower ─────────────────────────────► Candidate
+    ▲                                      │
+    │ обнаружен более                      │ победа
+    │ высокий term                         │ на выборах
+    │ (becomeFollower)                     ▼
+    ├──────────────────────────────────► Leader
+    │                                      │
+    │                                      │ обнаружен
+    │                                      │ более высокий term
+    │                                      │ (becomeFollower)
+    │                                      ▼
+    └──────────────────────────────────► Follower
+                                         (через обработчик RPC)
 
-### Замечания
-1. `restoreFromStorage()` вызывает `log.Fatal` при отсутствии ключей (строки 217, 225, 233) — нет graceful handling
-2. `persistToStorage()` использует `gob` без defensive checks — может запаниковать на не-кодируемых типах
-3. `leaderSendAEs` использует ручной `Unlock()` вместо `defer` (строки 659-727) — хрупкий код
-4. `part2/raft/` — замёрзший снепшот Part 2 без persistence; дублирует код
-5. `part1/raft/` — легаси, не импортируется из `pkg/raft`, мёртвый код
-6. `triggerAEChan` буфер 1 — второй триггер дропается (intentional, но может пропустить wakeup)
-7. `go.mod` требует `go 1.26.4` — будущая версия, может не компилироваться текущим toolchain
-8. Нет snapshot/compaction — лог растёт бесконечно
-9. `bin/raft`, `coverage.out`, `cmd_coverage.out` закоммичены
+Любое состояние ──► Dead (через Stop())
+```
+
+### Server и RPCProxy
+
+- Server представляет собой оболочку над ConsensusModule и *rpc.Server.
+- В качестве обработчика RPC под именем "ConsensusModule" регистрируется RPCProxy (а не ConsensusModule напрямую).
+- RPCProxy прозрачно перенаправляет вызовы RequestVote и AppendEntries в ConsensusModule,
+  но может искусственно вносить задержки (обычно 1–5 мс, либо 75 мс при установленной переменной RAFT_UNRELIABLE_RPC)
+  или отбрасывать RPC-вызовы.
+- Метод Server.Call() использует rpcProxy.Call() для выполнения исходящих RPC-вызовов к другим узлам.
+  В свою очередь, rpcProxy.Call() вызывает peer.Call() у соответствующего *rpc.Client.
+
+---
+
+## 3. Анализ жизненного цикла горутин
+
+### 3.1 Все горутины, создаваемые ConsensusModule
+
+| # | Создаётся в   | Функция                                         | Назначение                                                                 | Когда завершается                                                          |
+|---|---------------|-------------------------------------------------|----------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| 1 | raft.go:159   | commitChanSender()                              | Читает newCommitReadyChan и отправляет зафиксированные записи в commitChan | После закрытия newCommitReadyChan (в Stop())                               |
+| 2 | raft.go:148   | runElectionTimer() (начальный запуск)           | Ожидает сигнал готовности, затем запускает цикл таймера выборов            | При переходе в состояние Dead или изменении term                           |
+| 3 | raft.go:544   | runElectionTimer() (из startElection)           | Запускает новый таймер выборов после начала выборов                        | При переходе в состояние Dead или изменении term                           |
+| 4 | raft.go:559   | runElectionTimer() (из becomeFollower)          | Запускает новый таймер выборов после перехода в состояние последователя    | При переходе в состояние Dead или изменении term                           |
+| 5 | raft.go:500   | Горутины RPC RequestVote (по одной на узел)     | Отправляют RPC RequestVote отдельному узлу и обрабатывают ответ            | После обработки ответа либо при изменении состояния или устаревании term   |
+| 6 | raft.go:577   | Горутина heartbeat лидера                       | Периодически или по сигналу отправляет AppendEntries                       | При выходе из состояния Leader или закрытии triggerAEChan                  |
+| 7 | raft.go:634   | Горутины RPC AppendEntries (по одной на узел)   | Отправляют RPC AppendEntries отдельному узлу и обрабатывают ответ          | После обработки ответа либо при изменении состояния или устаревании term   |
+
+### 3.2 Все горутины, создаваемые Server
+
+| # | Created at     | Function                                          | Purpose                                   | How it exits                       |
+|---|----------------|---------------------------------------------------|-------------------------------------------|------------------------------------|
+| 8 | server.go:71   | Цикл Accept                                       | Принимает входящие TCP-соединения для RPC | После закрытия quit (в Shutdown()) |
+| 9 | server.go:85   | Обработка RPC-соединения (по одной на соединение) | Обслуживает одно RPC-соединение           | После закрытия соединения          |
+
+### 3.3 All Goroutines Created by KVService
+
+| #   | Created at        | Function     | Purpose                                                         | How it exits                |
+|-----|-------------------|--------------|-----------------------------------------------------------------|-----------------------------|
+| 10  | kvservice.go:374  | Updater      | Читает commitChan, обновляет DataStore и уведомляет подписчиков | После закрытия commitChan   |
+| 11  | kvservice.go:115  | HTTP-сервер  | Обслуживает HTTP REST API                                       | После вызова srv.Shutdown() |
+
+### 3.4 All Goroutines Created by Test Harnesses
+
+| #  | Created at               | Function          | Purpose                                               | How it exits                  |
+|----|--------------------------|-------------------|-------------------------------------------------------|-------------------------------|
+| 12 | testharness.go:98 (raft) | collectCommits(i) | Читает commitChans[i] и добавляет записи в commits[i] | После закрытия commitChans[i] |
+
+### 3.5 Сводка механизма отслеживания горутин
+
+| Горутина                             | Отслеживается через WaitGroup? | Ожидание завершения в `Stop()` / `Shutdown()`?                  |
+|--------------------------------------| ------------------------------ |-----------------------------------------------------------------|
+| `commitChanSender`                   | ✅ `newCommitReadyChanWg`       | ✅ `cm.newCommitReadyChanWg.Wait()` в `Stop()`                 |
+| `runElectionTimer` (все экземпляры)  | ❌ Не отслеживается             | ❌ Ожидание отсутствует                                        |
+| Горутина heartbeat лидера            | ❌ Не отслеживается             | ❌ Ожидание отсутствует                                        |
+| Горутины RPC `RequestVote`           | ❌ Не отслеживаются             | ❌ Ожидание отсутствует                                        |
+| Горутины RPC `AppendEntries`         | ❌ Не отслеживаются             | ❌ Ожидание отсутствует                                        |
+| Цикл `Accept`                        | ✅ `s.wg`                       | ✅ `s.wg.Wait()` в `Shutdown()`                                |
+| Обработка RPC-соединений             | ✅ `s.wg`                       | ✅ `s.wg.Wait()` в `Shutdown()`                                |
+| `Updater`                            | ❌ Не отслеживается             | ❌ Ожидание отсутствует                                        |
+| HTTP-сервер                          | ❌ Не отслеживается             | ✅ Завершается через `srv.Shutdown()` в `KVService.Shutdown()` |
+| `collectCommits`                     | ❌ Не отслеживается             | ✅ Завершается автоматически после закрытия канала             |
+
+
+---
 
 ## Вывод
 
-Проект — **полная реализация Raft Consensus Algorithm** (Figure 2 paper) в `pkg/raft/` с:
-- Leader election (Section 5.2)
-- Log replication + commitment (Section 5.3)
-- **Persistence** через `Storage` interface + `gob` encoding
-- **Crash/recovery** в тестовом harness
-- **Fast log conflict resolution** (Section 5.3 optimization)
-- **Trigger-based AppendEntries**
-- **RPC drop simulation** для тестов
-- **Safety fixes** (votedFor preservation)
+Проект — **полноценная реализация Raft + реплицированный KV сервис с exactly-once delivery**. `pkg/raft/` (без изменений от v0.0.3) предоставляет: leader election, log replication, commitment, persistence, crash/recovery. `pkg/kvservice/` (новый в Part 5) добавляет: REST API, Go-клиент, реплицированное DataStore, exactly-once семантику через `(ClientID, RequestID)` dedup в `runUpdater()`. 62 теста, 24 .go файла, 5351 строка.

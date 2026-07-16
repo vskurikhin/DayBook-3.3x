@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"vskurikhin/raft/internal/config"
-	"vskurikhin/raft/pkg/raft"
+	"github.com/vskurikhin/raft/internal/config"
+	"github.com/vskurikhin/raft/pkg/raft"
 )
 
 func TestRunWithEmptyPeers(t *testing.T) {
