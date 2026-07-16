@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"vskurikhin/raft/internal/config"
-	"vskurikhin/raft/internal/raft"
+	"vskurikhin/raft/pkg/raft"
 )
 
 func main() {
@@ -24,8 +24,9 @@ func runWith(values config.Values) error {
 	nums := slices.Collect(maps.Keys(values.Peers))
 	done := make(chan any)
 	ready := make(chan any)
+	commitChannel := make(chan raft.CommitEntry)
 
-	ns := raft.NewServer(values.Number, nums, ready)
+	ns := raft.NewServer(values.Number, nums, ready, commitChannel)
 	go func() {
 		for _, num := range nums {
 			err := ns.ConnectToPeer(num, values.Peers[num])
@@ -41,6 +42,7 @@ func runWith(values config.Values) error {
 		}
 	}()
 	ns.Serve(values.Address.String())
+	ready <- true
 	<-done
 	return nil
 }

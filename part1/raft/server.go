@@ -49,8 +49,6 @@ func (s *Server) Serve(address string) {
 	s.mu.Lock()
 	s.cm = NewConsensusModule(s.serverId, s.peerIds, s, s.ready)
 
-	// Create a new RPC server and register a RPCProxy that forwards all methods
-	// to n.cm
 	// Создаём новый RPC-сервер и регистрируем RPCProxy,
 	// который перенаправляет все методы в n.cm (ConsensusModule)
 	s.rpcServer = rpc.NewServer()
