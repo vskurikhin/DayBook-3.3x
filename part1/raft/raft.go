@@ -62,7 +62,7 @@ type ConsensusModule struct {
 	votedFor    int
 	log         []LogEntry
 
-	// Нестабильное состояние Raft на всех серверах
+	// Непостоянное состояние Raft на всех серверах
 	state              CMState
 	electionResetEvent time.Time
 }
@@ -115,7 +115,7 @@ func (cm *ConsensusModule) dlog(format string, args ...any) {
 	}
 }
 
-// See figure 2 in the paper.
+// RequestVoteArgs См. рисунок 2 в статье.
 type RequestVoteArgs struct {
 	Term         int
 	CandidateId  int
@@ -155,7 +155,7 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 	return nil
 }
 
-// See figure 2 in the paper.
+// AppendEntriesArgs См. рисунок 2 в статье.
 type AppendEntriesArgs struct {
 	Term     int
 	LeaderId int

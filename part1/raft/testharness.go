@@ -33,7 +33,8 @@ func NewHarness(t *testing.T, n int) *Harness {
 	connected := make([]bool, n)
 	ready := make(chan any)
 
-	// Create all Servers in this cluster, assign ids and peer ids.
+	// Создать все серверы этого кластера, назначить им идентификаторы
+	// и идентификаторы соседей.
 	for i := 0; i < n; i++ {
 		peerIds := make([]int, 0)
 		for p := 0; p < n; p++ {
@@ -46,7 +47,7 @@ func NewHarness(t *testing.T, n int) *Harness {
 		ns[i].Serve(":0")
 	}
 
-	// Connect all peers to each other.
+	// Соединить всех соседей друг с другом.
 	for i := 0; i < n; i++ {
 		for j := 0; j < n; j++ {
 			if i != j {
@@ -66,8 +67,8 @@ func NewHarness(t *testing.T, n int) *Harness {
 	}
 }
 
-// Shutdown shuts down all the servers in the harness and waits for them to
-// stop running.
+// Shutdown останавливает все серверы в тестовом окружении и ожидает,
+// пока они полностью завершат работу.
 func (h *Harness) Shutdown() {
 	for i := 0; i < h.n; i++ {
 		h.cluster[i].DisconnectAll()
@@ -78,7 +79,7 @@ func (h *Harness) Shutdown() {
 	}
 }
 
-// DisconnectPeer disconnects a server from all other servers in the cluster.
+// DisconnectPeer отключает сервер от всех остальных серверов кластера.
 func (h *Harness) DisconnectPeer(id int) {
 	tlog("Disconnect %d", id)
 	h.cluster[id].DisconnectAll()
@@ -90,7 +91,7 @@ func (h *Harness) DisconnectPeer(id int) {
 	h.connected[id] = false
 }
 
-// ReconnectPeer connects a server to all other servers in the cluster.
+// ReconnectPeer повторно подключает сервер ко всем остальным серверам кластера.
 func (h *Harness) ReconnectPeer(id int) {
 	tlog("Reconnect %d", id)
 	for j := 0; j < h.n; j++ {

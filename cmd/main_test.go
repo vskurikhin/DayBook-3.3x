@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"vskurikhin/raft/internal/config"
-	"vskurikhin/raft/internal/raft"
+	"vskurikhin/raft/pkg/raft"
 )
 
 func TestRunWithEmptyPeers(t *testing.T) {
@@ -37,7 +37,8 @@ func TestRunWithEmptyPeers(t *testing.T) {
 func TestRunWithPeerConnect(t *testing.T) {
 	// Start a peer server for runWith to connect to.
 	peerReady := make(chan any)
-	peer := raft.NewServer(1, []int{}, peerReady)
+	commitChannel := make(chan raft.CommitEntry)
+	peer := raft.NewServer(1, []int{}, peerReady, commitChannel)
 	peer.Serve(":0")
 	close(peerReady)
 	t.Cleanup(func() { peer.DisconnectAll() })
