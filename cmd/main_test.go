@@ -38,7 +38,8 @@ func TestRunWithPeerConnect(t *testing.T) {
 	// Start a peer server for runWith to connect to.
 	peerReady := make(chan any)
 	commitChannel := make(chan raft.CommitEntry)
-	peer := raft.NewServer(1, []int{}, peerReady, commitChannel)
+	storage := raft.NewMapStorage()
+	peer := raft.NewServer(1, []int{}, storage, peerReady, commitChannel)
 	peer.Serve(":0")
 	close(peerReady)
 	t.Cleanup(func() { peer.DisconnectAll() })

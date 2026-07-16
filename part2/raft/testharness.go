@@ -16,7 +16,6 @@ type Harness struct {
 
 	// cluster — список всех серверов Raft, участвующих в кластере.
 	cluster []*Server
-	storage []*MapStorage
 
 	// commitChans содержит по одному каналу фиксации для каждого
 	// сервера кластера.
@@ -34,13 +33,6 @@ type Harness struct {
 	// не передаются ни к нему, ни от него).
 	connected []bool
 
-	// alive содержит по одному логическому значению для каждого сервера
-	// кластера и определяет, работает ли данный сервер в настоящий момент
-	// (false означает, что сервер аварийно завершил работу и ещё не был
-	// перезапущен). Если сервер подключён (connected), то он обязательно
-	// находится в рабочем состоянии (alive).
-	alive []bool
-
 	n int
 	t *testing.T
 }
@@ -50,11 +42,9 @@ type Harness struct {
 func NewHarness(t *testing.T, n int) *Harness {
 	ns := make([]*Server, n)
 	connected := make([]bool, n)
-	alive := make([]bool, n)
 	commitChans := make([]chan CommitEntry, n)
 	commits := make([][]CommitEntry, n)
 	ready := make(chan any)
-	storage := make([]*MapStorage, n)
 
 	// Создать все серверы этого кластера, назначить им идентификаторы
 	// и идентификаторы соседей.
@@ -66,11 +56,9 @@ func NewHarness(t *testing.T, n int) *Harness {
 			}
 		}
 
-		storage[i] = NewMapStorage()
 		commitChans[i] = make(chan CommitEntry)
-		ns[i] = NewServer(i, peerIds, storage[i], ready, commitChans[i])
+		ns[i] = NewServer(i, peerIds, ready, commitChans[i])
 		ns[i].Serve(":0")
-		alive[i] = true
 	}
 
 	// Соединить всех соседей друг с другом.
@@ -86,11 +74,9 @@ func NewHarness(t *testing.T, n int) *Harness {
 
 	h := &Harness{
 		cluster:     ns,
-		storage:     storage,
 		commitChans: commitChans,
 		commits:     commits,
 		connected:   connected,
-		alive:       alive,
 		n:           n,
 		t:           t,
 	}
@@ -108,10 +94,7 @@ func (h *Harness) Shutdown() {
 		h.connected[i] = false
 	}
 	for i := 0; i < h.n; i++ {
-		if h.alive[i] {
-			h.alive[i] = false
-			h.cluster[i].Shutdown()
-		}
+		h.cluster[i].Shutdown()
 	}
 	for i := 0; i < h.n; i++ {
 		close(h.commitChans[i])
@@ -120,7 +103,7 @@ func (h *Harness) Shutdown() {
 
 // DisconnectPeer отключает сервер от всех остальных серверов кластера.
 func (h *Harness) DisconnectPeer(id int) {
-	tlog("Disconnect %d", id)
+	tLogf("Disconnect %d", id)
 	h.cluster[id].DisconnectAll()
 	for j := 0; j < h.n; j++ {
 		if j != id {
@@ -132,9 +115,9 @@ func (h *Harness) DisconnectPeer(id int) {
 
 // ReconnectPeer повторно подключает сервер ко всем остальным серверам кластера.
 func (h *Harness) ReconnectPeer(id int) {
-	tlog("Reconnect %d", id)
+	tLogf("Reconnect %d", id)
 	for j := 0; j < h.n; j++ {
-		if j != id && h.alive[j] {
+		if j != id {
 			if err := h.cluster[id].ConnectToPeer(j, h.cluster[j].GetListenAddr()); err != nil {
 				h.t.Fatal(err)
 			}
@@ -144,62 +127,6 @@ func (h *Harness) ReconnectPeer(id int) {
 		}
 	}
 	h.connected[id] = true
-}
-
-// CrashPeer «аварийно завершает работу» сервера, отключая его от всех соседей,
-// а затем запрашивая его завершение. Этот экземпляр сервера больше не будет
-// использоваться, однако его постоянное хранилище сохраняется.
-func (h *Harness) CrashPeer(id int) {
-	tlog("Crash %d", id)
-	h.DisconnectPeer(id)
-	h.alive[id] = false
-	h.cluster[id].Shutdown()
-
-	// Очищаем список зафиксированных записей для аварийно завершившего работу
-	// сервера; алгоритм Raft предполагает, что клиент не имеет постоянного
-	// состояния. После возвращения этого сервера в кластер он повторно
-	// воспроизведёт весь журнал.
-	h.mu.Lock()
-	h.commits[id] = h.commits[id][:0]
-	h.mu.Unlock()
-}
-
-// RestartPeer «перезапускает» сервер, создавая новый экземпляр Server,
-// передавая ему соответствующее постоянное хранилище и вновь подключая его
-// к соседям.
-func (h *Harness) RestartPeer(id int) {
-	if h.alive[id] {
-		log.Fatalf("id=%d is alive in RestartPeer", id)
-	}
-	tlog("Restart %d", id)
-
-	peerIds := make([]int, 0)
-	for p := 0; p < h.n; p++ {
-		if p != id {
-			peerIds = append(peerIds, p)
-		}
-	}
-
-	ready := make(chan any)
-	h.cluster[id] = NewServer(id, peerIds, h.storage[id], ready, h.commitChans[id])
-	h.cluster[id].Serve(":0")
-	h.ReconnectPeer(id)
-	close(ready)
-	h.alive[id] = true
-	sleepMs(20)
-}
-
-// PeerDropCallsAfterN указывает узлу `id` начать отбрасывать RPC-вызовы после
-// выполнения следующих `n` вызовов.
-func (h *Harness) PeerDropCallsAfterN(id int, n int) {
-	tlog("peer %d drop calls after %d", id, n)
-	h.cluster[id].Proxy().DropCallsAfterN(n)
-}
-
-// PeerDontDropCalls указывает узлу `id` прекратить отбрасывать RPC-вызовы.
-func (h *Harness) PeerDontDropCalls(id int) {
-	tlog("peer %d don't drop calls")
-	h.cluster[id].Proxy().DontDropCalls()
 }
 
 // CheckSingleLeader проверяет, что только один сервер считает себя лидером.
@@ -253,7 +180,6 @@ func (h *Harness) CheckNoLeader() {
 // Возвращает количество серверов, на которых команда зафиксирована,
 // и индекс этой записи журнала.
 func (h *Harness) CheckCommitted(cmd int) (nc int, index int) {
-	h.t.Helper()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -316,7 +242,6 @@ func (h *Harness) CheckCommitted(cmd int) (nc int, index int) {
 // CheckCommittedN проверяет, что команда cmd была зафиксирована
 // ровно на n подключённых серверах.
 func (h *Harness) CheckCommittedN(cmd int, n int) {
-	h.t.Helper()
 	nc, _ := h.CheckCommitted(cmd)
 	if nc != n {
 		h.t.Errorf("CheckCommittedN got nc=%d, want %d", nc, n)
@@ -326,7 +251,6 @@ func (h *Harness) CheckCommittedN(cmd int, n int) {
 // CheckNotCommitted проверяет, что ни на одном из активных серверов
 // команда cmd ещё не была зафиксирована.
 func (h *Harness) CheckNotCommitted(cmd int) {
-	h.t.Helper()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -343,11 +267,11 @@ func (h *Harness) CheckNotCommitted(cmd int) {
 }
 
 // SubmitToServer отправляет команду серверу с идентификатором serverId.
-func (h *Harness) SubmitToServer(serverId int, cmd any) int {
-	return h.cluster[serverId].Submit(cmd)
+func (h *Harness) SubmitToServer(serverId int, cmd any) bool {
+	return h.cluster[serverId].cm.Submit(cmd)
 }
 
-func tlog(format string, a ...any) {
+func tLogf(format string, a ...any) {
 	format = "[TEST] " + format
 	log.Printf(format, a...)
 }
@@ -363,7 +287,7 @@ func sleepMs(n int) {
 func (h *Harness) collectCommits(i int) {
 	for c := range h.commitChans[i] {
 		h.mu.Lock()
-		tlog("collectCommits(%d) got %+v", i, c)
+		tLogf("collectCommits(%d) got %+v", i, c)
 		h.commits[i] = append(h.commits[i], c)
 		h.mu.Unlock()
 	}

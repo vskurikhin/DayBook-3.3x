@@ -3,8 +3,6 @@
 package raft
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"log"
 	"math/rand"
@@ -73,28 +71,16 @@ type ConsensusModule struct {
 	// Используется для отправки RPC-запросов другим узлам кластера.
 	server *Server
 
-	// storage is used to persist state.
-	storage Storage
-
 	// commitChan — канал, через который данный CM сообщает
 	// о записях журнала, зафиксированных в кластере Raft.
 	// Передаётся клиентом при создании CM.
 	commitChan chan<- CommitEntry
 
-	// newCommitReadyChan — внутренний канал уведомлений, используемый
-	// горутинами, которые фиксируют новые записи журнала, чтобы сообщить,
-	// что эти записи могут быть отправлены в канал фиксации commitChan.
-	// Отдельная горутина отслеживает этот канал и при получении уведомления
-	// отправляет записи в commitChan; newCommitReadyChanWg используется для
-	// ожидания завершения этой горутины, обеспечивая корректное завершение
-	// работы.
-	newCommitReadyChan   chan struct{}
-	newCommitReadyChanWg sync.WaitGroup
-
-	// triggerAEChan — внутренний канал уведомлений, используемый для запуска
-	// отправки новых сообщений AppendEntries соседям, когда происходят
-	// существенные изменения состояния.
-	triggerAEChan chan struct{}
+	// newCommitReadyChan — внутренний канал уведомлений,
+	// используемый горутинами, фиксирующими новые записи журнала,
+	// чтобы сообщить, что эти записи могут быть отправлены
+	// через канал фиксации.
+	newCommitReadyChan chan struct{}
 
 	// Постоянное состояние Raft на всех серверах
 	currentTerm int
@@ -119,31 +105,20 @@ type ConsensusModule struct {
 // Канал фиксации будет использоваться CM для отправки записей журнала,
 // зафиксированных кластером Raft.
 func NewConsensusModule(
-	id int,
-	peerIds []int,
-	server *Server,
-	storage Storage,
-	ready <-chan any,
-	commitChan chan<- CommitEntry,
+	id int, peerIds []int, server *Server, ready <-chan any, commitChan chan<- CommitEntry,
 ) *ConsensusModule {
 	cm := new(ConsensusModule)
 	cm.id = id
 	cm.peerIds = peerIds
 	cm.server = server
-	cm.storage = storage
 	cm.commitChan = commitChan
 	cm.newCommitReadyChan = make(chan struct{}, 16)
-	cm.triggerAEChan = make(chan struct{}, 1)
 	cm.state = Follower
 	cm.votedFor = -1
 	cm.commitIndex = -1
 	cm.lastApplied = -1
 	cm.nextIndex = make(map[int]int)
 	cm.matchIndex = make(map[int]int)
-
-	if cm.storage.HasData() {
-		cm.restoreFromStorage()
-	}
 
 	go func() {
 		// CM находится в режиме ожидания, пока не будет подан сигнал готовности;
@@ -155,7 +130,6 @@ func NewConsensusModule(
 		cm.runElectionTimer()
 	}()
 
-	cm.newCommitReadyChanWg.Add(1)
 	go cm.commitChanSender()
 	return cm
 }
@@ -167,93 +141,33 @@ func (cm *ConsensusModule) Report() (id int, term int, isLeader bool) {
 	return cm.id, cm.currentTerm, cm.state == Leader
 }
 
-// Submit отправляет новую команду в CM. Этот метод не блокирует выполнение;
+// Submit отправляет новую команду в CM. Эта функция не блокирует выполнение;
 // клиенты читают канал фиксации, переданный в конструктор, чтобы получать
-// уведомления о новых зафиксированных записях.
-// Если данный CM является лидером, Submit возвращает индекс записи журнала,
-// в который была добавлена команда. В противном случае возвращается -1.
-func (cm *ConsensusModule) Submit(command any) int {
+// уведомления о новых зафиксированных записях журнала. Функция возвращает
+// true только в том случае, если данный CM является лидером; в этом случае
+// команда принимается. Если возвращается false, клиенту необходимо найти
+// другой экземпляр CM, чтобы отправить ему эту команду.
+func (cm *ConsensusModule) Submit(command any) bool {
 	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	cm.dLogf("Submit received by %v: %v", cm.state, command)
 	if cm.state == Leader {
-		submitIndex := len(cm.log)
 		cm.log = append(cm.log, LogEntry{Command: command, Term: cm.currentTerm})
-		cm.persistToStorage()
 		cm.dLogf("... log=%v", cm.log)
-		cm.mu.Unlock()
-		cm.triggerAEChan <- struct{}{}
-		return submitIndex
+		return true
 	}
-
-	cm.mu.Unlock()
-	return -1
+	return false
 }
 
 // Stop останавливает этот CM, очищая его состояние. Этот метод быстро возвращает результат,
 // но для завершения работы всех горутин может потребоваться некоторое время (до ~таймаута выборов).
 func (cm *ConsensusModule) Stop() {
-	cm.dLogf("CM.Stop called")
 	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	cm.state = Dead
-	cm.mu.Unlock()
 	cm.dLogf("becomes Dead")
-
-	// Close the commit notification channel, and wait for the goroutine that
-	// monitors it to exit.
 	close(cm.newCommitReadyChan)
-	cm.newCommitReadyChanWg.Wait()
-}
-
-// restoreFromStorage восстанавливает постоянное состояние данного CM
-// из хранилища. Должен вызываться в конструкторе до запуска какой-либо
-// конкурентной работы.
-func (cm *ConsensusModule) restoreFromStorage() {
-	if termData, found := cm.storage.Get("currentTerm"); found {
-		d := gob.NewDecoder(bytes.NewBuffer(termData))
-		if err := d.Decode(&cm.currentTerm); err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		log.Fatal("currentTerm not found in storage")
-	}
-	if votedData, found := cm.storage.Get("votedFor"); found {
-		d := gob.NewDecoder(bytes.NewBuffer(votedData))
-		if err := d.Decode(&cm.votedFor); err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		log.Fatal("votedFor not found in storage")
-	}
-	if logData, found := cm.storage.Get("log"); found {
-		d := gob.NewDecoder(bytes.NewBuffer(logData))
-		if err := d.Decode(&cm.log); err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		log.Fatal("log not found in storage")
-	}
-}
-
-// persistToStorage сохраняет всё постоянное состояние CM в cm.storage.
-// Предполагается, что cm.mu уже заблокирован.
-func (cm *ConsensusModule) persistToStorage() {
-	var termData bytes.Buffer
-	if err := gob.NewEncoder(&termData).Encode(cm.currentTerm); err != nil {
-		log.Fatal(err)
-	}
-	cm.storage.Set("currentTerm", termData.Bytes())
-
-	var votedData bytes.Buffer
-	if err := gob.NewEncoder(&votedData).Encode(cm.votedFor); err != nil {
-		log.Fatal(err)
-	}
-	cm.storage.Set("votedFor", votedData.Bytes())
-
-	var logData bytes.Buffer
-	if err := gob.NewEncoder(&logData).Encode(cm.log); err != nil {
-		log.Fatal(err)
-	}
-	cm.storage.Set("log", logData.Bytes())
 }
 
 // dLogf выводит отладочное сообщение, если DebugCM > 0.
@@ -306,7 +220,6 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 		reply.VoteGranted = false
 	}
 	reply.Term = cm.currentTerm
-	cm.persistToStorage()
 	cm.dLogf("... RequestVote reply: %+v", reply)
 	return nil
 }
@@ -325,11 +238,6 @@ type AppendEntriesArgs struct {
 type AppendEntriesReply struct {
 	Term    int
 	Success bool
-
-	// Faster conflict resolution optimization (described near the end of section
-	// 5.3 in the paper.)
-	ConflictIndex int
-	ConflictTerm  int
 }
 
 func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) error {
@@ -393,32 +301,10 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 				cm.dLogf("... setting commitIndex=%d", cm.commitIndex)
 				cm.newCommitReadyChan <- struct{}{}
 			}
-		} else {
-			// Не найдено совпадение для PrevLogIndex/PrevLogTerm.
-			// Заполнить ConflictIndex и ConflictTerm, чтобы помочь лидеру
-			// быстрее привести наш журнал в актуальное состояние.
-			if args.PrevLogIndex >= len(cm.log) {
-				reply.ConflictIndex = len(cm.log)
-				reply.ConflictTerm = -1
-			} else {
-				// PrevLogIndex указывает на существующую запись в нашем журнале,
-				// но PrevLogTerm не совпадает с термом записи
-				// cm.log[PrevLogIndex].
-				reply.ConflictTerm = cm.log[args.PrevLogIndex].Term
-
-				var i int
-				for i = args.PrevLogIndex - 1; i >= 0; i-- {
-					if cm.log[i].Term != reply.ConflictTerm {
-						break
-					}
-				}
-				reply.ConflictIndex = i + 1
-			}
 		}
 	}
 
 	reply.Term = cm.currentTerm
-	cm.persistToStorage()
 	cm.dLogf("AppendEntries reply: %+v", *reply)
 	return nil
 }
@@ -490,7 +376,6 @@ func (cm *ConsensusModule) startElection() {
 	savedCurrentTerm := cm.currentTerm
 	cm.electionResetEvent = time.Now()
 	cm.votedFor = cm.id
-	cm.persistToStorage()
 	cm.dLogf("becomes Candidate (currentTerm=%d); log=%v", savedCurrentTerm, cm.log)
 
 	votesReceived := 1
@@ -521,11 +406,11 @@ func (cm *ConsensusModule) startElection() {
 					return
 				}
 
-				if reply.Term > cm.currentTerm {
+				if reply.Term > savedCurrentTerm {
 					cm.dLogf("term out of date in RequestVoteReply")
 					cm.becomeFollower(reply.Term)
 					return
-				} else if reply.Term == cm.currentTerm {
+				} else if reply.Term == savedCurrentTerm {
 					if reply.VoteGranted {
 						votesReceived += 1
 						if votesReceived*2 > len(cm.peerIds)+1 {
@@ -549,11 +434,8 @@ func (cm *ConsensusModule) startElection() {
 func (cm *ConsensusModule) becomeFollower(term int) {
 	cm.dLogf("becomes Follower with term=%d; log=%v", term, cm.log)
 	cm.state = Follower
-	if term > cm.currentTerm {
-		cm.currentTerm = term
-		cm.votedFor = -1
-		cm.persistToStorage()
-	}
+	cm.currentTerm = term
+	cm.votedFor = -1
 	cm.electionResetEvent = time.Now()
 
 	go cm.runElectionTimer()
@@ -568,60 +450,33 @@ func (cm *ConsensusModule) startLeader() {
 		cm.nextIndex[peerId] = len(cm.log)
 		cm.matchIndex[peerId] = -1
 	}
-	cm.dLogf("becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; log=%v", cm.currentTerm, cm.nextIndex, cm.matchIndex, cm.log)
+	cm.dLogf(
+		"becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; log=%v",
+		cm.currentTerm, cm.nextIndex, cm.matchIndex, cm.log,
+	)
 
-	// Эта горутина выполняется в фоновом режиме и отправляет сообщения
-	// AppendEntries соседям:
-	// * каждый раз, когда в triggerAEChan поступает уведомление;
-	// * либо каждые 50 мс, если в triggerAEChan не происходит событий.
-	go func(heartbeatTimeout time.Duration) {
-		// Немедленно отправить сообщения AppendEntries всем соседям.
-		cm.leaderSendAEs()
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
 
-		t := time.NewTimer(heartbeatTimeout)
-		defer t.Stop()
+		// Отправлять периодические пульсы, пока этот узел остаётся лидером.
 		for {
-			doSend := false
-			select {
-			case <-t.C:
-				doSend = true
+			cm.leaderSendHeartbeats()
+			<-ticker.C
 
-				// Перезапустить таймер, чтобы он снова сработал через
-				// heartbeatTimeout.
-				t.Stop()
-				t.Reset(heartbeatTimeout)
-			case _, ok := <-cm.triggerAEChan:
-				if ok {
-					doSend = true
-				} else {
-					return
-				}
-
-				// Перезапустить таймер heartbeatTimeout.
-				if !t.Stop() {
-					<-t.C
-				}
-				t.Reset(heartbeatTimeout)
-			}
-
-			if doSend {
-				// Если этот узел больше не является лидером,
-				// остановить цикл отправки сообщений.
-				cm.mu.Lock()
-				if cm.state != Leader {
-					cm.mu.Unlock()
-					return
-				}
+			cm.mu.Lock()
+			if cm.state != Leader {
 				cm.mu.Unlock()
-				cm.leaderSendAEs()
+				return
 			}
+			cm.mu.Unlock()
 		}
-	}(50 * time.Millisecond)
+	}()
 }
 
-// leaderSendAEs отправляет очередной раунд сообщений AppendEntries всем
-// соседям, обрабатывает их ответы и обновляет состояние CM.
-func (cm *ConsensusModule) leaderSendAEs() {
+// leaderSendHeartbeats отправляет серию сигналов пульса подтверждения активности всем участникам сети,
+// собирает их ответы и корректирует состояние CM.
+func (cm *ConsensusModule) leaderSendHeartbeats() {
 	cm.mu.Lock()
 	if cm.state != Leader {
 		cm.mu.Unlock()
@@ -654,15 +509,10 @@ func (cm *ConsensusModule) leaderSendAEs() {
 			var reply AppendEntriesReply
 			if err := cm.server.Call(peerId, "ConsensusModule.AppendEntries", args, &reply); err == nil {
 				cm.mu.Lock()
-				// К сожалению, здесь нельзя просто использовать
-				// defer cm.mu.Unlock(), поскольку в одной из ветвей
-				// выполнения требуется отправка данных в каналы.
-				// Поэтому необходимо явно вызывать cm.mu.Unlock()
-				// во всех путях выхода, начиная с этого места.
+				defer cm.mu.Unlock()
 				if reply.Term > cm.currentTerm {
 					cm.dLogf("term out of date in heartbeat reply")
 					cm.becomeFollower(reply.Term)
-					cm.mu.Unlock()
 					return
 				}
 
@@ -670,6 +520,10 @@ func (cm *ConsensusModule) leaderSendAEs() {
 					if reply.Success {
 						cm.nextIndex[peerId] = ni + len(entries)
 						cm.matchIndex[peerId] = cm.nextIndex[peerId] - 1
+						cm.dLogf(
+							"AppendEntries reply from %d success: nextIndex := %v, matchIndex := %v",
+							peerId, cm.nextIndex, cm.matchIndex,
+						)
 
 						savedCommitIndex := cm.commitIndex
 						for i := cm.commitIndex + 1; i < len(cm.log); i++ {
@@ -685,45 +539,14 @@ func (cm *ConsensusModule) leaderSendAEs() {
 								}
 							}
 						}
-						cm.dLogf(
-							"AppendEntries reply from %d success: nextIndex := %v, matchIndex := %v; commitIndex := %d",
-							peerId, cm.nextIndex, cm.matchIndex, cm.commitIndex,
-						)
 						if cm.commitIndex != savedCommitIndex {
 							cm.dLogf("leader sets commitIndex := %d", cm.commitIndex)
-							// Индекс фиксации изменился: лидер считает новые
-							// записи журнала зафиксированными. Отправить новые
-							// записи в канал фиксации клиентам этого лидера
-							// и уведомить ведомых, отправив им сообщения
-							// AppendEntries.
-							cm.mu.Unlock()
 							cm.newCommitReadyChan <- struct{}{}
-							cm.triggerAEChan <- struct{}{}
-						} else {
-							cm.mu.Unlock()
 						}
 					} else {
-						if reply.ConflictTerm >= 0 {
-							lastIndexOfTerm := -1
-							for i := len(cm.log) - 1; i >= 0; i-- {
-								if cm.log[i].Term == reply.ConflictTerm {
-									lastIndexOfTerm = i
-									break
-								}
-							}
-							if lastIndexOfTerm >= 0 {
-								cm.nextIndex[peerId] = lastIndexOfTerm + 1
-							} else {
-								cm.nextIndex[peerId] = reply.ConflictIndex
-							}
-						} else {
-							cm.nextIndex[peerId] = reply.ConflictIndex
-						}
+						cm.nextIndex[peerId] = ni - 1
 						cm.dLogf("AppendEntries reply from %d !success: nextIndex := %d", peerId, ni-1)
-						cm.mu.Unlock()
 					}
-				} else {
-					cm.mu.Unlock()
 				}
 			}
 		}()
@@ -751,8 +574,6 @@ func (cm *ConsensusModule) lastLogIndexAndTerm() (int, int) {
 // с которой клиент получает новые зафиксированные записи журнала.
 // Метод завершает работу после закрытия newCommitReadyChan.
 func (cm *ConsensusModule) commitChanSender() {
-	defer cm.newCommitReadyChanWg.Done()
-
 	for range cm.newCommitReadyChan {
 		// Определить, какие записи журнала необходимо применить.
 		cm.mu.Lock()
@@ -767,7 +588,6 @@ func (cm *ConsensusModule) commitChanSender() {
 		cm.dLogf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
 
 		for i, entry := range entries {
-			cm.dLogf("send on commitchan i=%v, entry=%v", i, entry)
 			cm.commitChan <- CommitEntry{
 				Command: entry.Command,
 				Index:   savedLastApplied + i + 1,

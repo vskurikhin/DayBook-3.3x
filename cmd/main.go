@@ -26,7 +26,8 @@ func runWith(values config.Values) error {
 	ready := make(chan any)
 	commitChannel := make(chan raft.CommitEntry)
 
-	ns := raft.NewServer(values.Number, nums, ready, commitChannel)
+	storage := raft.NewMapStorage()
+	ns := raft.NewServer(values.Number, nums, storage, ready, commitChannel)
 	go func() {
 		for _, num := range nums {
 			err := ns.ConnectToPeer(num, values.Peers[num])

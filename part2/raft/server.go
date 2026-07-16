@@ -23,7 +23,6 @@ type Server struct {
 	peerIds  []int
 
 	cm       *ConsensusModule
-	storage  Storage
 	rpcProxy *RPCProxy
 
 	rpcServer *rpc.Server
@@ -37,12 +36,11 @@ type Server struct {
 	wg    sync.WaitGroup
 }
 
-func NewServer(serverId int, peerIds []int, storage Storage, ready <-chan any, commitChan chan<- CommitEntry) *Server {
+func NewServer(serverId int, peerIds []int, ready <-chan any, commitChan chan<- CommitEntry) *Server {
 	s := new(Server)
 	s.serverId = serverId
 	s.peerIds = peerIds
 	s.peerClients = make(map[int]*rpc.Client)
-	s.storage = storage
 	s.ready = ready
 	s.commitChan = commitChan
 	s.quit = make(chan any)
@@ -51,12 +49,12 @@ func NewServer(serverId int, peerIds []int, storage Storage, ready <-chan any, c
 
 func (s *Server) Serve(address string) {
 	s.mu.Lock()
-	s.cm = NewConsensusModule(s.serverId, s.peerIds, s, s.storage, s.ready, s.commitChan)
+	s.cm = NewConsensusModule(s.serverId, s.peerIds, s, s.ready, s.commitChan)
 
 	// Создаём новый RPC-сервер и регистрируем RPCProxy,
 	// который перенаправляет все методы в n.cm (ConsensusModule)
 	s.rpcServer = rpc.NewServer()
-	s.rpcProxy = NewProxy(s.cm)
+	s.rpcProxy = &RPCProxy{cm: s.cm}
 	s.rpcServer.RegisterName("ConsensusModule", s.rpcProxy)
 
 	var err error
@@ -88,12 +86,6 @@ func (s *Server) Serve(address string) {
 			}()
 		}
 	}()
-}
-
-// Submit вызывает метод Submit базового экземпляра CM; описание см. в
-// документации к этому методу.
-func (s *Server) Submit(cmd any) int {
-	return s.cm.Submit(cmd)
 }
 
 // DisconnectAll закрывает все клиентские соединения с другими узлами для этого сервера.
@@ -157,50 +149,20 @@ func (s *Server) Call(id int, serviceMethod string, args any, reply any) error {
 	if peer == nil {
 		return fmt.Errorf("call client %d after it's closed", id)
 	} else {
-		return s.rpcProxy.Call(peer, serviceMethod, args, reply)
+		return peer.Call(serviceMethod, args, reply)
 	}
 }
 
-// IsLeader проверяет, считает ли сервер s себя лидером в кластере Raft.
-func (s *Server) IsLeader() bool {
-	_, _, isLeader := s.cm.Report()
-	return isLeader
-}
-
-// Proxy предоставляет доступ к RPC-прокси, используемому данным сервером.
-// Используется только в тестах для моделирования отказов.
-func (s *Server) Proxy() *RPCProxy {
-	return s.rpcProxy
-}
-
-// RPCProxy — прокси-сервер, прозрачно перенаправляющий RPC-вызовы
-// ConsensusModule. Он принимает RPC-запросы, адресованные CM, при
-// необходимости модифицирует их и затем передаёт самому CM.
-//
-// Полезен для следующих целей:
-//   - моделирования потери RPC-вызовов;
-//   - моделирования небольшой задержки передачи RPC;
-//   - моделирования ненадёжных соединений путём значительной задержки
-//     некоторых сообщений и отбрасывания других, если установлена
+// RPCProxy — простой прокси, который лишь перенаправляет RPC-вызовы
+// методов ConsensusModule.
+// Он используется для:
+//   - моделирования небольшой задержки при передаче RPC;
+//   - обхода проблемы https://github.com/golang/go/issues/19957;
+//   - моделирования возможных ненадёжных соединений путём значительной
+//     задержки некоторых сообщений и потери других, когда установлена
 //     переменная окружения RAFT_UNRELIABLE_RPC.
 type RPCProxy struct {
-	mu sync.Mutex
 	cm *ConsensusModule
-
-	// numCallsBeforeDrop используется для управления отбрасыванием
-	// RPC-вызовов:
-	//   -1: не отбрасывать ни одного вызова;
-	//    0: отбрасывать все вызовы;
-	//   >0: начать отбрасывать вызовы после выполнения указанного
-	//       количества вызовов.
-	numCallsBeforeDrop int
-}
-
-func NewProxy(cm *ConsensusModule) *RPCProxy {
-	return &RPCProxy{
-		cm:                 cm,
-		numCallsBeforeDrop: -1,
-	}
 }
 
 func (rpp *RPCProxy) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) error {
@@ -233,35 +195,4 @@ func (rpp *RPCProxy) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesR
 		time.Sleep(time.Duration(1+rand.Intn(5)) * time.Millisecond)
 	}
 	return rpp.cm.AppendEntries(args, reply)
-}
-
-func (rpp *RPCProxy) Call(peer *rpc.Client, method string, args any, reply any) error {
-	rpp.mu.Lock()
-	if rpp.numCallsBeforeDrop == 0 {
-		rpp.mu.Unlock()
-		rpp.cm.dLogf("drop Call %s: %v", method, args)
-		return fmt.Errorf("RPC failed")
-	} else {
-		if rpp.numCallsBeforeDrop > 0 {
-			rpp.numCallsBeforeDrop--
-		}
-		rpp.mu.Unlock()
-		return peer.Call(method, args, reply)
-	}
-}
-
-// DropCallsAfterN настраивает прокси так, чтобы он начал отбрасывать
-// RPC-вызовы после выполнения следующих n вызовов.
-func (rpp *RPCProxy) DropCallsAfterN(n int) {
-	rpp.mu.Lock()
-	defer rpp.mu.Unlock()
-
-	rpp.numCallsBeforeDrop = n
-}
-
-func (rpp *RPCProxy) DontDropCalls() {
-	rpp.mu.Lock()
-	defer rpp.mu.Unlock()
-
-	rpp.numCallsBeforeDrop = -1
 }
