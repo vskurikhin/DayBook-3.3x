@@ -161,7 +161,7 @@ func NewConsensusModule(
 }
 
 // Report отчет о состоянии данного CM.
-func (cm *ConsensusModule) Report() (id, term int, isLeader bool) {
+func (cm *ConsensusModule) Report() (id int, term int, isLeader bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	return cm.id, cm.currentTerm, cm.state == Leader
@@ -267,7 +267,7 @@ func (cm *ConsensusModule) dLogf(format string, args ...any) {
 // RequestVoteArgs См. рисунок 2 в статье.
 type RequestVoteArgs struct {
 	Term         int
-	CandidateID  int
+	CandidateId  int
 	LastLogIndex int
 	LastLogTerm  int
 }
@@ -296,11 +296,11 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 	}
 
 	if cm.currentTerm == args.Term &&
-		(cm.votedFor == -1 || cm.votedFor == args.CandidateID) &&
+		(cm.votedFor == -1 || cm.votedFor == args.CandidateId) &&
 		(args.LastLogTerm > lastLogTerm ||
 			(args.LastLogTerm == lastLogTerm && args.LastLogIndex >= lastLogIndex)) {
 		reply.VoteGranted = true
-		cm.votedFor = args.CandidateID
+		cm.votedFor = args.CandidateId
 		cm.electionResetEvent = time.Now()
 	} else {
 		reply.VoteGranted = false
@@ -314,7 +314,7 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 // AppendEntriesArgs См. рисунок 2 в статье.
 type AppendEntriesArgs struct {
 	Term     int
-	LeaderID int
+	LeaderId int
 
 	PrevLogIndex int
 	PrevLogTerm  int
@@ -366,7 +366,10 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 			logInsertIndex := args.PrevLogIndex + 1
 			newEntriesIndex := 0
 
-			for logInsertIndex < len(cm.log) && newEntriesIndex < len(args.Entries) {
+			for {
+				if logInsertIndex >= len(cm.log) || newEntriesIndex >= len(args.Entries) {
+					break
+				}
 				if cm.log[logInsertIndex].Term != args.Entries[newEntriesIndex].Term {
 					break
 				}
@@ -425,10 +428,11 @@ func (cm *ConsensusModule) electionTimeout() time.Duration {
 	// Если установлен параметр RAFT_FORCE_MORE_REELECTION, проведите стресс-тест, намеренно
 	// генерируя жестко заданное число очень часто. Это вызовет коллизии
 	// между различными серверами и приведет к увеличению количества перевыборов.
-	if os.Getenv("RAFT_FORCE_MORE_REELECTION") != "" && rand.Intn(3) == 0 {
+	if len(os.Getenv("RAFT_FORCE_MORE_REELECTION")) > 0 && rand.Intn(3) == 0 {
 		return time.Duration(150) * time.Millisecond
+	} else {
+		return time.Duration(150+rand.Intn(150)) * time.Millisecond
 	}
-	return time.Duration(150+rand.Intn(150)) * time.Millisecond
 }
 
 // runElectionTimer реализует таймер выборов. Она должна запускаться всякий раз, когда
@@ -492,7 +496,7 @@ func (cm *ConsensusModule) startElection() {
 	votesReceived := 1
 
 	// Параллельно отправить RPC-запросы RequestVote всем остальным серверам.
-	for _, peerID := range cm.peerIds {
+	for _, peerId := range cm.peerIds {
 		go func() {
 			cm.mu.Lock()
 			savedLastLogIndex, savedLastLogTerm := cm.lastLogIndexAndTerm()
@@ -500,14 +504,14 @@ func (cm *ConsensusModule) startElection() {
 
 			args := RequestVoteArgs{
 				Term:         savedCurrentTerm,
-				CandidateID:  cm.id,
+				CandidateId:  cm.id,
 				LastLogIndex: savedLastLogIndex,
 				LastLogTerm:  savedLastLogTerm,
 			}
 
-			cm.dLogf("sending RequestVote to %d: %+v", peerID, args)
+			cm.dLogf("sending RequestVote to %d: %+v", peerId, args)
 			var reply RequestVoteReply
-			if err := cm.server.Call(peerID, "ConsensusModule.RequestVote", args, &reply); err == nil {
+			if err := cm.server.Call(peerId, "ConsensusModule.RequestVote", args, &reply); err == nil {
 				cm.mu.Lock()
 				defer cm.mu.Unlock()
 				cm.dLogf("received RequestVoteReply %+v", reply)
@@ -560,9 +564,9 @@ func (cm *ConsensusModule) becomeFollower(term int) {
 func (cm *ConsensusModule) startLeader() {
 	cm.state = Leader
 
-	for _, peerID := range cm.peerIds {
-		cm.nextIndex[peerID] = len(cm.log)
-		cm.matchIndex[peerID] = -1
+	for _, peerId := range cm.peerIds {
+		cm.nextIndex[peerId] = len(cm.log)
+		cm.matchIndex[peerId] = -1
 	}
 	cm.dLogf("becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; log=%v", cm.currentTerm, cm.nextIndex, cm.matchIndex, cm.log)
 
@@ -577,7 +581,7 @@ func (cm *ConsensusModule) startLeader() {
 		t := time.NewTimer(heartbeatTimeout)
 		defer t.Stop()
 		for {
-			doSend := false //nolint
+			doSend := false
 			select {
 			case <-t.C:
 				doSend = true
@@ -626,10 +630,10 @@ func (cm *ConsensusModule) leaderSendAEs() {
 	savedCurrentTerm := cm.currentTerm
 	cm.mu.Unlock()
 
-	for _, peerID := range cm.peerIds {
+	for _, peerId := range cm.peerIds {
 		go func() {
 			cm.mu.Lock()
-			ni := cm.nextIndex[peerID]
+			ni := cm.nextIndex[peerId]
 			prevLogIndex := ni - 1
 			prevLogTerm := -1
 			if prevLogIndex >= 0 {
@@ -639,16 +643,16 @@ func (cm *ConsensusModule) leaderSendAEs() {
 
 			args := AppendEntriesArgs{
 				Term:         savedCurrentTerm,
-				LeaderID:     cm.id,
+				LeaderId:     cm.id,
 				PrevLogIndex: prevLogIndex,
 				PrevLogTerm:  prevLogTerm,
 				Entries:      entries,
 				LeaderCommit: cm.commitIndex,
 			}
 			cm.mu.Unlock()
-			cm.dLogf("sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
+			cm.dLogf("sending AppendEntries to %v: ni=%d, args=%+v", peerId, ni, args)
 			var reply AppendEntriesReply
-			if err := cm.server.Call(peerID, "ConsensusModule.AppendEntries", args, &reply); err == nil {
+			if err := cm.server.Call(peerId, "ConsensusModule.AppendEntries", args, &reply); err == nil {
 				cm.mu.Lock()
 				// К сожалению, здесь нельзя просто использовать
 				// defer cm.mu.Unlock(), поскольку в одной из ветвей
@@ -664,15 +668,15 @@ func (cm *ConsensusModule) leaderSendAEs() {
 
 				if cm.state == Leader && savedCurrentTerm == reply.Term {
 					if reply.Success {
-						cm.nextIndex[peerID] = ni + len(entries)
-						cm.matchIndex[peerID] = cm.nextIndex[peerID] - 1
+						cm.nextIndex[peerId] = ni + len(entries)
+						cm.matchIndex[peerId] = cm.nextIndex[peerId] - 1
 
 						savedCommitIndex := cm.commitIndex
 						for i := cm.commitIndex + 1; i < len(cm.log); i++ {
 							if cm.log[i].Term == cm.currentTerm {
 								matchCount := 1
-								for _, peerID := range cm.peerIds {
-									if cm.matchIndex[peerID] >= i {
+								for _, peerId := range cm.peerIds {
+									if cm.matchIndex[peerId] >= i {
 										matchCount++
 									}
 								}
@@ -683,7 +687,7 @@ func (cm *ConsensusModule) leaderSendAEs() {
 						}
 						cm.dLogf(
 							"AppendEntries reply from %d success: nextIndex := %v, matchIndex := %v; commitIndex := %d",
-							peerID, cm.nextIndex, cm.matchIndex, cm.commitIndex,
+							peerId, cm.nextIndex, cm.matchIndex, cm.commitIndex,
 						)
 						if cm.commitIndex != savedCommitIndex {
 							cm.dLogf("leader sets commitIndex := %d", cm.commitIndex)
@@ -701,7 +705,6 @@ func (cm *ConsensusModule) leaderSendAEs() {
 					} else {
 						if reply.ConflictTerm >= 0 {
 							lastIndexOfTerm := -1
-							//nolint:modernize
 							for i := len(cm.log) - 1; i >= 0; i-- {
 								if cm.log[i].Term == reply.ConflictTerm {
 									lastIndexOfTerm = i
@@ -709,14 +712,14 @@ func (cm *ConsensusModule) leaderSendAEs() {
 								}
 							}
 							if lastIndexOfTerm >= 0 {
-								cm.nextIndex[peerID] = lastIndexOfTerm + 1
+								cm.nextIndex[peerId] = lastIndexOfTerm + 1
 							} else {
-								cm.nextIndex[peerID] = reply.ConflictIndex
+								cm.nextIndex[peerId] = reply.ConflictIndex
 							}
 						} else {
-							cm.nextIndex[peerID] = reply.ConflictIndex
+							cm.nextIndex[peerId] = reply.ConflictIndex
 						}
-						cm.dLogf("AppendEntries reply from %d !success: nextIndex := %d", peerID, ni-1)
+						cm.dLogf("AppendEntries reply from %d !success: nextIndex := %d", peerId, ni-1)
 						cm.mu.Unlock()
 					}
 				} else {
@@ -735,8 +738,9 @@ func (cm *ConsensusModule) lastLogIndexAndTerm() (int, int) {
 	if len(cm.log) > 0 {
 		lastIndex := len(cm.log) - 1
 		return lastIndex, cm.log[lastIndex].Term
+	} else {
+		return -1, -1
 	}
-	return -1, -1
 }
 
 // commitChanSender отвечает за отправку зафиксированных записей журнала

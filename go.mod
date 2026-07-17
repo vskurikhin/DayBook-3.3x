@@ -1,4 +1,4 @@
-module vskurikhin/raft
+module github.com/vskurikhin/raft
 
 go 1.26.4
 

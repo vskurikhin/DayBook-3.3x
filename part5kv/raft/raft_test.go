@@ -897,7 +897,7 @@ func TestSameTermDoubleVotePrevented(t *testing.T) {
 	cm := h.cluster[followerId].cm
 	args := RequestVoteArgs{
 		Term:         leaderTerm,
-		CandidateID:  otherCandidate,
+		CandidateId:  otherCandidate,
 		LastLogIndex: -1,
 		LastLogTerm:  -1,
 	}

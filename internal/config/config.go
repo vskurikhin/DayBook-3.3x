@@ -1,3 +1,4 @@
+// Package config Разбор аргументов командной строки
 package config
 
 import (
@@ -43,7 +44,7 @@ func ParseFlags() Values {
 }
 
 func parsePeers(peers map[int]net.Addr, raw string) map[int]net.Addr {
-	for _, elem := range strings.Split(raw, ",") {
+	for elem := range strings.SplitSeq(raw, ",") {
 		keyValue := strings.Split(elem, "=")
 		if len(keyValue) != 2 {
 			log.Fatalf("invalid peer server address: %s", raw)
@@ -87,10 +88,7 @@ func addrAppend(peers map[int]net.Addr, num int, addr string) map[int]net.Addr {
 // Например, "rpc://example.com:9999" -> "example.com:9999".
 // Возвращает [net.Addr].
 func parsePeerAddress(addr string) net.Addr {
-	trimmed := addr
-	if strings.HasPrefix(trimmed, PrefixRPC) {
-		trimmed = trimmed[len(PrefixRPC):]
-	}
+	trimmed := strings.TrimPrefix(addr, PrefixRPC)
 	// Преобразуем строку в net.Addr
 	result, err := net.ResolveTCPAddr("tcp", trimmed)
 	if err != nil {

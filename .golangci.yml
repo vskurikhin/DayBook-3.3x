@@ -20,6 +20,7 @@ linters:
     - goconst
     - gocyclo
     - godox
+    - gomodguard
     - gosec
     - gosmopolitan
     - inamedparam
@@ -34,6 +35,7 @@ linters:
     - noinlineerr
     - nonamedreturns
     - paralleltest
+    - perfsprint
     - testableexamples
     - testpackage
     - thelper
@@ -86,6 +88,13 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - part1/
+      - part2/
+      - part3/
+      - part4kv/
+      - part5kv/
+      - /testharness.go$
+      - .*_test.go$
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
