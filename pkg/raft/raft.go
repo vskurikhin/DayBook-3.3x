@@ -656,7 +656,7 @@ func (cm *ConsensusModule) leaderSendAEs() {
 			}
 			var entries []LogEntry
 			if ni < len(cm.log) {
-				entries = cm.log[ni:]
+				entries = append([]LogEntry{}, cm.log[ni:]...)
 			} else {
 				entries = nil
 			}
