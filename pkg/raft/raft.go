@@ -770,7 +770,7 @@ func (cm *ConsensusModule) commitChanSender() {
 		savedLastApplied := cm.lastApplied
 		var entries []LogEntry
 		if cm.commitIndex > cm.lastApplied {
-			entries = cm.log[cm.lastApplied+1 : cm.commitIndex+1]
+			entries = append([]LogEntry{}, cm.log[cm.lastApplied+1:cm.commitIndex+1]...)
 			cm.lastApplied = cm.commitIndex
 		}
 		cm.mu.Unlock()
