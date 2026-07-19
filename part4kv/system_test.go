@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
-	"github.com/vskurikhin/raft/pkg/raft"
 )
 
 func sleepMs(n int) {
@@ -70,7 +69,7 @@ func TestPutPrevValue(t *testing.T) {
 }
 
 func TestBasicPutGetDifferentClients(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -85,7 +84,7 @@ func TestBasicPutGetDifferentClients(t *testing.T) {
 }
 
 func TestCASBasic(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -100,7 +99,7 @@ func TestCASBasic(t *testing.T) {
 }
 
 func TestCASConcurrent(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -132,7 +131,7 @@ func TestCASConcurrent(t *testing.T) {
 }
 
 func TestConcurrentClientsPutsAndGets(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	// Проверить, что несколько запросов PUT и GET могут выполняться
 	// одновременно, когда каждая горутина отправляет свой запрос параллельно.
@@ -164,7 +163,7 @@ func TestConcurrentClientsPutsAndGets(t *testing.T) {
 func Test5ServerConcurrentClientsPutsAndGets(t *testing.T) {
 	// Аналогично предыдущему тесту, но используется кластер Raft
 	// из пяти серверов.
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 5)
 	defer h.Shutdown()
@@ -192,7 +191,7 @@ func Test5ServerConcurrentClientsPutsAndGets(t *testing.T) {
 }
 
 func TestDisconnectLeaderAfterPuts(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -234,7 +233,7 @@ func TestDisconnectLeaderAfterPuts(t *testing.T) {
 }
 
 func TestDisconnectLeaderAndFollower(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -279,7 +278,7 @@ func TestDisconnectLeaderAndFollower(t *testing.T) {
 }
 
 func TestCrashFollower(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -313,7 +312,7 @@ func TestCrashFollower(t *testing.T) {
 }
 
 func TestCrashLeader(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -341,7 +340,7 @@ func TestCrashLeader(t *testing.T) {
 }
 
 func TestCrashThenRestartLeader(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, 100*time.Millisecond)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()

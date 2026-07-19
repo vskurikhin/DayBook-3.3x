@@ -11,15 +11,20 @@ import (
 )
 
 func TestRunWithEmptyPeers(t *testing.T) {
-	addr, err := net.ResolveTCPAddr("tcp", ":0")
+	httpAddr, err := net.ResolveTCPAddr("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rpcAddr, err := net.ResolveTCPAddr("tcp", ":0")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	values := config.Values{
-		Number:  0,
-		Address: addr,
-		Peers:   map[int]net.Addr{},
+		Number:      0,
+		HTTPAddress: httpAddr,
+		RPCAddress:  rpcAddr,
+		Peers:       map[int]net.Addr{},
 	}
 
 	errCh := make(chan error, 1)
@@ -46,15 +51,20 @@ func TestRunWithPeerConnect(t *testing.T) {
 
 	peerAddr := peer.GetListenAddr()
 
-	addr, err := net.ResolveTCPAddr("tcp", ":0")
+	httpAddr, err := net.ResolveTCPAddr("tcp", ":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rpcAddr, err := net.ResolveTCPAddr("tcp", ":0")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	values := config.Values{
-		Number:  0,
-		Address: addr,
-		Peers:   map[int]net.Addr{1: peerAddr},
+		Number:      0,
+		HTTPAddress: httpAddr,
+		RPCAddress:  rpcAddr,
+		Peers:       map[int]net.Addr{1: peerAddr},
 	}
 
 	errCh := make(chan error, 1)
@@ -73,7 +83,7 @@ func TestRun(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
 
-	os.Args = []string{"raft", "-addr", ":0", "-number", "0"}
+	os.Args = []string{"raft", "-rpc-addr", ":0", "-number", "0"}
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -93,7 +103,7 @@ func TestMainFunction(t *testing.T) {
 
 	// main() calls log.Fatal on error, which exits. We redirect log output
 	// to discard and verify it doesn't exit immediately.
-	os.Args = []string{"raft", "-addr", ":0", "-number", "0"}
+	os.Args = []string{"raft", "-http-addr", ":0", "-rpc-addr", ":0", "-number", "0"}
 
 	done := make(chan any)
 	go func() {

@@ -67,11 +67,7 @@ func (s *Server) Serve(address string) {
 	log.Printf("[%v] listening at %s", s.serverID, s.listener.Addr())
 	s.mu.Unlock()
 
-	s.wg.Add(1)
-	//nolint:modernize
-	go func() {
-		defer s.wg.Done()
-
+	s.wg.Go(func() {
 		for {
 			conn, err := s.listener.Accept()
 			if err != nil {
@@ -82,13 +78,11 @@ func (s *Server) Serve(address string) {
 					log.Fatal("accept error:", err)
 				}
 			}
-			s.wg.Add(1)
-			go func() {
+			s.wg.Go(func() {
 				s.rpcServer.ServeConn(conn)
-				s.wg.Done()
-			}()
+			})
 		}
-	}()
+	})
 }
 
 // Submit вызывает метод Submit базового экземпляра CM; описание см. в
@@ -248,7 +242,6 @@ func (rpp *RPCProxy) Call(peer *rpc.Client, method string, args, reply any) erro
 		rpp.numCallsBeforeDrop--
 	}
 	rpp.mu.Unlock()
-
 	return peer.Call(method, args, reply)
 }
 

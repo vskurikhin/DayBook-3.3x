@@ -9,11 +9,19 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"slices"
 	"sync"
 	"time"
 )
 
-const DebugCM = 1
+const (
+	DebugCM = 1
+	Quantum = 2
+
+	HeartbeatTimeoutMs  = 5 * 10 * Quantum
+	ReelectionTimeoutMs = 15 * 10 * Quantum
+	TickerTimeoutMs     = 10 * Quantum
+)
 
 // CommitEntry — это данные, которые Raft отправляет в канал фиксации.
 // Каждая запись фиксации уведомляет клиента о том, что консенсус по команде
@@ -426,9 +434,9 @@ func (cm *ConsensusModule) electionTimeout() time.Duration {
 	// генерируя жестко заданное число очень часто. Это вызовет коллизии
 	// между различными серверами и приведет к увеличению количества перевыборов.
 	if os.Getenv("RAFT_FORCE_MORE_REELECTION") != "" && rand.Intn(3) == 0 {
-		return time.Duration(150) * time.Millisecond
+		return time.Duration(ReelectionTimeoutMs) * time.Millisecond
 	}
-	return time.Duration(150+rand.Intn(150)) * time.Millisecond
+	return time.Duration(ReelectionTimeoutMs+rand.Intn(ReelectionTimeoutMs)) * time.Millisecond
 }
 
 // runElectionTimer реализует таймер выборов. Она должна запускаться всякий раз, когда
@@ -449,7 +457,7 @@ func (cm *ConsensusModule) runElectionTimer() {
 	// - таймер выборов не истечёт и данный CM не станет кандидатом.
 	// Для ведомого узла этот цикл обычно продолжает работать в фоновом режиме
 	// в течение всего времени жизни CM.
-	ticker := time.NewTicker(10 * time.Millisecond)
+	ticker := time.NewTicker(TickerTimeoutMs * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		<-ticker.C
@@ -569,7 +577,7 @@ func (cm *ConsensusModule) startLeader() {
 	// Эта горутина выполняется в фоновом режиме и отправляет сообщения
 	// AppendEntries соседям:
 	// * каждый раз, когда в triggerAEChan поступает уведомление;
-	// * либо каждые 50 мс, если в triggerAEChan не происходит событий.
+	// * либо каждые HeartbeatTimeoutMs мс, если в triggerAEChan не происходит событий.
 	go func(heartbeatTimeout time.Duration) {
 		// Немедленно отправить сообщения AppendEntries всем соседям.
 		cm.leaderSendAEs()
@@ -612,7 +620,7 @@ func (cm *ConsensusModule) startLeader() {
 				cm.leaderSendAEs()
 			}
 		}
-	}(50 * time.Millisecond)
+	}(HeartbeatTimeoutMs * time.Millisecond)
 }
 
 // leaderSendAEs отправляет очередной раунд сообщений AppendEntries всем
@@ -701,9 +709,8 @@ func (cm *ConsensusModule) leaderSendAEs() {
 					} else {
 						if reply.ConflictTerm >= 0 {
 							lastIndexOfTerm := -1
-							//nolint:modernize
-							for i := len(cm.log) - 1; i >= 0; i-- {
-								if cm.log[i].Term == reply.ConflictTerm {
+							for i, v := range slices.Backward(cm.log) {
+								if v.Term == reply.ConflictTerm {
 									lastIndexOfTerm = i
 									break
 								}

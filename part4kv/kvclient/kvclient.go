@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vskurikhin/raft/part5kv/api"
+	"github.com/vskurikhin/raft/part4kv/api"
 )
 
 // DebugClient включает вывод отладочной информации.
@@ -29,12 +29,7 @@ type KVClient struct {
 
 	// clientID — уникальный идентификатор клиента. Управляется внутри этого
 	// файла путём увеличения глобального счётчика clientCount.
-	clientID int64
-
-	// requestID — уникальный идентификатор запроса, отправленного данным
-	// клиентом. Каждый клиент самостоятельно ведёт свой requestID и
-	// монотонно увеличивает его атомарно при каждом новом запросе.
-	requestID atomic.Int64
+	clientID int32
 }
 
 // New создаёт новый экземпляр KVClient. serviceAddrs — список адресов
@@ -50,44 +45,20 @@ func New(serviceAddrs []string) *KVClient {
 
 // clientCount используется для назначения уникальных идентификаторов
 // различным клиентам.
-var clientCount atomic.Int64
+var clientCount atomic.Int32
 
 // Put сохраняет пару key=value в хранилище.
 // Возвращает ошибку либо (prevValue, keyFound, nil), где keyFound показывает,
 // существовал ли ключ в хранилище до выполнения команды, а prevValue содержит
 // его предыдущее значение, если ключ был найден.
 func (c *KVClient) Put(ctx context.Context, key string, value string) (string, bool, error) {
-	// Каждый запрос получает уникальный идентификатор, состоящий из ID клиента
-	// и ID запроса внутри этого клиента. Структура с этим идентификатором
-	// передаётся в s.send, который может повторять отправку запроса до успешного
-	// завершения. Уникальный идентификатор позволяет сервису обнаруживать и
-	// устранять дублирование запросов, которые могут поступить несколько раз
-	// из-за проблем сети и повторных попыток клиента.
 	putReq := api.PutRequest{
-		Key:       key,
-		Value:     value,
-		ClientID:  c.clientID,
-		RequestID: c.requestID.Add(1),
+		Key:   key,
+		Value: value,
 	}
 	var putResp api.PutResponse
 	err := c.send(ctx, "put", putReq, &putResp)
 	return putResp.PrevValue, putResp.KeyFound, err
-}
-
-// Append добавляет value к значению по ключу.
-// Возвращает ошибку либо (prevValue, keyFound, nil), где keyFound показывает,
-// существовал ли ключ в хранилище до выполнения команды, а prevValue содержит
-// его предыдущее значение, если ключ был найден.
-func (c *KVClient) Append(ctx context.Context, key string, value string) (string, bool, error) {
-	appendReq := api.AppendRequest{
-		Key:       key,
-		Value:     value,
-		ClientID:  c.clientID,
-		RequestID: c.requestID.Add(1),
-	}
-	var appendResp api.AppendResponse
-	err := c.send(ctx, "append", appendReq, &appendResp)
-	return appendResp.PrevValue, appendResp.KeyFound, err
 }
 
 // Get получает значение по ключу.
@@ -95,9 +66,7 @@ func (c *KVClient) Append(ctx context.Context, key string, value string) (string
 // существует ли указанный ключ в хранилище.
 func (c *KVClient) Get(ctx context.Context, key string) (string, bool, error) {
 	getReq := api.GetRequest{
-		Key:       key,
-		ClientID:  c.clientID,
-		RequestID: c.requestID.Add(1),
+		Key: key,
 	}
 	var getResp api.GetResponse
 	err := c.send(ctx, "get", getReq, &getResp)
@@ -114,8 +83,6 @@ func (c *KVClient) CAS(ctx context.Context, key string, compare string, value st
 		Key:          key,
 		CompareValue: compare,
 		Value:        value,
-		ClientID:     c.clientID,
-		RequestID:    c.requestID.Add(1),
 	}
 	var casResp api.CASResponse
 	err := c.send(ctx, "cas", casReq, &casResp)
@@ -175,9 +142,6 @@ FindLeader:
 		case api.StatusFailedCommit:
 			retryCtxCancel()
 			return fmt.Errorf("commit failed; please retry")
-		case api.StatusDuplicateRequest:
-			retryCtxCancel()
-			return fmt.Errorf("this request was already completed")
 		default:
 			panic("unreachable")
 		}

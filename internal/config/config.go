@@ -11,17 +11,22 @@ import (
 	"strings"
 )
 
-const PrefixRPC = "rpc://"
+const (
+	PrefixHTTP = "http://"
+	PrefixRPC  = "rpc://"
+)
 
 type Values struct {
-	Address net.Addr
-	Number  int
-	Peers   map[int]net.Addr
+	HTTPAddress net.Addr
+	RPCAddress  net.Addr
+	Number      int
+	Peers       map[int]net.Addr
 }
 
 func ParseFlags() Values {
 	fs := flag.NewFlagSet("raft", flag.ContinueOnError)
-	addressFlag := fs.String("addr", ":9990", "Proxy server listen address")
+	httpAddressFlag := fs.String("http-addr", ":8880", "HTTP server listen address")
+	rpcAddressFlag := fs.String("rpc-addr", ":9990", "RPC server listen address")
 	numberFlag := fs.Int("number", -1, "")
 	peersFlag := fs.String("peers", "", "Comma-separated list of peers servers (id=host:port)")
 	err := fs.Parse(os.Args[1:])
@@ -29,7 +34,8 @@ func ParseFlags() Values {
 		log.Fatal(err)
 	}
 
-	address := parsePeerAddress(*addressFlag)
+	httpAddress := parseHTTPAddress(*httpAddressFlag)
+	rpcAddress := parsePeerAddress(*rpcAddressFlag)
 
 	peers := make(map[int]net.Addr)
 	if *peersFlag != "" {
@@ -37,9 +43,10 @@ func ParseFlags() Values {
 	}
 
 	return Values{
-		Address: address,
-		Number:  *numberFlag,
-		Peers:   peers,
+		HTTPAddress: httpAddress,
+		RPCAddress:  rpcAddress,
+		Number:      *numberFlag,
+		Peers:       peers,
 	}
 }
 
@@ -89,6 +96,21 @@ func addrAppend(peers map[int]net.Addr, num int, addr string) map[int]net.Addr {
 // Возвращает [net.Addr].
 func parsePeerAddress(addr string) net.Addr {
 	trimmed := strings.TrimPrefix(addr, PrefixRPC)
+	// Преобразуем строку в net.Addr
+	result, err := net.ResolveTCPAddr("tcp", trimmed)
+	if err != nil {
+		log.Fatalf("invalid peers address: %s", addr)
+	}
+	return result
+}
+
+func parseHTTPAddress(addr string) net.Addr {
+	var result net.Addr
+	trimmed := addr
+
+	if !strings.HasPrefix(addr, PrefixHTTP) {
+		trimmed = strings.TrimPrefix(addr, PrefixHTTP)
+	}
 	// Преобразуем строку в net.Addr
 	result, err := net.ResolveTCPAddr("tcp", trimmed)
 	if err != nil {
