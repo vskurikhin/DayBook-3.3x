@@ -766,7 +766,6 @@ func (cm *ConsensusModule) commitChanSender() {
 	for range cm.newCommitReadyChan {
 		// Определить, какие записи журнала необходимо применить.
 		cm.mu.Lock()
-		savedTerm := cm.currentTerm
 		savedLastApplied := cm.lastApplied
 		var entries []LogEntry
 		if cm.commitIndex > cm.lastApplied {
@@ -781,7 +780,7 @@ func (cm *ConsensusModule) commitChanSender() {
 			cm.commitChan <- CommitEntry{
 				Command: entry.Command,
 				Index:   savedLastApplied + i + 1,
-				Term:    savedTerm,
+				Term:    entry.Term,
 			}
 		}
 	}
