@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vskurikhin/raft/pkg/api"
-	"github.com/vskurikhin/raft/pkg/raft"
+	"github.com/vskurikhin/raft/part3/raft"
+	"github.com/vskurikhin/raft/part5kv/api"
 )
 
 const DebugKV = 1

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vskurikhin/raft/pkg/kvclient"
-	"github.com/vskurikhin/raft/pkg/kvservice"
-	"github.com/vskurikhin/raft/pkg/raft"
+	"github.com/vskurikhin/raft/part3/raft"
+	"github.com/vskurikhin/raft/part4kv/kvclient"
+	"github.com/vskurikhin/raft/part4kv/kvservice"
 )
 
 func init() {
@@ -89,8 +89,8 @@ func NewHarness(t *testing.T, n int) *Harness {
 	// Каждый экземпляр KVService обслуживает REST API на отдельном TCP-порту.
 	kvServiceAddrs := make([]string, n)
 	for i := range n {
-		port := 14220 + i
-		kvss[i].ServeHTTP(fmt.Sprintf(":%d", port))
+		port := 14200 + i
+		kvss[i].ServeHTTP(port)
 
 		kvServiceAddrs[i] = fmt.Sprintf("localhost:%d", port)
 	}
@@ -165,12 +165,12 @@ func (h *Harness) RestartService(id int) {
 	}
 	ready := make(chan any)
 	h.kvCluster[id] = kvservice.New(":0", id, peerIds, h.storage[id], ready)
-	h.kvCluster[id].ServeHTTP(fmt.Sprintf(":%d", 14220+id))
+	h.kvCluster[id].ServeHTTP(14200 + id)
 
 	h.ReconnectServiceToPeers(id)
 	close(ready)
 	h.alive[id] = true
-	time.Sleep(20 * raft.Quantum * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 }
 
 // DisableHTTPResponsesFromService заставляет указанный сервис перестать
@@ -258,7 +258,7 @@ func (h *Harness) CheckSingleLeader() int {
 		if leaderId >= 0 {
 			return leaderId
 		}
-		time.Sleep(150 * raft.Quantum * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 	}
 
 	h.t.Fatalf("leader not found")
@@ -268,7 +268,7 @@ func (h *Harness) CheckSingleLeader() int {
 // CheckPut отправляет через клиента c запрос Put и проверяет, что он
 // завершился без ошибок. Возвращает (prevValue, keyFound).
 func (h *Harness) CheckPut(c *kvclient.KVClient, key, value string) (string, bool) {
-	ctx, cancel := context.WithTimeout(h.ctx, 500*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, 500*time.Millisecond)
 	defer cancel()
 	pv, f, err := c.Put(ctx, key, value)
 	if err != nil {
@@ -281,7 +281,7 @@ func (h *Harness) CheckPut(c *kvclient.KVClient, key, value string) (string, boo
 // ошибок. Также проверяет, что ключ найден и его значение совпадает с
 // ожидаемым.
 func (h *Harness) CheckGet(c *kvclient.KVClient, key string, wantValue string) {
-	ctx, cancel := context.WithTimeout(h.ctx, 500*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, 500*time.Millisecond)
 	defer cancel()
 	gv, f, err := c.Get(ctx, key)
 	if err != nil {
@@ -298,7 +298,7 @@ func (h *Harness) CheckGet(c *kvclient.KVClient, key string, wantValue string) {
 // CheckCAS отправляет через клиента c запрос CAS и проверяет, что он
 // завершился без ошибок. Возвращает (prevValue, keyFound).
 func (h *Harness) CheckCAS(c *kvclient.KVClient, key, compare, value string) (string, bool) {
-	ctx, cancel := context.WithTimeout(h.ctx, 500*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, 500*time.Millisecond)
 	defer cancel()
 	pv, f, err := c.CAS(ctx, key, compare, value)
 	if err != nil {
@@ -310,7 +310,7 @@ func (h *Harness) CheckCAS(c *kvclient.KVClient, key, compare, value string) (st
 // CheckGetNotFound отправляет через клиента c запрос Get и проверяет
 // отсутствие ошибок, а также то, что указанный ключ отсутствует в сервисе.
 func (h *Harness) CheckGetNotFound(c *kvclient.KVClient, key string) {
-	ctx, cancel := context.WithTimeout(h.ctx, 500*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, 500*time.Millisecond)
 	defer cancel()
 	_, f, err := c.Get(ctx, key)
 	if err != nil {
@@ -325,7 +325,7 @@ func (h *Harness) CheckGetNotFound(c *kvclient.KVClient, key string) {
 // клиента, завершится по тайм-ауту при использовании контекста с дедлайном,
 // поскольку клиент не сможет добиться фиксации своей команды сервисом.
 func (h *Harness) CheckGetTimesOut(c *kvclient.KVClient, key string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 300*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 	_, _, err := c.Get(ctx, key)
 	if err == nil || !strings.Contains(err.Error(), "deadline exceeded") {

@@ -88,16 +88,16 @@ func TestParseFlags(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
 
-	os.Args = []string{"raft", "-addr", ":9999", "-number", "0", "-peers", "1=127.0.0.1:9991"}
+	os.Args = []string{"raft", "-rpc-addr", ":9999", "-number", "0", "-peers", "1=127.0.0.1:9991"}
 
 	v := ParseFlags()
 	if v.Number != 0 {
 		t.Errorf("Number = %d, want 0", v.Number)
 	}
-	if v.Address.String() != ":9999" &&
-		v.Address.String() != "0.0.0.0:9999" &&
-		v.Address.String() != "[::]:9999" {
-		t.Errorf("Address = %s, want :9999, 0.0.0.0:9999, or [::]:9999", v.Address.String())
+	if v.RPCAddress.String() != ":9999" &&
+		v.RPCAddress.String() != "0.0.0.0:9999" &&
+		v.RPCAddress.String() != "[::]:9999" {
+		t.Errorf("Address = %s, want :9999, 0.0.0.0:9999, or [::]:9999", v.RPCAddress.String())
 	}
 	if len(v.Peers) != 1 {
 		t.Errorf("len(Peers) = %d, want 1", len(v.Peers))
@@ -111,16 +111,16 @@ func TestParseFlagsNoPeers(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
 
-	os.Args = []string{"raft", "-addr", ":9990", "-number", "1"}
+	os.Args = []string{"raft", "-rpc-addr", ":9990", "-number", "1"}
 
 	v := ParseFlags()
 	if v.Number != 1 {
 		t.Errorf("Number = %d, want 1", v.Number)
 	}
-	if v.Address.String() != ":9990" &&
-		v.Address.String() != "0.0.0.0:9990" &&
-		v.Address.String() != "[::]:9990" {
-		t.Errorf("Address = %s, want :9990, 0.0.0.0:9990, or [::]:9990", v.Address.String())
+	if v.RPCAddress.String() != ":9990" &&
+		v.RPCAddress.String() != "0.0.0.0:9990" &&
+		v.RPCAddress.String() != "[::]:9990" {
+		t.Errorf("Address = %s, want :9990, 0.0.0.0:9990, or [::]:9990", v.RPCAddress.String())
 	}
 	if len(v.Peers) != 0 {
 		t.Errorf("len(Peers) = %d, want 0", len(v.Peers))
@@ -137,24 +137,24 @@ func TestParseFlagsDefaultAddr(t *testing.T) {
 	if v.Number != 2 {
 		t.Errorf("Number = %d, want 2", v.Number)
 	}
-	if v.Address.String() != ":9990" &&
-		v.Address.String() != "0.0.0.0:9990" &&
-		v.Address.String() != "[::]:9990" {
-		t.Errorf("Address = %s, want :9990", v.Address.String())
+	if v.RPCAddress.String() != ":9990" &&
+		v.RPCAddress.String() != "0.0.0.0:9990" &&
+		v.RPCAddress.String() != "[::]:9990" {
+		t.Errorf("Address = %s, want :9990", v.RPCAddress.String())
 	}
 }
 
 func TestValuesImplements(t *testing.T) {
 	v := Values{
-		Address: mustParseAddr("127.0.0.1:9990"),
-		Number:  0,
-		Peers:   map[int]net.Addr{1: mustParseAddr("127.0.0.1:9991")},
+		RPCAddress: mustParseAddr("127.0.0.1:9990"),
+		Number:     0,
+		Peers:      map[int]net.Addr{1: mustParseAddr("127.0.0.1:9991")},
 	}
 	if v.Number != 0 {
 		t.Errorf("Number = %d, want 0", v.Number)
 	}
-	if v.Address.String() != "127.0.0.1:9990" {
-		t.Errorf("Address = %s, want 127.0.0.1:9990", v.Address.String())
+	if v.RPCAddress.String() != "127.0.0.1:9990" {
+		t.Errorf("Address = %s, want 127.0.0.1:9990", v.RPCAddress.String())
 	}
 	if len(v.Peers) != 1 {
 		t.Errorf("len(Peers) = %d, want 1", len(v.Peers))

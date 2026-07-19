@@ -45,8 +45,8 @@ type Command struct {
 	ResultValue string
 	ResultFound bool
 
-	// ID — идентификатор Raft-сервиса, отправившего данную команду.
-	ID int
+	// Id — идентификатор Raft-сервиса, отправившего данную команду.
+	Id int
 }
 
 type CommandKind int
