@@ -79,7 +79,7 @@ func TestElectionLeaderDisconnectThenReconnect(t *testing.T) {
 
 	h.DisconnectPeer(origLeaderId)
 
-	sleepMs(350)
+	sleepMs(350 * Quantum)
 	newLeaderId, newTerm := h.CheckSingleLeader()
 
 	h.ReconnectPeer(origLeaderId)

@@ -4,8 +4,8 @@
 
 * [Часть 0: Введение](https://svn.su/2020/2020-02-22-implementing-raft-part-0-introduction.html)
 * [Часть 1: Выборы](https://svn.su/2020/2020-02-24-implementing-raft-part-1-elections.html)
-* [Part 2: Commands and log replication](https://svn.su/2020/2020-02-29-implementing-raft-part-2-commands-and-log-replication.html)
-* [Part 3: Persistence and optimizations](https://svn.su/2020/2020-05-05-implementing-raft-part-3-persistence-and-optimizations.html)
+* [Часть 2: Команды и репликация логов](https://svn.su/2020/2020-02-29-implementing-raft-part-2-commands-and-log-replication.html)
+* [Часть 3: Сохранение состояния и оптимизации](https://svn.su/2020/2020-05-05-implementing-raft-part-3-persistence-and-optimizations.html)
 * **Часть 4. База данных «ключ-значение»**
 * **Часть 5. Доставка сообщений «ровно один раз» (Exactly-Once Delivery)**
 
@@ -127,12 +127,12 @@ raft/
 ```
 Старт ────────────┐
                   ▼                    обнаружен
-               ВУДОМЫЙ ◄────────────────────┐более 
+               ВУДОМЫЙ ◄────────────────────┐более
                │     ▲      (becomeFollower)│высокий
                │     │                      │ term
                │     │                      │
        истекает│     │обнаруживает          │
-         время,│     │нынешнего           ЛИДЕР           
+         время,│     │нынешнего           ЛИДЕР
      начинаются│     │лидера                ▲
         выборы.│     │или новый терм        │
 startElection()│     │                      │
@@ -140,7 +140,7 @@ startElection()│     │                      │
                КАНДИДАТ ────────────────────┘
                │     ▲               на выборах
                └─────┘
-Любое состояние ──► Dead (через Stop())           
+Любое состояние ──► Dead (через Stop())
 ```
 
 ### Server и RPCProxy

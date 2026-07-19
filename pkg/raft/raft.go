@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -497,7 +498,8 @@ func (cm *ConsensusModule) startElection() {
 	cm.persistToStorage()
 	cm.dLogf("becomes Candidate (currentTerm=%d); log=%v", savedCurrentTerm, cm.log)
 
-	votesReceived := 1
+	var votesReceived atomic.Int32
+	votesReceived.Store(1)
 
 	// Параллельно отправить RPC-запросы RequestVote всем остальным серверам.
 	for _, peerID := range cm.peerIds {
@@ -531,10 +533,10 @@ func (cm *ConsensusModule) startElection() {
 					return
 				} else if reply.Term == cm.currentTerm {
 					if reply.VoteGranted {
-						votesReceived += 1
-						if votesReceived*2 > len(cm.peerIds)+1 {
+						votesReceived.Add(1)
+						if int(votesReceived.Load())*2 > len(cm.peerIds)+1 {
 							// Выиграл выборы!
-							cm.dLogf("wins election with %d votes", votesReceived)
+							cm.dLogf("wins election with %d votes", votesReceived.Load())
 							cm.startLeader()
 							return
 						}
