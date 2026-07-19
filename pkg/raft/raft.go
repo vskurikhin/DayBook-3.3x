@@ -115,6 +115,7 @@ type ConsensusModule struct {
 	lastApplied        int
 	state              CMState
 	electionResetEvent time.Time
+	electionTimerDone  chan struct{}
 
 	// Непостоянное состояние Raft на лидерах
 	nextIndex  map[int]int
@@ -149,6 +150,7 @@ func NewConsensusModule(
 	cm.lastApplied = -1
 	cm.nextIndex = make(map[int]int)
 	cm.matchIndex = make(map[int]int)
+	cm.electionTimerDone = make(chan struct{})
 
 	if cm.storage.HasData() {
 		cm.restoreFromStorage()
@@ -450,6 +452,7 @@ func (cm *ConsensusModule) runElectionTimer() {
 	timeoutDuration := cm.electionTimeout()
 	cm.mu.Lock()
 	termStarted := cm.currentTerm
+	electionTimerDone := cm.electionTimerDone
 	cm.mu.Unlock()
 	cm.dLogf("election timer started (%v), term=%d", timeoutDuration, termStarted)
 
@@ -461,29 +464,33 @@ func (cm *ConsensusModule) runElectionTimer() {
 	ticker := time.NewTicker(TickerTimeoutMs * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		<-ticker.C
+		select {
+		case <-ticker.C:
+			cm.mu.Lock()
+			if cm.state != Candidate && cm.state != Follower {
+				cm.dLogf("in election timer state=%s, bailing out", cm.state)
+				cm.mu.Unlock()
+				return
+			}
 
-		cm.mu.Lock()
-		if cm.state != Candidate && cm.state != Follower {
-			cm.dLogf("in election timer state=%s, bailing out", cm.state)
+			if termStarted != cm.currentTerm {
+				cm.dLogf("in election timer term changed from %d to %d, bailing out", termStarted, cm.currentTerm)
+				cm.mu.Unlock()
+				return
+			}
+
+			// Начать выборы, если в течение времени ожидания мы не получили
+			// сообщение от лидера или не проголосовали за кого-либо.
+			if elapsed := time.Since(cm.electionResetEvent); elapsed >= timeoutDuration {
+				cm.startElection()
+				cm.mu.Unlock()
+				return
+			}
 			cm.mu.Unlock()
+
+		case <-electionTimerDone:
 			return
 		}
-
-		if termStarted != cm.currentTerm {
-			cm.dLogf("in election timer term changed from %d to %d, bailing out", termStarted, cm.currentTerm)
-			cm.mu.Unlock()
-			return
-		}
-
-		// Начать выборы, если в течение времени ожидания мы не получили
-		// сообщение от лидера или не проголосовали за кого-либо.
-		if elapsed := time.Since(cm.electionResetEvent); elapsed >= timeoutDuration {
-			cm.startElection()
-			cm.mu.Unlock()
-			return
-		}
-		cm.mu.Unlock()
 	}
 }
 
@@ -562,6 +569,8 @@ func (cm *ConsensusModule) becomeFollower(term int) {
 	}
 	cm.electionResetEvent = time.Now()
 
+	close(cm.electionTimerDone)
+	cm.electionTimerDone = make(chan struct{})
 	go cm.runElectionTimer()
 }
 

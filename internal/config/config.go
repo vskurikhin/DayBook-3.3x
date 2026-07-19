@@ -108,7 +108,7 @@ func parseHTTPAddress(addr string) net.Addr {
 	var result net.Addr
 	trimmed := addr
 
-	if !strings.HasPrefix(addr, PrefixHTTP) {
+	if strings.HasPrefix(addr, PrefixHTTP) {
 		trimmed = strings.TrimPrefix(addr, PrefixHTTP)
 	}
 	// Преобразуем строку в net.Addr

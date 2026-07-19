@@ -113,7 +113,7 @@ func TestCASConcurrent(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		c := h.NewClient()
-		for range 20 {
+		for range 20 * raft.Quantum {
 			h.CheckCAS(c, "foo", "bar", "bomba")
 		}
 	}()
