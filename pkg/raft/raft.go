@@ -569,7 +569,11 @@ func (cm *ConsensusModule) becomeFollower(term int) {
 	}
 	cm.electionResetEvent = time.Now()
 
-	close(cm.electionTimerDone)
+	select {
+	case <-cm.electionTimerDone:
+	default:
+		close(cm.electionTimerDone)
+	}
 	cm.electionTimerDone = make(chan struct{})
 	go cm.runElectionTimer()
 }

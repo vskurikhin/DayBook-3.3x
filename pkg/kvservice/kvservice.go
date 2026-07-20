@@ -196,6 +196,9 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 			kvs.sendHTTPResponse(w, api.PutResponse{RespStatus: api.StatusFailedCommit})
 		}
 	case <-req.Context().Done():
+		kvs.mu.Lock()
+		delete(kvs.commitSubs, logIndex)
+		kvs.mu.Unlock()
 		return
 	}
 }
@@ -235,6 +238,9 @@ func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
 			kvs.sendHTTPResponse(w, api.GetResponse{RespStatus: api.StatusFailedCommit})
 		}
 	case <-req.Context().Done():
+		kvs.mu.Lock()
+		delete(kvs.commitSubs, logIndex)
+		kvs.mu.Unlock()
 		return
 	}
 }
@@ -274,6 +280,9 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 			kvs.sendHTTPResponse(w, api.CASResponse{RespStatus: api.StatusFailedCommit})
 		}
 	case <-req.Context().Done():
+		kvs.mu.Lock()
+		delete(kvs.commitSubs, logIndex)
+		kvs.mu.Unlock()
 		return
 	}
 }
@@ -310,7 +319,10 @@ func (kvs *KVService) runUpdater() {
 			// с данным индексом журнала, после чего закрыть подписку,
 			// поскольку она является одноразовой.
 			if sub := kvs.popCommitSubscription(entry.Index); sub != nil {
-				sub <- cmd
+				select {
+				case sub <- cmd:
+				default:
+				}
 				close(sub)
 			}
 		}

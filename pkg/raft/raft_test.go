@@ -912,6 +912,29 @@ func TestSameTermDoubleVotePrevented(t *testing.T) {
 	}
 }
 
+// TestBecomeFollowerDoubleClose проверяет, что двойной вызов becomeFollower
+// не вызывает панику при повторном close(electionTimerDone) (проблема 10).
+func TestBecomeFollowerDoubleClose(t *testing.T) {
+	cm := &ConsensusModule{
+		state:              Follower,
+		currentTerm:        1,
+		votedFor:           -1,
+		electionTimerDone:  make(chan struct{}),
+		electionResetEvent: time.Now(),
+		storage:            NewMapStorage(),
+	}
+	cm.log = make([]LogEntry, 0)
+	cm.mu.Lock()
+
+	// Первый вызов becomeFollower — нормально закрывает старый канал
+	cm.becomeFollower(2)
+
+	// Второй вызов becomeFollower с новым каналом — не должен паниковать
+	cm.becomeFollower(3)
+
+	cm.mu.Unlock()
+}
+
 // Стресс-тест: многократно изолирует текущего лидера и проверяет, что после
 // каждого нарушения связности кластер всегда сходится ровно к одному лидеру.
 func TestElectionSafetyStress(t *testing.T) {
