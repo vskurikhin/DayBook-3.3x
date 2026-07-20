@@ -45,27 +45,30 @@ type KVService struct {
 	httpResponsesEnabled bool
 }
 
-// New создаёт новый экземпляр KVService.
-//
-//   - address - адрес, который будет слушать Raft сервер.
-//   - id — идентификатор данного сервиса в кластере Raft.
-//   - peerIds — идентификаторы остальных узлов Raft в кластере.
-//   - storage — реализация интерфейса raft.Storage, используемая сервисом
-//     для долговременного хранения и сохранения своего состояния.
-//   - readyChan — канал уведомления, который должен быть закрыт после того,
-//     как кластер Raft будет готов к работе (все узлы запущены и соединены
-//     друг с другом).
-func New(address string, id int, peerIds []int, storage raft.Storage, readyChan <-chan any) *KVService {
+// Config — конфигурация для создания нового KVService.
+// Встраивает raft.Config и добавляет HTTPAddress — адрес,
+// на котором сервис будет принимать HTTP-запросы клиентов.
+type Config struct {
+	raft.Config
+
+	HTTPAddress string
+}
+
+// New создаёт новый экземпляр KVService с заданной конфигурацией cfg,
+// хранилищем storage и каналом уведомления readyChan.
+// cfg содержит параметры Raft-сервера (идентификатор, список узлов,
+// RPC-адрес) и HTTP-адрес для REST API сервиса.
+func New(cfg Config, storage raft.Storage, readyChan <-chan any) *KVService {
 	gob.Register(Command{})
 	commitChan := make(chan raft.CommitEntry)
 
 	// raft.Server обрабатывает RPC-вызовы протокола Raft в кластере.
 	// После вызова Serve сервер готов принимать RPC-соединения
 	// от остальных узлов.
-	rs := raft.NewServer(id, peerIds, storage, readyChan, commitChan)
-	rs.Serve(address)
+	rs := raft.New(cfg.Config, storage, readyChan, commitChan)
+	rs.Serve(cfg.RPCAddress)
 	kvs := &KVService{
-		id:                   id,
+		id:                   cfg.ServerID,
 		rs:                   rs,
 		commitChan:           commitChan,
 		ds:                   NewDataStore(),
@@ -75,6 +78,28 @@ func New(address string, id int, peerIds []int, storage raft.Storage, readyChan 
 
 	kvs.runUpdater()
 	return kvs
+}
+
+// NewKVService создаёт новый экземпляр KVService.
+//
+//   - address - адрес, который будет слушать Raft сервер.
+//   - id — идентификатор данного сервиса в кластере Raft.
+//   - peerIds — идентификаторы остальных узлов Raft в кластере.
+//   - storage — реализация интерфейса raft.Storage, используемая сервисом
+//     для долговременного хранения и сохранения своего состояния.
+//   - readyChan — канал уведомления, который должен быть закрыт после того,
+//     как кластер Raft будет готов к работе (все узлы запущены и соединены
+//     друг с другом).
+func NewKVService(address string, id int, peerIds []int, storage raft.Storage, readyChan <-chan any) *KVService {
+	return New(Config{
+		Config: raft.Config{
+			RPCAddress: address,
+			ServerID:   id,
+			PeerIds:    peerIds,
+		},
+	},
+		storage, readyChan,
+	)
 }
 
 // IsLeader проверяет, считает ли kvs себя лидером кластера Raft.
@@ -372,7 +397,7 @@ func (kvs *KVService) kvLogf(format string, args ...any) {
 // и используются для моделирования различных сбоев.
 
 func (kvs *KVService) ConnectToRaftPeer(peerID int, addr net.Addr) error {
-	return kvs.rs.ConnectToPeer(peerID, addr)
+	return kvs.rs.ConnectToPeerWithTimeout(peerID, addr, 2*raft.Quantum*time.Second)
 }
 
 func (kvs *KVService) DisconnectFromAllRaftPeers() {

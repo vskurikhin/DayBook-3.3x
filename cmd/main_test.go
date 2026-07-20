@@ -83,7 +83,7 @@ func TestRun(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
 
-	os.Args = []string{"raft", "-rpc-addr", ":0", "-number", "0"}
+	os.Args = []string{"raft", "-rpc-addr", ":0", "-http-addr", ":0", "-number", "0"}
 
 	errCh := make(chan error, 1)
 	go func() {

@@ -255,7 +255,7 @@ func TestDisconnectLeaderAndFollower(t *testing.T) {
 	h.DisconnectServiceFromPeers(lid)
 	otherId := (lid + 1) % 3
 	h.DisconnectServiceFromPeers(otherId)
-	sleepMs(100)
+	sleepMs(raft.ReelectionTimeoutMs)
 
 	c := h.NewClient()
 	h.CheckGetTimesOut(c, "key0")

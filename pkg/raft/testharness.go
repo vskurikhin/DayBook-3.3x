@@ -48,6 +48,7 @@ type Harness struct {
 // NewHarness создаёт новую тестовую запряжку,
 // инициализированную n серверами, соединёнными друг с другом.
 func NewHarness(t *testing.T, n int) *Harness {
+	t.Setenv("RAFT_TEST_HARNESS", "true")
 	ns := make([]*Server, n)
 	connected := make([]bool, n)
 	alive := make([]bool, n)

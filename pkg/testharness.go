@@ -54,6 +54,7 @@ type Harness struct {
 }
 
 func NewHarness(t *testing.T, n int) *Harness {
+	t.Setenv("RAFT_TEST_HARNESS", "true")
 	kvss := make([]*kvservice.KVService, n)
 	ready := make(chan any)
 	connected := make([]bool, n)
@@ -70,7 +71,7 @@ func NewHarness(t *testing.T, n int) *Harness {
 		}
 
 		storage[i] = raft.NewMapStorage()
-		kvss[i] = kvservice.New(":0", i, peerIds, storage[i], ready)
+		kvss[i] = kvservice.NewKVService(":0", i, peerIds, storage[i], ready)
 		alive[i] = true
 	}
 
@@ -164,7 +165,7 @@ func (h *Harness) RestartService(id int) {
 		}
 	}
 	ready := make(chan any)
-	h.kvCluster[id] = kvservice.New(":0", id, peerIds, h.storage[id], ready)
+	h.kvCluster[id] = kvservice.NewKVService(":0", id, peerIds, h.storage[id], ready)
 	h.kvCluster[id].ServeHTTP(fmt.Sprintf(":%d", 14220+id))
 
 	h.ReconnectServiceToPeers(id)

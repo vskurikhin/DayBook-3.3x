@@ -83,7 +83,7 @@ func TestElectionLeaderDisconnectThenReconnect(t *testing.T) {
 	newLeaderId, newTerm := h.CheckSingleLeader()
 
 	h.ReconnectPeer(origLeaderId)
-	sleepMs(150)
+	sleepMs(150 * Quantum)
 
 	againLeaderId, againTerm := h.CheckSingleLeader()
 
@@ -132,7 +132,7 @@ func TestElectionFollowerComesBack(t *testing.T) {
 	h.DisconnectPeer(otherId)
 	time.Sleep(650 * Quantum * time.Millisecond)
 	h.ReconnectPeer(otherId)
-	sleepMs(150)
+	sleepMs(150 * Quantum)
 
 	// Здесь мы не можем проверить идентификатор нового лидера,
 	// поскольку он зависит от относительных тайм-аутов выборов.
@@ -195,7 +195,7 @@ func TestCommitAfterCallDrops(t *testing.T) {
 	lid, _ := h.CheckSingleLeader()
 	h.PeerDropCallsAfterN(lid, 2)
 	h.SubmitToServer(lid, 99)
-	sleepMs(30)
+	sleepMs(30 * Quantum)
 	h.PeerDontDropCalls(lid)
 
 	sleepMs(60 * Quantum)
@@ -486,7 +486,7 @@ func TestCrashThenRestartLeader(t *testing.T) {
 	}
 
 	h.CrashPeer(origLeaderId)
-	sleepMs(350)
+	sleepMs(350 * Quantum)
 	for _, v := range vals {
 		h.CheckCommittedN(v, 2)
 	}
@@ -588,7 +588,7 @@ func TestReplaceMultipleLogEntries(t *testing.T) {
 	sleepMs(100)
 	finalLeaderId, _ := h.CheckSingleLeader()
 	h.ReconnectPeer(origLeaderId)
-	sleepMs(400)
+	sleepMs(400 * Quantum)
 
 	// Отправляем ещё одну запись. Это необходимо, потому что лидеры не
 	// фиксируют записи из предыдущих термов (раздел 5.4.2 статьи), поэтому
