@@ -288,7 +288,11 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 func (kvs *KVService) runUpdater() {
 	go func() {
 		for entry := range kvs.commitChan {
-			cmd := entry.Command.(Command)
+			cmd, ok := entry.Command.(Command)
+			if !ok {
+				kvs.kvLogf("unknown command %v", entry.Command)
+				continue
+			}
 
 			switch cmd.Kind {
 			case CommandGet:
@@ -298,7 +302,8 @@ func (kvs *KVService) runUpdater() {
 			case CommandCAS:
 				cmd.ResultValue, cmd.ResultFound = kvs.ds.CAS(cmd.Key, cmd.CompareValue, cmd.Value)
 			default:
-				panic(fmt.Errorf("unexpected command %v", cmd))
+				kvs.kvLogf("unknown command %v", cmd)
+				continue
 			}
 
 			// Передать команду подписчику, ожидающему фиксации записи

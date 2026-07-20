@@ -106,11 +106,7 @@ func parsePeerAddress(addr string) net.Addr {
 
 func parseHTTPAddress(addr string) net.Addr {
 	var result net.Addr
-	trimmed := addr
-
-	if strings.HasPrefix(addr, PrefixHTTP) {
-		trimmed = strings.TrimPrefix(addr, PrefixHTTP)
-	}
+	trimmed, _ := strings.CutPrefix(addr, PrefixHTTP)
 	// Преобразуем строку в net.Addr
 	result, err := net.ResolveTCPAddr("tcp", trimmed)
 	if err != nil {
