@@ -198,7 +198,7 @@ func (h *Harness) PeerDropCallsAfterN(id int, n int) {
 
 // PeerDontDropCalls указывает узлу `id` прекратить отбрасывать RPC-вызовы.
 func (h *Harness) PeerDontDropCalls(id int) {
-	tlog("peer %d don't drop calls")
+	tlog("peer %d don't drop calls", id)
 	h.cluster[id].Proxy().DontDropCalls()
 }
 
