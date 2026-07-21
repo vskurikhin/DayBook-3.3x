@@ -4,7 +4,7 @@ import (
 	"log"
 	"maps"
 	"slices"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/vskurikhin/raft/internal/config"
@@ -28,34 +28,55 @@ func run() error {
 	return runWith(config.ParseFlags())
 }
 
+var wg sync.WaitGroup
+
 func runWith(values config.Values) error {
 	nums := slices.Collect(maps.Keys(values.Peers))
 	done := make(chan any)
 	ready := make(chan any)
-	count := atomic.Int64{}
 
+	cfg := kvservice.Config{
+		HTTPAddress: values.HTTPAddress.String(),
+		Config: raft.Config{
+			PeerAddresses: values.Peers,
+			PeerIds:       nums,
+			RPCAddress:    values.RPCAddress.String(),
+			ServerID:      values.Number,
+		},
+	}
 	storage := raft.NewMapStorage()
-	kvs := kvservice.New(values.RPCAddress.String(), values.Number, nums, storage, ready)
-	go func() {
-		for _, num := range nums {
-			err := kvs.ConnectToRaftPeer(num, values.Peers[num])
-			for i := 0; i < Try && err != nil; i++ {
-				duration := (i * MinimalDuration) % DurationModulus
-				time.Sleep(time.Duration(duration+MinimalDuration) * time.Millisecond)
-				err = kvs.ConnectToRaftPeer(num, values.Peers[num])
-			}
-
-			if err != nil {
-				log.Printf("warning connect to peer %d: error: %v", num, err)
-				count.Add(1)
-				if count.Load() > int64(len(nums)/2) {
-					log.Fatalf("failed to connect to peer %d: %v, error: not quorum: %d", num, err, len(nums)/2)
-				}
-			}
-		}
-		ready <- true
-	}()
+	kvs := kvservice.New(cfg, storage, ready)
+	wg.Add(len(nums) / 2)
+	for _, num := range nums {
+		go connect(num, kvs, values, nums)
+	}
+	wg.Wait()
+	close(ready)
 	kvs.ServeHTTP(values.HTTPAddress.String())
 	<-done
 	return nil
+}
+
+var (
+	count int
+	mu    sync.Mutex
+)
+
+func connect(n int, kvs *kvservice.KVService, values config.Values, nums []int) {
+	log.Printf("connect to peer %d", n)
+	err := kvs.ConnectToRaftPeer(n, values.Peers[n])
+	for i := 0; i < Try && err != nil; i++ {
+		duration := (i * MinimalDuration) % DurationModulus
+		time.Sleep(time.Duration(duration+MinimalDuration) * time.Millisecond)
+		log.Printf("try connect to peer %d", n)
+		err = kvs.ConnectToRaftPeer(n, values.Peers[n])
+	}
+	if err != nil {
+		log.Printf("warning connect to peer %d: error: %v", n, err)
+	} else if count < len(nums)/2 {
+		mu.Lock()
+		count++
+		wg.Done()
+		mu.Unlock()
+	}
 }

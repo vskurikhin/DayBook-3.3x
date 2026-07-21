@@ -19,6 +19,8 @@ import (
 type Server struct {
 	mu sync.Mutex
 
+	harness bool
+
 	serverID int
 	peerIds  []int
 
@@ -29,24 +31,56 @@ type Server struct {
 	rpcServer *rpc.Server
 	listener  net.Listener
 
-	commitChan  chan<- CommitEntry
-	peerClients map[int]*rpc.Client
+	commitChan    chan<- CommitEntry
+	peerAddresses map[int]net.Addr
+	peerClients   map[int]*rpc.Client
 
 	ready <-chan any
 	quit  chan any
 	wg    sync.WaitGroup
 }
 
-func NewServer(serverID int, peerIds []int, storage Storage, ready <-chan any, commitChan chan<- CommitEntry) *Server {
+// Config — конфигурация для создания нового сервера Raft.
+// Содержит идентификатор сервера, список идентификаторов узлов-соседей,
+// адрес для RPC и карту адресов узлов-соседей.
+type Config struct {
+	PeerAddresses map[int]net.Addr
+	PeerIds       []int
+	RPCAddress    string
+	ServerID      int
+}
+
+// New создаёт новый сервер Raft с заданной конфигурацией cfg, хранилищем storage,
+// каналом уведомления ready (закрывается, когда кластер готов к работе) и
+// каналом фиксации commitChan, в который сервер отправляет зафиксированные записи журнала.
+func New(cfg Config, storage Storage, ready <-chan any, commitChan chan<- CommitEntry) *Server {
 	s := new(Server)
-	s.serverID = serverID
-	s.peerIds = peerIds
-	s.peerClients = make(map[int]*rpc.Client)
+	s.serverID = cfg.ServerID
+	s.peerIds = cfg.PeerIds
+	s.peerAddresses = cfg.PeerAddresses
+	if s.peerAddresses == nil {
+		s.peerAddresses = make(map[int]net.Addr, len(cfg.PeerIds))
+	}
+	s.peerClients = make(map[int]*rpc.Client, len(cfg.PeerIds))
+	if os.Getenv("RAFT_TEST_HARNESS") != "" {
+		s.harness = true
+	}
 	s.storage = storage
 	s.ready = ready
 	s.commitChan = commitChan
 	s.quit = make(chan any)
 	return s
+}
+
+// NewServer создаёт новый сервер Raft с указанными идентификатором serverID,
+// списком идентификаторов узлов-соседей peerIds, хранилищем storage, каналом
+// уведомления ready и каналом фиксации commitChan.
+// Является обёрткой над New для обратной совместимости.
+func NewServer(serverID int, peerIds []int, storage Storage, ready <-chan any, commitChan chan<- CommitEntry) *Server {
+	return New(Config{
+		ServerID: serverID,
+		PeerIds:  peerIds,
+	}, storage, ready, commitChan)
 }
 
 func (s *Server) Serve(address string) {
@@ -85,8 +119,8 @@ func (s *Server) Serve(address string) {
 	})
 }
 
-// Submit вызывает метод Submit базового экземпляра CM; описание см. в
-// документации к этому методу.
+// Submit вызывает метод Submit базового экземпляра CM; описание см.
+// в документации к этому методу.
 func (s *Server) Submit(cmd any) int {
 	return s.cm.Submit(cmd)
 }
@@ -97,7 +131,7 @@ func (s *Server) DisconnectAll() {
 	defer s.mu.Unlock()
 	for id := range s.peerClients {
 		if s.peerClients[id] != nil {
-			s.peerClients[id].Close()
+			_ = s.peerClients[id].Close()
 			s.peerClients[id] = nil
 		}
 	}
@@ -107,7 +141,7 @@ func (s *Server) DisconnectAll() {
 func (s *Server) Shutdown() {
 	s.cm.Stop()
 	close(s.quit)
-	s.listener.Close()
+	_ = s.listener.Close()
 	s.wg.Wait()
 }
 
@@ -130,6 +164,32 @@ func (s *Server) ConnectToPeer(peerID int, addr net.Addr) error {
 	return nil
 }
 
+// ConnectToPeerWithTimeout подключает данный сервер к удалённому узлу peerID
+// по адресу addr с заданным таймаутом timeout. Если соединение уже существует,
+// метод завершается без ошибки. При недоступности узла возвращает ошибку.
+func (s *Server) ConnectToPeerWithTimeout(peerID int, addr net.Addr, timeout time.Duration) error {
+	s.mu.Lock()
+	if s.peerClients[peerID] == nil {
+		s.mu.Unlock()
+		client, err := net.DialTimeout("tcp", addr.String(), timeout)
+		if err != nil {
+			return err
+		}
+		s.mu.Lock()
+		if s.peerClients[peerID] == nil {
+			rpcClient := rpc.NewClient(client)
+			s.peerClients[peerID] = rpcClient
+			s.peerAddresses[peerID] = addr
+		} else {
+			_ = client.Close()
+		}
+		s.mu.Unlock()
+		return nil
+	}
+	s.mu.Unlock()
+	return nil
+}
+
 // DisconnectPeer отключает этот сервер от удаленного узла, идентифицированного по peerId.
 func (s *Server) DisconnectPeer(peerID int) error {
 	s.mu.Lock()
@@ -142,17 +202,58 @@ func (s *Server) DisconnectPeer(peerID int) error {
 	return nil
 }
 
+// Call выполняет удалённый RPC-вызов метода serviceMethod на узле id.
+// При отсутствии соединения или его разрыве автоматически выполняет
+// повторное подключение. В тестовом режиме (harness) повторное
+// подключение не выполняется.
 func (s *Server) Call(id int, serviceMethod string, args, reply any) error {
-	s.mu.Lock()
-	peer := s.peerClients[id]
-	s.mu.Unlock()
+	peer := s.PeerClient(id)
 
 	// Если этот метод вызывается после завершения работы (когда вызывается client.Close),
 	// он вернет ошибку.
 	if peer == nil {
-		return fmt.Errorf("call client %d after it's closed", id)
+		err := s.reConnect(id)
+		if err != nil {
+			return err
+		}
 	}
-	return s.rpcProxy.Call(peer, serviceMethod, args, reply)
+	err := s.rpcProxy.Call(s.PeerClient(id), serviceMethod, args, reply)
+	if err != nil {
+		if s.harness {
+			return err
+		}
+		s.ClosePeerClient(id)
+		err = s.reConnect(id)
+		if err != nil {
+			if !s.harness {
+				go s.tryReconnect(id)
+			}
+			return err
+		}
+		return s.rpcProxy.Call(s.PeerClient(id), serviceMethod, args, reply)
+	}
+	return err
+}
+
+// PeerClient возвращает RPC-клиент для узла с идентификатором id.
+// Потокобезопасна. Возвращает nil, если клиент не подключён.
+func (s *Server) PeerClient(id int) *rpc.Client {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	peer := s.peerClients[id]
+	return peer
+}
+
+// ClosePeerClient закрывает RPC-клиент для узла с идентификатором id
+// и удаляет его из карты клиентов. Потокобезопасна.
+func (s *Server) ClosePeerClient(id int) {
+	s.mu.Lock()
+	peer := s.peerClients[id]
+	s.peerClients[id] = nil
+	s.mu.Unlock()
+	if peer != nil {
+		_ = peer.Close()
+	}
 }
 
 // IsLeader проверяет, считает ли сервер s себя лидером в кластере Raft.
@@ -165,6 +266,25 @@ func (s *Server) IsLeader() bool {
 // Используется только в тестах для моделирования отказов.
 func (s *Server) Proxy() *RPCProxy {
 	return s.rpcProxy
+}
+
+func (s *Server) tryReconnect(id int) {
+	s.mu.Lock()
+	s.peerClients[id] = nil
+	s.mu.Unlock()
+	_ = s.ConnectToPeerWithTimeout(id, s.peerAddresses[id], 2*ReelectionTimeoutMs*time.Millisecond)
+}
+
+func (s *Server) reConnect(id int) error {
+	fmtErrorf := func() error { return fmt.Errorf("call client %d after it's closed", id) }
+	if s.harness {
+		return fmtErrorf()
+	}
+	err := s.ConnectToPeerWithTimeout(id, s.peerAddresses[id], ReelectionTimeoutMs/2*time.Millisecond)
+	if err != nil {
+		return fmtErrorf()
+	}
+	return nil
 }
 
 // RPCProxy — прокси-сервер, прозрачно перенаправляющий RPC-вызовы

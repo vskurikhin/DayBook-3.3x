@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"log/slog"
 	"math/rand"
 	"os"
 	"slices"
@@ -19,9 +20,9 @@ const (
 	DebugCM = 1
 	Quantum = 2
 
-	HeartbeatTimeoutMs  = 5 * 10 * Quantum
-	ReelectionTimeoutMs = 15 * 10 * Quantum
-	TickerTimeoutMs     = 10 * Quantum
+	HeartbeatTimeoutMs  = 5 * 13 * Quantum
+	ReelectionTimeoutMs = 17 * 13 * Quantum
+	TickerTimeoutMs     = 17 * Quantum
 )
 
 // CommitEntry — это данные, которые Raft отправляет в канал фиксации.
@@ -545,6 +546,7 @@ func (cm *ConsensusModule) startElection() {
 							// Выиграл выборы!
 							cm.dLogf("wins election with %d votes", votesReceived.Load())
 							cm.startLeader()
+							slog.Info("wins election", slog.Int("votes", int(votesReceived.Load())))
 							return
 						}
 					}
@@ -587,7 +589,10 @@ func (cm *ConsensusModule) startLeader() {
 		cm.nextIndex[peerID] = len(cm.log)
 		cm.matchIndex[peerID] = -1
 	}
-	cm.dLogf("becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; log=%v", cm.currentTerm, cm.nextIndex, cm.matchIndex, cm.log)
+	cm.dLogf(
+		"becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; log=%v",
+		cm.currentTerm, cm.nextIndex, cm.matchIndex, cm.log,
+	)
 
 	// Эта горутина выполняется в фоновом режиме и отправляет сообщения
 	// AppendEntries соседям:
