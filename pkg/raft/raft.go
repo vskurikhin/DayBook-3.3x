@@ -648,6 +648,127 @@ func (cm *ConsensusModule) startLeader() {
 	}(HeartbeatTimeoutMs * time.Millisecond)
 }
 
+func (cm *ConsensusModule) nextIndexArgsEntries(peerID, savedCurrentTerm int) (int, AppendEntriesArgs, []LogEntry) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	ni := cm.nextIndex[peerID]
+	prevLogIndex := ni - 1
+	prevLogTerm := -1
+	if 0 <= prevLogIndex && prevLogIndex < len(cm.log) {
+		prevLogTerm = cm.log[prevLogIndex].Term
+	}
+	var entries []LogEntry
+	if ni < len(cm.log) {
+		entries = append([]LogEntry{}, cm.log[ni:]...)
+	} else {
+		entries = nil
+	}
+	return ni, AppendEntriesArgs{
+		Term:         savedCurrentTerm,
+		LeaderID:     cm.id,
+		PrevLogIndex: prevLogIndex,
+		PrevLogTerm:  prevLogTerm,
+		Entries:      entries,
+		LeaderCommit: cm.commitIndex,
+	}, entries
+}
+
+// leaderSendAEsToPeer отправляет очередной раунд сообщений AppendEntries соседу,
+// обрабатывает их ответы и обновляет состояние CM.
+//
+// peerID - сосед
+// savedCurrentTerm - терм.
+func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int) {
+	ni, args, entries := cm.nextIndexArgsEntries(peerID, savedCurrentTerm)
+	cm.dLogf("sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
+	var reply AppendEntriesReply
+	if err := cm.server.Call(peerID, "ConsensusModule.AppendEntries", args, &reply); err == nil {
+		cm.mu.Lock()
+		// К сожалению, здесь нельзя просто использовать
+		// defer cm.mu.Unlock(), поскольку в одной из ветвей
+		// выполнения требуется отправка данных в каналы.
+		// Поэтому необходимо явно вызывать cm.mu.Unlock()
+		// во всех путях выхода, начиная с этого места.
+		if reply.Term > cm.currentTerm {
+			cm.dLogf("term out of date in heartbeat reply")
+			cm.becomeFollower(reply.Term)
+			cm.mu.Unlock()
+			return
+		}
+		if cm.nextIndex[peerID] != ni {
+			cm.dLogf("#44 ni out of date in heartbeat reply")
+			cm.mu.Unlock()
+			return
+		}
+
+		if cm.state == Leader && savedCurrentTerm == reply.Term {
+			if reply.Success {
+				cm.nextIndex[peerID] = ni + len(entries)
+				cm.matchIndex[peerID] = cm.nextIndex[peerID] - 1
+
+				savedCommitIndex := cm.commitIndex
+				for i := cm.commitIndex + 1; i < len(cm.log); i++ {
+					if cm.log[i].Term == cm.currentTerm {
+						matchCount := 1
+						for _, peerID := range cm.peerIds {
+							if cm.matchIndex[peerID] >= i {
+								matchCount++
+							}
+						}
+						if matchCount*2 > len(cm.peerIds)+1 {
+							cm.commitIndex = i
+						}
+					}
+				}
+				cm.dLogf(
+					"AppendEntries reply from %d success: nextIndex := %v, matchIndex := %v; commitIndex := %d",
+					peerID, cm.nextIndex, cm.matchIndex, cm.commitIndex,
+				)
+				if cm.commitIndex != savedCommitIndex {
+					cm.dLogf("leader sets commitIndex := %d", cm.commitIndex)
+					// Индекс фиксации изменился: лидер считает новые
+					// записи журнала зафиксированными. Отправить новые
+					// записи в канал фиксации клиентам этого лидера
+					// и уведомить ведомых, отправив им сообщения
+					// AppendEntries.
+					cm.mu.Unlock()
+					select {
+					case cm.newCommitReadyChan <- struct{}{}:
+					default:
+					}
+					select {
+					case cm.triggerAEChan <- struct{}{}:
+					default:
+					}
+				} else {
+					cm.mu.Unlock()
+				}
+			} else {
+				if reply.ConflictTerm >= 0 {
+					lastIndexOfTerm := -1
+					for i, v := range slices.Backward(cm.log) {
+						if v.Term == reply.ConflictTerm {
+							lastIndexOfTerm = i
+							break
+						}
+					}
+					if lastIndexOfTerm >= 0 {
+						cm.nextIndex[peerID] = lastIndexOfTerm + 1
+					} else {
+						cm.nextIndex[peerID] = reply.ConflictIndex
+					}
+				} else {
+					cm.nextIndex[peerID] = reply.ConflictIndex
+				}
+				cm.dLogf("AppendEntries reply from %d !success: nextIndex := %d", peerID, ni-1)
+				cm.mu.Unlock()
+			}
+		} else {
+			cm.mu.Unlock()
+		}
+	}
+}
+
 // leaderSendAEs отправляет очередной раунд сообщений AppendEntries всем
 // соседям, обрабатывает их ответы и обновляет состояние CM.
 func (cm *ConsensusModule) leaderSendAEs() {
@@ -660,118 +781,7 @@ func (cm *ConsensusModule) leaderSendAEs() {
 	cm.mu.Unlock()
 
 	for _, peerID := range cm.peerIds {
-		go func() {
-			cm.mu.Lock()
-			ni := cm.nextIndex[peerID]
-			prevLogIndex := ni - 1
-			prevLogTerm := -1
-			if 0 <= prevLogIndex && prevLogIndex < len(cm.log) {
-				prevLogTerm = cm.log[prevLogIndex].Term
-			}
-			var entries []LogEntry
-			if ni < len(cm.log) {
-				entries = append([]LogEntry{}, cm.log[ni:]...)
-			} else {
-				entries = nil
-			}
-
-			args := AppendEntriesArgs{
-				Term:         savedCurrentTerm,
-				LeaderID:     cm.id,
-				PrevLogIndex: prevLogIndex,
-				PrevLogTerm:  prevLogTerm,
-				Entries:      entries,
-				LeaderCommit: cm.commitIndex,
-			}
-			cm.mu.Unlock()
-			cm.dLogf("sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
-			var reply AppendEntriesReply
-			if err := cm.server.Call(peerID, "ConsensusModule.AppendEntries", args, &reply); err == nil {
-				cm.mu.Lock()
-				// К сожалению, здесь нельзя просто использовать
-				// defer cm.mu.Unlock(), поскольку в одной из ветвей
-				// выполнения требуется отправка данных в каналы.
-				// Поэтому необходимо явно вызывать cm.mu.Unlock()
-				// во всех путях выхода, начиная с этого места.
-				if reply.Term > cm.currentTerm {
-					cm.dLogf("term out of date in heartbeat reply")
-					cm.becomeFollower(reply.Term)
-					cm.mu.Unlock()
-					return
-				}
-				if cm.nextIndex[peerID] != ni {
-					cm.dLogf("#44 ni out of date in heartbeat reply")
-					cm.mu.Unlock()
-					return
-				}
-
-				if cm.state == Leader && savedCurrentTerm == reply.Term {
-					if reply.Success {
-						cm.nextIndex[peerID] = ni + len(entries)
-						cm.matchIndex[peerID] = cm.nextIndex[peerID] - 1
-
-						savedCommitIndex := cm.commitIndex
-						for i := cm.commitIndex + 1; i < len(cm.log); i++ {
-							if cm.log[i].Term == cm.currentTerm {
-								matchCount := 1
-								for _, peerID := range cm.peerIds {
-									if cm.matchIndex[peerID] >= i {
-										matchCount++
-									}
-								}
-								if matchCount*2 > len(cm.peerIds)+1 {
-									cm.commitIndex = i
-								}
-							}
-						}
-						cm.dLogf(
-							"AppendEntries reply from %d success: nextIndex := %v, matchIndex := %v; commitIndex := %d",
-							peerID, cm.nextIndex, cm.matchIndex, cm.commitIndex,
-						)
-						if cm.commitIndex != savedCommitIndex {
-							cm.dLogf("leader sets commitIndex := %d", cm.commitIndex)
-							// Индекс фиксации изменился: лидер считает новые
-							// записи журнала зафиксированными. Отправить новые
-							// записи в канал фиксации клиентам этого лидера
-							// и уведомить ведомых, отправив им сообщения
-							// AppendEntries.
-							cm.mu.Unlock()
-							select {
-							case cm.newCommitReadyChan <- struct{}{}:
-							default:
-							}
-							select {
-							case cm.triggerAEChan <- struct{}{}:
-							default:
-							}
-						} else {
-							cm.mu.Unlock()
-						}
-					} else {
-						if reply.ConflictTerm >= 0 {
-							lastIndexOfTerm := -1
-							for i, v := range slices.Backward(cm.log) {
-								if v.Term == reply.ConflictTerm {
-									lastIndexOfTerm = i
-									break
-								}
-							}
-							if lastIndexOfTerm >= 0 {
-								cm.nextIndex[peerID] = lastIndexOfTerm + 1
-							} else {
-								cm.nextIndex[peerID] = reply.ConflictIndex
-							}
-						} else {
-							cm.nextIndex[peerID] = reply.ConflictIndex
-						}
-						cm.dLogf("AppendEntries reply from %d !success: nextIndex := %d", peerID, ni-1)
-						cm.mu.Unlock()
-					}
-				} else {
-					cm.mu.Unlock()
-				}
-			}
-		}()
+		go cm.leaderSendAEsToPeer(peerID, savedCurrentTerm)
 	}
 }
 
@@ -797,7 +807,14 @@ func (cm *ConsensusModule) lastLogIndexAndTerm() (int, int) {
 func (cm *ConsensusModule) commitChanSender() {
 	defer cm.newCommitReadyChanWg.Done()
 
-	for range cm.newCommitReadyChan {
+	for {
+		// Ожидание сигнала о новых зафиксированных записях.
+		_, ok := <-cm.newCommitReadyChan
+		if !ok {
+			cm.dLogf("commitChanSender done")
+			return
+		}
+
 		// Определить, какие записи журнала необходимо применить.
 		cm.mu.Lock()
 		savedLastApplied := cm.lastApplied
@@ -811,12 +828,19 @@ func (cm *ConsensusModule) commitChanSender() {
 
 		for i, entry := range entries {
 			cm.dLogf("send on commitchan i=%v, entry=%v", i, entry)
-			cm.commitChan <- CommitEntry{
+			ce := CommitEntry{
 				Command: entry.Command,
 				Index:   savedLastApplied + i + 1,
 				Term:    entry.Term,
 			}
+			// Используем select, чтобы отправка могла быть прервана
+			// закрытием newCommitReadyChan при остановке.
+			select {
+			case cm.commitChan <- ce:
+			case <-cm.newCommitReadyChan:
+				cm.dLogf("commitChanSender done")
+				return
+			}
 		}
 	}
-	cm.dLogf("commitChanSender done")
 }
