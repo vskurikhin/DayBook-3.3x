@@ -59,7 +59,7 @@ func (s CMState) String() string {
 	case Dead:
 		return "Dead"
 	default:
-		panic("unreachable")
+		return "unreachable"
 	}
 }
 
@@ -402,7 +402,10 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 			if args.LeaderCommit > cm.commitIndex {
 				cm.commitIndex = min(args.LeaderCommit, len(cm.log)-1)
 				cm.dLogf("... setting commitIndex=%d", cm.commitIndex)
-				cm.newCommitReadyChan <- struct{}{}
+				select {
+				case cm.newCommitReadyChan <- struct{}{}:
+				default:
+				}
 			}
 		} else {
 			// Не найдено совпадение для PrevLogIndex/PrevLogTerm.
@@ -733,8 +736,14 @@ func (cm *ConsensusModule) leaderSendAEs() {
 							// и уведомить ведомых, отправив им сообщения
 							// AppendEntries.
 							cm.mu.Unlock()
-							cm.newCommitReadyChan <- struct{}{}
-							cm.triggerAEChan <- struct{}{}
+							select {
+							case cm.newCommitReadyChan <- struct{}{}:
+							default:
+							}
+							select {
+							case cm.triggerAEChan <- struct{}{}:
+							default:
+							}
 						} else {
 							cm.mu.Unlock()
 						}
