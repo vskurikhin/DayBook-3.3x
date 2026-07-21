@@ -694,6 +694,11 @@ func (cm *ConsensusModule) leaderSendAEs() {
 					cm.mu.Unlock()
 					return
 				}
+				if cm.nextIndex[peerID] != ni {
+					cm.dLogf("#44 ni out of date in heartbeat reply")
+					cm.mu.Unlock()
+					return
+				}
 
 				if cm.state == Leader && savedCurrentTerm == reply.Term {
 					if reply.Success {
