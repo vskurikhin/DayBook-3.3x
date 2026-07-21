@@ -306,7 +306,7 @@ func TestNoCommitWithNoQuorum(t *testing.T) {
 	sleepMs(250 * Quantum)
 
 	h.SubmitToServer(origLeaderId, 8)
-	sleepMs(250)
+	sleepMs(250 * Quantum)
 	h.CheckNotCommitted(8)
 
 	// Повторно подключаем оба остальных сервера;

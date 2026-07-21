@@ -186,19 +186,21 @@ func (cm *ConsensusModule) Report() (id, term int, isLeader bool) {
 // в который была добавлена команда. В противном случае возвращается -1.
 func (cm *ConsensusModule) Submit(command any) int {
 	cm.mu.Lock()
-	cm.dLogf("Submit received by %v: %v", cm.state, command)
-	if cm.state == Leader {
-		submitIndex := len(cm.log)
-		cm.log = append(cm.log, LogEntry{Command: command, Term: cm.currentTerm})
-		cm.persistToStorage()
-		cm.dLogf("... log=%v", cm.log)
+	if cm.state != Leader {
 		cm.mu.Unlock()
-		cm.triggerAEChan <- struct{}{}
-		return submitIndex
+		return -1
 	}
-
+	cm.dLogf("Submit received by %v: %v", cm.state, command)
+	submitIndex := len(cm.log)
+	cm.log = append(cm.log, LogEntry{Command: command, Term: cm.currentTerm})
+	cm.persistToStorage()
+	cm.dLogf("... log=%v", cm.log)
 	cm.mu.Unlock()
-	return -1
+	select {
+	case cm.triggerAEChan <- struct{}{}:
+	default:
+	}
+	return submitIndex
 }
 
 // Stop останавливает этот CM, очищая его состояние. Этот метод быстро возвращает результат,
