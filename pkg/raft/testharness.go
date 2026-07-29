@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const submitTimeout = 5 * time.Second
+
 func init() {
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 }
@@ -69,7 +71,7 @@ func NewHarness(t *testing.T, n int) *Harness {
 
 		storage[i] = NewMapStorage()
 		commitChans[i] = make(chan CommitEntry)
-		ns[i] = NewServer(i, peerIds, storage[i], ready, commitChans[i])
+		ns[i] = NewServer(i, peerIds, storage[i], ready, NewCommitChannelFSM(commitChans[i]))
 		ns[i].Serve(":0")
 		alive[i] = true
 	}
@@ -182,7 +184,7 @@ func (h *Harness) RestartPeer(id int) {
 	}
 
 	ready := make(chan any)
-	h.cluster[id] = NewServer(id, peerIds, h.storage[id], ready, h.commitChans[id])
+	h.cluster[id] = NewServer(id, peerIds, h.storage[id], ready, NewCommitChannelFSM(h.commitChans[id]))
 	h.cluster[id].Serve(":0")
 	h.ReconnectPeer(id)
 	close(ready)
@@ -343,9 +345,25 @@ func (h *Harness) CheckNotCommitted(cmd int) {
 	}
 }
 
-// SubmitToServer отправляет команду серверу с идентификатором serverId.
+// SubmitToServer отправляет команду серверу и дожидается коммита.
+// Возвращает индекс записи или -1 при ошибке (не лидер, потеря лидерства, shutdown).
 func (h *Harness) SubmitToServer(serverId int, cmd any) int {
-	return h.cluster[serverId].Submit(cmd)
+	future := h.cluster[serverId].Apply(cmd, 0)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- future.Error()
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return -1
+		}
+		return future.Index()
+	case <-time.After(submitTimeout):
+		return -1
+	}
 }
 
 func tlog(format string, a ...any) {

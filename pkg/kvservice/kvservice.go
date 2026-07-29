@@ -26,14 +26,6 @@ type KVService struct {
 	// rs — сервер Raft, содержащий экземпляр ConsensusModule (CM).
 	rs *raft.Server
 
-	// commitChan — канал фиксации, передаваемый серверу Raft. После фиксации
-	// команд они отправляются через этот канал.
-	commitChan chan raft.CommitEntry
-
-	// commitSubs — активные подписки на события фиксации команд в данном
-	// сервисе. Подробнее см. метод createCommitSubscription.
-	commitSubs map[int]chan Command
-
 	// ds — базовое хранилище данных, реализующее KV-базу данных.
 	ds *DataStore
 
@@ -58,26 +50,51 @@ type Config struct {
 // хранилищем storage и каналом уведомления readyChan.
 // cfg содержит параметры Raft-сервера (идентификатор, список узлов,
 // RPC-адрес) и HTTP-адрес для REST API сервиса.
+//
+// KVService реализует raft.FSM: закоммиченные записи журнала применяются
+// непосредственно к DataStore через метод Apply.
 func New(cfg Config, storage raft.Storage, readyChan <-chan any) *KVService {
 	gob.Register(Command{})
-	commitChan := make(chan raft.CommitEntry)
 
-	// raft.Server обрабатывает RPC-вызовы протокола Raft в кластере.
-	// После вызова Serve сервер готов принимать RPC-соединения
-	// от остальных узлов.
-	rs := raft.New(cfg.Config, storage, readyChan, commitChan)
-	rs.Serve(cfg.RPCAddress)
 	kvs := &KVService{
 		id:                   cfg.ServerID,
-		rs:                   rs,
-		commitChan:           commitChan,
 		ds:                   NewDataStore(),
-		commitSubs:           make(map[int]chan Command),
 		httpResponsesEnabled: true,
 	}
 
-	kvs.runUpdater()
+	// raft.Server обрабатывает RPC-вызовы протокола Raft в кластере.
+	// KVService передаётся как FSM, поэтому Apply будет вызываться Raft'ом
+	// для каждой закоммиченной записи.
+	rs := raft.New(cfg.Config, storage, readyChan, kvs)
+	rs.Serve(cfg.RPCAddress)
+	kvs.rs = rs
+
 	return kvs
+}
+
+// Apply реализует raft.FSM. Вызывается Raft'ом для каждой закоммиченной
+// записи журнала. Команда применяется к DataStore, результат сохраняется
+// в полях ResultValue/ResultFound команды и возвращается в future клиента.
+func (kvs *KVService) Apply(log *raft.LogEntry) any {
+	cmd, ok := log.Command.(Command)
+	if !ok {
+		kvs.kvLogf("unknown command type %T", log.Command)
+		return nil
+	}
+
+	switch cmd.Kind {
+	case CommandGet:
+		cmd.ResultValue, cmd.ResultFound = kvs.ds.Get(cmd.Key)
+	case CommandPut:
+		cmd.ResultValue, cmd.ResultFound = kvs.ds.Put(cmd.Key, cmd.Value)
+	case CommandCAS:
+		cmd.ResultValue, cmd.ResultFound = kvs.ds.CAS(cmd.Key, cmd.CompareValue, cmd.Value)
+	default:
+		kvs.kvLogf("unknown command kind %v", cmd.Kind)
+		return nil
+	}
+
+	return cmd
 }
 
 // NewKVService создаёт новый экземпляр KVService.
@@ -144,8 +161,6 @@ func (kvs *KVService) ServeHTTP(address string) {
 func (kvs *KVService) Shutdown() error {
 	kvs.kvLogf("shutting down Raft server")
 	kvs.rs.Shutdown()
-	kvs.kvLogf("closing commitChan")
-	close(kvs.commitChan)
 
 	if kvs.srv != nil {
 		kvs.kvLogf("shutting down HTTP server")
@@ -182,54 +197,40 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 	}
 	kvs.kvLogf("HTTP PUT %v", pr)
 
-	// Отправить команду серверу Raft. Это изменение состояния реплицируемой
-	// машины состояний, построенной поверх журнала Raft.
 	cmd := Command{
 		Kind:  CommandPut,
 		Key:   pr.Key,
 		Value: pr.Value,
 		ID:    kvs.id,
 	}
-	logIndex := kvs.rs.Submit(cmd)
-	// Если мы не являемся лидером Raft, вернуть соответствующий статус.
-	if logIndex < 0 {
-		kvs.sendHTTPResponse(w, api.PutResponse{RespStatus: api.StatusNotLeader})
-		return
-	}
 
-	// Создать подписку на фиксацию записи с данным индексом журнала,
-	// затем дождаться соответствующего уведомления.
-	sub := kvs.createCommitSubscription(logIndex)
+	future := kvs.rs.Apply(cmd, 0)
 
-	// Ожидать получения сообщения по каналу подписки: горутина updater
-	// передаст значение, когда запись с индексом logIndex будет зафиксирована
-	// в журнале Raft. Для корректного завершения работы сервиса также
-	// отслеживается контекст запроса: если запрос отменён, обработчик
-	// прекращает работу, не отправляя ответ клиенту.
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- future.Error()
+	}()
+
 	select {
-	case commitCmd := <-sub:
-		// Если это наша команда — всё в порядке. Если же была зафиксирована
-		// команда другого сервиса, значит, в какой-то момент мы утратили
-		// лидерство и должны вернуть клиенту сообщение об ошибке.
-		if commitCmd.ID == kvs.id {
+	case err := <-errCh:
+		if err != nil {
 			kvs.sendHTTPResponse(w, api.PutResponse{
-				RespStatus: api.StatusOK,
-				KeyFound:   commitCmd.ResultFound,
-				PrevValue:  commitCmd.ResultValue,
+				RespStatus: api.StatusNotLeader,
 			})
-		} else {
-			kvs.sendHTTPResponse(w, api.PutResponse{RespStatus: api.StatusFailedCommit})
+			return
 		}
+		cmdResp := future.Response().(Command)
+		kvs.sendHTTPResponse(w, api.PutResponse{
+			RespStatus: api.StatusOK,
+			KeyFound:   cmdResp.ResultFound,
+			PrevValue:  cmdResp.ResultValue,
+		})
+
 	case <-req.Context().Done():
-		kvs.mu.Lock()
-		delete(kvs.commitSubs, logIndex)
-		kvs.mu.Unlock()
 		return
 	}
 }
 
-// handleGet детали реализации этих обработчиков очень похожи на handlePut.
-// Подробные комментарии см. в описании этой функции.
 func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
 	gr := &api.GetRequest{}
 	if err := readRequestJSON(req, gr); err != nil {
@@ -243,29 +244,30 @@ func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
 		Key:  gr.Key,
 		ID:   kvs.id,
 	}
-	logIndex := kvs.rs.Submit(cmd)
-	if logIndex < 0 {
-		kvs.sendHTTPResponse(w, api.GetResponse{RespStatus: api.StatusNotLeader})
-		return
-	}
 
-	sub := kvs.createCommitSubscription(logIndex)
+	future := kvs.rs.Apply(cmd, 0)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- future.Error()
+	}()
 
 	select {
-	case commitCmd := <-sub:
-		if commitCmd.ID == kvs.id {
+	case err := <-errCh:
+		if err != nil {
 			kvs.sendHTTPResponse(w, api.GetResponse{
-				RespStatus: api.StatusOK,
-				KeyFound:   commitCmd.ResultFound,
-				Value:      commitCmd.ResultValue,
+				RespStatus: api.StatusNotLeader,
 			})
-		} else {
-			kvs.sendHTTPResponse(w, api.GetResponse{RespStatus: api.StatusFailedCommit})
+			return
 		}
+		cmdResp := future.Response().(Command)
+		kvs.sendHTTPResponse(w, api.GetResponse{
+			RespStatus: api.StatusOK,
+			KeyFound:   cmdResp.ResultFound,
+			Value:      cmdResp.ResultValue,
+		})
+
 	case <-req.Context().Done():
-		kvs.mu.Lock()
-		delete(kvs.commitSubs, logIndex)
-		kvs.mu.Unlock()
 		return
 	}
 }
@@ -285,104 +287,32 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 		CompareValue: cr.CompareValue,
 		ID:           kvs.id,
 	}
-	logIndex := kvs.rs.Submit(cmd)
-	if logIndex < 0 {
-		kvs.sendHTTPResponse(w, api.PutResponse{RespStatus: api.StatusNotLeader})
-		return
-	}
 
-	sub := kvs.createCommitSubscription(logIndex)
+	future := kvs.rs.Apply(cmd, 0)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- future.Error()
+	}()
 
 	select {
-	case commitCmd := <-sub:
-		if commitCmd.ID == kvs.id {
+	case err := <-errCh:
+		if err != nil {
 			kvs.sendHTTPResponse(w, api.CASResponse{
-				RespStatus: api.StatusOK,
-				KeyFound:   commitCmd.ResultFound,
-				PrevValue:  commitCmd.ResultValue,
+				RespStatus: api.StatusNotLeader,
 			})
-		} else {
-			kvs.sendHTTPResponse(w, api.CASResponse{RespStatus: api.StatusFailedCommit})
+			return
 		}
+		cmdResp := future.Response().(Command)
+		kvs.sendHTTPResponse(w, api.CASResponse{
+			RespStatus: api.StatusOK,
+			KeyFound:   cmdResp.ResultFound,
+			PrevValue:  cmdResp.ResultValue,
+		})
+
 	case <-req.Context().Done():
-		kvs.mu.Lock()
-		delete(kvs.commitSubs, logIndex)
-		kvs.mu.Unlock()
 		return
 	}
-}
-
-// runUpdater запускает горутину "updater", которая читает канал фиксации
-// (commit channel) Raft и обновляет хранилище данных. Именно эта часть
-// реализует реплицируемую машину состояний (Replicated State Machine)
-// распределённого консенсуса.
-// Кроме того, updater уведомляет подписчиков, зарегистрированных через
-// createCommitSubscription.
-// Обрабатывает как обычные записи журнала, так и snapshot-уведомления.
-func (kvs *KVService) runUpdater() {
-	go func() {
-		for entry := range kvs.commitChan {
-			cmd, ok := entry.Command.(Command)
-			if !ok {
-				kvs.kvLogf("unknown command %v", entry.Command)
-				continue
-			}
-
-			switch cmd.Kind {
-			case CommandGet:
-				cmd.ResultValue, cmd.ResultFound = kvs.ds.Get(cmd.Key)
-			case CommandPut:
-				cmd.ResultValue, cmd.ResultFound = kvs.ds.Put(cmd.Key, cmd.Value)
-			case CommandCAS:
-				cmd.ResultValue, cmd.ResultFound = kvs.ds.CAS(cmd.Key, cmd.CompareValue, cmd.Value)
-			default:
-				kvs.kvLogf("unknown command %v", cmd)
-				continue
-			}
-
-			// Передать команду подписчику, ожидающему фиксации записи
-			// с данным индексом журнала, после чего закрыть подписку,
-			// поскольку она является одноразовой.
-			if sub := kvs.popCommitSubscription(entry.Index); sub != nil {
-				select {
-				case sub <- cmd:
-				default:
-				}
-				close(sub)
-			}
-		}
-	}()
-}
-
-// createCommitSubscription создаёт "подписку на фиксацию" для указанного
-// индекса журнала. Она используется обработчиками клиентских запросов,
-// отправляющими команды в ConsensusModule Raft.
-// Вызов createCommitSubscription(index) означает:
-// "уведомить меня, когда запись с этим индексом будет зафиксирована
-// в журнале Raft".
-// После фиксации записи горутина updater отправляет её через возвращаемый
-// (буферизированный) канал, затем закрывает канал, автоматически отменяя
-// подписку.
-func (kvs *KVService) createCommitSubscription(logIndex int) chan Command {
-	kvs.mu.Lock()
-	defer kvs.mu.Unlock()
-
-	if _, exists := kvs.commitSubs[logIndex]; exists {
-		panic(fmt.Sprintf("duplicate commit subscription for logIndex=%d", logIndex))
-	}
-
-	ch := make(chan Command, 1)
-	kvs.commitSubs[logIndex] = ch
-	return ch
-}
-
-func (kvs *KVService) popCommitSubscription(logIndex int) chan Command {
-	kvs.mu.Lock()
-	defer kvs.mu.Unlock()
-
-	ch := kvs.commitSubs[logIndex]
-	delete(kvs.commitSubs, logIndex)
-	return ch
 }
 
 // kvLogf выводит отладочное сообщение, если DebugKV > 0.

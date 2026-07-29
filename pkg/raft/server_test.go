@@ -30,7 +30,7 @@ func TestNewServer(t *testing.T) {
 		ServerID:   1,
 		PeerIds:    []int{2, 3},
 		RPCAddress: ":0",
-	}, storage, ready, commitChan)
+	}, storage, ready, NewCommitChannelFSM(commitChan))
 
 	if s.serverID != 1 {
 		t.Fatalf("expected serverID=1, got %d", s.serverID)
@@ -48,7 +48,7 @@ func TestNewServerWrapper(t *testing.T) {
 	commitChan := make(chan CommitEntry, 10)
 	ready := make(chan any)
 
-	s := NewServer(2, []int{1, 3}, storage, ready, commitChan)
+	s := NewServer(2, []int{1, 3}, storage, ready, NewCommitChannelFSM(commitChan))
 
 	if s.serverID != 2 {
 		t.Fatalf("expected serverID=2, got %d", s.serverID)
@@ -66,8 +66,8 @@ func TestConnectToPeerWithTimeout(t *testing.T) {
 	ready0 := make(chan any)
 	ready1 := make(chan any)
 
-	s0 := NewServer(0, []int{1}, storage0, ready0, commitChan0)
-	s1 := NewServer(1, []int{0}, storage1, ready1, commitChan1)
+	s0 := NewServer(0, []int{1}, storage0, ready0, NewCommitChannelFSM(commitChan0))
+	s1 := NewServer(1, []int{0}, storage1, ready1, NewCommitChannelFSM(commitChan1))
 
 	s0.Serve(":0")
 	s1.Serve(":0")
@@ -90,7 +90,7 @@ func TestConnectToPeerWithTimeoutInvalid(t *testing.T) {
 	commitChan := make(chan CommitEntry, 10)
 	ready := make(chan any)
 
-	s := NewServer(0, []int{1}, storage, ready, commitChan)
+	s := NewServer(0, []int{1}, storage, ready, NewCommitChannelFSM(commitChan))
 
 	// Подключение к несуществующему адресу должно вернуть ошибку
 	fakeAddr, _ := net.ResolveTCPAddr("tcp", "127.0.0.1:9999")
@@ -108,8 +108,8 @@ func TestPeerClient(t *testing.T) {
 	ready0 := make(chan any)
 	ready1 := make(chan any)
 
-	s0 := NewServer(0, []int{1}, storage0, ready0, commitChan0)
-	s1 := NewServer(1, []int{0}, storage1, ready1, commitChan1)
+	s0 := NewServer(0, []int{1}, storage0, ready0, NewCommitChannelFSM(commitChan0))
+	s1 := NewServer(1, []int{0}, storage1, ready1, NewCommitChannelFSM(commitChan1))
 
 	s0.Serve(":0")
 	s1.Serve(":0")
@@ -138,8 +138,8 @@ func TestClosePeerClient(t *testing.T) {
 	ready0 := make(chan any)
 	ready1 := make(chan any)
 
-	s0 := NewServer(0, []int{1}, storage0, ready0, commitChan0)
-	s1 := NewServer(1, []int{0}, storage1, ready1, commitChan1)
+	s0 := NewServer(0, []int{1}, storage0, ready0, NewCommitChannelFSM(commitChan0))
+	s1 := NewServer(1, []int{0}, storage1, ready1, NewCommitChannelFSM(commitChan1))
 
 	s0.Serve(":0")
 	s1.Serve(":0")
@@ -165,8 +165,8 @@ func TestCallReconnect(t *testing.T) {
 	ready0 := make(chan any)
 	ready1 := make(chan any)
 
-	s0 := NewServer(0, []int{1}, storage0, ready0, commitChan0)
-	s1 := NewServer(1, []int{0}, storage1, ready1, commitChan1)
+	s0 := NewServer(0, []int{1}, storage0, ready0, NewCommitChannelFSM(commitChan0))
+	s1 := NewServer(1, []int{0}, storage1, ready1, NewCommitChannelFSM(commitChan1))
 
 	s0.Serve(":0")
 	s1.Serve(":0")
