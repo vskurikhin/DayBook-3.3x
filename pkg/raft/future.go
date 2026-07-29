@@ -1,4 +1,3 @@
-// Package raft — реализация протокола консенсуса Raft (v3).
 package raft
 
 import (
@@ -8,10 +7,11 @@ import (
 )
 
 var (
-	ErrNotLeader      = errors.New("raft: not leader")
-	ErrLeadershipLost = errors.New("raft: leadership lost while committing")
-	ErrRaftShutdown   = errors.New("raft: raft is shutdown")
-	ErrEnqueueTimeout = errors.New("raft: timeout enqueuing operation")
+	ErrNotLeader           = errors.New("raft: not leader")
+	ErrLeadershipLost      = errors.New("raft: leadership lost while committing")
+	ErrRaftShutdown        = errors.New("raft: raft is shutdown")
+	ErrEnqueueTimeout      = errors.New("raft: timeout enqueuing operation")
+	ErrUnsupportedProtocol = errors.New("raft: unsupported protocol version")
 )
 
 // Future представляет асинхронную операцию Raft.

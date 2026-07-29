@@ -1,5 +1,3 @@
-// Package raft Реализация ядра Raft — модуль консенсуса.
-// This code is in the public domain.
 package raft
 
 import (
@@ -25,6 +23,10 @@ const (
 	ReelectionTimeoutMs = 150 * Quantum
 	TickerTimeoutMs     = 10 * Quantum
 )
+
+// ProtocolVersion — версия протокола Raft, используемая данной реализацией.
+// Значение 3. Совместимость с версиями 0, 1 и 2 не поддерживается.
+const ProtocolVersion = 3
 
 // CommitEntry — это данные, которые Raft отправляет в канал фиксации.
 // Каждая запись фиксации уведомляет клиента о том, что консенсус по команде
@@ -229,17 +231,51 @@ func (cm *ConsensusModule) dLogf(format string, args ...any) {
 	}
 }
 
+// RPCHeader — общий заголовок для всех RPC-сообщений Raft.
+// Встраивается во все структуры аргументов и ответов RPC.
+// Содержит версию протокола и идентификатор узла-отправителя.
+type RPCHeader struct {
+	ProtocolVersion int
+	ServerID        int
+}
+
+// WithRPCHeader — интерфейс, позволяющий получить RPCHeader из RPC-сообщения.
+type WithRPCHeader interface {
+	GetRPCHeader() RPCHeader
+}
+
+// checkRPCHeader проверяет, что RPC-сообщение использует поддерживаемую
+// версию протокола. Для v3-only возвращает nil только при ProtocolVersion == 3.
+func checkRPCHeader(rpc WithRPCHeader) error {
+	header := rpc.GetRPCHeader()
+	if header.ProtocolVersion != ProtocolVersion {
+		return ErrUnsupportedProtocol
+	}
+
+	return nil
+}
+
 // RequestVoteArgs См. рисунок 2 в статье.
 type RequestVoteArgs struct {
+	RPCHeader
 	Term         int
 	CandidateID  int
 	LastLogIndex int
 	LastLogTerm  int
 }
 
+func (r *RequestVoteArgs) GetRPCHeader() RPCHeader {
+	return r.RPCHeader
+}
+
 type RequestVoteReply struct {
+	RPCHeader
 	Term        int
 	VoteGranted bool
+}
+
+func (r *RequestVoteReply) GetRPCHeader() RPCHeader {
+	return r.RPCHeader
 }
 
 // RequestVote RPC.
@@ -249,6 +285,11 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 	if cm.state == Dead {
 		return nil
 	}
+
+	if err := checkRPCHeader(&args); err != nil {
+		return err
+	}
+
 	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTerm()
 	cm.dLogf(
 		"RequestVote: %+v [currentTerm=%d, votedFor=%d, log index/term=(%d, %d)]",
@@ -270,6 +311,10 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 	} else {
 		reply.VoteGranted = false
 	}
+	reply.RPCHeader = RPCHeader{
+		ProtocolVersion: ProtocolVersion,
+		ServerID:        cm.id,
+	}
 	reply.Term = cm.currentTerm
 	cm.persistToStorage()
 	cm.dLogf("... RequestVote reply: %+v", reply)
@@ -278,6 +323,7 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 
 // AppendEntriesArgs См. рисунок 2 в статье.
 type AppendEntriesArgs struct {
+	RPCHeader
 	Term     int
 	LeaderID int
 
@@ -287,7 +333,12 @@ type AppendEntriesArgs struct {
 	LeaderCommit int
 }
 
+func (r *AppendEntriesArgs) GetRPCHeader() RPCHeader {
+	return r.RPCHeader
+}
+
 type AppendEntriesReply struct {
+	RPCHeader
 	Term    int
 	Success bool
 
@@ -297,12 +348,21 @@ type AppendEntriesReply struct {
 	ConflictTerm  int
 }
 
+func (r *AppendEntriesReply) GetRPCHeader() RPCHeader {
+	return r.RPCHeader
+}
+
 func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	if cm.state == Dead {
 		return nil
 	}
+
+	if err := checkRPCHeader(&args); err != nil {
+		return err
+	}
+
 	cm.dLogf("AppendEntries: %+v", args)
 
 	if args.Term > cm.currentTerm {
@@ -382,6 +442,10 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 		}
 	}
 
+	reply.RPCHeader = RPCHeader{
+		ProtocolVersion: ProtocolVersion,
+		ServerID:        cm.id,
+	}
 	reply.Term = cm.currentTerm
 	cm.persistToStorage()
 	cm.dLogf("AppendEntries reply: %+v", *reply)
@@ -479,6 +543,10 @@ func (cm *ConsensusModule) startElection() {
 			cm.mu.Unlock()
 
 			args := RequestVoteArgs{
+				RPCHeader: RPCHeader{
+					ProtocolVersion: ProtocolVersion,
+					ServerID:        cm.id,
+				},
 				Term:         savedCurrentTerm,
 				CandidateID:  cm.id,
 				LastLogIndex: savedLastLogIndex,
@@ -634,6 +702,10 @@ func (cm *ConsensusModule) nextIndexArgsEntries(peerID, savedCurrentTerm int) (i
 		entries = nil
 	}
 	return ni, AppendEntriesArgs{
+		RPCHeader: RPCHeader{
+			ProtocolVersion: ProtocolVersion,
+			ServerID:        cm.id,
+		},
 		Term:         savedCurrentTerm,
 		LeaderID:     cm.id,
 		PrevLogIndex: prevLogIndex,
@@ -910,11 +982,12 @@ func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 			}
 		}
 	}
+	newCommitIndex := cm.commitIndex
 	cm.mu.Unlock()
 
-	if cm.commitIndex != savedCommitIndex {
-		cm.dLogf("leader sets commitIndex := %d", cm.commitIndex)
-		cm.processLogs(cm.commitIndex)
+	if newCommitIndex != savedCommitIndex {
+		cm.dLogf("leader sets commitIndex := %d", newCommitIndex)
+		cm.processLogs(newCommitIndex)
 	}
 }
 

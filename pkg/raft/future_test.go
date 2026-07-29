@@ -276,7 +276,10 @@ func waitForLeader(t testing.TB, cm *ConsensusModule, timeout time.Duration) {
 	t.Helper()
 	deadline := time.After(timeout)
 	for {
-		if cm.state == Leader {
+		cm.mu.Lock()
+		isLeader := cm.state == Leader
+		cm.mu.Unlock()
+		if isLeader {
 			return
 		}
 		select {
@@ -559,6 +562,10 @@ func TestApplyNoQuorumThenNewLeader(t *testing.T) {
 	// This simulates a new leader being elected (in a higher term) without needing
 	// the disconnected followers to actually win an election.
 	args := AppendEntriesArgs{
+		RPCHeader: RPCHeader{
+			ProtocolVersion: ProtocolVersion,
+			ServerID:        (lid + 1) % 3,
+		},
 		Term:         100,
 		LeaderID:     (lid + 1) % 3,
 		PrevLogIndex: -1,
@@ -582,7 +589,10 @@ func waitForLeaderB(t testing.TB, cm *ConsensusModule) {
 	t.Helper()
 	deadline := time.After(800 * time.Millisecond)
 	for {
-		if cm.state == Leader {
+		cm.mu.Lock()
+		isLeader := cm.state == Leader
+		cm.mu.Unlock()
+		if isLeader {
 			return
 		}
 		select {
