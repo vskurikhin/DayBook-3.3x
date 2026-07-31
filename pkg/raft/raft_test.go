@@ -2,6 +2,7 @@ package raft
 
 import (
 	"bytes"
+	"container/list"
 	"encoding/gob"
 	"testing"
 	"time"
@@ -608,32 +609,23 @@ func TestCrashAfterSubmit(t *testing.T) {
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
 
-	// Ждём появления лидера, отправляем команду и сразу после этого аварийно
-	// завершаем его работу. Лидер не успеет отправить обновлённое значение
-	// LeaderCommit ведомым. Он также не успеет получить ответы на
-	// AppendEntries, поэтому сам не отправит запись в канал фиксации.
 	origLeaderId, _ := h.CheckSingleLeader()
 
+	// SubmitToServer теперь использует Apply, который блокируется до коммита.
+	// Команда 5 может быть закоммичена до краша лидера.
 	h.SubmitToServer(origLeaderId, 5)
-	sleepMs(1)
 	h.CrashPeer(origLeaderId)
 
-	// Убеждаемся, что запись 5 не зафиксирована после выбора нового лидера.
-	// Лидеры не фиксируют команды из предыдущих термов.
 	sleepMs(10)
 	h.CheckSingleLeader()
-	sleepMs(300)
-	h.CheckNotCommitted(5)
 
-	// Старый лидер перезапускается. Спустя некоторое время запись 5 всё ещё
-	// не должна быть зафиксирована.
+	// Старый лидер перезапускается.
 	h.RestartPeer(origLeaderId)
 	sleepMs(150)
 	newLeaderId, _ := h.CheckSingleLeader()
-	h.CheckNotCommitted(5)
 
-	// После отправки новой команды она будет зафиксирована вместе с записью 5,
-	// поскольку запись 5 уже присутствует в журналах всех серверов.
+	// После отправки новой команды 6 запись 5 будет закоммичена вместе с 6,
+	// независимо от того, успела ли она закоммититься до краша.
 	h.SubmitToServer(newLeaderId, 6)
 	sleepMs(100)
 	h.CheckCommittedN(5, 3)
@@ -648,24 +640,20 @@ func TestDisconnectAfterSubmit(t *testing.T) {
 
 	origLeaderId, _ := h.CheckSingleLeader()
 
+	// SubmitToServer теперь использует Apply, который блокируется до коммита.
+	// Команда 5 может быть закоммичена до дисконнекта лидера.
 	h.SubmitToServer(origLeaderId, 5)
-	sleepMs(1)
 	h.DisconnectPeer(origLeaderId)
 
-	// Убеждаемся, что запись 5 не зафиксирована после выбора нового лидера.
-	// Лидеры не фиксируют команды из предыдущих термов.
 	sleepMs(10)
 	h.CheckSingleLeader()
-	sleepMs(300)
-	h.CheckNotCommitted(5)
 
 	h.ReconnectPeer(origLeaderId)
 	sleepMs(150)
 	newLeaderId, _ := h.CheckSingleLeader()
-	h.CheckNotCommitted(5)
 
-	// После отправки новой команды она будет зафиксирована вместе с записью 5,
-	// поскольку запись 5 уже присутствует в журналах всех серверов.
+	// После отправки новой команды 6 запись 5 будет закоммичена вместе с 6,
+	// независимо от того, успела ли она закоммититься до дисконнекта.
 	h.SubmitToServer(newLeaderId, 6)
 	sleepMs(100)
 	h.CheckCommittedN(5, 3)
@@ -916,12 +904,19 @@ func TestSameTermDoubleVotePrevented(t *testing.T) {
 // не вызывает панику при повторном close(electionTimerDone) (проблема 10).
 func TestBecomeFollowerDoubleClose(t *testing.T) {
 	cm := &ConsensusModule{
+		id:                 1,
 		state:              Follower,
 		currentTerm:        1,
 		votedFor:           -1,
 		electionTimerDone:  make(chan struct{}),
 		electionResetEvent: time.Now(),
 		storage:            NewMapStorage(),
+		nextIndex:          make(map[int]int),
+		matchIndex:         make(map[int]int),
+		inflight:           list.New(),
+		applyCh:            make(chan *logFuture),
+		shutdownCh:         make(chan struct{}),
+		triggerAEChan:      make(chan struct{}, 1),
 	}
 	cm.log = make([]LogEntry, 0)
 	cm.mu.Lock()

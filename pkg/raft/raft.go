@@ -4,6 +4,7 @@ package raft
 
 import (
 	"bytes"
+	"container/list"
 	"encoding/gob"
 	"fmt"
 	"log"
@@ -20,9 +21,9 @@ const (
 	DebugCM = 1
 	Quantum = 2
 
-	HeartbeatTimeoutMs  = 5 * 13 * Quantum
-	ReelectionTimeoutMs = 17 * 13 * Quantum
-	TickerTimeoutMs     = 17 * Quantum
+	HeartbeatTimeoutMs  = 50 * Quantum
+	ReelectionTimeoutMs = 150 * Quantum
+	TickerTimeoutMs     = 10 * Quantum
 )
 
 // CommitEntry — это данные, которые Raft отправляет в канал фиксации.
@@ -63,87 +64,90 @@ func (s CMState) String() string {
 	}
 }
 
+// LogType определяет тип записи журнала.
+type LogType int
+
+const (
+	LogCommand LogType = iota
+	LogNoop
+	LogConfiguration
+)
+
+// maxApplyBatchSize — максимальное количество команд, собираемых в один
+// пакет при групповой фиксации (group commit). Значение 64 выбрано
+// как разумный компромисс между задержкой (latency) и пропускной
+// способностью (throughput): при интенсивной нагрузке лидер успевает
+// собрать до 64 команд перед отправкой одного AppendEntries RPC,
+// что снижает количество RPC-вызовов без значительного увеличения
+// времени ожидания.
+const maxApplyBatchSize = 64
+
 type LogEntry struct {
-	Command any
+	Index   int
 	Term    int
+	Type    LogType
+	Command any
+}
+
+// commitTuple связывает запись журнала с future для отправки в FSM.
+type commitTuple struct {
+	log    *LogEntry
+	future *logFuture
 }
 
 // ConsensusModule (CM) реализует единый узел консенсуса Raft.
 type ConsensusModule struct {
-	// mu защищает одновременный доступ к CM.
 	mu sync.Mutex
 
-	// id — идентификатор сервера этого экземпляра CM (ConsensusModule).
-	id int
-
-	// peerIds содержит список идентификаторов узлов-соседей в кластере.
+	id      int
 	peerIds []int
-
-	// server — это сервер, содержащий данный экземпляр CM.
-	// Используется для отправки RPC-запросов другим узлам кластера.
-	server *Server
-
-	// storage is used to persist state.
+	server  *Server
 	storage Storage
 
-	// commitChan — канал, через который данный CM сообщает
-	// о записях журнала, зафиксированных в кластере Raft.
-	// Передаётся клиентом при создании CM.
-	commitChan chan<- CommitEntry
+	fsm         FSM
+	fsmMutateCh chan []*commitTuple
+	shutdownCh  chan struct{}
 
-	// newCommitReadyChan — внутренний канал уведомлений, используемый
-	// горутинами, которые фиксируют новые записи журнала, чтобы сообщить,
-	// что эти записи могут быть отправлены в канал фиксации commitChan.
-	// Отдельная горутина отслеживает этот канал и при получении уведомления
-	// отправляет записи в commitChan; newCommitReadyChanWg используется для
-	// ожидания завершения этой горутины, обеспечивая корректное завершение
-	// работы.
-	newCommitReadyChan   chan struct{}
-	newCommitReadyChanWg sync.WaitGroup
+	applyCh  chan *logFuture
+	inflight *list.List
 
-	// triggerAEChan — внутренний канал уведомлений, используемый для запуска
-	// отправки новых сообщений AppendEntries соседям, когда происходят
-	// существенные изменения состояния.
 	triggerAEChan chan struct{}
 
-	// Постоянное состояние Raft на всех серверах
 	currentTerm int
 	votedFor    int
 	log         []LogEntry
 
-	// Непостоянное состояние Raft на всех серверах
 	commitIndex        int
 	lastApplied        int
 	state              CMState
 	electionResetEvent time.Time
 	electionTimerDone  chan struct{}
 
-	// Непостоянное состояние Raft на лидерах
 	nextIndex  map[int]int
 	matchIndex map[int]int
 }
 
-// NewConsensusModule создаёт новый экземпляр CM с указанными
-// идентификатором, списком идентификаторов соседей и сервером.
-// Канал ready уведомляет CM о том, что все соседи подключены
-// и можно безопасно запускать его машину состояний.
-// Канал фиксации будет использоваться CM для отправки записей журнала,
-// зафиксированных кластером Raft.
+// NewConsensusModule создаёт новый экземпляр CM.
+// fsm — машина состояний клиента, к которой применяются закоммиченные записи.
+// ready уведомляет CM, что все соседи подключены.
 func NewConsensusModule(
 	id int,
 	peerIds []int,
 	server *Server,
 	storage Storage,
+	fsm FSM,
 	ready <-chan any,
-	commitChan chan<- CommitEntry,
 ) *ConsensusModule {
 	cm := new(ConsensusModule)
 	cm.id = id
 	cm.peerIds = peerIds
 	cm.server = server
 	cm.storage = storage
-	cm.commitChan = commitChan
-	cm.newCommitReadyChan = make(chan struct{}, 16)
+	cm.fsm = fsm
+	cm.fsmMutateCh = make(chan []*commitTuple, 16)
+	cm.shutdownCh = make(chan struct{})
+	cm.applyCh = make(chan *logFuture)
+	cm.inflight = list.New()
 	cm.triggerAEChan = make(chan struct{}, 1)
 	cm.state = Follower
 	cm.votedFor = -1
@@ -157,18 +161,15 @@ func NewConsensusModule(
 		cm.restoreFromStorage()
 	}
 
+	go cm.runFSM()
+
 	go func() {
-		// CM находится в режиме ожидания, пока не будет подан сигнал готовности;
-		// затем он запускает обратный отсчет до выборов лидера.
 		<-ready
 		cm.mu.Lock()
 		cm.electionResetEvent = time.Now()
 		cm.mu.Unlock()
 		cm.runElectionTimer()
 	}()
-
-	cm.newCommitReadyChanWg.Add(1)
-	go cm.commitChanSender()
 	return cm
 }
 
@@ -179,32 +180,7 @@ func (cm *ConsensusModule) Report() (id, term int, isLeader bool) {
 	return cm.id, cm.currentTerm, cm.state == Leader
 }
 
-// Submit отправляет новую команду в CM. Этот метод не блокирует выполнение;
-// клиенты читают канал фиксации, переданный в конструктор, чтобы получать
-// уведомления о новых зафиксированных записях.
-// Если данный CM является лидером, Submit возвращает индекс записи журнала,
-// в который была добавлена команда. В противном случае возвращается -1.
-func (cm *ConsensusModule) Submit(command any) int {
-	cm.mu.Lock()
-	if cm.state != Leader {
-		cm.mu.Unlock()
-		return -1
-	}
-	cm.dLogf("Submit received by %v: %v", cm.state, command)
-	submitIndex := len(cm.log)
-	cm.log = append(cm.log, LogEntry{Command: command, Term: cm.currentTerm})
-	cm.persistToStorage()
-	cm.dLogf("... log=%v", cm.log)
-	cm.mu.Unlock()
-	select {
-	case cm.triggerAEChan <- struct{}{}:
-	default:
-	}
-	return submitIndex
-}
-
-// Stop останавливает этот CM, очищая его состояние. Этот метод быстро возвращает результат,
-// но для завершения работы всех горутин может потребоваться некоторое время (до ~таймаута выборов).
+// Stop останавливает этот CM.
 func (cm *ConsensusModule) Stop() {
 	cm.dLogf("CM.Stop called")
 	cm.mu.Lock()
@@ -212,10 +188,7 @@ func (cm *ConsensusModule) Stop() {
 	cm.mu.Unlock()
 	cm.dLogf("becomes Dead")
 
-	// Close the commit notification channel, and wait for the goroutine that
-	// monitors it to exit.
-	close(cm.newCommitReadyChan)
-	cm.newCommitReadyChanWg.Wait()
+	close(cm.shutdownCh)
 }
 
 // restoreFromStorage восстанавливает постоянное состояние данного CM
@@ -246,28 +219,6 @@ func (cm *ConsensusModule) restoreFromStorage() {
 	} else {
 		log.Fatal("log not found in storage")
 	}
-}
-
-// persistToStorage сохраняет всё постоянное состояние CM в cm.storage.
-// Предполагается, что cm.mu уже заблокирован.
-func (cm *ConsensusModule) persistToStorage() {
-	var termData bytes.Buffer
-	if err := gob.NewEncoder(&termData).Encode(cm.currentTerm); err != nil {
-		log.Fatal(err)
-	}
-	cm.storage.Set("currentTerm", termData.Bytes())
-
-	var votedData bytes.Buffer
-	if err := gob.NewEncoder(&votedData).Encode(cm.votedFor); err != nil {
-		log.Fatal(err)
-	}
-	cm.storage.Set("votedFor", votedData.Bytes())
-
-	var logData bytes.Buffer
-	if err := gob.NewEncoder(&logData).Encode(cm.log); err != nil {
-		log.Fatal(err)
-	}
-	cm.storage.Set("log", logData.Bytes())
 }
 
 // dLogf выводит отладочное сообщение, если DebugCM > 0.
@@ -398,14 +349,14 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 				cm.dLogf("... log is now: %v", cm.log)
 			}
 
-			// Устанавливает индекс фиксации.
 			if args.LeaderCommit > cm.commitIndex {
 				cm.commitIndex = min(args.LeaderCommit, len(cm.log)-1)
 				cm.dLogf("... setting commitIndex=%d", cm.commitIndex)
-				select {
-				case cm.newCommitReadyChan <- struct{}{}:
-				default:
-				}
+				cm.persistToStorage()
+				commitIdx := cm.commitIndex
+				cm.mu.Unlock()
+				cm.processLogs(commitIdx)
+				cm.mu.Lock()
 			}
 		} else {
 			// Не найдено совпадение для PrevLogIndex/PrevLogTerm.
@@ -511,6 +462,12 @@ func (cm *ConsensusModule) startElection() {
 	cm.persistToStorage()
 	cm.dLogf("becomes Candidate (currentTerm=%d); log=%v", savedCurrentTerm, cm.log)
 
+	// Одиночный узел: побеждает на выборах немедленно.
+	if len(cm.peerIds) == 0 {
+		cm.startLeader()
+		return
+	}
+
 	var votesReceived atomic.Int32
 	votesReceived.Store(1)
 
@@ -598,6 +555,19 @@ func (cm *ConsensusModule) startLeader() {
 		"becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; log=%v",
 		cm.currentTerm, cm.nextIndex, cm.matchIndex, cm.log,
 	)
+
+	// Noop entry при утверждении лидерства (§5.4.2).
+	// Лидер должен закоммитить noop запись своего терма, чтобы
+	// зафиксировать любые незакоммиченные записи из предыдущих термов.
+	noop := &logFuture{
+		log: LogEntry{
+			Type: LogNoop,
+		},
+	}
+	noop.init(cm.shutdownCh)
+	cm.dispatchLogsUnsafe([]*logFuture{noop})
+
+	go cm.runLeaderLoop()
 
 	// Эта горутина выполняется в фоновом режиме и отправляет сообщения
 	// AppendEntries соседям:
@@ -726,16 +696,10 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int) {
 				)
 				if cm.commitIndex != savedCommitIndex {
 					cm.dLogf("leader sets commitIndex := %d", cm.commitIndex)
-					// Индекс фиксации изменился: лидер считает новые
-					// записи журнала зафиксированными. Отправить новые
-					// записи в канал фиксации клиентам этого лидера
-					// и уведомить ведомых, отправив им сообщения
-					// AppendEntries.
+					commitIdx := cm.commitIndex
+					cm.persistToStorage()
 					cm.mu.Unlock()
-					select {
-					case cm.newCommitReadyChan <- struct{}{}:
-					default:
-					}
+					cm.processLogs(commitIdx)
 					select {
 					case cm.triggerAEChan <- struct{}{}:
 					default:
@@ -785,10 +749,7 @@ func (cm *ConsensusModule) leaderSendAEs() {
 	}
 }
 
-// lastLogIndexAndTerm возвращает индекс последней записи журнала
-// и терм последней записи журнала данного сервера
-// (или -1, если журнал пуст).
-// Предполагается, что cm.mu уже заблокирован.
+// lastLogIndexAndTerm возвращает индекс и терм последней записи журнала.
 func (cm *ConsensusModule) lastLogIndexAndTerm() (int, int) {
 	if len(cm.log) > 0 {
 		lastIndex := len(cm.log) - 1
@@ -797,50 +758,269 @@ func (cm *ConsensusModule) lastLogIndexAndTerm() (int, int) {
 	return -1, -1
 }
 
-// commitChanSender отвечает за отправку зафиксированных записей журнала
-// в cm.commitChan. Он отслеживает уведомления, поступающие через
-// newCommitReadyChan, и определяет, какие новые записи журнала готовы
-// к отправке. Этот метод должен выполняться в отдельной фоновой горутине;
-// cm.commitChan может быть буферизированным, что будет ограничивать скорость,
-// с которой клиент получает новые зафиксированные записи журнала.
-// Метод завершает работу после закрытия newCommitReadyChan.
-func (cm *ConsensusModule) commitChanSender() {
-	defer cm.newCommitReadyChanWg.Done()
+// Apply отправляет команду в Raft и возвращает ApplyFuture.
+// Команда будет применена к FSM после коммита.
+func (cm *ConsensusModule) Apply(command any, timeout time.Duration) ApplyFuture {
+	select {
+	case <-cm.shutdownCh:
+		return errorFuture{ErrRaftShutdown}
+	default:
+	}
 
+	future := &logFuture{
+		log: LogEntry{
+			Type:    LogCommand,
+			Command: command,
+		},
+	}
+	future.init(cm.shutdownCh)
+
+	cm.mu.Lock()
+	if cm.state != Leader {
+		cm.mu.Unlock()
+		return errorFuture{ErrNotLeader}
+	}
+	cm.mu.Unlock()
+
+	var timer <-chan time.Time
+	if timeout > 0 {
+		timer = time.After(timeout)
+	}
+	select {
+	case <-timer:
+		return errorFuture{ErrEnqueueTimeout}
+	case <-cm.shutdownCh:
+		return errorFuture{ErrRaftShutdown}
+	case cm.applyCh <- future:
+		return future
+	}
+}
+
+// Submit отправляет команду напрямую в журнал (без future).
+// Возвращает индекс записи или -1, если не лидер.
+func (cm *ConsensusModule) Submit(command any) int {
+	cm.mu.Lock()
+	if cm.state != Leader {
+		cm.mu.Unlock()
+		return -1
+	}
+	cm.dLogf("Submit received by %v: %v", cm.state, command)
+	submitIndex := len(cm.log)
+	cm.log = append(cm.log, LogEntry{
+		Index:   submitIndex,
+		Term:    cm.currentTerm,
+		Type:    LogCommand,
+		Command: command,
+	})
+	cm.persistToStorage()
+	cm.dLogf("... log=%v", cm.log)
+	cm.mu.Unlock()
+	select {
+	case cm.triggerAEChan <- struct{}{}:
+	default:
+	}
+	return submitIndex
+}
+
+// runFSM — отдельная горутина, применяющая закоммиченные записи к FSM.
+// Получает батчи через fsmMutateCh и вызывает fsm.Apply для каждой записи
+// типа LogCommand. После применения отвечает в соответствующий future,
+// если он существует. Завершает работу при закрытии shutdownCh.
+func (cm *ConsensusModule) runFSM() {
 	for {
-		// Ожидание сигнала о новых зафиксированных записях.
-		_, ok := <-cm.newCommitReadyChan
-		if !ok {
-			cm.dLogf("commitChanSender done")
+		select {
+		case batch := <-cm.fsmMutateCh:
+			for _, ct := range batch {
+				if ct.log.Type != LogCommand {
+					if ct.future != nil {
+						ct.future.response = nil
+						ct.future.respond(nil)
+					}
+					continue
+				}
+				resp := cm.fsm.Apply(ct.log)
+				if ct.future != nil {
+					ct.future.response = resp
+					ct.future.respond(nil)
+				}
+			}
+		case <-cm.shutdownCh:
 			return
 		}
+	}
+}
 
-		// Определить, какие записи журнала необходимо применить.
-		cm.mu.Lock()
-		savedLastApplied := cm.lastApplied
-		var entries []LogEntry
-		if cm.commitIndex > cm.lastApplied {
-			entries = append([]LogEntry{}, cm.log[cm.lastApplied+1:cm.commitIndex+1]...)
-			cm.lastApplied = cm.commitIndex
-		}
+// processLogs собирает закоммиченные записи от lastApplied+1 до commitIndex
+// и отправляет их в FSM goroutine. Метод не требует удержания cm.mu при вызове,
+// но сам захватывает её внутри для чтения журнала и поиска соответствующих
+// future в списке inflight. После формирования батча отпускает блокировку
+// и отправляет данные в fsmMutateCh.
+func (cm *ConsensusModule) processLogs(commitIndex int) {
+	cm.mu.Lock()
+	if commitIndex <= cm.lastApplied {
 		cm.mu.Unlock()
-		cm.dLogf("commitChanSender entries=%v, savedLastApplied=%d", entries, savedLastApplied)
-
-		for i, entry := range entries {
-			cm.dLogf("send on commitchan i=%v, entry=%v", i, entry)
-			ce := CommitEntry{
-				Command: entry.Command,
-				Index:   savedLastApplied + i + 1,
-				Term:    entry.Term,
+		return
+	}
+	var batch []*commitTuple
+	for idx := cm.lastApplied + 1; idx <= commitIndex; idx++ {
+		var future *logFuture
+		for e := cm.inflight.Front(); e != nil; e = e.Next() {
+			if lf := e.Value.(*logFuture); lf.log.Index == idx {
+				future = lf
+				cm.inflight.Remove(e)
+				break
 			}
-			// Используем select, чтобы отправка могла быть прервана
-			// закрытием newCommitReadyChan при остановке.
-			select {
-			case cm.commitChan <- ce:
-			case <-cm.newCommitReadyChan:
-				cm.dLogf("commitChanSender done")
-				return
+		}
+		if idx >= len(cm.log) {
+			continue
+		}
+		log := &cm.log[idx]
+		batch = append(batch, &commitTuple{log: log, future: future})
+	}
+	cm.lastApplied = commitIndex
+	cm.persistToStorage()
+	cm.mu.Unlock()
+	cm.fsmMutateCh <- batch
+}
+
+// dispatchLogs присваивает индексы и термы записям, добавляет их в журнал
+// лидера (cm.log), помещает future в очередь inflight и инициирует
+// репликацию через triggerAEChan.
+//
+// Вызывается только из runLeaderLoop после проверки, что сервер всё ещё
+// является лидером. Предполагается, что будущие ответы будут разрешены
+// после коммита в processLogs, либо при потере лидерства в runLeaderLoop.
+func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
+	cm.mu.Lock()
+	cm.dispatchLogsUnsafe(applyLogs)
+
+	// Попытка сразу продвинуть commitIndex (необходимо для одиночного узла
+	// и ускоряет коммит в многопоточном кластере после dispatchLogs).
+	savedCommitIndex := cm.commitIndex
+	for i := cm.commitIndex + 1; i < len(cm.log); i++ {
+		if cm.log[i].Term == cm.currentTerm {
+			matchCount := 1
+			for _, peerID := range cm.peerIds {
+				if cm.matchIndex[peerID] >= i {
+					matchCount++
+				}
+			}
+			if matchCount*2 > len(cm.peerIds)+1 {
+				cm.commitIndex = i
 			}
 		}
 	}
+	cm.mu.Unlock()
+
+	if cm.commitIndex != savedCommitIndex {
+		cm.dLogf("leader sets commitIndex := %d", cm.commitIndex)
+		cm.processLogs(cm.commitIndex)
+	}
+}
+
+// dispatchLogsUnsafe — внутренняя версия dispatchLogs без захвата блокировки.
+// Вызывающий должен удерживать cm.mu.
+func (cm *ConsensusModule) dispatchLogsUnsafe(applyLogs []*logFuture) {
+	term := cm.currentTerm
+	lastIndex := len(cm.log) - 1
+	now := time.Now()
+	for _, f := range applyLogs {
+		f.dispatch = now
+		lastIndex++
+		f.log.Index = lastIndex
+		f.log.Term = term
+		cm.log = append(cm.log, f.log)
+	}
+	cm.persistToStorage()
+	cm.matchIndex[cm.id] = lastIndex
+
+	for _, f := range applyLogs {
+		cm.inflight.PushBack(f)
+	}
+
+	select {
+	case cm.triggerAEChan <- struct{}{}:
+	default:
+	}
+}
+
+// runLeaderLoop — центральный цикл лидера. Запускается при переходе в
+// состояние Leader и завершается при потере лидерства или остановке CM.
+//
+// Цикл получает future из applyCh, собирает их в пакеты (group commit)
+// и передаёт в dispatchLogs. После успешной репликации и коммита
+// processLogs разрешает соответствующие future.
+//
+// При потере лидерства (выход из цикла) все ожидающие future из списка
+// inflight получают ошибку ErrLeadershipLost, после чего список
+// очищается.
+func (cm *ConsensusModule) runLeaderLoop() {
+	defer func() {
+		cm.mu.Lock()
+		for e := cm.inflight.Front(); e != nil; e = e.Next() {
+			e.Value.(*logFuture).respond(ErrLeadershipLost)
+		}
+		cm.inflight = list.New()
+		cm.mu.Unlock()
+	}()
+
+	checkLeaderTicker := time.NewTicker(TickerTimeoutMs * time.Millisecond)
+	defer checkLeaderTicker.Stop()
+
+	for {
+		select {
+		case future := <-cm.applyCh:
+			cm.mu.Lock()
+			if cm.state != Leader {
+				cm.mu.Unlock()
+				future.respond(ErrNotLeader)
+				return
+			}
+			cm.mu.Unlock()
+
+			ready := []*logFuture{future}
+		groupCommit:
+			for i := 0; i < maxApplyBatchSize-1; i++ {
+				select {
+				case f := <-cm.applyCh:
+					ready = append(ready, f)
+				default:
+					break groupCommit
+				}
+			}
+			cm.dispatchLogs(ready)
+
+		case <-checkLeaderTicker.C:
+			cm.mu.Lock()
+			if cm.state != Leader {
+				cm.mu.Unlock()
+				return
+			}
+			cm.mu.Unlock()
+
+		case <-cm.shutdownCh:
+			return
+		}
+	}
+}
+
+// persistToStorage сохраняет постоянное состояние CM в cm.storage.
+func (cm *ConsensusModule) persistToStorage() {
+	var termData bytes.Buffer
+	if err := gob.NewEncoder(&termData).Encode(cm.currentTerm); err != nil {
+		log.Fatal(err)
+	}
+	cm.storage.Set("currentTerm", termData.Bytes())
+
+	var votedData bytes.Buffer
+	if err := gob.NewEncoder(&votedData).Encode(cm.votedFor); err != nil {
+		log.Fatal(err)
+	}
+	cm.storage.Set("votedFor", votedData.Bytes())
+
+	var logData bytes.Buffer
+	if err := gob.NewEncoder(&logData).Encode(cm.log); err != nil {
+		log.Fatal(err)
+	}
+	cm.storage.Set("log", logData.Bytes())
 }
