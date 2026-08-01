@@ -182,6 +182,10 @@ func TestCallReconnect(t *testing.T) {
 
 	var reply RequestVoteReply
 	err := s0.Call(1, "ConsensusModule.RequestVote", RequestVoteArgs{
+		RPCHeader: RPCHeader{
+			ProtocolVersion: ProtocolVersion,
+			ServerID:        0,
+		},
 		Term:        1,
 		CandidateID: 0,
 	}, &reply)
