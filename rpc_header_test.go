@@ -1,8 +1,8 @@
 package raft
 
 import (
+	"io"
 	"testing"
-	"time"
 
 	"github.com/fortytw2/leaktest"
 )
@@ -11,6 +11,13 @@ import (
 type NoopFSM struct{}
 
 func (NoopFSM) Apply(*LogEntry) any { return nil }
+func (NoopFSM) Snapshot() (FSMSnapshot, error) {
+	return nil, ErrNotImplemented
+}
+
+func (NoopFSM) Restore(_ io.ReadCloser) error {
+	return ErrNotImplemented
+}
 
 // testWithHeader — вспомогательный тип для теста checkRPCHeader.
 type testWithHeader struct {
@@ -137,7 +144,8 @@ func TestAppendEntriesArgsImplementsWithHeader(t *testing.T) {
 func TestRequestVoteReplyRPCHeaderFilled(t *testing.T) {
 	cm := testServerWithFSM(t, &NoopFSM{})
 	defer cm.Stop()
-	time.Sleep(100 * time.Millisecond)
+	// remove: разогрев не требуется — RequestVote обрабатывается
+	// синхронно и не зависит от того, стартовали ли фоновые горутины.
 
 	var reply RequestVoteReply
 	err := cm.RequestVote(RequestVoteArgs{
@@ -158,7 +166,8 @@ func TestRequestVoteReplyRPCHeaderFilled(t *testing.T) {
 func TestAppendEntriesReplyRPCHeaderFilled(t *testing.T) {
 	cm := testServerWithFSM(t, &NoopFSM{})
 	defer cm.Stop()
-	time.Sleep(100 * time.Millisecond)
+	// remove: разогрев не требуется — AppendEntries обрабатывается
+	// синхронно (см. TestRequestVoteReplyRPCHeaderFilled).
 
 	var reply AppendEntriesReply
 	err := cm.AppendEntries(AppendEntriesArgs{
@@ -270,9 +279,12 @@ func TestAppendEntriesRejectsProtocolVersionFuture(t *testing.T) {
 // --- Leaktest ---
 
 func TestRPCHeaderNoGoroutineLeak(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 200*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := testServerWithFSM(t, &NoopFSM{})
 	defer cm.Stop()
-	time.Sleep(50 * time.Millisecond)
+	// keep: timing — предмет теста. Окно даёт фоновым горутинам CM
+	// фактически стартовать, иначе leaktest проверял бы отсутствие
+	// ещё не запущенных горутин и был бы ложно-зелёным.
+	sleepMs(50)
 }

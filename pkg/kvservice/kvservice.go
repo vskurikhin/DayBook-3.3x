@@ -4,22 +4,95 @@ package kvservice
 import (
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/pkg/api"
-	"github.com/vskurikhin/raft/pkg/raft"
 )
 
-const DebugKV = 1
+// traceKV — порог детализации отладочных сообщений KV-сервиса (traceLogf).
+// Сообщение выводится, если traceKV > 0. Значение задаётся полем
+// TraceConfig.Level единственного успешного вызова SetTrace, по
+// умолчанию 0. Изменяется только до старта горутин.
+var traceKV = 0
+
+// _traceLogger — логгер отладочных сообщений KV-сервиса (traceLogf).
+// По умолчанию выводит в стандартный логгер (stderr). Перенаправляется
+// в файл функцией SetTrace.
+var _traceLogger = log.Default()
+
+// traceConfigured — сторожевой флаг строгого set-once: единственная
+// успешная конфигурация трассировки на процесс уже выполнена.
+// Устанавливается только успешным вызовом SetTrace
+// (вызов, завершившийся ошибкой I/O, окно не расходует).
+var traceConfigured atomic.Bool
+
+// traceCMCreated — сторожевой флаг: в процессе уже создавался
+// KVService. Устанавливается конструктором New/NewKVService.
+var traceCMCreated atomic.Bool
+
+// TraceConfig — параметры трассировки KV-сервиса, передаваемые SetTrace.
+// Тип является простым носителем значений: у него нет методов и он не
+// подразумевает расширения поведением.
+type TraceConfig struct {
+	// Level — порог детализации: трассировка KV-сервиса печатается,
+	// если Level > 0. Level == 0 означает, что трассировка выключена;
+	// нулевое значение НЕ трактуется как «уровень по умолчанию 1».
+	Level int
+
+	// LogFile — путь к файлу журнала трассировки. Файл открывается в
+	// режиме добавления и создаётся при необходимости. Пустая строка
+	// означает вывод в стандартный логгер (stderr).
+	LogFile string
+}
+
+// SetTrace конфигурирует трассировку KV-сервиса (traceLogf): порог
+// детализации cfg.Level и назначение вывода cfg.LogFile.
+// Пустой cfg.LogFile — вывод в стандартный логгер;
+// иначе файл открывается в режиме добавления и создаётся при необходимости.
+// Значение cfg.Level == 0 выключает трассировку и не подменяется значением
+// по умолчанию.
+//
+// SetTrace — единственная точка конфигурации трассировки пакета.
+func SetTrace(cfg TraceConfig) error {
+	if traceConfigured.Load() || traceCMCreated.Load() {
+		return fmt.Errorf(
+			"kvservice: trace configuration must be set exactly once, " +
+				"before the first KVService is created; repeated calls are forbidden",
+		)
+	}
+	if cfg.LogFile == "" {
+		traceKV = cfg.Level
+		_traceLogger = log.Default()
+		traceConfigured.Store(true)
+		return nil
+	}
+	// Порог присваивается только после успешного открытия файла.
+	f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return err
+	}
+	traceKV = cfg.Level
+	_traceLogger = log.New(f, "", log.LstdFlags|log.Lmicroseconds)
+	traceConfigured.Store(true)
+	return nil
+}
+
+// requestTimeout — таймаут для Apply-операций (PUT, CAS).
+// Если за это время не удалось отправить команду в applyCh лидера,
+// возвращается ErrEnqueueTimeout.
+const requestTimeout = 10 * time.Second
 
 type KVService struct {
-	mu sync.Mutex
-
 	// id — идентификатор сервиса в кластере Raft.
 	id int
 
@@ -30,11 +103,31 @@ type KVService struct {
 	ds *DataStore
 
 	// srv — HTTP-сервер, через который сервис предоставляет внешний API.
+	// Устанавливается один раз в ServeHTTP до старта Serve-горутины и
+	// после этого не изменяется (владение сервером и слушателем
+	// закреплено за структурой KVService; прежнее присваивание nil из
+	// Serve-горутины было data race).
 	srv *http.Server
+
+	// ln — слушатель HTTP-сервера. Устанавливается один раз в ServeHTTP
+	// до старта Serve-горутины и не изменяется. Позволяет узнать
+	// фактический адрес при address == ":0" (GetHTTPListenAddr).
+	ln net.Listener
+
+	// serveErrCh — канал доставки ошибки http.Server.Serve (кроме
+	// штатного ErrServerClosed). Буфер 1: Serve завершается один раз.
+	// Заменяет прежний log.Fatal из Serve-горутины, недопустимый
+	// в тестах.
+	serveErrCh chan error
+
+	// shutdownOnce обеспечивает идемпотентность Shutdown.
+	shutdownOnce sync.Once
 
 	// httpResponsesEnabled controls whether this service returns HTTP responses
 	// to the client. It's only used for testing and debugging.
-	httpResponsesEnabled bool
+	// atomic.Bool: пишется из тестовой горутины
+	// (ToggleHTTPResponsesEnabled), читается из HTTP-обработчиков.
+	httpResponsesEnabled atomic.Bool
 }
 
 // Config — конфигурация для создания нового KVService.
@@ -51,34 +144,40 @@ type Config struct {
 // cfg содержит параметры Raft-сервера (идентификатор, список узлов,
 // RPC-адрес) и HTTP-адрес для REST API сервиса.
 //
-// KVService реализует raft.FSM: закоммиченные записи журнала применяются
+// KVService реализует raft.FSM: зафиксированные записи журнала применяются
 // непосредственно к DataStore через метод Apply.
-func New(cfg Config, storage raft.Storage, readyChan <-chan any) *KVService {
+func New(cfg *Config, readyChan <-chan any) *KVService {
 	gob.Register(Command{})
 
+	// Сторожевой флаг контракта трассировки: конфигурация SetTrace
+	// разрешена только до создания первого сервиса (строгий set-once).
+	traceCMCreated.Store(true)
+
 	kvs := &KVService{
-		id:                   cfg.ServerID,
-		ds:                   NewDataStore(),
-		httpResponsesEnabled: true,
+		id:         cfg.ServerID,
+		ds:         NewDataStore(),
+		serveErrCh: make(chan error, 1),
 	}
+	kvs.httpResponsesEnabled.Store(true)
+	cfg.Fsm = kvs
 
 	// raft.Server обрабатывает RPC-вызовы протокола Raft в кластере.
 	// KVService передаётся как FSM, поэтому Apply будет вызываться Raft'ом
-	// для каждой закоммиченной записи.
-	rs := raft.New(cfg.Config, storage, readyChan, kvs)
+	// для каждой зафиксированной записи.
+	rs := raft.New(&cfg.Config, readyChan)
 	rs.Serve(cfg.RPCAddress)
 	kvs.rs = rs
 
 	return kvs
 }
 
-// Apply реализует raft.FSM. Вызывается Raft'ом для каждой закоммиченной
+// Apply реализует raft.FSM. Вызывается Raft'ом для каждой зафиксированной
 // записи журнала. Команда применяется к DataStore, результат сохраняется
 // в полях ResultValue/ResultFound команды и возвращается в future клиента.
 func (kvs *KVService) Apply(log *raft.LogEntry) any {
-	cmd, ok := log.Command.(Command)
+	cmd, ok := log.Data.(Command)
 	if !ok {
-		kvs.kvLogf("unknown command type %T", log.Command)
+		kvs.traceLogf("unknown command type %T", log.Data)
 		return nil
 	}
 
@@ -90,11 +189,58 @@ func (kvs *KVService) Apply(log *raft.LogEntry) any {
 	case CommandCAS:
 		cmd.ResultValue, cmd.ResultFound = kvs.ds.CAS(cmd.Key, cmd.CompareValue, cmd.Value)
 	default:
-		kvs.kvLogf("unknown command kind %v", cmd.Kind)
+		kvs.traceLogf("unknown command kind %v", cmd.Kind)
 		return nil
 	}
 
 	return cmd
+}
+
+// Snapshot реализует raft.FSM.Snapshot.
+// Возвращает снимок текущего состояния DataStore.
+func (kvs *KVService) Snapshot() (raft.FSMSnapshot, error) {
+	data, err := kvs.ds.Snapshot()
+	if err != nil {
+		return nil, err
+	}
+	return &kvSnapshot{data: data}, nil
+}
+
+// Restore реализует raft.FSM.Restore.
+// Восстанавливает состояние DataStore из снимка.
+func (kvs *KVService) Restore(reader io.ReadCloser) error {
+	defer func() { _ = reader.Close() }()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return err
+	}
+	return kvs.ds.Restore(data)
+}
+
+// kvSnapshot — снимок состояния KVService для raft.FSMSnapshot.
+type kvSnapshot struct {
+	data []byte
+}
+
+func (s *kvSnapshot) Persist(sink raft.SnapshotSink) error {
+	_, err := sink.Write(s.data)
+	return err
+}
+
+func (s *kvSnapshot) Release() {}
+
+// ApplyBatch реализует интерфейс raft.BatchingFSM. Вызывается Raft'ом
+// для группового применения зафиксированных записей журнала. Каждая запись
+// применяется к DataStore через Apply, результат (Command с заполненными
+// полями ResultValue/ResultFound) возвращается в срезе ответов для
+// сопоставления с соответствующими future клиентов.
+func (kvs *KVService) ApplyBatch(logs []*raft.LogEntry) []any {
+	results := make([]any, 0, len(logs))
+	for _, l := range logs {
+		cmd := kvs.Apply(l)
+		results = append(results, cmd)
+	}
+	return results
 }
 
 // NewKVService создаёт новый экземпляр KVService.
@@ -108,14 +254,14 @@ func (kvs *KVService) Apply(log *raft.LogEntry) any {
 //     как кластер Raft будет готов к работе (все узлы запущены и соединены
 //     друг с другом).
 func NewKVService(address string, id int, peerIds []int, storage raft.Storage, readyChan <-chan any) *KVService {
-	return New(Config{
+	return New(&Config{
 		Config: raft.Config{
 			RPCAddress: address,
 			ServerID:   id,
 			PeerIds:    peerIds,
+			Storage:    storage,
 		},
-	},
-		storage, readyChan,
+	}, readyChan,
 	)
 }
 
@@ -126,50 +272,89 @@ func (kvs *KVService) IsLeader() bool {
 }
 
 // ServeHTTP запускает HTTP-сервер, предоставляющий REST API KV-сервиса
-// на указанном TCP-порту. Метод не блокирует выполнение: он запускает
-// HTTP-сервер в отдельной горутине и сразу возвращает управление.
+// на указанном TCP-адресе. Метод не блокирует выполнение: слушатель
+// открывается синхронно (поэтому фактический порт известен сразу после
+// возврата — см. GetHTTPListenAddr, в том числе при address == ":0"),
+// а обслуживание запускается в отдельной горутине.
+//
+// Ошибка открытия слушателя возвращается вызывающему; ошибка Serve
+// (кроме штатного http.ErrServerClosed) доставляется через ServeErr()
+// log.Fatal из горутины недопустим.
+//
 // Для корректной остановки сервера вызовите метод Shutdown.
-func (kvs *KVService) ServeHTTP(address string) {
+func (kvs *KVService) ServeHTTP(address string) error {
 	if kvs.srv != nil {
-		panic("ServeHTTP called with existing server")
+		return fmt.Errorf("kvservice %d: ServeHTTP called with existing server", kvs.id)
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /get/", kvs.handleGet)
 	mux.HandleFunc("POST /put/", kvs.handlePut)
 	mux.HandleFunc("POST /cas/", kvs.handleCAS)
+	mux.HandleFunc("POST /verifyleader/", kvs.handleVerifyLeader)
 
+	ln, err := net.Listen("tcp", address)
+	if err != nil {
+		return fmt.Errorf("kvservice %d: listen %q: %w", kvs.id, address, err)
+	}
+
+	// srv и ln устанавливаются ДО старта Serve-горутины и далее
+	// не изменяются — читатели (GetHTTPListenAddr, Shutdown) видят
+	// неизменяемые значения.
+	kvs.ln = ln
 	kvs.srv = &http.Server{
 		Addr:    address,
 		Handler: mux,
 	}
 
+	kvs.traceLogf("serving HTTP on %s", ln.Addr().String())
 	go func() {
-		kvs.kvLogf("serving HTTP on %s", kvs.srv.Addr)
-		if err := kvs.srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatal(err)
+		if err := kvs.srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			kvs.serveErrCh <- err
 		}
-		kvs.srv = nil
+		close(kvs.serveErrCh)
 	}()
+	return nil
+}
+
+// GetHTTPListenAddr возвращает фактический адрес слушателя HTTP-сервера
+// (актуально при address == ":0"). Пустая строка — ServeHTTP не вызывался.
+func (kvs *KVService) GetHTTPListenAddr() string {
+	if kvs.ln == nil {
+		return ""
+	}
+	return kvs.ln.Addr().String()
+}
+
+// ServeErr возвращает канал ошибок HTTP-сервера. Канал закрывается
+// после завершения Serve; штатное завершение (http.ErrServerClosed)
+// ошибкой не считается и в канал не отправляется.
+func (kvs *KVService) ServeErr() <-chan error {
+	return kvs.serveErrCh
 }
 
 // Shutdown корректно завершает работу сервиса: останавливает RPC-сервер
 // Raft и основной HTTP-сервер. Метод возвращает управление только после
-// полного завершения процедуры остановки.
+// полного завершения процедуры остановки. Идемпотентен — повторные
+// вызовы безопасны и возвращают nil.
 //
 // Примечание: перед вызовом Shutdown необходимо вызвать
 // DisconnectFromRaftPeers для всех узлов кластера.
 func (kvs *KVService) Shutdown() error {
-	kvs.kvLogf("shutting down Raft server")
-	kvs.rs.Shutdown()
+	kvs.shutdownOnce.Do(func() {
+		kvs.traceLogf("shutting down Raft server")
+		kvs.rs.Shutdown()
 
-	if kvs.srv != nil {
-		kvs.kvLogf("shutting down HTTP server")
-		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-		defer cancel()
-		_ = kvs.srv.Shutdown(ctx)
-		kvs.kvLogf("HTTP shutdown complete")
-		return nil
-	}
+		if kvs.srv != nil {
+			kvs.traceLogf("shutting down HTTP server")
+			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			defer cancel()
+			// srv.Shutdown закрывает слушатель; ln.Close() дополнительно
+			// гарантирует освобождение порта при истечении ctx.
+			_ = kvs.srv.Shutdown(ctx)
+			_ = kvs.ln.Close()
+			kvs.traceLogf("HTTP shutdown complete")
+		}
+	})
 
 	return nil
 }
@@ -180,22 +365,44 @@ func (kvs *KVService) Shutdown() error {
 // со значением false; в этом случае сервис не будет отвечать клиентам
 // по HTTP.
 func (kvs *KVService) ToggleHTTPResponsesEnabled(enable bool) {
-	kvs.httpResponsesEnabled = enable
+	kvs.httpResponsesEnabled.Store(enable)
 }
 
 func (kvs *KVService) sendHTTPResponse(w http.ResponseWriter, v any) {
-	if kvs.httpResponsesEnabled {
+	if kvs.httpResponsesEnabled.Load() {
 		renderJSON(w, v)
 	}
 }
 
+func (kvs *KVService) handleVerifyLeader(w http.ResponseWriter, _ *http.Request) {
+	// ReadIndex-проверка лидерства (Raft §8) без записи в журнал.
+	if err := kvs.rs.VerifyLeader().Error(); err != nil {
+		kvs.sendHTTPResponse(w, api.StatusResponse{RespStatus: api.StatusNotLeader})
+		return
+	}
+	kvs.sendHTTPResponse(w, api.StatusResponse{RespStatus: api.StatusOK})
+}
+
 func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
+	start := time.Now()
 	pr := &api.PutRequest{}
+	defer func() {
+		elapsed := time.Since(start)
+		kvs.traceLogf("HTTP PUT %v took %v", pr, elapsed)
+	}()
+
 	if err := readRequestJSON(req, pr); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	kvs.kvLogf("HTTP PUT %v", pr)
+
+	// ReadIndex-проверка лидерства (Raft §8) без записи в журнал.
+	if err := kvs.rs.VerifyLeader().Error(); err != nil {
+		kvs.sendHTTPResponse(w, api.PutResponse{
+			RespStatus: api.StatusNotLeader,
+		})
+		return
+	}
 
 	cmd := Command{
 		Kind:  CommandPut,
@@ -204,22 +411,23 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 		ID:    kvs.id,
 	}
 
-	future := kvs.rs.Apply(cmd, 0)
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- future.Error()
-	}()
+	future := kvs.rs.Apply(cmd, requestTimeout)
 
 	select {
-	case err := <-errCh:
+	case err := <-future.ErrorCh():
 		if err != nil {
 			kvs.sendHTTPResponse(w, api.PutResponse{
 				RespStatus: api.StatusNotLeader,
 			})
 			return
 		}
-		cmdResp := future.Response().(Command)
+		cmdResp, ok := future.Response().(Command)
+		if !ok {
+			kvs.sendHTTPResponse(w, api.PutResponse{
+				RespStatus: api.StatusInvalid,
+			})
+			return
+		}
 		kvs.sendHTTPResponse(w, api.PutResponse{
 			RespStatus: api.StatusOK,
 			KeyFound:   cmdResp.ResultFound,
@@ -232,78 +440,87 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 }
 
 func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
+	start := time.Now()
 	gr := &api.GetRequest{}
+	defer func() {
+		elapsed := time.Since(start)
+		kvs.traceLogf("HTTP GET %v took %v", gr, elapsed)
+	}()
+
 	if err := readRequestJSON(req, gr); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	kvs.kvLogf("HTTP GET %v", gr)
 
-	cmd := Command{
-		Kind: CommandGet,
-		Key:  gr.Key,
-		ID:   kvs.id,
-	}
-
-	future := kvs.rs.Apply(cmd, 0)
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- future.Error()
-	}()
-
+	// ReadIndex: подтверждение лидерства без записи в raft-журнал (Raft §8).
+	future := kvs.rs.VerifyLeader()
 	select {
-	case err := <-errCh:
+	case err := <-future.ErrorCh():
 		if err != nil {
 			kvs.sendHTTPResponse(w, api.GetResponse{
 				RespStatus: api.StatusNotLeader,
 			})
 			return
 		}
-		cmdResp := future.Response().(Command)
-		kvs.sendHTTPResponse(w, api.GetResponse{
-			RespStatus: api.StatusOK,
-			KeyFound:   cmdResp.ResultFound,
-			Value:      cmdResp.ResultValue,
-		})
-
 	case <-req.Context().Done():
 		return
 	}
+
+	// Локальное чтение из DataStore (без raft-журнала, только после ReadIndex).
+	value, found := kvs.ds.Get(gr.Key)
+	kvs.sendHTTPResponse(w, api.GetResponse{
+		RespStatus: api.StatusOK,
+		KeyFound:   found,
+		Value:      value,
+	})
 }
 
 func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
+	start := time.Now()
 	cr := &api.CASRequest{}
+	defer func() {
+		elapsed := time.Since(start)
+		kvs.traceLogf("HTTP CAS %v took %v", cr, elapsed)
+	}()
+
 	if err := readRequestJSON(req, cr); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	kvs.kvLogf("HTTP CAS %v", cr)
+
+	// ReadIndex-проверка лидерства (Raft §8) без записи в журнал.
+	if err := kvs.rs.VerifyLeader().Error(); err != nil {
+		kvs.sendHTTPResponse(w, api.CASResponse{
+			RespStatus: api.StatusNotLeader,
+		})
+		return
+	}
 
 	cmd := Command{
 		Kind:         CommandCAS,
 		Key:          cr.Key,
-		Value:        cr.Value,
 		CompareValue: cr.CompareValue,
+		Value:        cr.Value,
 		ID:           kvs.id,
 	}
 
-	future := kvs.rs.Apply(cmd, 0)
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- future.Error()
-	}()
+	future := kvs.rs.Apply(cmd, requestTimeout)
 
 	select {
-	case err := <-errCh:
+	case err := <-future.ErrorCh():
 		if err != nil {
 			kvs.sendHTTPResponse(w, api.CASResponse{
 				RespStatus: api.StatusNotLeader,
 			})
 			return
 		}
-		cmdResp := future.Response().(Command)
+		cmdResp, ok := future.Response().(Command)
+		if !ok {
+			kvs.sendHTTPResponse(w, api.CASResponse{
+				RespStatus: api.StatusInvalid,
+			})
+			return
+		}
 		kvs.sendHTTPResponse(w, api.CASResponse{
 			RespStatus: api.StatusOK,
 			KeyFound:   cmdResp.ResultFound,
@@ -315,11 +532,11 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// kvLogf выводит отладочное сообщение, если DebugKV > 0.
-func (kvs *KVService) kvLogf(format string, args ...any) {
-	if DebugKV > 0 {
+// traceLogf выводит отладочное сообщение, если traceKV > 0.
+func (kvs *KVService) traceLogf(format string, args ...any) {
+	if traceKV > 0 {
 		format = fmt.Sprintf("[kv %d] ", kvs.id) + format
-		log.Printf(format, args...)
+		_traceLogger.Printf(format, args...)
 	}
 }
 

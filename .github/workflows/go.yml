@@ -1,0 +1,70 @@
+name: Go
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# Отменять предыдущий незавершённый прогон для той же ветки: полный набор
+# тестов идёт около 5 минут на цель, дублирующие прогоны не нужны.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: make lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Create empty .env required by Makefile
+        run: touch .env
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: make lint
+        run: make lint
+
+  test:
+    name: make test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # Makefile начинается с `include .env`; файл не отслеживается git,
+      # поэтому в чистом checkout'е make прерывается с
+      # ошибкой «No rule to make target '.env'». Создаём пустой файл —
+      # локальные переменные окружения в CI не требуются.
+      - name: Create empty .env required by Makefile
+        run: touch .env
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: make test
+        run: make test
+
+      - name: make test-race
+        run: make test-race

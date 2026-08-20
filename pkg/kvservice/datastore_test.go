@@ -1,8 +1,37 @@
 package kvservice
 
 import (
+	"fmt"
 	"testing"
 )
+
+// checkDataStoreSnapshotRestore проверяет, что Snapshot/Restore корректно
+// сохраняет и восстанавливает состояние DataStore.
+func checkDataStoreSnapshotRestore(t *testing.T, ds *DataStore) {
+	t.Helper()
+
+	// Создаём снимок (сериализованные байты).
+	data, err := ds.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot failed: %v", err)
+	}
+
+	// Восстанавливаем новый DataStore из снимка.
+	ds2 := NewDataStore()
+	if err := ds2.Restore(data); err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+
+	// Проверяем, что все ключи совпадают.
+	for k, v := range ds.data {
+		if ds2.data[k] != v {
+			t.Fatalf("key %q: original=%q, restored=%q", k, v, ds2.data[k])
+		}
+	}
+	if len(ds.data) != len(ds2.data) {
+		t.Fatalf("key count: original=%d, restored=%d", len(ds.data), len(ds2.data))
+	}
+}
 
 func checkPutPrev(t *testing.T, ds *DataStore, k string, v string, prev string, hasPrev bool) {
 	t.Helper()
@@ -80,4 +109,30 @@ func TestCASConcurrent(t *testing.T) {
 	if v != "bar" && v != "baz" {
 		t.Errorf("got v=%s, want bar or baz", v)
 	}
+}
+
+// TestDataStoreSnapshotRestore_Empty проверяет Snapshot/Restore для пустого DataStore.
+func TestDataStoreSnapshotRestore_Empty(t *testing.T) {
+	ds := NewDataStore()
+	checkDataStoreSnapshotRestore(t, ds)
+}
+
+// TestDataStoreSnapshotRestore_WithData проверяет Snapshot/Restore для DataStore с данными.
+func TestDataStoreSnapshotRestore_WithData(t *testing.T) {
+	ds := NewDataStore()
+	ds.Put("foo", "bar")
+	ds.Put("baz", "qux")
+	ds.Put("hello", "world")
+	checkDataStoreSnapshotRestore(t, ds)
+}
+
+// TestDataStoreSnapshotRestore_LargeDataset проверяет Snapshot/Restore для большого набора.
+func TestDataStoreSnapshotRestore_LargeDataset(t *testing.T) {
+	ds := NewDataStore()
+	for i := range 1000 {
+		key := fmt.Sprintf("key%d", i)
+		val := fmt.Sprintf("val%d", i)
+		ds.Put(key, val)
+	}
+	checkDataStoreSnapshotRestore(t, ds)
 }

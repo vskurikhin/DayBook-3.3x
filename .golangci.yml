@@ -2,51 +2,38 @@ version: "2"
 linters:
   default: all
   disable:
-    - copyloopvar
     - cyclop
     - depguard
     - dupl
     - err113
-    - errname
     - errorlint
     - exhaustive
     - exhaustruct
     - forbidigo
-    - forcetypeassert
     - funcorder
-    - funlen
     - gochecknoglobals
-    - gocognit
-    - goconst
-    - gocyclo
-    - godox
     - gomodguard
     - gosec
-    - gosmopolitan
+    - iface
     - inamedparam
-    - intrange
     - ireturn
-    - maintidx
     - mnd
-    - nakedret
-    - nestif
+    - modernize
     - nlreturn
     - noctx
     - noinlineerr
     - nonamedreturns
-    - paralleltest
     - perfsprint
-    - testableexamples
-    - testpackage
-    - thelper
-    - tparallel
     - unparam
-    - usestdlibvars
     - varnamelen
     - wrapcheck
     - wsl
     - wsl_v5
   settings:
+    funlen:
+      lines: 93
+      statements: 61
+      ignore-comments: true
     gocritic:
       disabled-checks:
         - importShadow
@@ -66,6 +53,8 @@ linters:
       enable-all: true
     lll:
       line-length: 130
+    nestif:
+      min-complexity: 19
     revive:
       rules:
         - name: indent-error-flow
@@ -93,7 +82,7 @@ linters:
       - part3/
       - part4kv/
       - part5kv/
-      - /testharness.go$
+      - testharness\.go$
       - .*_test.go$
 issues:
   max-issues-per-linter: 0

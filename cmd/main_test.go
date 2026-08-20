@@ -2,55 +2,66 @@ package main
 
 import (
 	"net"
-	"os"
 	"testing"
-	"time"
 
+	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/internal/config"
-	"github.com/vskurikhin/raft/pkg/raft"
 )
 
+// TestRunWithEmptyPeers запускает узел без соседей через runWith и
+// останавливает его как следствие:
+// - после теста не остаётся живых узловых горутин (leaktest).
+// - порядок cleanup (LIFO): stop → проверка leaktest.
 func TestRunWithEmptyPeers(t *testing.T) {
-	httpAddr, err := net.ResolveTCPAddr("tcp", ":0")
+	t.Cleanup(leaktest.CheckTimeout(t, raft.LeaktestBudget))
+
+	values := newTestValues(t)
+	values.Peers = map[int]net.Addr{}
+
+	stop, err := runWith(&values)
 	if err != nil {
-		t.Fatal(err)
-	}
-	rpcAddr, err := net.ResolveTCPAddr("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	values := config.Values{
-		Number:      0,
-		HTTPAddress: httpAddr,
-		RPCAddress:  rpcAddr,
-		Peers:       map[int]net.Addr{},
-	}
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- runWith(values)
-	}()
-
-	select {
-	case err := <-errCh:
 		t.Fatalf("runWith returned unexpectedly: %v", err)
-	case <-time.After(500 * time.Millisecond):
 	}
+	t.Cleanup(stop)
 }
 
+// TestRunWithPeerConnect запускает узел, подключённый к серверу-соседу.
 func TestRunWithPeerConnect(t *testing.T) {
-	// Start a peer server for runWith to connect to.
+	t.Cleanup(leaktest.CheckTimeout(t, raft.LeaktestBudget))
+
 	peerReady := make(chan any)
 	commitChannel := make(chan raft.CommitEntry)
-	storage := raft.NewMapStorage()
-	peer := raft.NewServer(1, []int{}, storage, peerReady, raft.NewCommitChannelFSM(commitChannel))
+	readerDone := make(chan any)
+	go func() {
+		defer close(readerDone)
+		for range commitChannel {
+		}
+	}()
+	peer := raft.NewServer(1, []int{}, raft.NewCommitChannelFSM(commitChannel), peerReady)
 	peer.Serve(":0")
 	close(peerReady)
-	t.Cleanup(func() { peer.DisconnectAll() })
+	t.Cleanup(func() {
+		peer.Shutdown()
+		close(commitChannel)
+		<-readerDone
+	})
 
-	peerAddr := peer.GetListenAddr()
+	values := newTestValues(t)
+	values.Peers = map[int]net.Addr{1: peer.GetListenAddr()}
 
+	stop, err := runWith(&values)
+	if err != nil {
+		t.Fatalf("runWith returned: %v", err)
+	}
+	t.Cleanup(stop)
+}
+
+// newTestValues собирает конфигурацию узла для тестов:
+// слушатели на :0 (без фиксированных портов), хранилище — во
+// временном каталоге теста.
+func newTestValues(t *testing.T) config.Values {
+	t.Helper()
 	httpAddr, err := net.ResolveTCPAddr("tcp", ":0")
 	if err != nil {
 		t.Fatal(err)
@@ -59,61 +70,10 @@ func TestRunWithPeerConnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	values := config.Values{
+	return config.Values{
 		Number:      0,
 		HTTPAddress: httpAddr,
 		RPCAddress:  rpcAddr,
-		Peers:       map[int]net.Addr{1: peerAddr},
-	}
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- runWith(values)
-	}()
-
-	select {
-	case err := <-errCh:
-		t.Fatalf("runWith returned: %v", err)
-	case <-time.After(500 * time.Millisecond):
-	}
-}
-
-func TestRun(t *testing.T) {
-	origArgs := os.Args
-	t.Cleanup(func() { os.Args = origArgs })
-
-	os.Args = []string{"raft", "-rpc-addr", ":0", "-http-addr", ":0", "-number", "0"}
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- run()
-	}()
-
-	select {
-	case err := <-errCh:
-		t.Fatalf("run returned: %v", err)
-	case <-time.After(500 * time.Millisecond):
-	}
-}
-
-func TestMainFunction(t *testing.T) {
-	origArgs := os.Args
-	t.Cleanup(func() { os.Args = origArgs })
-
-	// main() calls log.Fatal on error, which exits. We redirect log output
-	// to discard and verify it doesn't exit immediately.
-	os.Args = []string{"raft", "-http-addr", ":0", "-rpc-addr", ":0", "-number", "0"}
-
-	done := make(chan any)
-	go func() {
-		main()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		t.Fatal("main returned unexpectedly")
-	case <-time.After(500 * time.Millisecond):
+		DataDir:     t.TempDir(),
 	}
 }

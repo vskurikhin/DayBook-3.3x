@@ -17,7 +17,13 @@ import (
 )
 
 // DebugClient включает вывод отладочной информации.
-const DebugClient = 1
+const DebugClient = 0
+
+const (
+	// defaultRequestTimeout — таймаут на один HTTP-запрос.
+	// При недоступности лидера клиент переключается на другой адрес.
+	defaultRequestTimeout = 500 * time.Millisecond
+)
 
 type KVClient struct {
 	addrs []string
@@ -46,6 +52,39 @@ func New(serviceAddrs []string) *KVClient {
 // clientCount используется для назначения уникальных идентификаторов
 // различным клиентам.
 var clientCount atomic.Int32
+
+// VerifyLeader проверяет, является ли assumedLeader действующим лидером,
+// используя ReadIndex-запрос (Raft §8). Возвращает leaderID или ошибку.
+// Если текущий assumedLeader не лидер, перебирает остальные адреса.
+// Позволяет клиенту быстро обнаружить смену лидера без лишних KV-запросов.
+func (c *KVClient) VerifyLeader(ctx context.Context) (int, error) {
+	for {
+		path := fmt.Sprintf("http://%s/verifyleader/", c.addrs[c.assumedLeader])
+
+		reqCtx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
+		var resp api.Response
+		err := sendJSONRequest(reqCtx, path, nil, &resp)
+		cancel()
+		if err != nil {
+			if ctx.Err() != nil {
+				return -1, err
+			}
+			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			continue
+		}
+
+		switch resp.Status() {
+		case api.StatusOK:
+			return c.assumedLeader, nil
+		case api.StatusNotLeader:
+			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			continue
+		default:
+			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			continue
+		}
+	}
+}
 
 // Put сохраняет пару key=value в хранилище.
 // Возвращает ошибку либо (prevValue, keyFound, nil), где keyFound показывает,
@@ -90,57 +129,31 @@ func (c *KVClient) CAS(ctx context.Context, key, compare, value string) (string,
 }
 
 func (c *KVClient) send(ctx context.Context, route string, req any, resp api.Response) error {
-	// Этот цикл перебирает список адресов сервисов до тех пор, пока не получит
-	// ответ, подтверждающий, что найден лидер кластера. Начинает поиск с
-	// c.assumedLeader.
-FindLeader:
 	for {
-		// Здесь используется двухуровневое дерево контекстов: пользовательский
-		// контекст ctx и созданный нами дочерний контекст с тайм-аутом для
-		// каждого отдельного запроса к сервису. Если тайм-аут дочернего
-		// контекста истекает, выполняется попытка обращения к следующему
-		// сервису. При этом необходимо постоянно отслеживать пользовательский
-		// контекст: если он будет отменён (по тайм-ауту, явной отмене и т.п.),
-		// выполнение немедленно прекращается.
-		retryCtx, retryCtxCancel := context.WithTimeout(ctx, 50*time.Millisecond)
+		reqCtx, reqCtxCancel := context.WithTimeout(ctx, defaultRequestTimeout)
 		path := fmt.Sprintf("http://%s/%s/", c.addrs[c.assumedLeader], route)
 
 		c.clientLogf("sending %#v to %v", req, path)
-		if err := sendJSONRequest(retryCtx, path, req, resp); err != nil {
-			// Поскольку контексты вложены друг в друга, порядок проверок имеет
-			// значение. Сначала необходимо проверить родительский контекст —
-			// если он завершён, нужно немедленно вернуть управление.
-			if contextDone(ctx) {
-				c.clientLogf("parent context done; bailing out")
-				retryCtxCancel()
+		if err := sendJSONRequest(reqCtx, path, req, resp); err != nil {
+			reqCtxCancel()
+			if ctx.Err() != nil {
 				return err
-			} else if contextDeadlineExceeded(retryCtx) {
-				// Если родительский контекст ещё активен, а истёк только
-				// дочерний контекст повторной попытки, необходимо обратиться
-				// к следующему сервису.
-				c.clientLogf("timed out: will try next address")
-				c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
-				retryCtxCancel()
-				continue FindLeader
 			}
-			retryCtxCancel()
-			return err
+			c.clientLogf("request failed: %v; switching to next address", err)
+			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			continue
 		}
+		reqCtxCancel()
 		c.clientLogf("received response %#v", resp)
 
-		// Для этого этапа контекст и тайм-аут больше не учитываются —
-		// ответ от сервиса уже успешно получен.
 		switch resp.Status() {
 		case api.StatusNotLeader:
 			c.clientLogf("not leader: will try next address")
 			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
-			retryCtxCancel()
-			continue FindLeader
+			continue
 		case api.StatusOK:
-			retryCtxCancel()
 			return nil
 		case api.StatusFailedCommit:
-			retryCtxCancel()
 			return fmt.Errorf("commit failed; please retry")
 		default:
 			panic("unreachable")
@@ -185,28 +198,4 @@ func sendJSONRequest(ctx context.Context, path string, reqData, respData any) er
 		return fmt.Errorf("JSON-decoding response data: %w", err)
 	}
 	return nil
-}
-
-// contextDone проверяет, завершён ли контекст ctx по любой причине.
-// Функция не блокируется.
-func contextDone(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return true
-	default:
-	}
-	return false
-}
-
-// contextDeadlineExceeded проверяет, завершился ли контекст ctx из-за
-// истечения времени ожидания (deadline). Функция не блокируется.
-func contextDeadlineExceeded(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		if ctx.Err() == context.DeadlineExceeded {
-			return true
-		}
-	default:
-	}
-	return false
 }
