@@ -200,18 +200,19 @@ func (cm *ConsensusModule) handleAEReply(
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	// Сброс задержки повторов при любом RPC без транспортной ошибки,
-	// независимо от reply.Success.
-	if cm.cmState.state == Leader && cm.cmState.currentTerm == savedCurrentTerm {
-		cm.resetReplFailuresLocked(peerID)
-	}
+	cm.recordPeerReplyLocked(peerID, savedCurrentTerm)
 	if reply.Term > cm.cmState.currentTerm {
 		cm.traceLockedLogf(8, "term out of date in heartbeat reply")
 		cm.becomeFollowerLocked(reply.Term)
 		return
 	}
-	// Запоздавший ответ вытесненного лидерства состояние репликации не меняет.
-	if cm.cmState.state != Leader || savedCurrentTerm != reply.Term {
+	// Запоздавший ответ вытесненного лидерства состояние репликации не меняет:
+	// терм отправки сверяется и с термом ответа, и с текущим термом лидера.
+	// Без сверки с текущим термом успех прежнего лидерства применился бы к
+	// свежим картам репликации нового лидерства, не сбрасывая при этом
+	// счётчик транспортных ошибок (recordPeerReplyLocked сверяет текущий терм).
+	if cm.cmState.state != Leader || savedCurrentTerm != reply.Term ||
+		savedCurrentTerm != cm.cmState.currentTerm {
 		return
 	}
 	if !reply.Success {
@@ -367,6 +368,30 @@ func (cm *ConsensusModule) leaderSendAEs() {
 	cm.mu.Unlock()
 }
 
+// leaderSendAEsToPeerIfIdle отправляет AppendEntries одному соседу, если для
+// него не выполняется горутина репликации. Дедупликация — тот же флаг
+// inflightAE и тот же CompareAndSwap, что и в leaderSendAEs: догоняющая
+// репликация передачи лидерства не должна порождать второго отправителя
+// одному соседу (конкурирующие попытки искажают счётчик транспортных ошибок
+// и периодизацию задержки повторов).
+//
+// Эпоха верификации снимается в той же критической секции, что и захват
+// флага, — как в leaderSendAEs.
+// Самостоятельно захватывает и освобождает cm.mu.
+func (cm *ConsensusModule) leaderSendAEsToPeerIfIdle(peerID, savedCurrentTerm int) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if cm.leaderState.inflightAE[peerID] == nil {
+		return
+	}
+	dispatchEpoch := cm.leaderState.verifyEpoch
+	if cm.leaderState.inflightAE[peerID].CompareAndSwap(false, true) {
+		cm.goSpawnLocked(func() {
+			cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, dispatchEpoch)
+		})
+	}
+}
+
 // leaderSendSnapshot отправляет последний снимок отстающему follower.
 // Вызывается, когда лидер не может обслужить AppendEntries для текущего
 // nextIndex[follower] (предикат).
@@ -457,37 +482,34 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 		cm.mu.Unlock()
 		return
 	}
-	// Сброс задержка повторов при RPC без транспортной ошибки,
-	// независимо от reply.Success.
+	// Сосед, догоняемый снимком, отвечает дольше одного пульса, но остаётся
+	// живым: его ответ — такое же доказательство контакта, как ответ
+	// AppendEntries. Сброс задержки повторов и применение результата
+	// выполняются в одной критической секции: наблюдатель не может увидеть
+	// несогласованную пару «matchIndex вырос, счётчик ошибок не сброшен».
 	cm.mu.Lock()
-	if cm.cmState.state == Leader && cm.cmState.currentTerm == term {
-		cm.resetReplFailuresLocked(peerID)
-	}
-	cm.mu.Unlock()
-	if reply.Term > term {
-		// becomeFollowerLocked требует удержания cm.mu; здесь блокировка
-		// не удерживается (RPC выполнялся без блокировки).
-		cm.mu.Lock()
+	cm.recordPeerReplyLocked(peerID, term)
+	if reply.Term > cm.cmState.currentTerm {
 		cm.becomeFollowerLocked(reply.Term)
 		cm.mu.Unlock()
 		return
 	}
-	if reply.Success {
-		cm.mu.Lock()
-		// Симметрия с путём AppendEntries (raft_cm_replication.go, ветка
-		// успеха AE): запоздавший ответ из вытесненного term'а не должен
-		// менять состояние репликации нового лидера.
-		if cm.cmState.state == Leader && term == reply.Term {
-			cm.leaderState.nextIndex[peerID] = meta.Index + 1
-			cm.leaderState.matchIndex[peerID] = meta.Index
-			// matchIndex = meta.Index означает сохранённое на диске владение префиксом
-			// до meta.Index — ровно то, что гарантирует Success:true.
-			// Проверка term'а внутри setMatch работает через fallback
-			// lookupTermLocked на lastSnapshotTerm.
-			cm.leaderState.commitmentTracker.setMatch(peerID, meta.Index, cm.lookupTermLocked)
-		}
-		cm.mu.Unlock()
+	// Симметрия с путём AppendEntries (ветка успеха AE): запоздавший ответ
+	// вытесненного лидерства состояние репликации не меняет — результат
+	// применяется только в терме отправки, совпадающем с текущим.
+	// Сверка с термом ответа сохранена как защита от несогласованного ответа
+	// соседа: при Success:true протокол гарантирует reply.Term == term.
+	if reply.Success && cm.cmState.state == Leader &&
+		cm.cmState.currentTerm == term && reply.Term == term {
+		cm.leaderState.nextIndex[peerID] = meta.Index + 1
+		cm.leaderState.matchIndex[peerID] = meta.Index
+		// matchIndex = meta.Index означает сохранённое на диске владение префиксом
+		// до meta.Index — ровно то, что гарантирует Success:true.
+		// Проверка терма внутри setMatch работает через fallback
+		// lookupTermLocked на lastSnapshotTerm.
+		cm.leaderState.commitmentTracker.setMatch(peerID, meta.Index, cm.lookupTermLocked)
 	}
+	cm.mu.Unlock()
 }
 
 // failedAETrace формирует текст трассировки неудачного AppendEntries
@@ -535,6 +557,31 @@ func (cm *ConsensusModule) recordAttemptLocked(peerID int) {
 		cm.leaderState.lastAttempt = make(map[int]time.Time)
 	}
 	cm.leaderState.lastAttempt[peerID] = time.Now()
+}
+
+// recordPeerReplyLocked обрабатывает ответ соседа, полученный без
+// транспортной ошибки: сбрасывает задержку повторов и отмечает контакт.
+// Содержание ответа значения не имеет — доказательством живого соседа
+// служит сам факт ответа. Состояние меняется только для текущего
+// лидерства: term — терм, снятый до отправки RPC.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) recordPeerReplyLocked(peerID, term int) {
+	if cm.cmState.state != Leader || cm.cmState.currentTerm != term {
+		return
+	}
+	cm.resetReplFailuresLocked(peerID)
+	cm.recordContactLocked(peerID)
+}
+
+// recordContactLocked отмечает момент получения ответа RPC от соседа без
+// транспортной ошибки: такой ответ доказывает, что сосед жив, независимо
+// от содержания ответа.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) recordContactLocked(peerID int) {
+	if cm.leaderState.lastContact == nil {
+		cm.leaderState.lastContact = make(map[int]time.Time)
+	}
+	cm.leaderState.lastContact[peerID] = time.Now()
 }
 
 // incReplFailuresLocked инкрементирует число подряд идущих транспортных ошибок

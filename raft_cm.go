@@ -51,6 +51,18 @@ type ConsensusModule struct {
 	stepDown     chan struct{}
 	confChangeCh chan *configurationChangeFuture
 
+	// checkQuorumTimeout — предельный срок без ответов от кворума голосующих,
+	// после которого лидер шагает вниз, в ведомые. Значение по умолчанию —
+	// defaultCheckQuorumTimeout; поле, а не константа, чтобы тесты пакета
+	// могли задать заведомо больший или меньший срок. Читается только
+	// в цикле лидера под cm.mu.
+	checkQuorumTimeout time.Duration
+
+	// leaderLoopsAlive — число живых горутин цикла лидера на этом узле.
+	// Инвариант: значение не превышает 1. Увеличивается на входе в цикл
+	// и уменьшается при выходе, оба раза под cm.mu; читается тестами пакета.
+	leaderLoopsAlive int
+
 	// preVoteDisabled отключает механизм Pre-Vote.
 	// Если true, выборы начинаются сразу (как в классическом Raft).
 	// По умолчанию false — Pre-Vote включён.
@@ -155,6 +167,21 @@ type leaderState struct {
 	// leadershipTransferFuture — текущий future передачи лидерства.
 	// Устанавливается в handleLeadershipTransfer, отвечается в stepDown.
 	leadershipTransferFuture *leadershipTransferFuture
+
+	// lastContact — время последнего ответа RPC без транспортной ошибки
+	// по каждому соседу. Ответ соседа любого содержания (в том числе отказ
+	// AppendEntries и ответ InstallSnapshot) доказывает, что сосед жив,
+	// поэтому отметка обновляется в тех же критических секциях, где
+	// сбрасывается задержка повторов.
+	//
+	// Жизненный цикл привязан к роли лидера: карта создаётся заново
+	// в startLeaderLocked (отметка «сейчас» для соседей актуальной
+	// конфигурации), пополняется в ensureReplicationForLocked при
+	// добавлении сервера и очищается от удалённых серверов в
+	// startStopReplicationLocked. Отсутствующая отметка трактуется как
+	// «контакт только что был» — льгота, защищающая от ложного шага вниз
+	// сразу после изменения состава кластера. Все обращения — под cm.mu.
+	lastContact map[int]time.Time
 
 	// replFailures — число подряд идущих транспортных ошибок по соседу.
 	// Жизненный цикл привязан к роли лидера: создаётся в startLeaderLocked,

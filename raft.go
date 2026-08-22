@@ -25,6 +25,27 @@ const (
 	// для ускорения тестов не влияло на production-развёртывание.
 	TCPRPCTimeout = 191 * time.Millisecond
 
+	// defaultCheckQuorumTimeout — предельный срок без ответов от кворума
+	// голосующих, после которого лидер шагает вниз, в ведомые. Значение
+	// 2 × TCPRPCTimeout: отметка контакта по соседу обновляется не чаще,
+	// чем завершается один RPC (AppendEntries к одному соседу
+	// сериализованы флагом inflightAE), а дедлайн одного RPC равен
+	// TCPRPCTimeout и масштабируется объёмом передаваемых записей;
+	// двукратный запас покрывает один полный тайм-аут RPC. Итоговая
+	// величина близка к ReelectionTimeoutMs: лидер обнаруживает потерю
+	// кворума не позже, чем ведомый начинает выборы.
+	defaultCheckQuorumTimeout = 2 * TCPRPCTimeout
+
+	// maxUncommittedEntries — предел незафиксированного хвоста журнала,
+	// при котором лидер перестаёт принимать новые команды клиентов.
+	// Это не протокольная гарантия, а ограничение ущерба: лидер, потерявший
+	// кворум, не должен наращивать журнал неограниченно. Предел действует
+	// только на клиентском пути; служебные записи (noop вступления в
+	// лидерство и записи конфигурации) им не проверяются, иначе кластер
+	// с накопленным хвостом не смог бы ни избрать лидера, ни изменить
+	// состав.
+	maxUncommittedEntries = 4096
+
 	// leaderBatchSize — количество записей, которые лидер собирает из applyCh
 	// перед одним вызовом dispatchLogs. Компромисс между latency (одиночные
 	// записи) и throughput (групповой commit, Raft §5.1).
@@ -204,6 +225,8 @@ func NewConsensusModule(
 	cm.cmState.lastLogTerm = -1
 	cm.leaderState.nextIndex = make(map[int]int)
 	cm.leaderState.matchIndex = make(map[int]int)
+	cm.leaderState.lastContact = make(map[int]time.Time)
+	cm.checkQuorumTimeout = defaultCheckQuorumTimeout
 	cm.leaderState.inflightAE = make(map[int]*atomic.Bool)
 	cm.cmState.termIndexMap = make(map[int]int)
 	cm.cmState.electionTimerDone = make(chan struct{})

@@ -96,6 +96,30 @@ func (r *latencyReport) format() string {
 	)
 }
 
+// countersReport формирует строку счётчиков узла: события репликации
+// и снимков, показатели по каждому соседу, шаги лидера вниз по причинам
+// и размер незафиксированного хвоста журнала.
+// Самостоятельно захватывает и освобождает cm.mu.
+func (cm *ConsensusModule) countersReport() string {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return fmt.Sprintf(
+		"%s %s Uncommitted=%d",
+		cm.counters.report(&cm.leaderState),
+		cm.counters.stepDowns.report(),
+		cm.uncommittedLogLenLocked(),
+	)
+}
+
+// uncommittedLogLenLocked возвращает размер незафиксированного хвоста
+// журнала — число записей, добавленных в журнал, но ещё не зафиксированных.
+// Величина считается по индексам (lastLogIndex - commitIndex), а не по длине
+// среза журнала: после сжатия журнала позиция в срезе не равна индексу записи.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) uncommittedLogLenLocked() int {
+	return cm.cmState.lastLogIndex - cm.cmState.commitIndex
+}
+
 func (cm *ConsensusModule) stats(shutdownCh chan struct{}) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -112,6 +136,7 @@ func (cm *ConsensusModule) stats(shutdownCh chan struct{}) {
 			// Префикс [state,N:id,T:term] добавляет stdoutTracePrintln.
 			if traceEnabled(0) {
 				cm.stdoutTracePrintln(rep.format())
+				cm.stdoutTracePrintln(cm.countersReport())
 			}
 		}
 	}
@@ -156,11 +181,33 @@ type raftCounters struct {
 	// показывает, как часто это окно проходится.
 	snapshotIndexBehindDispatched atomic.Int64
 
+	// stepDowns — шаги лидера вниз, в ведомые, с разбивкой по причине.
+	stepDowns stepDownCounters
+
 	// sendBatchEntrySkipped — записи, пропущенные при сборке батча для
 	// машины состояний (запись выше конца журнала, позиция вне журнала,
 	// несовпадение индекса). Штатная причина — сжатие журнала: запись уже
 	// покрыта снимком.
 	sendBatchEntrySkipped atomic.Int64
+}
+
+// stepDownCounters — шаги лидера вниз, в ведомые, по причинам:
+// higherTerm — обнаружен больший терм; checkQuorum — кворум голосующих
+// не отвечал дольше checkQuorumTimeout; configExit — лидер не входит
+// в зафиксированную конфигурацию. Разбивка отвечает на вопрос
+// «шаги вниз вызваны потерей контакта или чем-то иным?», на который
+// суммарный счётчик ответить не способен. Поля — atomic.Int64,
+// инкремент без захвата cm.mu.
+type stepDownCounters struct {
+	higherTerm, checkQuorum, configExit atomic.Int64
+}
+
+// report форматирует счётчики шагов вниз в одну строку отчёта.
+func (c *stepDownCounters) report() string {
+	return fmt.Sprintf(
+		"SDterm=%d SDquorum=%d SDconfig=%d",
+		c.higherTerm.Load(), c.checkQuorum.Load(), c.configExit.Load(),
+	)
 }
 
 // incPeerCount инкрементирует счётчик по каждому соседу, лениво инициализируя

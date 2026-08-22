@@ -14,6 +14,12 @@ var (
 	ErrUnsupportedProtocol          = errors.New("raft: unsupported protocol version")
 	ErrLeadershipTransferInProgress = errors.New("raft: leadership transfer in progress")
 
+	// ErrTooManyUncommittedEntries возвращается клиенту, когда
+	// незафиксированный хвост журнала лидера достиг maxUncommittedEntries.
+	// Признак того, что фиксация не продвигается: кворум недоступен либо
+	// соседи не успевают за нагрузкой.
+	ErrTooManyUncommittedEntries = errors.New("raft: too many uncommitted log entries")
+
 	// ErrNothingNewToSnapshot возвращается, когда нет новых зафиксированных
 	// записей для создания снимка.
 	ErrNothingNewToSnapshot = errors.New("raft: nothing new to snapshot")

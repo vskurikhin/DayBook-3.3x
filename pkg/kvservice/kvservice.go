@@ -396,14 +396,6 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// ReadIndex-проверка лидерства (Raft §8) без записи в журнал.
-	if err := kvs.rs.VerifyLeader().Error(); err != nil {
-		kvs.sendHTTPResponse(w, api.PutResponse{
-			RespStatus: api.StatusNotLeader,
-		})
-		return
-	}
-
 	cmd := Command{
 		Kind:  CommandPut,
 		Key:   pr.Key,
@@ -485,14 +477,6 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 
 	if err := readRequestJSON(req, cr); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// ReadIndex-проверка лидерства (Raft §8) без записи в журнал.
-	if err := kvs.rs.VerifyLeader().Error(); err != nil {
-		kvs.sendHTTPResponse(w, api.CASResponse{
-			RespStatus: api.StatusNotLeader,
-		})
 		return
 	}
 

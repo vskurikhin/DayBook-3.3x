@@ -184,8 +184,11 @@ func TestVerifyFuture_VoteDeduplication(t *testing.T) {
 func TestVerifyLeader_EpochFilter(t *testing.T) {
 	newCM := func(epoch uint64) (*ConsensusModule, *verifyFuture) {
 		cm := &ConsensusModule{
-			id:        0,
-			transport: &mockTransportAE{},
+			id: 0,
+			// Терм ответа совпадает с термом лидера: отправка выполняется
+			// в текущем терме, иначе успешный ответ к состоянию репликации
+			// не применяется и фильтр по раунду верификации не проверялся бы.
+			transport: &mockTransportAE{replyTerm: 1},
 			commitCh:  make(chan int, 1),
 			leaderState: leaderState{
 				nextIndex:  map[int]int{1: 0},
@@ -224,7 +227,7 @@ func TestVerifyLeader_EpochFilter(t *testing.T) {
 	// Ответ AE, отправленного ДО запроса (dispatchEpoch=1 < epoch=2):
 	// голос не засчитывается.
 	cm, vf := newCM(2)
-	cm.leaderSendAEsToPeer(1, 0, 1)
+	cm.leaderSendAEsToPeer(1, 1, 1)
 	if vf.votes != 0 {
 		t.Fatalf("votes = %d, want 0 (AE dispatched before request must not vote)", vf.votes)
 	}
@@ -232,7 +235,7 @@ func TestVerifyLeader_EpochFilter(t *testing.T) {
 	// Ответ AE, отправленного ПОСЛЕ запроса (dispatchEpoch=2 == epoch=2):
 	// голос засчитывается.
 	cm, vf = newCM(2)
-	cm.leaderSendAEsToPeer(1, 0, 2)
+	cm.leaderSendAEsToPeer(1, 1, 2)
 	if vf.votes != 1 {
 		t.Fatalf("votes = %d, want 1 (AE dispatched after request must vote)", vf.votes)
 	}

@@ -87,10 +87,10 @@ start-raft: stop-raft
 	done
 	@sleep 2
 	@$(GOBIN)/loadkv \
-		-concurrency 16 \
+		-concurrency 10 \
 		-get-percent 75 \
 		-peers ":8881,:8882,:8883" \
-		-request-rate 1000 \
+		-request-rate 700 \
 		> $(OUT_LOAD_KV_FILE) 2>&1 & echo $$! > $(PID_LOADKV)
 	@sed "/^/s/^/  \>  PID4: /" $(PID_LOADKV)
 
@@ -118,7 +118,9 @@ clean-build-files:
 
 clean-data-files:
 	@echo "  >  Clean data files..."
-	@rm -rf ./data
+	@rm -f ./data/node-?/snapshots/*/*
+	@rm -f ./data/node-?/* 2>/dev/null || true
+	@rmdir ./data/node-?/snapshots/* 2>/dev/null || true
 
 clean-trace-files:
 	@echo "  >  Clean trace files..."

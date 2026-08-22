@@ -6,7 +6,7 @@
 * [Часть 1: Выборы](https://svn.su/2020/2020-02-24-implementing-raft-part-1-elections.html)
 * [Часть 2: Команды и репликация логов](https://svn.su/2020/2020-02-29-implementing-raft-part-2-commands-and-log-replication.html)
 * [Часть 3: Сохранение состояния и оптимизации](https://svn.su/2020/2020-05-05-implementing-raft-part-3-persistence-and-optimizations.html)
-* **Часть 4. База данных «ключ-значение»**
+* [Часть 4. База данных «ключ-значение»](https://svn.su/2024/2024-10-10-implementing-raft-part-4-key-value-database.html)
 * ~~Часть 5. Доставка сообщений «ровно один раз» (Exactly-Once Delivery)~~ _todo_
 
 Каждый каталог `partN` в этом репозитории содержит полный исходный код, соответствующий **части N** серии статей (за исключением части 0, которая является вводной и не содержит кода).

@@ -131,6 +131,25 @@ func (cm *ConsensusModule) compactLogs(compactIndex int) {
 // в processLogs, либо при потере лидерства в runLeaderLoop.
 func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 	cm.mu.Lock()
+
+	// Страховочный лимит незафиксированного хвоста журнала: лидер, потерявший
+	// кворум, не наращивает журнал неограниченно. Это ограничение ущерба, а не
+	// протокольная гарантия, и действует только на клиентском пути — служебные
+	// записи идут через dispatchLogsUnsafe и лимитом не проверяются.
+	if room := maxUncommittedEntries - cm.uncommittedLogLenLocked(); room < len(applyLogs) {
+		if room < 0 {
+			room = 0
+		}
+		for _, f := range applyLogs[room:] {
+			f.respond(ErrTooManyUncommittedEntries)
+		}
+		applyLogs = applyLogs[:room]
+		if len(applyLogs) == 0 {
+			cm.mu.Unlock()
+			return
+		}
+	}
+
 	cm.dispatchLogsUnsafe(applyLogs)
 
 	// Защита от nil cm.cmState.log после dispatchLogsUnsafe. В нормальном состоянии

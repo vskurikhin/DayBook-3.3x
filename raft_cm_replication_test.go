@@ -732,6 +732,63 @@ func TestLeaderSendSnapshot_SuccessNotLeader(t *testing.T) {
 	}
 }
 
+// TestLeaderSendSnapshot_StaleTermReplyDoesNotResetFailures проверяет, что
+// запоздавший успешный ответ InstallSnapshot чужого терма не применяется к
+// состоянию нового лидерства.
+//
+// Сценарий воспроизводит наблюдение стресс-прогона «matchIndex вырос, а
+// счётчик транспортных ошибок не сброшен»: узел был лидером терма 1, потерял
+// лидерство и снова стал лидером терма 3 со свежими картами репликации;
+// ответ на снимок, отправленный в терме 1, приходит после повторного
+// избрания.
+//
+//  1. Отправка выполняется в терме 1 (term=1), текущий терм узла — 3.
+//  2. Транспорт отвечает Success:true, Term:1.
+//  3. Проверить: nextIndex/matchIndex и индекс соседа в commitmentTracker не
+//     изменились, счётчик транспортных ошибок не сброшен.
+func TestLeaderSendSnapshot_StaleTermReplyDoesNotResetFailures(t *testing.T) {
+	transport := &mockTransportAE{replyTerm: 1}
+	tracker := newCommitmentTracker(0, 3, -1, make(chan int, 1))
+	cm := &ConsensusModule{
+		leaderState: leaderState{
+			nextIndex:         map[int]int{1: 0},
+			matchIndex:        map[int]int{1: -1},
+			replFailures:      map[int]int{1: 4},
+			commitmentTracker: tracker,
+		},
+		cmState: cmState{
+			state:             Leader,
+			currentTerm:       3,
+			lastSnapshotIndex: 5,
+			lastSnapshotTerm:  1,
+		},
+
+		id:        0,
+		transport: transport,
+		snapshotStore: &mockSnapshotStoreCfg{
+			listResult: []*SnapshotMeta{{ID: "snap-5", Index: 5, Term: 1, Size: 100}},
+			openMeta:   &SnapshotMeta{Index: 5, Term: 1, Size: 100},
+		},
+	}
+	tracker.setConfiguration([]int{0, 1}, cm.lookupTermLocked)
+
+	// Ответ на отправку терма 1 приходит, когда узел уже лидер терма 3.
+	cm.leaderSendSnapshot(1, 1)
+
+	if cm.leaderState.nextIndex[1] != 0 {
+		t.Errorf("nextIndex[1] = %d, want unchanged (0)", cm.leaderState.nextIndex[1])
+	}
+	if cm.leaderState.matchIndex[1] != -1 {
+		t.Errorf("matchIndex[1] = %d, want unchanged (-1)", cm.leaderState.matchIndex[1])
+	}
+	if got := tracker.matchIndex[1]; got != -1 {
+		t.Errorf("commitmentTracker.matchIndex[1] = %d, want -1 (not updated)", got)
+	}
+	if got := cm.leaderState.replFailures[1]; got != 4 {
+		t.Errorf("replFailures[1] = %d, want unchanged (4)", got)
+	}
+}
+
 // newRejectionTestCM собирает литеральный CM-лидер для тестов обработки
 // отказа AppendEntries: nextIndex[1]=10, matchIndex[1]=5, журнал с
 // записями 9..10. Транспорт — mock с настраиваемым отказом.
@@ -1246,5 +1303,35 @@ func TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState(t *testing.T) {
 				t.Fatal("inflightAE[1] = true, want false (flag must be cleared on every exit)")
 			}
 		})
+	}
+}
+
+// TestLeaderSendAEsToPeer_StaleTermSuccessDoesNotApply проверяет, что успешный
+// ответ AppendEntries, отправленный в прежнем терме, не применяется к
+// состоянию нового лидерства.
+//
+// Сценарий: узел отправил AppendEntries в терме 1, затем потерял лидерство и
+// снова стал лидером — текущий терм 3. Успешный ответ терма 1 приходит после
+// повторного избрания: и nextIndex/matchIndex, и счётчик транспортных ошибок
+// остаются нетронутыми (recordPeerReplyLocked сверяет текущий терм, ветка
+// применения обязана сверять его так же).
+func TestLeaderSendAEsToPeer_StaleTermSuccessDoesNotApply(t *testing.T) {
+	mock := &mockTransportAE{replyTerm: 1}
+	cm := newRejectionTestCM(mock)
+	cm.cmState.currentTerm = 3
+	cm.leaderState.replFailures = map[int]int{1: 4}
+
+	// Отправка выполнена в терме 1, узел уже лидер терма 3.
+	cm.leaderSendAEsToPeer(1, 1, 0)
+
+	if cm.leaderState.nextIndex[1] != 10 || cm.leaderState.matchIndex[1] != 5 {
+		t.Fatalf("успех чужого терма изменил состояние репликации: nextIndex=%d matchIndex=%d, want 10 и 5",
+			cm.leaderState.nextIndex[1], cm.leaderState.matchIndex[1])
+	}
+	if got := cm.leaderState.replFailures[1]; got != 4 {
+		t.Fatalf("replFailures[1] = %d, want unchanged (4) — ответ чужого терма не сбрасывает счётчик", got)
+	}
+	if cm.leaderState.inflightAE[1].Load() {
+		t.Fatal("inflightAE[1] = true, want false (флаг снимается на каждом выходе)")
 	}
 }

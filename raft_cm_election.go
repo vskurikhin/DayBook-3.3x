@@ -29,6 +29,9 @@ func (cm *ConsensusModule) becomeFollowerLocked(term int) {
 
 	cm.cmState.state = Follower
 	if wasLeader {
+		if term > cm.cmState.currentTerm {
+			cm.counters.stepDowns.higherTerm.Add(1)
+		}
 		// Очищаем состояние повторных попыток репликации, связанное с ролью лидера.
 		// Жизненный цикл этих полей строго привязан к роли Leader;
 		// такой сброс исключает утечки и некорректное использование при смене роли.

@@ -284,15 +284,20 @@ func (h *Harness) DisconnectPeer(id int) {
 	h.mu.Unlock()
 }
 
-// ReconnectPeer повторно подключает сервер ко всем остальным серверам кластера.
+// ReconnectPeer повторно подключает сервер к остальным живым серверам
+// кластера, логически подключённым в этот момент. Сервер, отключённый
+// отдельным вызовом DisconnectPeer, остаётся изолированным: восстановление
+// связи с ним нарушило бы учёт connected и делало бы «отключённый» узел
+// участником кворума.
 //
-// Значения alive снимаются под h.mu до работы с транспортами; мутация
-// connected — отдельной короткой секцией.
+// Значения alive и connected снимаются под h.mu до работы с транспортами;
+// мутация connected — отдельной короткой секцией.
 func (h *Harness) ReconnectPeer(id int) {
 	tlog("Reconnect %d", id)
 	alive := h.aliveSnapshot()
+	connected := h.connectedSnapshot()
 	for j := 0; j < h.n; j++ {
-		if j != id && alive[j] {
+		if j != id && alive[j] && connected[j] {
 			h.transports[id].Connect(ServerID(j), h.transports[j])
 			h.transports[j].Connect(ServerID(id), h.transports[id])
 		}
@@ -1014,6 +1019,31 @@ func (h *Harness) waitForApplyInflight(id int, want int, budget time.Duration) {
 			"  expected: server %d has >=%d inflight Apply futures (got %d)\n  %s",
 		budget, pollInterval, id, want, h.applyInflightCount(id), h.nodeStates(),
 	)
+}
+
+// lastLogIndex возвращает индекс последней записи журнала узла id.
+// Читается под cm.mu; h.mu не участвует.
+func (h *Harness) lastLogIndex(id int) int {
+	cm := h.cluster[id]
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return cm.cmState.lastLogIndex
+}
+
+// waitForLastLogIndex ждёт, пока журнал узла id не дорастёт до индекса want:
+// команда, отправленная клиентом, дошла до лидерского цикла и записана
+// в журнал. Барьер не зависит от скорости применения к машине состояний,
+// в отличие от ожидания непустой очереди inflight.
+func (h *Harness) waitForLastLogIndex(id, want int, budget time.Duration) {
+	h.t.Helper()
+	if err := waitCond(
+		"log of the node reaches the expected index",
+		budget,
+		func() bool { return h.lastLogIndex(id) >= want },
+		func() string { return "lastLogIndex = " + itoa(h.lastLogIndex(id)) },
+	); err != nil {
+		h.t.Fatalf("waitForLastLogIndex(server %d, want %d): %v\n  %s", id, want, err, h.nodeStates())
+	}
 }
 
 // CheckNotCommitted проверяет, что команда cmd ещё не зафиксирована.

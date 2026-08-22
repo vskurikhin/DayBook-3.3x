@@ -1598,6 +1598,15 @@ func TestReplicationBackoff_BoundsAttemptsToUnavailablePeer(t *testing.T) {
 // задержки (1000 мс) проверяется детерминированно в
 // TestReplicationBackoffDelay_Clamp; здесь дедлайн 3 с — запас на
 // contention полного набора тестов (in-memory harness, один процесс).
+//
+// Обнуление счётчика проверяется как ограниченное во времени условие:
+// между ростом matchIndex и опросом проходят интервал опроса, задержки
+// планировщика под -race и легитимные новые транспортные ошибки, поэтому
+// на возврат счётчика к нулю отводится окно 1500 мс = потолок задержки
+// повторов (1000 мс) + таймаут inmem-транспорта (500 мс). Сверх окна —
+// отказ: органический рост счётчика с нуля до наблюдаемых значений
+// занимает больше этого окна, то есть невозврат означает дефект, а не
+// переходное состояние.
 func TestReplicationBackoff_RecoveryAfterReconnect(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
@@ -1651,19 +1660,39 @@ func TestReplicationBackoff_RecoveryAfterReconnect(t *testing.T) {
 	// Ждём первого успешного RPC (matchIndex на лидере растёт выше
 	// значения, зафиксированного до отключения).
 	deadline := start.Add(3000 * time.Millisecond)
+	// growthSeenAt — момент первого наблюдения роста matchIndex; от него
+	// отсчитывается окно возврата счётчика транспортных ошибок к нулю.
+	var growthSeenAt time.Time
+	const resetGrace = 1500 * time.Millisecond
 	for {
 		cm := h.cluster[leaderID]
 		cm.mu.Lock()
 		mi := cm.leaderState.matchIndex[followerID]
 		rf := cm.leaderState.replFailures[followerID]
+		ni := cm.leaderState.nextIndex[followerID]
+		term := cm.cmState.currentTerm
+		state := cm.cmState.state
 		cm.mu.Unlock()
 		if mi > matchBefore {
-			if rf != 0 {
-				t.Fatalf("replFailures = %d after first success, want 0", rf)
+			if rf == 0 {
+				return
 			}
-			return
+			if growthSeenAt.IsZero() {
+				growthSeenAt = time.Now()
+			}
+			// Окно возврата: потолок задержки повторов (1000 мс) +
+			// таймаут inmem-транспорта (500 мс).
+			if elapsed := time.Since(growthSeenAt); elapsed > resetGrace {
+				t.Fatalf(
+					"replFailures = %d still non-zero %v after matchIndex growth "+
+						"(matchIndex=%d, nextIndex=%d, term=%d, state=%v), want reset within %v",
+					rf, elapsed.Round(time.Millisecond), mi, ni, term, state, resetGrace,
+				)
+			}
 		}
-		if time.Now().After(deadline) {
+		// Дедлайн относится к росту matchIndex: после его наблюдения окно
+		// ожидания задаётся resetGrace (худший суммарный бюджет — 4,5 с).
+		if growthSeenAt.IsZero() && time.Now().After(deadline) {
 			t.Fatal("first successful RPC delayed beyond backoff ceiling + load margin")
 		}
 		// poll-интервал condition-wait (не фиксированная пауза).
