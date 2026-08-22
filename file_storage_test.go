@@ -354,3 +354,191 @@ func mustGet(t *testing.T, fs *FileStorage, key string) []byte {
 	}
 	return data
 }
+
+// TestFileStorage_SetSkipsUnchangedValue проверяет, что повторная запись того
+// же значения не выполняет ввода-вывода, а смена значения — выполняет.
+func TestFileStorage_SetSkipsUnchangedValue(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	fs := NewFileStorage(t.TempDir())
+	value := gobEncode(t, 42)
+	for i := 0; i < 10; i++ {
+		fs.Set("currentTerm", value)
+	}
+	if got := fs.writeCount(); got != 1 {
+		t.Fatalf("writeCount = %d after 10 identical Set, want 1", got)
+	}
+
+	fs2 := NewFileStorage(t.TempDir())
+	v1 := gobEncode(t, 1)
+	v2 := gobEncode(t, 2)
+	for _, value := range [][]byte{v1, v1, v2, v2, v1} {
+		fs2.Set("currentTerm", value)
+	}
+	if got := fs2.writeCount(); got != 3 {
+		t.Fatalf("writeCount = %d for sequence v1,v1,v2,v2,v1, want 3", got)
+	}
+}
+
+// TestFileStorage_SetWritesChangedValue проверяет, что изменение каждого из
+// пяти ключей по отдельности выполняет запись именно этого ключа и что после
+// открытия каталога новым экземпляром значения прочитаны верно.
+func TestFileStorage_SetWritesChangedValue(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	dir := t.TempDir()
+	fs := NewFileStorage(dir)
+
+	initial := map[string][]byte{
+		"currentTerm":       gobEncode(t, 1),
+		"votedFor":          gobEncode(t, -1),
+		"lastSnapshotIndex": gobEncode(t, 0),
+		"lastSnapshotTerm":  gobEncode(t, 0),
+		"log":               gobEncode(t, []LogEntry{{Index: 0, Term: 1}}),
+	}
+	keys := []string{"currentTerm", "votedFor", "lastSnapshotIndex", "lastSnapshotTerm", "log"}
+	for _, key := range keys {
+		fs.Set(key, initial[key])
+	}
+	if got := fs.writeCount(); got != len(keys) {
+		t.Fatalf("writeCount = %d after initial fill, want %d", got, len(keys))
+	}
+
+	changed := map[string][]byte{
+		"currentTerm":       gobEncode(t, 7),
+		"votedFor":          gobEncode(t, 2),
+		"lastSnapshotIndex": gobEncode(t, 5),
+		"lastSnapshotTerm":  gobEncode(t, 3),
+		"log":               gobEncode(t, []LogEntry{{Index: 6, Term: 3}}),
+	}
+	expected := make(map[string][]byte, len(keys))
+	for key, value := range initial {
+		expected[key] = value
+	}
+
+	for i, key := range keys {
+		before := fs.writeCount()
+		fs.Set(key, changed[key])
+		if got := fs.writeCount() - before; got != 1 {
+			t.Fatalf("key %q: %d writes on change, want 1", key, got)
+		}
+		expected[key] = changed[key]
+
+		// Остальные ключи на диске не тронуты: их значения соответствуют
+		// последнему записанному состоянию.
+		restarted := NewFileStorage(dir)
+		for _, other := range keys {
+			if !bytes.Equal(mustGet(t, restarted, other), expected[other]) {
+				t.Fatalf("after change %d of key %q: key %q on disk differs from expected", i, key, other)
+			}
+		}
+
+		// Повторная запись того же значения ввода-вывода не выполняет.
+		before = fs.writeCount()
+		fs.Set(key, changed[key])
+		if got := fs.writeCount() - before; got != 0 {
+			t.Fatalf("key %q: %d writes on repeated identical Set, want 0", key, got)
+		}
+	}
+}
+
+// TestFileStorage_CloneOnSet проверяет, что кэш хранит собственную копию
+// значения: мутация буфера вызывающего после Set не влияет ни на диск, ни на
+// решение о пропуске следующей записи.
+func TestFileStorage_CloneOnSet(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	dir := t.TempDir()
+	fs := NewFileStorage(dir)
+
+	original := []byte{1, 2, 3}
+	fs.Set("log", original)
+	if got := fs.writeCount(); got != 1 {
+		t.Fatalf("writeCount = %d after first Set, want 1", got)
+	}
+
+	// Вызывающий мутирует свой буфер на месте.
+	original[0] = 9
+	mutated := []byte{9, 2, 3}
+
+	if got := mustGet(t, NewFileStorage(dir), "log"); !bytes.Equal(got, []byte{1, 2, 3}) {
+		t.Fatalf("disk value = %v after caller mutation, want [1 2 3]", got)
+	}
+
+	// Значение, совпадающее с мутированным буфером, отличается от лежащего на
+	// диске, поэтому запись обязана быть выполнена.
+	fs.Set("log", mutated)
+	if got := fs.writeCount(); got != 2 {
+		t.Fatalf("writeCount = %d after Set of mutated value, want 2 (cache aliased caller buffer)", got)
+	}
+	if got := mustGet(t, NewFileStorage(dir), "log"); !bytes.Equal(got, mutated) {
+		t.Fatalf("disk value = %v, want %v", got, mutated)
+	}
+}
+
+// TestFileStorage_CloneOnGet проверяет, что Get возвращает защитную копию:
+// мутация полученного среза не портит ни кэш, ни диск.
+func TestFileStorage_CloneOnGet(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	dir := t.TempDir()
+	fs := NewFileStorage(dir)
+
+	original := []byte{1, 2, 3}
+	fs.Set("log", original)
+
+	got, ok := fs.Get("log")
+	if !ok {
+		t.Fatal("key log not found")
+	}
+	got[0] = 9
+
+	if again := mustGet(t, fs, "log"); !bytes.Equal(again, []byte{1, 2, 3}) {
+		t.Fatalf("cached value = %v after reader mutation, want [1 2 3]", again)
+	}
+	if onDisk := mustGet(t, NewFileStorage(dir), "log"); !bytes.Equal(onDisk, []byte{1, 2, 3}) {
+		t.Fatalf("disk value = %v after reader mutation, want [1 2 3]", onDisk)
+	}
+
+	before := fs.writeCount()
+	fs.Set("log", []byte{9, 2, 3})
+	if got := fs.writeCount() - before; got != 1 {
+		t.Fatalf("%d writes for value differing from cached, want 1 (cache spoiled by reader)", got)
+	}
+}
+
+// TestFileStorage_HasDataAfterSkippedSet проверяет, что пропуск записи не
+// меняет семантику HasData.
+func TestFileStorage_HasDataAfterSkippedSet(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	dir := t.TempDir()
+	fs := NewFileStorage(dir)
+	value := gobEncode(t, 3)
+
+	fs.Set("currentTerm", value)
+	if !fs.HasData() {
+		t.Fatal("HasData() = false after first Set, want true")
+	}
+	fs.Set("currentTerm", value)
+	if got := fs.writeCount(); got != 1 {
+		t.Fatalf("writeCount = %d after repeated identical Set, want 1", got)
+	}
+	if !fs.HasData() {
+		t.Fatal("HasData() = false after skipped Set, want true")
+	}
+
+	// Значение поднято с диска новым экземпляром: пропуск записи должен
+	// сохранить HasData, выставленный загрузкой каталога.
+	restarted := NewFileStorage(dir)
+	if !restarted.HasData() {
+		t.Fatal("HasData() = false after load from disk, want true")
+	}
+	restarted.Set("currentTerm", value)
+	if got := restarted.writeCount(); got != 0 {
+		t.Fatalf("writeCount = %d after Set of value already on disk, want 0", got)
+	}
+	if !restarted.HasData() {
+		t.Fatal("HasData() = false after skipped Set on restarted storage, want true")
+	}
+}

@@ -61,6 +61,17 @@ func (cm *ConsensusModule) respondRPC(rpc RPC, reply any, err error) {
 	}
 }
 
+// AppendEntries обрабатывает входящий запрос лидера на добавление записей
+// журнала (§5.3).
+//
+// Граница долговечности: ответ Success: true отправляется только после того,
+// как принятые записи журнала стали долговечными. Лидер по такому ответу
+// продвигает matchIndex ведомого и вправе зафиксировать запись, поэтому
+// потеря записей при крэше ведомого нарушила бы безопасность машины
+// состояний. Ответ формируется здесь, а отправляется вызывающим уже после
+// возврата из обработчика, поэтому сохранение состояния выполняется до
+// возврата и покрывает все ветки, изменившие постоянное состояние.
+//
 //nolint:funlen,gocognit,gocritic
 func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) error {
 	startTimeNow := time.Now()
@@ -202,6 +213,12 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 			}
 		}
 	}
+
+	// Сохранение состояния до возврата закрывает случай, когда лидер шлёт
+	// записи, не продвигая LeaderCommit: ветка продвижения индекса фиксации
+	// сохраняет состояние сама, а ветка добавления записей — нет. Повторное
+	// сохранение неизменившегося состояния записей на диск не выполняет.
+	cm.persistToStorage()
 
 	reply.RPCHeader = RPCHeader{
 		ProtocolVersion: ProtocolVersion,

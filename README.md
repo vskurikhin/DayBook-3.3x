@@ -104,8 +104,8 @@ raft/
 │  │ (Serve)  │  │ обновления │  │ Raft     │  │           │  │
 │  └──────────┘  └────────────┘  └──────────┘  └───────────┘  │
 └─────────────────────────────────────────────────────────────┘
-                           │
-                           ▼
+                               │
+                               ▼
  ┌──────────────────────────────────────────────────────────┐
  │                    Server (server.go)                    │
  │                                                          │
@@ -115,8 +115,8 @@ raft/
  │  │ (net/rpc)│  │          │  │                        │  │
  │  └──────────┘  └──────────┘  └────────────────────────┘  │
  └──────────────────────────────────────────────────────────┘
-                           │
-                           ▼
+                              │
+                              ▼
 ┌────────────────────────────────────────────────────────────┐
 │            ConsensusModule (raft_cm_*.go)                  │
 │                                                            │
@@ -160,6 +160,4 @@ startElection()│     │                      │
 
 ---
 
-## Вывод
-
-Проект — **полноценная реализация Raft + реплицированный KV сервис**. Корневой пакет `github.com/vskurikhin/raft` (без изменений от v0.0.3) предоставляет: leader election, log replication, commitment, persistence, crash/recovery. `pkg/kvservice/` (новый в Part 5) добавляет: REST API, Go-клиент, реплицированное DataStore, exactly-once семантику через `(ClientID, RequestID)` dedup в `runUpdater()`. 62 теста, 24 .go файла, 5351 строка.
+Проект — **полноценная реализация Raft + реплицированный KV сервис**. Корневой пакет `github.com/vskurikhin/raft` (без изменений от v1.0.2) предоставляет: leader election, log replication, commitment, persistence, crash/recovery. `pkg/kvservice/` (новый в Part 5) добавляет: REST API, Go-клиент, реплицированное DataStore, exactly-once семантику через `(ClientID, RequestID)` dedup в `runUpdater()`. 62 теста, 24 .go файла, 5351 строка.

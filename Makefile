@@ -86,8 +86,11 @@ start-raft: stop-raft
 		sed "/^/s/^/  \>  PID$$n: /" $(call pid_file,$$n); \
 	done
 	@sleep 2
-	@$(GOBIN)/loadkv -get-percent 75 \
-		-peers ":8881,:8882,:8883" -request-rate 1000 \
+	@$(GOBIN)/loadkv \
+		-concurrency 16 \
+		-get-percent 75 \
+		-peers ":8881,:8882,:8883" \
+		-request-rate 1000 \
 		> $(OUT_LOAD_KV_FILE) 2>&1 & echo $$! > $(PID_LOADKV)
 	@sed "/^/s/^/  \>  PID4: /" $(PID_LOADKV)
 

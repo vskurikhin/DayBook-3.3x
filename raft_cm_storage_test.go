@@ -428,9 +428,52 @@ func (r *recordingStorage) keysSnapshot() []string {
 	return append([]string{}, r.keys...)
 }
 
-// TestPersistToStorage_LogWrittenLast проверяет порядок записи ключей
-// снимок-ключи записываются ДО усечённого лога, чтобы крэш
-// между записями не оставлял «лог усечён, а lastSnapshotIndex старый».
+// persistKeys — ключи, которые вправе записывать persistToStorage.
+var persistKeys = []string{"currentTerm", "votedFor", "lastSnapshotIndex", "lastSnapshotTerm", "log"}
+
+// assertPersistKeyOrder проверяет инвариант крэш-безопасности по наблюдённой
+// последовательности записанных ключей: снимок-ключи предшествуют журналу,
+// журнал записан последним, каждый ключ известен и записан не более раза.
+//
+// Число записанных ключей инвариантом не является: слой хранения вправе
+// пропустить запись значения, которое уже лежит на диске, поэтому любой ключ
+// может отсутствовать в последовательности — его значение уже долговечно.
+func assertPersistKeyOrder(t *testing.T, keys []string) {
+	t.Helper()
+
+	known := make(map[string]bool, len(persistKeys))
+	for _, key := range persistKeys {
+		known[key] = true
+	}
+
+	position := make(map[string]int, len(keys))
+	for i, key := range keys {
+		if !known[key] {
+			t.Fatalf("persist wrote unknown key %q (keys = %v)", key, keys)
+		}
+		if _, repeated := position[key]; repeated {
+			t.Fatalf("persist wrote key %q more than once (keys = %v)", key, keys)
+		}
+		position[key] = i
+	}
+
+	logPos, logWritten := position["log"]
+	if !logWritten {
+		return
+	}
+	if logPos != len(keys)-1 {
+		t.Fatalf("persist key order = %v: log must be written last", keys)
+	}
+	for _, key := range []string{"lastSnapshotIndex", "lastSnapshotTerm"} {
+		if pos, written := position[key]; written && pos > logPos {
+			t.Fatalf("persist key order = %v: %s must be written before log", keys, key)
+		}
+	}
+}
+
+// TestPersistToStorage_LogWrittenLast проверяет относительный порядок записи:
+// снимок-ключи записываются ДО усечённого журнала, чтобы крэш между записями
+// не оставлял «журнал усечён, а lastSnapshotIndex старый».
 func TestPersistToStorage_LogWrittenLast(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
@@ -442,14 +485,82 @@ func TestPersistToStorage_LogWrittenLast(t *testing.T) {
 	cm.persistToStorage()
 
 	keys := rec.keysSnapshot()
-	want := []string{"currentTerm", "votedFor", "lastSnapshotIndex", "lastSnapshotTerm", "log"}
-	if len(keys) != len(want) {
-		t.Fatalf("persist wrote %d keys (%v), want %d", len(keys), keys, len(want))
+	if len(keys) == 0 {
+		t.Fatal("persist wrote no keys")
 	}
-	for i := range want {
-		if keys[i] != want[i] {
-			t.Fatalf("persist key order = %v, want %v (log must be last)", keys, want)
-		}
+	assertPersistKeyOrder(t, keys)
+}
+
+// skippingStorage — хранилище, пропускающее запись части ключей: имитирует
+// слой, который не переписывает значения, уже лежащие на диске.
+type skippingStorage struct {
+	Storage
+	allowed map[string]bool
+}
+
+func (s *skippingStorage) Set(key string, value []byte) {
+	if !s.allowed[key] {
+		return
+	}
+	s.Storage.Set(key, value)
+}
+
+// TestPersistToStorage_KeyOrderWithSkippedWrites проверяет, что пропуск записи
+// неизменившихся ключей инвариант порядка не нарушает: наблюдаются только
+// currentTerm и журнал.
+func TestPersistToStorage_KeyOrderWithSkippedWrites(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	rec := &recordingStorage{Storage: NewMapStorage()}
+	skipping := &skippingStorage{
+		Storage: rec,
+		allowed: map[string]bool{"currentTerm": true, "log": true},
+	}
+	cm := &ConsensusModule{storage: skipping}
+	cm.cmState.log = []LogEntry{{Index: 5, Term: 1}}
+	cm.cmState.logNeedsPersist = true
+
+	cm.persistToStorage()
+
+	keys := rec.keysSnapshot()
+	if len(keys) != 2 || keys[0] != "currentTerm" || keys[1] != "log" {
+		t.Fatalf("observed keys = %v, want [currentTerm log]", keys)
+	}
+	assertPersistKeyOrder(t, keys)
+}
+
+// TestPersistToStorage_NoWritesWhenUnchanged проверяет, что сохранение
+// неизменившегося состояния не выполняет записей на диск, а изменение журнала
+// выполняет ровно одну запись.
+func TestPersistToStorage_NoWritesWhenUnchanged(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	storage := NewFileStorage(t.TempDir())
+	cm := &ConsensusModule{storage: storage}
+	cm.cmState.currentTerm = 1
+	cm.cmState.votedFor = -1
+	cm.cmState.lastSnapshotIndex = -1
+	cm.cmState.lastSnapshotTerm = -1
+	cm.cmState.log = []LogEntry{{Index: 0, Term: 1}}
+	cm.cmState.logNeedsPersist = true
+
+	cm.persistToStorage()
+	if got := storage.writeCount(); got != 5 {
+		t.Fatalf("writeCount = %d after first persist, want 5", got)
+	}
+
+	before := storage.writeCount()
+	cm.persistToStorage()
+	if got := storage.writeCount() - before; got != 0 {
+		t.Fatalf("%d writes for unchanged state, want 0", got)
+	}
+
+	cm.cmState.log = append(cm.cmState.log, LogEntry{Index: 1, Term: 1})
+	cm.cmState.logNeedsPersist = true
+	before = storage.writeCount()
+	cm.persistToStorage()
+	if got := storage.writeCount() - before; got != 1 {
+		t.Fatalf("%d writes for changed log, want 1", got)
 	}
 }
 
