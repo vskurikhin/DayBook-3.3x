@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 const (
@@ -15,21 +16,39 @@ const (
 )
 
 type Values struct {
-	GetPercent    int
-	KeyCount      int
-	Peers         []net.Addr
-	RequestRate   int
+	// Concurrency — предельное число одновременно выполняющихся запросов.
+	Concurrency int
+	// Duration — длительность прогона; ноль означает работу до сигнала.
+	Duration   time.Duration
+	GetPercent int
+	KeyCount   int
+	Peers      []net.Addr
+	// RequestRate — число тиков в секунду, задающих моменты старта запросов.
+	RequestRate int
+	// ValueSize — размер значения в байтах для операций записи.
+	ValueSize     int
 	VerifyPercent int
 }
 
 func ParseFlags() Values {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
+	concurrencyFlag := fs.Int("concurrency", 4, "Maximum number of requests in flight")
+	durationFlag := fs.Duration("duration", 0, "Load run duration (0 = until signal)")
 	getPercentFlag := fs.Int("get-percent", 66, "")
 	keyCountFlag := fs.Int("key-count", 2000, "")
 	requestRateFlag := fs.Int("request-rate", 100, "")
 	peersFlag := fs.String("peers", "", "Comma-separated list of peers servers (host:port)")
+	valueSizeFlag := fs.Int("value-size", 128, "Value size in bytes")
 	verifyPercentFlag := fs.Int("verify-percent", 33, "")
-	err := fs.Parse(os.Args[1:])
+
+	args := make([]string, 0, len(os.Args)-1)
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-test.") {
+			continue
+		}
+		args = append(args, arg)
+	}
+	err := fs.Parse(args)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,10 +59,13 @@ func ParseFlags() Values {
 	}
 
 	return Values{
+		Concurrency:   *concurrencyFlag,
+		Duration:      *durationFlag,
 		GetPercent:    *getPercentFlag,
 		KeyCount:      *keyCountFlag,
 		RequestRate:   *requestRateFlag,
 		Peers:         peers,
+		ValueSize:     *valueSizeFlag,
 		VerifyPercent: *verifyPercentFlag,
 	}
 }

@@ -1,172 +1,106 @@
 package config
 
-/*
 import (
-	"net"
 	"os"
 	"testing"
+	"time"
 )
 
-func TestParsePeerAddress(t *testing.T) {
-	// with rpc:// prefix
-	addr := parsePeerAddress("rpc://127.0.0.1:9990")
-	if addr.Network() != "tcp" {
-		t.Errorf("parsePeerAddress('rpc://...') network = %s, want tcp", addr.Network())
-	}
-	if addr.String() != "127.0.0.1:9990" {
-		t.Errorf("parsePeerAddress('rpc://...') addr = %s, want 127.0.0.1:9990", addr.String())
-	}
-
-	// without prefix (backward compatibility)
-	addr2 := parsePeerAddress("127.0.0.1:9991")
-	if addr2.Network() != "tcp" {
-		t.Errorf("parsePeerAddress('host:port') network = %s, want tcp", addr2.Network())
-	}
-	if addr2.String() != "127.0.0.1:9991" {
-		t.Errorf("parsePeerAddress('host:port') addr = %s, want 127.0.0.1:9991", addr2.String())
-	}
-}
-
-func TestAddrAppendWithPrefix(t *testing.T) {
-	peers := make(map[int]net.Addr)
-	peers = addrAppend(peers, 0, "rpc://127.0.0.1:9990")
-	if len(peers) != 1 {
-		t.Fatalf("len = %d, want 1", len(peers))
-	}
-	if peers[0].String() != "127.0.0.1:9990" {
-		t.Errorf("peers[0] = %s, want 127.0.0.1:9990", peers[0].String())
-	}
-}
-
-func TestAddrAppendWithoutPrefix(t *testing.T) {
-	peers := make(map[int]net.Addr)
-	peers = addrAppend(peers, 1, "127.0.0.1:9991")
-	if len(peers) != 1 {
-		t.Fatalf("len = %d, want 1", len(peers))
-	}
-	if peers[1].String() != "127.0.0.1:9991" {
-		t.Errorf("peers[1] = %s, want 127.0.0.1:9991", peers[1].String())
-	}
-}
-
-func TestAddrAppendTrimmed(t *testing.T) {
-	peers := make(map[int]net.Addr)
-	peers = addrAppend(peers, 0, "  rpc://127.0.0.1:9990  ")
-	if len(peers) != 1 {
-		t.Fatalf("len = %d, want 1", len(peers))
-	}
-	if peers[0].String() != "127.0.0.1:9990" {
-		t.Errorf("peers[0] = %s, want 127.0.0.1:9990", peers[0].String())
-	}
-}
-
-func TestParsePeers(t *testing.T) {
-	peers := make(map[int]net.Addr)
-	peers = parsePeers(peers, "0=127.0.0.1:9990,1=127.0.0.1:9991")
-	if len(peers) != 2 {
-		t.Fatalf("len = %d, want 2", len(peers))
-	}
-	if peers[0].String() != "127.0.0.1:9990" {
-		t.Errorf("peers[0] = %s, want 127.0.0.1:9990", peers[0].String())
-	}
-	if peers[1].String() != "127.0.0.1:9991" {
-		t.Errorf("peers[1] = %s, want 127.0.0.1:9991", peers[1].String())
-	}
-}
-
-func TestParsePeersSingle(t *testing.T) {
-	peers := make(map[int]net.Addr)
-	peers = parsePeers(peers, "0=127.0.0.1:9990")
-	if len(peers) != 1 {
-		t.Fatalf("len = %d, want 1", len(peers))
-	}
-	if peers[0].String() != "127.0.0.1:9990" {
-		t.Errorf("peers[0] = %s, want 127.0.0.1:9990", peers[0].String())
-	}
-}
-
-func TestParseFlags(t *testing.T) {
+// withArgs подменяет аргументы командной строки на время теста.
+func withArgs(t *testing.T, args ...string) {
+	t.Helper()
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
-
-	os.Args = []string{"raft", "-rpc-addr", ":9999", "-number", "0", "-peers", "1=127.0.0.1:9991"}
-
-	v := ParseFlags()
-	if v.RequestRate != 0 {
-		t.Errorf("RequestRate = %d, want 0", v.RequestRate)
-	}
-	if v.RPCAddress.String() != ":9999" &&
-		v.RPCAddress.String() != "0.0.0.0:9999" &&
-		v.RPCAddress.String() != "[::]:9999" {
-		t.Errorf("Address = %s, want :9999, 0.0.0.0:9999, or [::]:9999", v.RPCAddress.String())
-	}
-	if len(v.Peers) != 1 {
-		t.Errorf("len(Peers) = %d, want 1", len(v.Peers))
-	}
-	if v.Peers[1].String() != "127.0.0.1:9991" {
-		t.Errorf("Peers[1] = %s, want 127.0.0.1:9991", v.Peers[1].String())
-	}
+	os.Args = append([]string{"loadkv"}, args...)
 }
 
-func TestParseFlagsNoPeers(t *testing.T) {
-	origArgs := os.Args
-	t.Cleanup(func() { os.Args = origArgs })
-
-	os.Args = []string{"raft", "-rpc-addr", ":9990", "-number", "1"}
+// TestParseFlagsDefaults проверяет значения по умолчанию, в том числе для
+// флагов конкурентности, длительности и размера значения.
+func TestParseFlagsDefaults(t *testing.T) {
+	withArgs(t)
 
 	v := ParseFlags()
-	if v.RequestRate != 1 {
-		t.Errorf("RequestRate = %d, want 1", v.RequestRate)
+
+	if v.Concurrency != 4 {
+		t.Errorf("Concurrency = %d, want 4", v.Concurrency)
 	}
-	if v.RPCAddress.String() != ":9990" &&
-		v.RPCAddress.String() != "0.0.0.0:9990" &&
-		v.RPCAddress.String() != "[::]:9990" {
-		t.Errorf("Address = %s, want :9990, 0.0.0.0:9990, or [::]:9990", v.RPCAddress.String())
+	if v.Duration != 0 {
+		t.Errorf("Duration = %v, want 0", v.Duration)
+	}
+	if v.ValueSize != 128 {
+		t.Errorf("ValueSize = %d, want 128", v.ValueSize)
+	}
+	if v.GetPercent != 66 {
+		t.Errorf("GetPercent = %d, want 66", v.GetPercent)
+	}
+	if v.KeyCount != 2000 {
+		t.Errorf("KeyCount = %d, want 2000", v.KeyCount)
+	}
+	if v.RequestRate != 100 {
+		t.Errorf("RequestRate = %d, want 100", v.RequestRate)
+	}
+	if v.VerifyPercent != 33 {
+		t.Errorf("VerifyPercent = %d, want 33", v.VerifyPercent)
 	}
 	if len(v.Peers) != 0 {
 		t.Errorf("len(Peers) = %d, want 0", len(v.Peers))
 	}
 }
 
-func TestParseFlagsDefaultAddr(t *testing.T) {
-	origArgs := os.Args
-	t.Cleanup(func() { os.Args = origArgs })
-
-	os.Args = []string{"raft", "-number", "2"}
+// TestParseFlagsExplicit проверяет разбор явно заданных значений всех флагов.
+func TestParseFlagsExplicit(t *testing.T) {
+	withArgs(t,
+		"-concurrency", "64",
+		"-duration", "5m",
+		"-get-percent", "75",
+		"-key-count", "10",
+		"-request-rate", "100000",
+		"-peers", ":8881,:8882",
+		"-value-size", "1024",
+		"-verify-percent", "10",
+	)
 
 	v := ParseFlags()
-	if v.RequestRate != 2 {
-		t.Errorf("RequestRate = %d, want 2", v.RequestRate)
+
+	if v.Concurrency != 64 {
+		t.Errorf("Concurrency = %d, want 64", v.Concurrency)
 	}
-	if v.RPCAddress.String() != ":9990" &&
-		v.RPCAddress.String() != "0.0.0.0:9990" &&
-		v.RPCAddress.String() != "[::]:9990" {
-		t.Errorf("Address = %s, want :9990", v.RPCAddress.String())
+	if v.Duration != 5*time.Minute {
+		t.Errorf("Duration = %v, want 5m", v.Duration)
+	}
+	if v.GetPercent != 75 {
+		t.Errorf("GetPercent = %d, want 75", v.GetPercent)
+	}
+	if v.KeyCount != 10 {
+		t.Errorf("KeyCount = %d, want 10", v.KeyCount)
+	}
+	if v.RequestRate != 100000 {
+		t.Errorf("RequestRate = %d, want 100000", v.RequestRate)
+	}
+	if v.ValueSize != 1024 {
+		t.Errorf("ValueSize = %d, want 1024", v.ValueSize)
+	}
+	if v.VerifyPercent != 10 {
+		t.Errorf("VerifyPercent = %d, want 10", v.VerifyPercent)
+	}
+	if len(v.Peers) != 2 {
+		t.Fatalf("len(Peers) = %d, want 2", len(v.Peers))
 	}
 }
 
-func TestValuesImplements(t *testing.T) {
-	v := Values{
-		RPCAddress:  mustParseAddr("127.0.0.1:9990"),
-		RequestRate: 0,
-		Peers:       map[int]net.Addr{1: mustParseAddr("127.0.0.1:9991")},
-	}
-	if v.RequestRate != 0 {
-		t.Errorf("RequestRate = %d, want 0", v.RequestRate)
-	}
-	if v.RPCAddress.String() != "127.0.0.1:9990" {
-		t.Errorf("Address = %s, want 127.0.0.1:9990", v.RPCAddress.String())
-	}
-	if len(v.Peers) != 1 {
-		t.Errorf("len(Peers) = %d, want 1", len(v.Peers))
-	}
-}
+// TestParseFlagsPeersWithScheme проверяет разбор адресов со схемой и без неё.
+func TestParseFlagsPeersWithScheme(t *testing.T) {
+	withArgs(t, "-peers", "http://127.0.0.1:8881, 127.0.0.1:8882")
 
-func mustParseAddr(s string) net.Addr {
-	addr, err := net.ResolveTCPAddr("tcp", s)
-	if err != nil {
-		panic(err)
+	v := ParseFlags()
+
+	if len(v.Peers) != 2 {
+		t.Fatalf("len(Peers) = %d, want 2", len(v.Peers))
 	}
-	return addr
+	if v.Peers[0].String() != "127.0.0.1:8881" {
+		t.Errorf("Peers[0] = %s, want 127.0.0.1:8881", v.Peers[0].String())
+	}
+	if v.Peers[1].String() != "127.0.0.1:8882" {
+		t.Errorf("Peers[1] = %s, want 127.0.0.1:8882", v.Peers[1].String())
+	}
 }
-*/

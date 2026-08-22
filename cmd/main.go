@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"maps"
+	"net/http"
+	"net/http/pprof"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sync"
 	"time"
@@ -19,6 +24,12 @@ const (
 	DurationModulus = 30 * 1000
 	MinimalDuration = 500
 	Try             = 4096
+
+	// pprofReadHeaderTimeout — предельное время чтения заголовков запроса
+	// сервером профилирования.
+	pprofReadHeaderTimeout = 5 * time.Second
+	// pprofShutdownTimeout — предельное время остановки сервера профилирования.
+	pprofShutdownTimeout = 5 * time.Second
 )
 
 func main() {
@@ -45,6 +56,7 @@ var wg sync.WaitGroup
 // (CM.Stop → HTTP shutdown). Позволяет тестам управлять полным
 // жизненный цикл узла без глобальных экземпляров запуска.
 func runWith(values *config.Values) (func(), error) {
+	stopPprof := startPprof(values)
 	nums := slices.Collect(maps.Keys(values.Peers))
 	ready := make(chan any)
 
@@ -58,6 +70,7 @@ func runWith(values *config.Values) (func(), error) {
 	// запас на случай повреждения последнего снимка.
 	snapshotStore, err := raft.NewFileSnapshotStore(dataDir, 2)
 	if err != nil {
+		stopPprof()
 		return nil, fmt.Errorf("failed to create file snapshot store in %s: %w", dataDir, err)
 	}
 
@@ -85,6 +98,7 @@ func runWith(values *config.Values) (func(), error) {
 		if shutdownErr := kvs.Shutdown(); shutdownErr != nil {
 			log.Printf("warning: shutting down node %d: %v", values.Number, shutdownErr)
 		}
+		stopPprof()
 		return nil, fmt.Errorf("failed to serve HTTP on %s: %w", values.HTTPAddress, err)
 	}
 
@@ -93,7 +107,56 @@ func runWith(values *config.Values) (func(), error) {
 		if err := kvs.Shutdown(); err != nil {
 			log.Printf("warning: shutting down node %d: %v", values.Number, err)
 		}
+		stopPprof()
 	}, nil
+}
+
+// startPprof поднимает отдельный HTTP-сервер профилирования и включает сбор
+// профилей блокировок и состязаний за мьютекс, если заданы соответствующие
+// параметры. При пустом адресе не создаётся ни слушающего сокета, ни
+// накладных расходов среды выполнения. Возвращает функцию остановки.
+func startPprof(values *config.Values) func() {
+	if values.PprofAddress == "" {
+		return func() {}
+	}
+	if values.BlockProfileRate > 0 {
+		runtime.SetBlockProfileRate(values.BlockProfileRate)
+	}
+	if values.MutexProfileFraction > 0 {
+		runtime.SetMutexProfileFraction(values.MutexProfileFraction)
+	}
+	server := &http.Server{
+		Addr:              values.PprofAddress,
+		Handler:           pprofMux(),
+		ReadHeaderTimeout: pprofReadHeaderTimeout,
+	}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("warning: profiling server on %s: %v", values.PprofAddress, err)
+		}
+	}()
+	log.Printf("profiling server is available at %s", values.PprofAddress)
+
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), pprofShutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("warning: shutting down profiling server: %v", err)
+		}
+	}
+}
+
+// pprofMux собирает обработчики профилирования в отдельном мультиплексоре:
+// профили не попадают в мультиплексор по умолчанию и не делят порт с
+// HTTP-интерфейсом KV-сервиса, чтобы не влиять на измеряемый путь.
+func pprofMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	return mux
 }
 
 var (

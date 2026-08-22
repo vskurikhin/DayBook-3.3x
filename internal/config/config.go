@@ -32,6 +32,16 @@ type Values struct {
 	// DataDir — директория для persistent-хранилища узла;
 	// пустая строка — вычисляется путь по умолчанию в cmd/main.go.
 	DataDir string
+
+	// PprofAddress — адрес отдельного HTTP-сервера профилирования;
+	// пустая строка выключает профилирование.
+	PprofAddress string
+	// BlockProfileRate — доля учитываемых событий блокировки;
+	// ноль оставляет профилирование блокировок выключенным.
+	BlockProfileRate int
+	// MutexProfileFraction — доля учитываемых событий состязания за мьютекс;
+	// ноль оставляет профилирование мьютексов выключенным.
+	MutexProfileFraction int
 }
 
 func ParseFlags() Values {
@@ -44,6 +54,9 @@ func ParseFlags() Values {
 	traceCMLogFileFlag := fs.String("trace-cm-log-file", "", "Trace consensus module log file path (empty = stderr)")
 	traceKVLogFileFlag := fs.String("trace-kv-log-file", "", "Trace key-value database log file path (empty = stderr)")
 	dataDirFlag := fs.String("data-dir", "", "Directory for persistent storage")
+	pprofAddressFlag := fs.String("pprof-addr", "", "Profiling HTTP server listen address (empty = disabled)")
+	blockProfileRateFlag := fs.Int("block-profile-rate", 0, "Block profile rate (0 = disabled)")
+	mutexProfileFractionFlag := fs.Int("mutex-profile-fraction", 0, "Mutex profile fraction (0 = disabled)")
 
 	args := make([]string, 0, len(os.Args)-1)
 	for _, arg := range os.Args[1:] {
@@ -74,6 +87,10 @@ func ParseFlags() Values {
 		TraceCMLogFile: *traceCMLogFileFlag,
 		TraceKVLogFile: *traceKVLogFileFlag,
 		DataDir:        *dataDirFlag,
+
+		PprofAddress:         *pprofAddressFlag,
+		BlockProfileRate:     *blockProfileRateFlag,
+		MutexProfileFraction: *mutexProfileFractionFlag,
 	}
 }
 
