@@ -21,6 +21,13 @@ type mockTransportAE struct {
 	installCallCount atomic.Int32
 	delay            time.Duration
 	blockCh          chan struct{}
+	// gateBlockAfter / gateCh — гейт отправок AppendEntries: если gateCh задан,
+	// вызовы с callCount >= gateBlockAfter блокируются до закрытия gateCh.
+	// Используется для детерминированной фазовой проверки перерассылки: первая
+	// (синхронная) отправка проходит, вторая и последующие придерживаются, пока
+	// тест не освободит гейт.
+	gateBlockAfter int32
+	gateCh         chan struct{}
 
 	// failReply — AppendEntries отвечает Success:false с заданным
 	// конфликтом (ConflictIndex/ConflictTerm), вместо Success:true.
@@ -55,6 +62,9 @@ func (m *mockTransportAE) AppendEntries(_ ServerID, args AppendEntriesArgs) (App
 	m.lastArgsSet = true
 	if m.blockCh != nil {
 		<-m.blockCh
+	}
+	if m.gateCh != nil && m.callCount.Load() >= m.gateBlockAfter {
+		<-m.gateCh
 	}
 	if m.delay > 0 {
 		// poll-интервал condition-wait (не фиксированная пауза).
@@ -266,28 +276,37 @@ func TestInflightAE_DeferReset(t *testing.T) {
 	}
 }
 
-// TestInflightAE_DeferResetOnSnapshotPath проверяет, что defer
-// сбрасывает inflightAE при выходе через snapshot path.
+// TestInflightAE_DeferResetOnSnapshotPath проверяет, что defer сбрасывает
+// inflightAE при выходе через путь снимка.
 //
 // Сценарий:
-//  1. ConsensusModule в состоянии Leader, snapshotStore != nil,
-//     nextIndex[1] <= lastSnapshotIndex.
+//  1. ConsensusModule в состоянии Leader, lastSnapshotIndex = 3, журнал
+//     начинается после снимка (запись с индексом 4), nextIndex[1] = 3.
 //  2. Установить inflightAE[1] = true.
-//  3. Вызвать leaderSendAEsToPeer — она идёт по snapshot path.
-//  4. После завершения inflightAE[1] == false.
+//  3. Вызвать leaderSendAEsToPeer — предикат плана даёт replicationSnapshot
+//     (prev = 2: 0 <= 2, 2 != lastSnapshotIndex = 3, 2 < first = 4), поэтому
+//     исполняется путь снимка (leaderSendSnapshot).
+//  4. Проверить, что InstallSnapshot действительно вызван (installCallCount
+//     >= 1) — путь снимка исполнен; после завершения inflightAE[1] == false.
 func TestInflightAE_DeferResetOnSnapshotPath(t *testing.T) {
+	// Терм отправки AppendEntries в вызове теста — константа; сверяется с
+	// currentTerm приспособления ниже (терм отправки должен равняться currentTerm).
+	const sendTerm = 1
+
+	transport := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:        map[int]int{1: -1},
+			nextIndex:        map[int]int{1: 3},
 			matchIndex:       map[int]int{1: -1},
 			leaderStartIndex: -1,
 			inflightAE:       map[int]*atomic.Bool{1: new(atomic.Bool)},
 		},
 		cmState: cmState{
 			state:             Leader,
-			log:               make([]LogEntry, 0),
-			lastLogIndex:      -1,
-			lastSnapshotIndex: -1,
+			log:               []LogEntry{{Index: 4, Term: 1}},
+			lastLogIndex:      4,
+			lastLogTerm:       1,
+			lastSnapshotIndex: 3,
 			currentTerm:       1,
 			commitIndex:       -1,
 			votedFor:          -1,
@@ -307,19 +326,44 @@ func TestInflightAE_DeferResetOnSnapshotPath(t *testing.T) {
 			},
 		},
 
-		id:            0,
-		transport:     &mockTransportAE{},
-		storage:       NewMapStorage(),
-		snapshotStore: &mockSnapshotStore{},
+		id:        0,
+		transport: transport,
+		storage:   NewMapStorage(),
+		snapshotStore: &mockSnapshotStoreCfg{
+			listResult: []*SnapshotMeta{{ID: "snap-3", Index: 3, Term: 1, Size: 100}},
+			openMeta:   &SnapshotMeta{Index: 3, Term: 1, Size: 100},
+		},
 	}
 	cm.leaderState.inflightAE[1].Store(false)
 
+	// Защитная проверка согласованности приспособления: предикат плана должен
+	// выбирать путь снимка (prev = nextIndex[1] − 1 удовлетворяет
+	// prev >= 0 ∧ prev != lastSnapshotIndex ∧ prev < first = log[0].Index), а
+	// терм отправки равен currentTerm.
+	cm.mu.Lock()
+	first := cm.cmState.log[0].Index
+	prev := cm.leaderState.nextIndex[1] - 1
+	if cm.cmState.currentTerm != sendTerm {
+		cm.mu.Unlock()
+		t.Fatalf("sendTerm = %d, currentTerm = %d: приспособление несогласованно (терм отправки != currentTerm)",
+			sendTerm, cm.cmState.currentTerm)
+	}
+	if !(prev >= 0 && prev != cm.cmState.lastSnapshotIndex && prev < first) {
+		cm.mu.Unlock()
+		t.Fatalf("приспособление не выбирает путь снимка: prev = %d, first = %d, lastSnapshotIndex = %d",
+			prev, first, cm.cmState.lastSnapshotIndex)
+	}
+	cm.mu.Unlock()
+
 	cm.leaderState.inflightAE[1].Store(true)
-	cm.leaderSendAEsToPeer(1, 1, 0, true)
+	cm.leaderSendAEsToPeer(1, sendTerm, 0, true)
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
 	time.Sleep(20 * time.Millisecond)
 
+	if n := transport.installCallCount.Load(); n < 1 {
+		t.Errorf("InstallSnapshot calls = %d, want >= 1 (snapshot path must be executed)", n)
+	}
 	if cm.leaderState.inflightAE[1].Load() {
 		t.Error("inflightAE[1] should be false after snapshot path exit")
 	}
@@ -650,11 +694,20 @@ func TestLeaderSendSnapshot_Success(t *testing.T) {
 	}
 }
 
-// TestLeaderSendSnapshot_SuccessStaleTerm проверяет защиту от
-// запоздалого ответа из вытесненного term'а: при
-// reply.Term != term запроса (ответ из прошлого лидерства) состояние
-// репликации не изменяется.
-func TestLeaderSendSnapshot_SuccessStaleTerm(t *testing.T) {
+// TestLeaderSendSnapshot_InconsistentSuccessReplyGuard — защитная проверка
+// (страж) несогласованного ответа об успехе: сочетание Success:true, Term=1
+// при терме запроса 2 недостижимо от корректного соседа.
+//
+// Производственный инвариант: при Success:true протокол гарантирует
+// равенство терма ответа терму запроса (reply.Term == term). Приведённое
+// ниже сочетание исключается этим инвариантом, поэтому тестовый сценарий
+// явно византийский: он проверяет, что защитная проверка не позволяет
+// несогласованному ответу изменить состояние репликации.
+//
+// Реалистичный сценарий (ответ из прошлого лидерства, когда узел снова стал
+// лидером другого терма) покрыт тестом
+// TestLeaderSendSnapshot_StaleTermReplyDoesNotResetFailures.
+func TestLeaderSendSnapshot_InconsistentSuccessReplyGuard(t *testing.T) {
 	transport := &mockTransportAE{replyTerm: 1}
 	tracker := newCommitmentTracker(0, 2, -1, make(chan int, 1))
 	cm := &ConsensusModule{
@@ -679,7 +732,8 @@ func TestLeaderSendSnapshot_SuccessStaleTerm(t *testing.T) {
 	}
 	tracker.setConfiguration([]int{0, 1}, cm.lookupTermLocked)
 
-	// term запроса 2, reply.Term 1 — ответ устарел.
+	// Терм запроса 2, reply.Term 1 при Success:true — явно византийский
+	// ответ: от корректного соседа такое сочетание недостижимо.
 	cm.leaderSendSnapshot(1, 2)
 
 	if cm.leaderState.nextIndex[1] != 7 {
@@ -1260,10 +1314,19 @@ func TestReplicationBackoff_TransportErrorIncrementsFailures(t *testing.T) {
 // TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState — запоздавший ответ не
 // изменяет состояние репликации.
 //
-// Ответ горутины вытесненного лидерства (терм ответа не совпадает с термом
-// отправки) и ответ, пришедший после утраты лидерства, обязаны быть
-// отброшены: иначе nextIndex и matchIndex нового лидера откатились бы к
-// значениям прошлого терма.
+// Первый подслучай — защитная проверка (страж) несогласованного ответа об
+// успехе: reply.Term = 0 < терма отправки 1 при Success:true недостижим от
+// корректного соседа. Производственный инвариант: при Success:true терм
+// ответа равен терму запроса (и не меньше терма отправки). Сочетание ниже
+// исключается этим инвариантом, поэтому тестовый сценарий явно византийский:
+// он проверяет, что защитная проверка не даёт несогласованному ответу
+// изменить состояние репликации. Реалистичный сценарий (успех ответа из
+// прежнего лидерства, когда узел снова стал лидером другого терма) покрыт
+// тестом TestLeaderSendAEsToPeer_StaleTermSuccessDoesNotApply.
+//
+// Второй подслучай — ответ, пришедший после утраты лидерства: узел больше не
+// лидер, состояние репликации не изменяется. Иначе nextIndex и matchIndex
+// нового лидера откатились бы к значениям прошлого терма.
 func TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1271,7 +1334,7 @@ func TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState(t *testing.T) {
 		replyTerm int
 	}{
 		{
-			name:      "терм ответа не совпадает с термом отправки",
+			name:      "терм ответа не совпадает с термом отправки (явно византийский ответ)",
 			state:     Leader,
 			replyTerm: 0,
 		},
