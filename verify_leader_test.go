@@ -315,7 +315,12 @@ func TestVerifyLeader_MultiplePendingDifferentEpochs(t *testing.T) {
 	if vfFuture.votes != 1 {
 		t.Fatalf("vfFuture.votes = %d, want 1 (epoch 7 > 5 must not vote)", vfFuture.votes)
 	}
+	// Очередь читается под cm.mu: немедленная перерассылка после завершения
+	// AppendEntries (есть запрос с эпохой 7 > 5) запускает фоновую горутину
+	// репликации, которая меняет pendingVerify под блокировкой.
+	cm.mu.Lock()
 	remaining := cm.leaderState.pendingVerify
+	cm.mu.Unlock()
 	if len(remaining) != 2 || remaining[0] != vfSame || remaining[1] != vfFuture {
 		t.Fatalf("pendingVerify = %v, want [vfSame vfFuture] in the original order", remaining)
 	}

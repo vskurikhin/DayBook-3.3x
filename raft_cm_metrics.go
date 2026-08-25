@@ -202,6 +202,12 @@ type raftCounters struct {
 	// постановке). Числитель доли. Защищён cm.mu: инкремент — под уже
 	// удерживаемым cm.mu, чтение — из горутины stats.
 	verifyWaitedHeartbeat int64
+
+	// aeSentPerPeer — исходящие AppendEntries по соседу: фактическая отправка
+	// через транспорт. Контроль частоты исходящих AE (немедленная
+	// перерассылка не должна превращаться в пульсацию). Защищён cm.mu:
+	// инкремент — под уже удерживаемым cm.mu, чтение — из горутины stats.
+	aeSentPerPeer map[int]int64
 }
 
 // stepDownCounters — шаги лидера вниз, в ведомые, по причинам:
@@ -252,12 +258,12 @@ func (c *raftCounters) report(ls *leaderState) string {
 	var b strings.Builder
 	_, _ = fmt.Fprintf(&b,
 		"ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d "+
-			"BatchSkip=%d VerifyDone=%d VerifyWaited=%d",
+			"BatchSkip=%d VerifyDone=%d VerifyWaited=%d AESent=%d",
 		peerSum(c.installSnapshotSent), c.installSnapshotReceived.Load(),
 		peerSum(c.installSnapshotSkippedStale), peerSum(c.appendEntriesRejected),
 		peerSum(c.nextIndexRejectionIgnored), c.snapshotLogBoundaryViolation.Load(),
 		c.snapshotIndexBehindDispatched.Load(), c.sendBatchEntrySkipped.Load(),
-		c.verifyCompleted, c.verifyWaitedHeartbeat)
+		c.verifyCompleted, c.verifyWaitedHeartbeat, peerSum(c.aeSentPerPeer))
 	peers := make([]int, 0, len(ls.nextIndex))
 	for p := range ls.nextIndex {
 		peers = append(peers, p)

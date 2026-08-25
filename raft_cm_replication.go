@@ -157,15 +157,24 @@ func (cm *ConsensusModule) incReplFailuresIfLeader(peerID, savedCurrentTerm int)
 // вызов для этого соседа. Горутина без владения чужой флаг не снимает:
 // иначе она обнулила бы флаг параллельной горутины, запущенной другим путём.
 func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dispatchEpoch uint64, ownsInflight bool) {
+	// Решение предотправочной фазы снимается до объявления defer: defer
+	// должен знать, завершилась ли горутина веткой replicationSkip, чтобы не
+	// выполнять перерассылку при активной задержке повторов.
+	plan := cm.planReplication(peerID, savedCurrentTerm)
 	defer func() {
 		cm.mu.Lock()
 		if ownsInflight && cm.leaderState.inflightAE != nil && cm.leaderState.inflightAE[peerID] != nil {
 			cm.leaderState.inflightAE[peerID].Store(false)
+			// Немедленная перерассылка при неудовлетворённом verify-запросе:
+			// только владелец флага и только вне ветки задержки повторов.
+			if plan != replicationSkip {
+				cm.redispatchVerifyIfPendingLocked(peerID, savedCurrentTerm, dispatchEpoch)
+			}
 		}
 		cm.mu.Unlock()
 	}()
 
-	switch cm.planReplication(peerID, savedCurrentTerm) {
+	switch plan {
 	case replicationSkip:
 		return
 	case replicationSnapshot:
@@ -185,6 +194,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 	}
 	cm.traceLogf(8, "sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
 	cm.recordAttemptIfLeader(peerID, savedCurrentTerm)
+	cm.countAEOutbound(peerID)
 
 	reply, err := cm.transport.AppendEntries(ServerID(peerID), args)
 	if err != nil {
@@ -192,6 +202,79 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 		return
 	}
 	cm.handleAEReply(peerID, savedCurrentTerm, ni, len(entries), reply, dispatchEpoch)
+}
+
+// redispatchVerifyIfPendingLocked выполняет немедленную перерассылку
+// AppendEntries соседу после завершения горутины репликации, если остался
+// verify-запрос, поставленный позже момента отправки завершившегося AE.
+//
+// Завершившаяся горутина только что сняла флаг inflightAE[peerID]
+// (Store(false)) в той же критической секции — флаг свободен. Если узел всё
+// ещё лидер того же терма и в pendingVerify есть запрос с epoch > dispatchEpoch,
+// ответ завершившегося AE такому запросу голосом не является (AE отправлен до
+// постановки запроса), и запрос ждал бы ближайшего пульса. Перерассылка
+// отправляет свежий AE с новой эпохой, покрывающей все текущие pendingVerify.
+//
+// Ограниченность (отсутствие бесконечной перерассылки): verifyEpoch монотонно
+// возрастает и инкрементируется только в цикле лидера под cm.mu при постановке
+// нового verify. newDispatchEpoch снимается под той же блокировкой и потому не
+// меньше эпохи любого verify, находящегося в pendingVerify в этот момент:
+// ответ перерассланного AE засчитывается всем текущим запросам, и повторная
+// перерассылка для них не требуется — новая возможна только при поступлении
+// нового verify, то есть ограничена частотой клиентских запросов, а не
+// самовоспроизводится. Перерассылка выполняется только владельцем флага
+// (инвариант «на одного соседа не более одной живой горутины репликации»),
+// поэтому каскад горутин невозможен. Ветка replicationSkip не перерассылает:
+// AE всё равно не был бы отправлен, а смена горутин без прогресса была бы
+// бесполезной.
+//
+// Требует удержания cm.mu; блокировку не берёт и не снимает.
+func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentTerm int, dispatchEpoch uint64) {
+	// nil-проверки защищают от изменения конфигурации: сосед мог быть
+	// исключён из состава кластера, пока выполнялась горутина репликации.
+	if cm.leaderState.inflightAE == nil || cm.leaderState.inflightAE[peerID] == nil {
+		return
+	}
+	// Условие перерассылки — все три одновременно: узел всё ещё лидер того же
+	// терма и есть verify, поставленный позже отправки завершившегося AE.
+	if cm.cmState.state != Leader || cm.cmState.currentTerm != savedCurrentTerm {
+		return
+	}
+	if !hasPendingVerifyAfterEpoch(cm.leaderState.pendingVerify, dispatchEpoch) {
+		return
+	}
+	// Свежая эпоха под той же блокировкой: не меньше эпохи любого текущего
+	// запроса, поэтому ответ перерассланного AE покрывает все pendingVerify.
+	newDispatchEpoch := cm.leaderState.verifyEpoch
+	if !cm.leaderState.inflightAE[peerID].CompareAndSwap(false, true) {
+		return
+	}
+	cm.goSpawnLocked(func() {
+		cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, newDispatchEpoch, true)
+	})
+}
+
+// hasPendingVerifyAfterEpoch сообщает, есть ли в очереди verify-запрос с
+// эпохой позже dispatchEpoch — поставленный после отправки AppendEntries,
+// ответ которого такому запросу голосом не является.
+func hasPendingVerifyAfterEpoch(pending []*verifyFuture, dispatchEpoch uint64) bool {
+	for _, vf := range pending {
+		if vf.epoch > dispatchEpoch {
+			return true
+		}
+	}
+	return false
+}
+
+// countAEOutbound фиксирует факт отправки AppendEntries соседу: инкремент
+// счётчика исходящих AE по соседу. Счётчик контролирует частоту исходящих AE
+// (перерассылка не должна превращаться в пульсацию); чтение — из горутины
+// stats под cm.mu.
+// Самостоятельно захватывает и освобождает cm.mu.
+func (cm *ConsensusModule) countAEOutbound(peerID int) {
+	cm.mu.Lock()
+	cm.counters.aeSentPerPeer = incPeerCount(cm.counters.aeSentPerPeer, peerID)
+	cm.mu.Unlock()
 }
 
 // handleAEReply разбирает ответ AppendEntries от соседа: сбрасывает задержку
