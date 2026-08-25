@@ -8,7 +8,7 @@ GOPATH="$(GOBASE)/vendor:$(GOBASE)"
 GOBIN=$(GOBASE)/bin
 GOCMD=$(GOBASE)/cmd
 TRACE=trace
-TRACE_LOG_LEVEL=0
+TRACE_LOG_LEVEL=1
 
 # Redirect error output to a file, so we can show it in development mode.
 STDERR=/tmp/.$(PROJECTNAME)kv-stderr.txt
