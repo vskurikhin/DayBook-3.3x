@@ -189,6 +189,19 @@ type raftCounters struct {
 	// несовпадение индекса). Штатная причина — сжатие журнала: запись уже
 	// покрыта снимком.
 	sendBatchEntrySkipped atomic.Int64
+
+	// verifyCompleted — успешно завершённые verify-запросы (ReadIndex),
+	// получившие кворум голосов через очередь pendingVerify. Знаменатель доли
+	// «дождавшихся пульса». Защищён cm.mu: инкремент — под уже удерживаемым
+	// cm.mu в countVerifyVotesLocked, чтение — из горутины stats.
+	verifyCompleted int64
+
+	// verifyWaitedHeartbeat — успешно завершённые verify-запросы, между
+	// постановкой в pendingVerify и завершением которых успел сработать тик
+	// пульса (leaderState.heartbeatTicks вырос относительно значения при
+	// постановке). Числитель доли. Защищён cm.mu: инкремент — под уже
+	// удерживаемым cm.mu, чтение — из горутины stats.
+	verifyWaitedHeartbeat int64
 }
 
 // stepDownCounters — шаги лидера вниз, в ведомые, по причинам:
@@ -237,11 +250,14 @@ func peerSum(m map[int]int64) int64 {
 // ni/mi. Вызывается только из stats под cm.mu.
 func (c *raftCounters) report(ls *leaderState) string {
 	var b strings.Builder
-	_, _ = fmt.Fprintf(&b, "ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d BatchSkip=%d",
+	_, _ = fmt.Fprintf(&b,
+		"ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d "+
+			"BatchSkip=%d VerifyDone=%d VerifyWaited=%d",
 		peerSum(c.installSnapshotSent), c.installSnapshotReceived.Load(),
 		peerSum(c.installSnapshotSkippedStale), peerSum(c.appendEntriesRejected),
 		peerSum(c.nextIndexRejectionIgnored), c.snapshotLogBoundaryViolation.Load(),
-		c.snapshotIndexBehindDispatched.Load(), c.sendBatchEntrySkipped.Load())
+		c.snapshotIndexBehindDispatched.Load(), c.sendBatchEntrySkipped.Load(),
+		c.verifyCompleted, c.verifyWaitedHeartbeat)
 	peers := make([]int, 0, len(ls.nextIndex))
 	for p := range ls.nextIndex {
 		peers = append(peers, p)

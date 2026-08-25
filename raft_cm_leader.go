@@ -571,6 +571,9 @@ func (cm *ConsensusModule) runLeaderLoop() {
 			return
 
 		case <-heartbeatTicker.C:
+			cm.mu.Lock()
+			cm.leaderState.heartbeatTicks++
+			cm.mu.Unlock()
 			cm.checkQuorumContact()
 			cm.leaderSendAEs()
 
@@ -607,6 +610,7 @@ func (cm *ConsensusModule) runLeaderLoop() {
 				cm.mu.Unlock()
 				break
 			}
+			vf.enqueuedAtHeartbeat = cm.leaderState.heartbeatTicks
 			cm.leaderState.pendingVerify = append(cm.leaderState.pendingVerify, vf)
 			// Снимок длины под cm.mu: чтение len(pendingVerify) вне
 			// блокировки гоняло с записью списка из горутин репликации.

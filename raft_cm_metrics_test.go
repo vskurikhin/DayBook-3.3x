@@ -273,7 +273,7 @@ func TestRaftCountersReportFormat(t *testing.T) {
 		matchIndex: map[int]int{2: 29, 1: 24},
 	}
 	got := c.report(ls)
-	want := "ISsent=7 ISrecv=5 ISstale=2 AErej=7 NIrejIgn=1 BndViol=0 SnapLag=3 BatchSkip=2 p1:ni=25/mi=24 p2:ni=30/mi=29"
+	want := "ISsent=7 ISrecv=5 ISstale=2 AErej=7 NIrejIgn=1 BndViol=0 SnapLag=3 BatchSkip=2 VerifyDone=0 VerifyWaited=0 p1:ni=25/mi=24 p2:ni=30/mi=29"
 	if got != want {
 		t.Fatalf("report = %q\nwant   = %q", got, want)
 	}
@@ -337,8 +337,8 @@ func TestCounters_DistinguishSnapshotLoop(t *testing.T) {
 		cm.leaderState.matchIndex[1] = -1
 		cm.mu.Unlock()
 
-		cm.leaderSendAEsToPeer(1, 1, 0) // ветка снимка → успех IS
-		cm.leaderSendAEsToPeer(1, 1, 0) // ветка AE → отказ CI=0
+		cm.leaderSendAEsToPeer(1, 1, 0, true) // ветка снимка → успех IS
+		cm.leaderSendAEsToPeer(1, 1, 0, true) // ветка AE → отказ CI=0
 	}
 
 	cm.mu.Lock()

@@ -227,7 +227,7 @@ func TestVerifyLeader_EpochFilter(t *testing.T) {
 	// Ответ AE, отправленного ДО запроса (dispatchEpoch=1 < epoch=2):
 	// голос не засчитывается.
 	cm, vf := newCM(2)
-	cm.leaderSendAEsToPeer(1, 1, 1)
+	cm.leaderSendAEsToPeer(1, 1, 1, true)
 	if vf.votes != 0 {
 		t.Fatalf("votes = %d, want 0 (AE dispatched before request must not vote)", vf.votes)
 	}
@@ -235,7 +235,7 @@ func TestVerifyLeader_EpochFilter(t *testing.T) {
 	// Ответ AE, отправленного ПОСЛЕ запроса (dispatchEpoch=2 == epoch=2):
 	// голос засчитывается.
 	cm, vf = newCM(2)
-	cm.leaderSendAEsToPeer(1, 1, 2)
+	cm.leaderSendAEsToPeer(1, 1, 2, true)
 	if vf.votes != 1 {
 		t.Fatalf("votes = %d, want 1 (AE dispatched after request must vote)", vf.votes)
 	}
@@ -304,7 +304,7 @@ func TestVerifyLeader_MultiplePendingDifferentEpochs(t *testing.T) {
 	vfFuture := newVerifyFuture(7, 2)
 	cm.leaderState.pendingVerify = []*verifyFuture{vfOld, vfSame, vfFuture}
 
-	cm.leaderSendAEsToPeer(1, 1, 5)
+	cm.leaderSendAEsToPeer(1, 1, 5, true)
 
 	if err := vfOld.Error(); err != nil {
 		t.Fatalf("vfOld.Error() = %v, want nil (quorum reached, epoch 3 <= 5)", err)
@@ -383,7 +383,7 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 		mock := &mockTransportAE{failReply: true, failConflictIndex: 8, failConflictTerm: -1, replyTerm: 1}
 		cm, vf := newCM(mock, nil, -1, 5, []LogEntry{{Index: 4, Term: 1}, {Index: 5, Term: 1}})
 
-		cm.leaderSendAEsToPeer(1, 1, 0)
+		cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 		if got := mock.callCount.Load(); got != 1 {
 			t.Fatalf("AppendEntries calls = %d, want 1", got)
@@ -421,7 +421,7 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 		// и первой записью журнала (5) — отправляется снимок.
 		cm, vf := newCM(mock, store, 3, 5, []LogEntry{{Index: 5, Term: 1}})
 
-		cm.leaderSendAEsToPeer(1, 1, 0)
+		cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 		if got := mock.installCallCount.Load(); got != 1 {
 			t.Fatalf("InstallSnapshot calls = %d, want 1", got)

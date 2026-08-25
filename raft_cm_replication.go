@@ -140,18 +140,26 @@ func (cm *ConsensusModule) incReplFailuresIfLeader(peerID, savedCurrentTerm int)
 // leaderSendAEsToPeer отправляет AppendEntries указанному соседу и
 // обрабатывает ответ. Выполняется в отдельной горутине.
 //
-// dispatchEpoch — эпоха верификации, снятая в leaderSendAEs под cm.mu
+// dispatchEpoch — эпоха верификации, снятая вызывающим под cm.mu
 // в момент запуска горутины: ответы этого AE являются голосами только
 // для verify-запросов с epoch <= dispatchEpoch (AE отправлен не раньше
 // постановки запроса, Raft §8).
 //
-// При любом завершении (успех, ошибка, step down) сбрасывает
-// inflightAE[peerID], разрешая последующий вызов leaderSendAEs
-// для этого соседа. Сброс гарантирован через defer.
-func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dispatchEpoch uint64) {
+// ownsInflight — признак владения флагом inflightAE[peerID]: истина, если
+// флаг захвачен вызывающим через CompareAndSwap(false, true). Все точки
+// запуска захватывают флаг только через CompareAndSwap и передают признак
+// владения; прямой вызов без захвата запрещён конструктивно. Единый протокол
+// захвата гарантирует инвариант «на одного соседа не более одной живой
+// горутины репликации при любом пути вызова».
+//
+// При любом завершении (успех, ошибка, step down) горутина, владеющая
+// флагом, сбрасывает inflightAE[peerID] через defer, разрешая последующий
+// вызов для этого соседа. Горутина без владения чужой флаг не снимает:
+// иначе она обнулила бы флаг параллельной горутины, запущенной другим путём.
+func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dispatchEpoch uint64, ownsInflight bool) {
 	defer func() {
 		cm.mu.Lock()
-		if cm.leaderState.inflightAE != nil && cm.leaderState.inflightAE[peerID] != nil {
+		if ownsInflight && cm.leaderState.inflightAE != nil && cm.leaderState.inflightAE[peerID] != nil {
 			cm.leaderState.inflightAE[peerID].Store(false)
 		}
 		cm.mu.Unlock()
@@ -228,9 +236,20 @@ func (cm *ConsensusModule) handleAEReply(
 // ni и sentEntries сняты до отправки RPC и передаются по значению: nextIndex
 // вычисляется от фактически отправленного диапазона, а не от текущего
 // значения карты.
+//
+// Продвижение matchIndex и nextIndex — только вперёд: поздний или
+// дублирующий ответ более старой отправки с меньшим ni+sentEntries не
+// уменьшает значения. Это устраняет расхождение leaderState с фактическим
+// состоянием соседа и лишние повторные отправки записей, которые сосед уже
+// имеет. Продвижение индекса фиксации от отката защищено независимо от этой
+// правки: commitmentTracker.setMatch игнорирует убывающие значения.
 // Требует удержания cm.mu; блокировку не берёт и не снимает.
 func (cm *ConsensusModule) applyAESuccessLocked(peerID, ni, sentEntries int) {
-	cm.leaderState.nextIndex[peerID] = ni + sentEntries
+	newNextIndex := ni + sentEntries
+	if newNextIndex <= cm.leaderState.nextIndex[peerID] {
+		return
+	}
+	cm.leaderState.nextIndex[peerID] = newNextIndex
 	cm.leaderState.matchIndex[peerID] = cm.leaderState.nextIndex[peerID] - 1
 
 	cm.leaderState.commitmentTracker.setMatch(peerID, cm.leaderState.matchIndex[peerID], cm.lookupTermLocked)
@@ -260,6 +279,14 @@ func (cm *ConsensusModule) countVerifyVotesLocked(peerID int, dispatchEpoch uint
 	for _, vf := range cm.leaderState.pendingVerify {
 		if vf.votes >= vf.quorumSize {
 			vf.respond(nil)
+			// Успешное завершение verify-запроса: знаменатель доли
+			// «дождавшихся пульса». Запрос считается дождавшимся, если между
+			// постановкой в очередь и завершением успел сработать тик пульса
+			// (счётчик тиков строго вырос относительно значения при постановке).
+			cm.counters.verifyCompleted++
+			if cm.leaderState.heartbeatTicks > vf.enqueuedAtHeartbeat {
+				cm.counters.verifyWaitedHeartbeat++
+			}
 		} else {
 			remaining = append(remaining, vf)
 		}
@@ -361,7 +388,7 @@ func (cm *ConsensusModule) leaderSendAEs() {
 		}
 		if cm.leaderState.inflightAE[peerID].CompareAndSwap(false, true) {
 			cm.goSpawnLocked(func() {
-				cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, dispatchEpoch)
+				cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, dispatchEpoch, true)
 			})
 		}
 	}
@@ -375,6 +402,11 @@ func (cm *ConsensusModule) leaderSendAEs() {
 // одному соседу (конкурирующие попытки искажают счётчик транспортных ошибок
 // и периодизацию задержки повторов).
 //
+// Флаг захватывается только через CompareAndSwap(false, true), и признак
+// владения передаётся запущенной горутине по единому протоколу захвата —
+// сброс флага выполняется только владельцем. При занятом флаге попытка
+// пропускается: живая репликация догонит соседа сама.
+//
 // Эпоха верификации снимается в той же критической секции, что и захват
 // флага, — как в leaderSendAEs.
 // Самостоятельно захватывает и освобождает cm.mu.
@@ -387,7 +419,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeerIfIdle(peerID, savedCurrentTerm in
 	dispatchEpoch := cm.leaderState.verifyEpoch
 	if cm.leaderState.inflightAE[peerID].CompareAndSwap(false, true) {
 		cm.goSpawnLocked(func() {
-			cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, dispatchEpoch)
+			cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, dispatchEpoch, true)
 		})
 	}
 }

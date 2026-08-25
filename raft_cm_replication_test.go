@@ -255,7 +255,7 @@ func TestInflightAE_DeferReset(t *testing.T) {
 
 	// Установить флаг и вызвать leaderSendAEsToPeer.
 	cm.leaderState.inflightAE[1].Store(true)
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
 	time.Sleep(20 * time.Millisecond)
@@ -315,7 +315,7 @@ func TestInflightAE_DeferResetOnSnapshotPath(t *testing.T) {
 	cm.leaderState.inflightAE[1].Store(false)
 
 	cm.leaderState.inflightAE[1].Store(true)
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
 	time.Sleep(20 * time.Millisecond)
@@ -384,7 +384,7 @@ func TestInflightAE_NilSafe(t *testing.T) {
 
 	// Не должно быть panic.
 	cm.leaderSendAEs()
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 }
 
 // TestBecomeFollower_InflightAE_NilEntry проверяет, что becomeFollowerLocked
@@ -833,7 +833,7 @@ func TestLeaderSendAEsToPeer_RejectsImpossibleConflictIndex(t *testing.T) {
 	mock := &mockTransportAE{failReply: true, failConflictIndex: 0, failConflictTerm: -1, replyTerm: 1}
 	cm := newRejectionTestCM(mock)
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if cm.leaderState.nextIndex[1] != 10 {
 		t.Fatalf("nextIndex[1] = %d, want unchanged (10) — impossible rejection must be ignored",
@@ -858,7 +858,7 @@ func TestLeaderSendAEsToPeer_AcceptsPlausibleRejection(t *testing.T) {
 	mock := &mockTransportAE{failReply: true, failConflictIndex: 8, failConflictTerm: -1, replyTerm: 1}
 	cm := newRejectionTestCM(mock)
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if cm.leaderState.nextIndex[1] != 8 {
 		t.Fatalf("nextIndex[1] = %d, want 8 (plausible rejection applied)", cm.leaderState.nextIndex[1])
@@ -950,7 +950,7 @@ func TestLeaderSendAEsToPeer_SnapshotPredicateBoundaries(t *testing.T) {
 			}
 			cm.leaderState.inflightAE[1].Store(false)
 
-			cm.leaderSendAEsToPeer(1, 1, 0)
+			cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 			installs := mock.installCallCount.Load()
 			calls := mock.callCount.Load()
@@ -1023,7 +1023,7 @@ func TestReplicationBackoff_LogicalRejectionsDoNotBackoff(t *testing.T) {
 
 	const attempts = 5
 	for i := 0; i < attempts; i++ {
-		cm.leaderSendAEsToPeer(1, 1, 0)
+		cm.leaderSendAEsToPeer(1, 1, 0, true)
 	}
 
 	if got := mock.callCount.Load(); got != attempts {
@@ -1126,7 +1126,7 @@ func TestReplicationBackoff_SkipsTransportAndDoesNotRecordAttempt(t *testing.T) 
 	cm.leaderState.inflightAE[1].Store(false)
 	lastAttemptBefore := cm.leaderState.lastAttempt[1]
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if got := mock.callCount.Load(); got != 0 {
 		t.Fatalf("AppendEntries calls = %d, want 0 (backoff must skip the attempt)", got)
@@ -1193,7 +1193,7 @@ func TestLeaderSendAEsToPeer_HigherTermStepsDown(t *testing.T) {
 	cm.leaderState.inflightAE[1].Store(false)
 	defer cm.Stop()
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	// Чтение состояния под cm.mu: горутина таймера выборов уже запущена.
 	cm.mu.Lock()
@@ -1234,7 +1234,7 @@ func TestReplicationBackoff_TransportErrorIncrementsFailures(t *testing.T) {
 	mock := &mockTransportAE{aeErr: errors.New("transport unavailable")}
 	cm := newRejectionTestCM(mock)
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if got := mock.callCount.Load(); got != 1 {
 		t.Fatalf("AppendEntries calls = %d, want 1", got)
@@ -1289,7 +1289,7 @@ func TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState(t *testing.T) {
 			cm.cmState.state = tt.state
 			cm.leaderState.replFailures = map[int]int{1: 2}
 
-			cm.leaderSendAEsToPeer(1, 1, 0)
+			cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 			if cm.leaderState.nextIndex[1] != 10 || cm.leaderState.matchIndex[1] != 5 {
 				t.Fatalf("stale reply mutated replication state: nextIndex=%d matchIndex=%d, want 10 and 5",
@@ -1322,7 +1322,7 @@ func TestLeaderSendAEsToPeer_StaleTermSuccessDoesNotApply(t *testing.T) {
 	cm.leaderState.replFailures = map[int]int{1: 4}
 
 	// Отправка выполнена в терме 1, узел уже лидер терма 3.
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if cm.leaderState.nextIndex[1] != 10 || cm.leaderState.matchIndex[1] != 5 {
 		t.Fatalf("успех чужого терма изменил состояние репликации: nextIndex=%d matchIndex=%d, want 10 и 5",

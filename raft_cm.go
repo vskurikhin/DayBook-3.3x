@@ -133,7 +133,10 @@ type leaderState struct {
 	//		nil — сосед вне конфигурации;
 	//		false — нет активной горутины;
 	//		true — leaderSendAEsToPeer выполняется.
-	// Сброс: в defer leaderSendAEsToPeer, runLeaderLoop и becomeFollowerLocked.
+	// Захват — только через CompareAndSwap(false, true), единый для всех
+	// точек запуска; сброс флага — только горутиной, владеющей им (признак
+	// владения передаётся в leaderSendAEsToPeer). Сброс также выполняется в
+	// runLeaderLoop и becomeFollowerLocked.
 	inflightAE map[int]*atomic.Bool
 
 	// commitmentTracker — продвижение commitIndex на лидере.
@@ -152,6 +155,12 @@ type leaderState struct {
 	// Инкрементируется в leaderLoop при каждом verify‑запросе.
 	// Значение снимается в leaderSendAEs и передаётся как dispatchEpoch.
 	verifyEpoch uint64
+
+	// heartbeatTicks — монотонный счётчик тиков пульса текущего лидерства.
+	// Инкрементируется в leaderLoop по тику пульса под cm.mu. Значение,
+	// снятое при постановке verify в pendingVerify, служит нижней границей
+	// «дождался ли запрос тика пульса» при его успешном завершении.
+	heartbeatTicks uint64
 
 	// leaderStartIndex — первый индекс текущего терма лидера.
 	leaderStartIndex int

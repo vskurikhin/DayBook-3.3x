@@ -3423,7 +3423,7 @@ func TestRace_TermIndexMapDispatchAndConflict(t *testing.T) {
 			case <-done:
 				return
 			default:
-				cm.leaderSendAEsToPeer(1, 1, 0)
+				cm.leaderSendAEsToPeer(1, 1, 0, true)
 				conflictIters.Add(1)
 			}
 		}
