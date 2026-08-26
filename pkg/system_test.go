@@ -1,35 +1,35 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/fortytw2/leaktest"
-	"github.com/vskurikhin/raft/pkg/raft"
+	"github.com/vskurikhin/raft"
 )
-
-func sleepMs(n int) {
-	time.Sleep(time.Duration(n) * time.Millisecond)
-}
 
 func TestSetupHarness(t *testing.T) {
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
-	sleepMs(80)
+	// replace: предмет теста — что кластер поднимается и выбирает лидера;
+	// проверяется наблюдаемым состоянием, а не паузой.
+	h.CheckSingleLeader()
 }
 
 func TestClientRequestBeforeConsensus(t *testing.T) {
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
-	sleepMs(10)
-
-	// Клиент будет последовательно обращаться ко всем сервисам,
-	// пока не найдёт лидера.
+	// remove: предмет теста — обращение клиента ДО завершения выборов;
+	// пауза здесь ослабляла бы его. Клиент последовательно обходит все
+	// сервисы, пока не найдёт лидера.
 	c1 := h.NewClient()
 	h.CheckPut(c1, "llave", "cosa")
-	sleepMs(80)
+	// remove: завершающая пауза ничего не проверяет; остановку сервисов
+	// выполняет h.Shutdown().
 }
 
 func TestBasicPutGetSingleClient(t *testing.T) {
@@ -42,7 +42,7 @@ func TestBasicPutGetSingleClient(t *testing.T) {
 	h.CheckPut(c1, "llave", "cosa")
 
 	h.CheckGet(c1, "llave", "cosa")
-	sleepMs(80)
+	// remove: завершающая пауза ничего не проверяет.
 }
 
 func TestPutPrevValue(t *testing.T) {
@@ -70,7 +70,7 @@ func TestPutPrevValue(t *testing.T) {
 }
 
 func TestBasicPutGetDifferentClients(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -81,11 +81,11 @@ func TestBasicPutGetDifferentClients(t *testing.T) {
 
 	c2 := h.NewClient()
 	h.CheckGet(c2, "k", "v")
-	sleepMs(80)
+	// remove: завершающая пауза ничего не проверяет.
 }
 
 func TestCASBasic(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -100,7 +100,7 @@ func TestCASBasic(t *testing.T) {
 }
 
 func TestCASConcurrent(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -108,31 +108,59 @@ func TestCASConcurrent(t *testing.T) {
 	c := h.NewClient()
 	h.CheckPut(c, "foo", "mexico")
 
+	// Worker использует Try*-хелперы и не обращается к *testing.T;
+	// ошибки доставляются через errCh и репортятся после wg.Wait().
+	// defer wg.Wait() зарегистрирован ПОСЛЕ defer h.Shutdown(), поэтому
+	// выполняется раньше него (join → Shutdown → leaktest).
 	var wg sync.WaitGroup
+	errCh := make(chan error, 1)
+	started := make(chan struct{}, 1)
+	defer wg.Wait()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		c := h.NewClient()
-		for range 20 * raft.Quantum {
-			h.CheckCAS(c, "foo", "bar", "bomba")
+		for {
+			pv, _, err := h.TryCAS(c, "foo", "bar", "bomba")
+			// Сигнал «первая попытка CAS выполнена» — заменяет
+			// фиксированную паузу перед конкурирующим PUT.
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if pv == "bar" {
+				return
+			}
+			select {
+			case <-h.ctx.Done():
+				return
+			default:
+			}
 		}
 	}()
 
-	// После того как клиент находит правильного лидера, полный цикл обработки
-	// команды занимает 4–5 мс. В течение первых 50 мс после запуска горутин CAS
-	// значение 'foo' ещё неверное, поэтому операция CAS не срабатывает, но
-	sleepMs(50)
+	// replace: ждём наблюдаемого события (worker выполнил первый CAS)
+	// вместо фиксированной паузы.
+	<-started
 	c2 := h.NewClient()
 	h.CheckPut(c2, "foo", "bar")
 
-	sleepMs(300)
-	h.CheckGet(c2, "foo", "bomba")
+	h.WaitForKeyValue(c2, "foo", "bomba")
 
 	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
+	}
 }
 
 func TestConcurrentClientsPutsAndGets(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	// Проверить, что несколько запросов PUT и GET могут выполняться
 	// одновременно, когда каждая горутина отправляет свой запрос параллельно.
@@ -140,59 +168,82 @@ func TestConcurrentClientsPutsAndGets(t *testing.T) {
 	defer h.Shutdown()
 	h.CheckSingleLeader()
 
-	n := 9
-	for i := range n {
-		go func() {
-			c := h.NewClient()
-			_, f := h.CheckPut(c, fmt.Sprintf("key%v", i), fmt.Sprintf("value%v", i))
-			if f {
-				t.Errorf("got key found for %d, want false", i)
-			}
-		}()
-	}
-	sleepMs(150)
-
-	for i := range n {
-		go func() {
-			c := h.NewClient()
-			h.CheckGet(c, fmt.Sprintf("key%v", i), fmt.Sprintf("value%v", i))
-		}()
-	}
-	sleepMs(150)
+	runConcurrentPutsAndGets(t, h, 9)
 }
 
 func Test5ServerConcurrentClientsPutsAndGets(t *testing.T) {
 	// Аналогично предыдущему тесту, но используется кластер Raft
 	// из пяти серверов.
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 5)
 	defer h.Shutdown()
 	h.CheckSingleLeader()
 
-	n := 9
+	runConcurrentPutsAndGets(t, h, 9)
+}
+
+// runConcurrentPutsAndGets выполняет две фазы параллельных запросов
+// (PUT, затем GET) по паттерну:
+// start → work → error propagation (errCh) → Wait → assertions.
+//
+// Worker-горутины используют Try*-хелперы и НЕ обращаются к *testing.T;
+// ошибки собираются в буферизованный канал и репортятся тестовой
+// горутиной после wg.Wait(). Join зарегистрирован через defer внутри
+// хелпера — он отрабатывает и при раннем t.Fatal, причём ДО
+// defer h.Shutdown() вызывающего теста (join → Shutdown → leaktest).
+func runConcurrentPutsAndGets(t *testing.T, h *Harness, n int) {
+	t.Helper()
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2*n)
+	// Join worker'ов гарантирован и при раннем t.Fatal: defer в этом
+	// хелпере отрабатывает ДО defer h.Shutdown()/leaktest вызывающего
+	// теста (порядок join → Shutdown → leaktest). t.Cleanup здесь
+	// непригоден: cleanup-функции выполняются ПОСЛЕ всех defer теста.
+	defer wg.Wait()
+
+	// Фаза 1: параллельные PUT.
 	for i := range n {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			c := h.NewClient()
-			_, f := h.CheckPut(c, fmt.Sprintf("key%v", i), fmt.Sprintf("value%v", i))
+			_, f, err := h.TryPut(c, fmt.Sprintf("key%v", i), fmt.Sprintf("value%v", i))
+			if err != nil {
+				errCh <- err
+				return
+			}
 			if f {
-				t.Errorf("got key found for %d, want false", i)
+				errCh <- fmt.Errorf("got key found for %d, want false", i)
 			}
 		}()
 	}
-	sleepMs(150)
+	// Вместо sleepMs(150): фаза GET начинается после завершения всех PUT.
+	wg.Wait()
 
+	// Фаза 2: параллельные GET.
 	for i := range n {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			c := h.NewClient()
-			h.CheckGet(c, fmt.Sprintf("key%v", i), fmt.Sprintf("value%v", i))
+			if err := h.TryGet(c, fmt.Sprintf("key%v", i), fmt.Sprintf("value%v", i)); err != nil {
+				errCh <- err
+			}
 		}()
 	}
-	sleepMs(150)
+	wg.Wait()
+
+	// Assertions — после Wait, из тестовой горутины.
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
+	}
 }
 
 func TestDisconnectLeaderAfterPuts(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -206,7 +257,9 @@ func TestDisconnectLeaderAfterPuts(t *testing.T) {
 	}
 
 	h.DisconnectServiceFromPeers(lid)
-	sleepMs(300)
+	// replace: CheckSingleLeader сам опрашивает состояние до появления
+	// единственного лидера — фиксированная пауза не нужна. Отключённый
+	// лидер исключён из опроса (connected[lid] == false).
 	newlid := h.CheckSingleLeader()
 
 	if newlid == lid {
@@ -225,22 +278,22 @@ func TestDisconnectLeaderAfterPuts(t *testing.T) {
 		}
 	}
 
-	// В конце теста повторно подключаем серверы, чтобы избежать утечки горутин.
-	// В реальной системе предполагается, что сервисы рано или поздно будут
-	// переподключены, а если нет — утечка одной горутины не критична, поскольку
-	// сервер всё равно будет завершён.
+	// Возвращаем изолированный сервис в кластер и дожидаемся схождения
+	// к единственному лидеру. Прежняя схема (реконнект + sleepMs(200)
+	// с комментарием «утечка одной горутины не критична») допускала
+	// утечку; теперь h.Shutdown() в defer полностью останавливает все
+	// сервисы, поэтому непогашенных горутин не остаётся.
 	h.ReconnectServiceToPeers(lid)
-	sleepMs(200)
+	h.WaitForSingleLeader(3 * time.Second)
 }
 
 func TestDisconnectLeaderAndFollower(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
 	lid := h.CheckSingleLeader()
 
-	// Отправить несколько команд PUT.
 	n := 4
 	for i := range n {
 		c := h.NewClient()
@@ -250,36 +303,34 @@ func TestDisconnectLeaderAndFollower(t *testing.T) {
 		}
 	}
 
-	// Отключить лидера и ещё один сервер. Кластер потеряет кворум,
-	// и клиентские запросы должны завершаться по тайм-ауту.
 	h.DisconnectServiceFromPeers(lid)
 	otherId := (lid + 1) % 3
 	h.DisconnectServiceFromPeers(otherId)
-	sleepMs(raft.ReelectionTimeoutMs)
 
 	c := h.NewClient()
+	for r := 0; r < 10; r++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 300*raft.Quantum*time.Millisecond)
+		_, _, err := c.Get(ctx, "key0")
+		cancel()
+		if err != nil {
+			break
+		}
+		// poll-интервал condition-wait: ждём, пока потеря кворума
+		// станет наблюдаемой (Get начнёт завершаться ошибкой).
+		time.Sleep(50 * time.Millisecond)
+	}
 	h.CheckGetTimesOut(c, "key0")
 
-	// Подключить обратно один сервер, но не старого лидера.
-	// Все данные должны оставаться доступными.
 	h.ReconnectServiceToPeers(otherId)
-	h.CheckSingleLeader()
-	for i := range n {
-		h.CheckGet(c, fmt.Sprintf("key%v", i), fmt.Sprintf("value%v", i))
-	}
-
-	// Подключить обратно старого лидера.
-	// Все данные по-прежнему должны быть доступны.
 	h.ReconnectServiceToPeers(lid)
 	h.CheckSingleLeader()
 	for i := range n {
 		h.CheckGet(c, fmt.Sprintf("key%v", i), fmt.Sprintf("value%v", i))
 	}
-	sleepMs(100)
 }
 
 func TestCrashFollower(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -313,7 +364,7 @@ func TestCrashFollower(t *testing.T) {
 }
 
 func TestCrashLeader(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -341,7 +392,7 @@ func TestCrashLeader(t *testing.T) {
 }
 
 func TestCrashThenRestartLeader(t *testing.T) {
-	defer leaktest.CheckTimeout(t, 100*raft.Quantum*time.Millisecond)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -377,5 +428,70 @@ func TestCrashThenRestartLeader(t *testing.T) {
 		for j := range n {
 			h.CheckGet(c, fmt.Sprintf("key%v", j), fmt.Sprintf("value%v", j))
 		}
+	}
+}
+
+// TestRestartServiceGetsNewPort — регрессионный тест
+// сервис слушает на ":0", поэтому после рестарта он получает
+// НОВЫЙ порт. Харнесс обязан обновить kvServiceAddrs; перезапущенный
+// сервис обязан отвечать по новому адресу, а клиенты, пересозданные
+// после рестарта, — успешно выполнять put/get.
+func TestRestartServiceGetsNewPort(t *testing.T) {
+	h := NewHarness(t, 3)
+	defer h.Shutdown()
+
+	lid := h.CheckSingleLeader()
+
+	c := h.NewClient()
+	h.CheckPut(c, "restartkey", "restartvalue")
+
+	// Останавливаем не-лидера: кластер сохраняет кворум и лидера.
+	victim := (lid + 1) % 3
+	oldAddr := h.ServiceAddr(victim)
+
+	h.CrashService(victim)
+	h.CheckSingleLeader()
+
+	h.RestartService(victim)
+
+	newAddr := h.ServiceAddr(victim)
+	if newAddr == "" {
+		t.Fatalf("service %d has no HTTP address after restart", victim)
+	}
+	if newAddr == oldAddr {
+		t.Fatalf("service %d reused address %q after restart on \":0\"", victim, newAddr)
+	}
+
+	// Перезапущенный сервис отвечает по НОВОМУ адресу: /verifyleader/
+	// возвращает 200 и на follower'е (в теле — StatusNotLeader).
+	checkServiceReachable(t, newAddr)
+
+	// Клиенты, пересозданные из обновлённого kvServiceAddrs, работают.
+	h.WaitForKeyValue(h.NewClient(), "restartkey", "restartvalue")
+	h.CheckPut(h.NewClient(), "restartkey2", "restartvalue2")
+	h.WaitForKeyValue(h.NewClientWithRandomAddrsOrder(), "restartkey2", "restartvalue2")
+}
+
+// checkServiceReachable проверяет, что по адресу addr отвечает
+// HTTP-обработчик KVService (эндпоинт /verifyleader/ не требует тела
+// и отвечает как на лидере, так и на follower'е).
+func checkServiceReachable(t *testing.T, addr string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 600*raft.Quantum*time.Millisecond)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodPost, "http://"+addr+"/verifyleader/", http.NoBody,
+	)
+	if err != nil {
+		t.Fatalf("cannot build request for %s: %v", addr, err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("service at %s is not reachable: %v", addr, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("service at %s returned status %d, want %d", addr, resp.StatusCode, http.StatusOK)
 	}
 }

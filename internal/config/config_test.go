@@ -92,7 +92,7 @@ func TestParseFlags(t *testing.T) {
 
 	v := ParseFlags()
 	if v.Number != 0 {
-		t.Errorf("Number = %d, want 0", v.Number)
+		t.Errorf("RequestRate = %d, want 0", v.Number)
 	}
 	if v.RPCAddress.String() != ":9999" &&
 		v.RPCAddress.String() != "0.0.0.0:9999" &&
@@ -115,7 +115,7 @@ func TestParseFlagsNoPeers(t *testing.T) {
 
 	v := ParseFlags()
 	if v.Number != 1 {
-		t.Errorf("Number = %d, want 1", v.Number)
+		t.Errorf("RequestRate = %d, want 1", v.Number)
 	}
 	if v.RPCAddress.String() != ":9990" &&
 		v.RPCAddress.String() != "0.0.0.0:9990" &&
@@ -135,12 +135,80 @@ func TestParseFlagsDefaultAddr(t *testing.T) {
 
 	v := ParseFlags()
 	if v.Number != 2 {
-		t.Errorf("Number = %d, want 2", v.Number)
+		t.Errorf("RequestRate = %d, want 2", v.Number)
 	}
 	if v.RPCAddress.String() != ":9990" &&
 		v.RPCAddress.String() != "0.0.0.0:9990" &&
 		v.RPCAddress.String() != "[::]:9990" {
 		t.Errorf("Address = %s, want :9990", v.RPCAddress.String())
+	}
+}
+
+func TestParseFlagsTraceLogDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.TraceLogLevel != 1 {
+		t.Errorf("TraceLogLevel = %d, want default 1", v.TraceLogLevel)
+	}
+	if v.TraceCMLogFile != "" {
+		t.Errorf("TraceCMLogFile = %q, want default empty", v.TraceCMLogFile)
+	}
+	if v.TraceKVLogFile != "" {
+		t.Errorf("TraceKVLogFile = %q, want default empty", v.TraceKVLogFile)
+	}
+}
+
+func TestParseFlagsTraceLog(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{
+		"raft", "-number", "1",
+		"--trace-log-level", "16",
+		"--trace-cm-log-file", "/tmp/raft-trace-cm.log",
+		"--trace-kv-log-file", "/tmp/raft-trace-kv.log",
+	}
+
+	v := ParseFlags()
+	if v.TraceLogLevel != 16 {
+		t.Errorf("TraceLogLevel = %d, want 16", v.TraceLogLevel)
+	}
+	if v.TraceCMLogFile != "/tmp/raft-trace-cm.log" {
+		t.Errorf("TraceCMLogFile = %q, want /tmp/raft-trace-cm.log", v.TraceCMLogFile)
+	}
+	if v.TraceKVLogFile != "/tmp/raft-trace-kv.log" {
+		t.Errorf("TraceKVLogFile = %q, want /tmp/raft-trace-kv.log", v.TraceKVLogFile)
+	}
+}
+
+func TestParseFlagsDataDir(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "0", "--data-dir", "/tmp/raft-data-test"}
+
+	v := ParseFlags()
+	if v.Number != 0 {
+		t.Errorf("Number = %d, want 0", v.Number)
+	}
+	if v.DataDir != "/tmp/raft-data-test" {
+		t.Errorf("DataDir = %q, want /tmp/raft-data-test", v.DataDir)
+	}
+}
+
+func TestParseFlagsDataDirDefault(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.DataDir != "" {
+		t.Errorf("DataDir = %q, want default empty", v.DataDir)
 	}
 }
 
@@ -151,7 +219,7 @@ func TestValuesImplements(t *testing.T) {
 		Peers:      map[int]net.Addr{1: mustParseAddr("127.0.0.1:9991")},
 	}
 	if v.Number != 0 {
-		t.Errorf("Number = %d, want 0", v.Number)
+		t.Errorf("RequestRate = %d, want 0", v.Number)
 	}
 	if v.RPCAddress.String() != "127.0.0.1:9990" {
 		t.Errorf("Address = %s, want 127.0.0.1:9990", v.RPCAddress.String())

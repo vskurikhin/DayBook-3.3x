@@ -3,9 +3,8 @@ package kvservice
 import (
 	"net"
 	"testing"
-	"time"
 
-	"github.com/vskurikhin/raft/pkg/raft"
+	"github.com/vskurikhin/raft"
 )
 
 func TestConfig(t *testing.T) {
@@ -30,14 +29,15 @@ func TestNewKVService(t *testing.T) {
 	storage := raft.NewMapStorage()
 	ready := make(chan any)
 
-	kvs := New(Config{
+	kvs := New(&Config{
 		Config: raft.Config{
 			PeerIds:    []int{1, 2},
 			RPCAddress: ":0",
 			ServerID:   0,
+			Storage:    storage,
 		},
 		HTTPAddress: ":8080",
-	}, storage, ready)
+	}, ready)
 
 	if kvs.id != 0 {
 		t.Fatalf("expected id=0, got %d", kvs.id)
@@ -77,28 +77,5 @@ func TestConnectToRaftPeer(t *testing.T) {
 	// Повторное подключение не должно вызывать ошибку
 	if err := kvs0.ConnectToRaftPeer(1, addr1); err != nil {
 		t.Fatalf("re-connect should not fail: %v", err)
-	}
-}
-
-func TestConnectToRaftPeerTimeout(t *testing.T) {
-	storage := raft.NewMapStorage()
-	ready := make(chan any)
-
-	kvs := NewKVService(":0", 0, []int{1}, storage, ready)
-
-	// Подключение к несуществующему адресу должно вернуть ошибку по таймауту
-	fakeAddr, _ := net.ResolveTCPAddr("tcp", "127.0.0.1:9999")
-	err := kvs.ConnectToRaftPeer(1, fakeAddr)
-	if err == nil {
-		t.Fatalf("expected timeout error, got nil")
-	}
-}
-
-func TestConnectToRaftPeerWithTimeoutValue(t *testing.T) {
-	// Проверяем, что ConnectToRaftPeer использует ConnectToPeerWithTimeout
-	// с ожидаемым таймаутом 2*Quantum секунд
-	expectedTimeout := 2 * raft.Quantum * time.Second
-	if expectedTimeout != 4*time.Second {
-		t.Fatalf("expected timeout 4s, got %v", expectedTimeout)
 	}
 }

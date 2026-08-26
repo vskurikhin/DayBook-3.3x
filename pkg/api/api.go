@@ -71,6 +71,16 @@ const (
 	StatusFailedCommit
 )
 
+// StatusResponse — минимальный ответ, содержащий только статус.
+// Используется для VerifyLeader и других операций без данных.
+type StatusResponse struct {
+	RespStatus ResponseStatus
+}
+
+func (s *StatusResponse) Status() ResponseStatus {
+	return s.RespStatus
+}
+
 var responseName = map[ResponseStatus]string{
 	StatusInvalid:      "invalid",
 	StatusOK:           "OK",

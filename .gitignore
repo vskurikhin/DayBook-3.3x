@@ -10,7 +10,8 @@
 /stackless
 /tcplisten
 /testdata
-/*.go
+bootstrap.sh
+CLAUDE.md
 http-server
 fasthttpproxy-server
 tags
@@ -132,6 +133,10 @@ go-telnet
 ehthumbs.db
 Thumbs.db
 *.bak
+.claude/
+data/
+.opencode/
+trace/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -201,6 +206,7 @@ venv/
 .pytest_cache
 
 # Translations
+.ai/*
 *.mo
 *.pot
 
@@ -215,5 +221,4 @@ target/
 
 .history
 .psql_history
-hashicorp/*
-uber-go/*
+.doc/*

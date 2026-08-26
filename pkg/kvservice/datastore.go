@@ -1,6 +1,10 @@
 package kvservice
 
-import "sync"
+import (
+	"bytes"
+	"encoding/gob"
+	"sync"
+)
 
 // DataStore — простое потокобезопасное хранилище «ключ-значение»,
 // используемое в качестве внутреннего хранилища данных для kvservice.
@@ -13,6 +17,26 @@ func NewDataStore() *DataStore {
 	return &DataStore{
 		data: make(map[string]string),
 	}
+}
+
+// Snapshot возвращает сериализованное состояние DataStore.
+func (ds *DataStore) Snapshot() ([]byte, error) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(ds.data); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Restore восстанавливает состояние DataStore из сериализованных данных.
+func (ds *DataStore) Restore(data []byte) error {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	ds.data = make(map[string]string)
+	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(&ds.data)
 }
 
 // Get получает значение по ключу из хранилища.

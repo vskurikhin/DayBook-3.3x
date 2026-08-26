@@ -7,7 +7,7 @@
 * [Часть 2: Команды и репликация логов](https://svn.su/2020/2020-02-29-implementing-raft-part-2-commands-and-log-replication.html)
 * [Часть 3: Сохранение состояния и оптимизации](https://svn.su/2020/2020-05-05-implementing-raft-part-3-persistence-and-optimizations.html)
 * **Часть 4. База данных «ключ-значение»**
-* **Часть 5. Доставка сообщений «ровно один раз» (Exactly-Once Delivery)**
+* ~~Часть 5. Доставка сообщений «ровно один раз» (Exactly-Once Delivery)~~ _todo_
 
 Каждый каталог `partN` в этом репозитории содержит полный исходный код, соответствующий **части N** серии статей (за исключением части 0, которая является вводной и не содержит кода).
 
@@ -41,6 +41,12 @@ $ go test -race ./...
 
 `github.com/vskurikhin/raft` — Go 1.26.4, единственная зависимость `github.com/fortytw2/leaktest` (vendored).
 
+**Импортный путь пакета Raft.** :
+
+```go
+import "github.com/vskurikhin/raft"
+```
+
 ## 1. Project Overview
 
 ### Packages
@@ -61,14 +67,13 @@ raft/
 │   │   ├── datastore.go     — Потокобезопасное хранилище «ключ-значение» (DataStore)
 │   │   ├── datastore_test.go
 │   │   └── json.go          — Вспомогательные функции для работы с JSON
-│   ├── raft/
-│   │   ├── raft.go          — ConsensusModule (основной алгоритм Raft)
-│   │   ├── server.go        — Server (RPC-сервер + RPCProxy)
-│   │   ├── storage.go       — Интерфейс Storage и реализация MapStorage
-│   │   ├── testharness.go   — Тестовый Harness для модульных тестов Raft
-│   │   └── raft_test.go     — Модульные тесты Raft
 │   ├── system_test.go       — Системные тесты (сквозное тестирование KV-сервиса)
 │   └── testharness.go       — Системный Harness (управление жизненным циклом кластера KVService)
+├── raft.go                  — ConsensusModule (основной алгоритм Raft)
+├── server.go                — Server (RPC-сервер + RPCProxy)
+├── storage.go               — Интерфейс Storage и реализация MapStorage
+├── testharness.go           — Тестовый Harness для модульных тестов Raft
+├── raft_test.go             — Модульные тесты Raft
 └── README.md
 ```
 
@@ -76,10 +81,10 @@ raft/
 
 | Файл                         | Назначение                                                                                            |
 |------------------------------|-------------------------------------------------------------------------------------------------------|
-| `pkg/raft/raft.go`           | Основной алгоритм Raft: ConsensusModule, выборы лидера, репликация журнала, фиксация (commit) записей |
-| `pkg/raft/server.go`         | Обёртка над RPC-сервером: Server, RPCProxy (перенаправление RPC и моделирование сбоев)                |
-| `pkg/raft/storage.go`        | Интерфейс Storage и его реализация MapStorage, работающая в памяти                                    |
-| `pkg/raft/testharness.go`    | Harness для модульных тестов уровня Raft (управление жизненным циклом кластера серверов)              |
+| `raft.go`                    | Основной алгоритм Raft: ConsensusModule, выборы лидера, репликация журнала, фиксация (commit) записей |
+| `server.go`                  | Обёртка над RPC-сервером: Server, RPCProxy (перенаправление RPC и моделирование сбоев)                |
+| `storage.go`                 | Интерфейс Storage и его реализация MapStorage, работающая в памяти                                    |
+| `testharness.go`             | Harness для модульных тестов уровня Raft (управление жизненным циклом кластера серверов)              |
 | `pkg/kvservice/kvservice.go` | KV-сервис: HTTP API + реплицируемый автомат состояний на основе Raft                                  |
 | `pkg/system_test.go`         | Системные тесты, проверяющие работу всего стека KVService + Raft                                      |
 | `pkg/testharness.go`         | Harness для системных тестов (управление жизненным циклом кластера KVService)                         |
@@ -102,7 +107,7 @@ raft/
                            │
                            ▼
  ┌──────────────────────────────────────────────────────────┐
- │                 Server (pkg/raft/server.go)              │
+ │                    Server (server.go)                    │
  │                                                          │
  │  ┌──────────┐  ┌──────────┐  ┌────────────────────────┐  │
  │  │ RPC-     │  │ RPCProxy │  │ Клиенты узлов          │  │
@@ -113,7 +118,7 @@ raft/
                            │
                            ▼
 ┌────────────────────────────────────────────────────────────┐
-│          ConsensusModule (pkg/raft/raft.go)                │
+│            ConsensusModule (raft_cm_*.go)                  │
 │                                                            │
 │  ┌───────────┐  ┌──────────┐  ┌───────────┐  ┌──────────┐  │
 │  │ Состояние │  │ Журнал   │  │ Таймеры   │  │ Каналы   │  │
@@ -127,7 +132,7 @@ raft/
 ```
 Старт ────────────┐
                   ▼                    обнаружен
-               ВУДОМЫЙ ◄────────────────────┐более
+               ВЕДОМЫЙ ◄────────────────────┐более
                │     ▲      (becomeFollower)│высокий
                │     │                      │ term
                │     │                      │
@@ -157,4 +162,4 @@ startElection()│     │                      │
 
 ## Вывод
 
-Проект — **полноценная реализация Raft + реплицированный KV сервис с exactly-once delivery**. `pkg/raft/` (без изменений от v0.0.3) предоставляет: leader election, log replication, commitment, persistence, crash/recovery. `pkg/kvservice/` (новый в Part 5) добавляет: REST API, Go-клиент, реплицированное DataStore, exactly-once семантику через `(ClientID, RequestID)` dedup в `runUpdater()`. 62 теста, 24 .go файла, 5351 строка.
+Проект — **полноценная реализация Raft + реплицированный KV сервис**. Корневой пакет `github.com/vskurikhin/raft` (без изменений от v0.0.3) предоставляет: leader election, log replication, commitment, persistence, crash/recovery. `pkg/kvservice/` (новый в Part 5) добавляет: REST API, Go-клиент, реплицированное DataStore, exactly-once семантику через `(ClientID, RequestID)` dedup в `runUpdater()`. 62 теста, 24 .go файла, 5351 строка.
