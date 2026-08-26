@@ -705,6 +705,10 @@ func (cm *ConsensusModule) startLeaderLocked() {
 	// своя карта. Момент вступления считается контактом со всеми соседями,
 	// иначе проверка кворума сработала бы до первого пульса.
 	cm.leaderState.lastContact = make(map[int]time.Time)
+	// Окно троттлинга перерассылок не переносится между лидерствами: каждому
+	// лидерству — своя карта, поэтому первая перерассылка нового лидерства
+	// немедленна (отсутствующий ключ — окно свободно).
+	cm.leaderState.nextVerifyRedispatchAt = make(map[int]time.Time)
 	now := time.Now()
 
 	cfg := cm.cmState.configurations.latest

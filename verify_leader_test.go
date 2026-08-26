@@ -208,9 +208,10 @@ func TestVerifyLeader_EpochFilter(t *testing.T) {
 			transport: transport,
 			commitCh:  make(chan int, 1),
 			leaderState: leaderState{
-				nextIndex:  map[int]int{1: 0},
-				matchIndex: map[int]int{1: -1},
-				inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+				nextIndex:              map[int]int{1: 0},
+				matchIndex:             map[int]int{1: -1},
+				inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+				nextVerifyRedispatchAt: map[int]time.Time{},
 			},
 			cmState: cmState{
 				state:        Leader,
@@ -339,9 +340,10 @@ func TestVerifyLeader_MultiplePendingDifferentEpochs(t *testing.T) {
 		commitCh:   make(chan int, 1),
 		shutdownCh: make(chan struct{}),
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 0},
-			matchIndex: map[int]int{1: -1},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 0},
+			matchIndex:             map[int]int{1: -1},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:             Leader,
@@ -491,9 +493,10 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 			commitCh:   make(chan int, 1),
 			shutdownCh: make(chan struct{}),
 			leaderState: leaderState{
-				nextIndex:  map[int]int{1: nextIndex},
-				matchIndex: map[int]int{1: -1},
-				inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+				nextIndex:              map[int]int{1: nextIndex},
+				matchIndex:             map[int]int{1: -1},
+				inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+				nextVerifyRedispatchAt: map[int]time.Time{},
 			},
 			cmState: cmState{
 				state:             Leader,

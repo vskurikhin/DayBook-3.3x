@@ -215,18 +215,22 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 // постановки запроса), и запрос ждал бы ближайшего пульса. Перерассылка
 // отправляет свежий AE с новой эпохой, покрывающей все текущие pendingVerify.
 //
-// Ограниченность (отсутствие бесконечной перерассылки): verifyEpoch монотонно
+// Ограниченность (отсутствие бесконечной перерассылки) — две независимые
+// границы. Первая — по частоте клиентских запросов: verifyEpoch монотонно
 // возрастает и инкрементируется только в цикле лидера под cm.mu при постановке
 // нового verify. newDispatchEpoch снимается под той же блокировкой и потому не
 // меньше эпохи любого verify, находящегося в pendingVerify в этот момент:
 // ответ перерассланного AE засчитывается всем текущим запросам, и повторная
 // перерассылка для них не требуется — новая возможна только при поступлении
-// нового verify, то есть ограничена частотой клиентских запросов, а не
-// самовоспроизводится. Перерассылка выполняется только владельцем флага
-// (инвариант «на одного соседа не более одной живой горутины репликации»),
-// поэтому каскад горутин невозможен. Ветка replicationSkip не перерассылает:
-// AE всё равно не был бы отправлен, а смена горутин без прогресса была бы
-// бесполезной.
+// нового verify. Вторая — минимальный интервал на соседа: перерассылки
+// отстоят не менее чем на verifyRedispatchMinInterval, поэтому их частота
+// ≤ 1000/интервал независимо от темпа запросов. Запрос, заставший окно
+// занятым, дожидается либо следующей перерассылки, либо пульса — не дольше
+// пульса (интервал строго меньше HeartbeatTimeoutMs). Перерассылка выполняется
+// только владельцем флага (инвариант «на одного соседа не более одной живой
+// горутины репликации»), поэтому каскад горутин невозможен. Ветка
+// replicationSkip не перерассылает: AE всё равно не был бы отправлен, а смена
+// горутин без прогресса была бы бесполезной.
 //
 // Требует удержания cm.mu; блокировку не берёт и не снимает.
 func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentTerm int, dispatchEpoch uint64) {
@@ -243,6 +247,15 @@ func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentT
 	if !hasPendingVerifyAfterEpoch(cm.leaderState.pendingVerify, dispatchEpoch) {
 		return
 	}
+	// Окно троттлинга: не более одной перерассылки соседу за минимальный
+	// интервал. Метка ставится только при фактической перерассылке, поэтому
+	// неуспешный CAS (флаг занят другим путём) окно не закрывает — чужая
+	// отправка без фактической рассылки не должна подавлять перерассылку.
+	now := time.Now()
+	if !now.After(cm.leaderState.nextVerifyRedispatchAt[peerID]) {
+		cm.counters.verifyRedispatchSuppressed = incPeerCount(cm.counters.verifyRedispatchSuppressed, peerID)
+		return
+	}
 	// Свежая эпоха под той же блокировкой: не меньше эпохи любого текущего
 	// запроса, поэтому ответ перерассланного AE покрывает все pendingVerify.
 	newDispatchEpoch := cm.leaderState.verifyEpoch
@@ -252,6 +265,10 @@ func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentT
 	cm.goSpawnLocked(func() {
 		cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, newDispatchEpoch, true)
 	})
+	// Метка окна и счётчик перерассылок — только при фактическом запуске
+	// горутины: неуспешный CAS выше вернулся бы до этой точки.
+	cm.leaderState.nextVerifyRedispatchAt[peerID] = now.Add(cm.verifyRedispatchMinInterval)
+	cm.counters.verifyRedispatched = incPeerCount(cm.counters.verifyRedispatched, peerID)
 }
 
 // hasPendingVerifyAfterEpoch сообщает, есть ли в очереди verify-запрос с

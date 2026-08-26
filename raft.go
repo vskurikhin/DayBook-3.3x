@@ -19,6 +19,16 @@ const (
 	ReelectionTimeoutMs = 127 * Quantum
 	TickerTimeoutMs     = 7 * Quantum
 
+	// verifyRedispatchMinIntervalMs — минимальный интервал между немедленными
+	// перерассылками AppendEntries одному соседу при плотном потоке verify.
+	// Значение строго меньше HeartbeatTimeoutMs (33 мс), поэтому перерассылка
+	// остаётся быстрее пульса: первая перерассылка немедленна, а запрос,
+	// заставший окно занятым, дожидается либо следующей перерассылки, либо
+	// пульса — не дольше пульса. По построению частота перерассылок на
+	// каждого соседа ограничена 1000/24 ≈ 41,7 перерассылок/с независимо от
+	// темпа клиентских запросов.
+	verifyRedispatchMinIntervalMs = 8 * Quantum
+
 	// TCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
 	// в production-транспорте. Исходное значение 85ms получено из 382/2 при
 	// Quantum=3. Вынесено в независимую константу, чтобы изменение Quantum
@@ -227,6 +237,7 @@ func NewConsensusModule(
 	cm.leaderState.matchIndex = make(map[int]int)
 	cm.leaderState.lastContact = make(map[int]time.Time)
 	cm.checkQuorumTimeout = defaultCheckQuorumTimeout
+	cm.verifyRedispatchMinInterval = verifyRedispatchMinIntervalMs * time.Millisecond
 	cm.leaderState.inflightAE = make(map[int]*atomic.Bool)
 	cm.cmState.termIndexMap = make(map[int]int)
 	cm.cmState.electionTimerDone = make(chan struct{})

@@ -150,9 +150,10 @@ func TestLeaderSendAEs_Deduplication(t *testing.T) {
 	mock := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 0},
-			matchIndex: map[int]int{1: -1},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 0},
+			matchIndex:             map[int]int{1: -1},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:        Leader,
@@ -232,9 +233,10 @@ func TestInflightAE_DeferReset(t *testing.T) {
 	mock := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 0},
-			matchIndex: map[int]int{1: -1},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 0},
+			matchIndex:             map[int]int{1: -1},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:        Leader,
@@ -380,7 +382,8 @@ func TestLeaderSendAEs_StateCheck(t *testing.T) {
 	mock := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state: Follower,
@@ -849,9 +852,10 @@ func TestLeaderSendSnapshot_StaleTermReplyDoesNotResetFailures(t *testing.T) {
 func newRejectionTestCM(transport *mockTransportAE) *ConsensusModule {
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 10},
-			matchIndex: map[int]int{1: 5},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 10},
+			matchIndex:             map[int]int{1: 5},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:             Leader,
@@ -976,9 +980,10 @@ func TestLeaderSendAEsToPeer_SnapshotPredicateBoundaries(t *testing.T) {
 			}
 			cm := &ConsensusModule{
 				leaderState: leaderState{
-					nextIndex:  map[int]int{1: tt.nextIndex},
-					matchIndex: map[int]int{1: -1},
-					inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+					nextIndex:              map[int]int{1: tt.nextIndex},
+					matchIndex:             map[int]int{1: -1},
+					inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+					nextVerifyRedispatchAt: map[int]time.Time{},
 				},
 				cmState: cmState{
 					state:             Leader,
@@ -1051,9 +1056,10 @@ func TestReplicationBackoff_LogicalRejectionsDoNotBackoff(t *testing.T) {
 	mock := &mockTransportAE{failReply: true, failConflictIndex: 0, failConflictTerm: -1, replyTerm: 1}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 0},
-			matchIndex: map[int]int{1: -1},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 0},
+			matchIndex:             map[int]int{1: -1},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:             Leader,
@@ -1150,9 +1156,10 @@ func TestReplicationBackoff_SkipsTransportAndDoesNotRecordAttempt(t *testing.T) 
 	mock := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 1},
-			matchIndex: map[int]int{1: 0},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 1},
+			matchIndex:             map[int]int{1: 0},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 			// Одна транспортная ошибка при HeartbeatTimeoutMs = 33 даёт
 			// задержку 66 мс, поэтому только что зафиксированная попытка
 			// гарантирует активную задержку.
@@ -1215,9 +1222,10 @@ func TestLeaderSendAEsToPeer_HigherTermStepsDown(t *testing.T) {
 	mock := &mockTransportAE{replyTerm: 5}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 1},
-			matchIndex: map[int]int{1: 0},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 1},
+			matchIndex:             map[int]int{1: 0},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:             Leader,

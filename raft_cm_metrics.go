@@ -208,6 +208,19 @@ type raftCounters struct {
 	// перерассылка не должна превращаться в пульсацию). Защищён cm.mu:
 	// инкремент — под уже удерживаемым cm.mu, чтение — из горутины stats.
 	aeSentPerPeer map[int]int64
+
+	// verifyRedispatched — фактические немедленные перерассылки AppendEntries
+	// по соседу при неудовлетворённом verify-запросе (после успешного захвата
+	// флага и запуска горутины). Числитель границы частоты перерассылок.
+	// Защищён cm.mu: инкремент — под уже удерживаемым cm.mu, чтение — из
+	// горутины stats.
+	verifyRedispatched map[int]int64
+
+	// verifyRedispatchSuppressed — перерассылки AppendEntries, подавленные
+	// окном троттлинга (окно ещё не истекло) по соседу. Наблюдаемость того,
+	// что троттлинг срабатывает при плотном потоке verify. Защищён cm.mu:
+	// инкремент — под уже удерживаемым cm.mu, чтение — из горутины stats.
+	verifyRedispatchSuppressed map[int]int64
 }
 
 // stepDownCounters — шаги лидера вниз, в ведомые, по причинам:
@@ -258,12 +271,14 @@ func (c *raftCounters) report(ls *leaderState) string {
 	var b strings.Builder
 	_, _ = fmt.Fprintf(&b,
 		"ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d "+
-			"BatchSkip=%d VerifyDone=%d VerifyWaited=%d AESent=%d",
+			"BatchSkip=%d VerifyDone=%d VerifyWaited=%d AESent=%d "+
+			"VerifyRedispatched=%d VerifyRedispatchSuppressed=%d",
 		peerSum(c.installSnapshotSent), c.installSnapshotReceived.Load(),
 		peerSum(c.installSnapshotSkippedStale), peerSum(c.appendEntriesRejected),
 		peerSum(c.nextIndexRejectionIgnored), c.snapshotLogBoundaryViolation.Load(),
 		c.snapshotIndexBehindDispatched.Load(), c.sendBatchEntrySkipped.Load(),
-		c.verifyCompleted, c.verifyWaitedHeartbeat, peerSum(c.aeSentPerPeer))
+		c.verifyCompleted, c.verifyWaitedHeartbeat, peerSum(c.aeSentPerPeer),
+		peerSum(c.verifyRedispatched), peerSum(c.verifyRedispatchSuppressed))
 	peers := make([]int, 0, len(ls.nextIndex))
 	for p := range ls.nextIndex {
 		peers = append(peers, p)

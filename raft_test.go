@@ -1064,11 +1064,12 @@ func TestSameTermDoubleVotePrevented(t *testing.T) {
 func TestBecomeFollowerDoubleClose(t *testing.T) {
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			leaderStartIndex: -1,
-			nextIndex:        make(map[int]int),
-			matchIndex:       make(map[int]int),
-			inflightAE:       make(map[int]*atomic.Bool),
-			inflight:         make(map[int]*logFuture),
+			leaderStartIndex:       -1,
+			nextIndex:              make(map[int]int),
+			matchIndex:             make(map[int]int),
+			inflightAE:             make(map[int]*atomic.Bool),
+			nextVerifyRedispatchAt: make(map[int]time.Time),
+			inflight:               make(map[int]*logFuture),
 		},
 
 		id:           1,
