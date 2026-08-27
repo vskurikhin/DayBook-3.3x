@@ -80,16 +80,17 @@ func (l *cmLatency) snapshotAndReset() latencyReport {
 }
 
 // format форматирует снимок агрегатов в одну строку отчёта. Чистая функция:
-// не читает глобалей и полей CM, не логирует. Набор, порядок
-// и имена колонок, а также формат %5.2fms сохраняются прежними; собственной
-// метки времени и префикса [state,N:id,T:term] нет — их добавляют логгер
+// не читает глобалей и полей CM, не логирует. Набор и порядок колонок,
+// а также формат %5.2fms сохраняются; имена колонок сокращены для
+// компактности (например TakeSnap вместо TakeSnapshot). Собственной метки
+// времени и префикса [state,N:id,T:term] нет — их добавляют логгер
 // трассировки и traceLogf. Приём только по указателю —
 // (88 B > порог gocritic:hugeParam).
 func (r *latencyReport) format() string {
 	return fmt.Sprintf(
 		"AE=%5.2fms, BatchingFSM=%5.2fms, Election=%5.2fms, FSMSnapSh=%5.2fms,"+
 			" InstSnapShot=%5.2fms, ProcessLog=%5.2fms, RqPVt=%5.2fms, RqVote=%5.2fms,"+
-			" SendBatch=%5.2fms, TakeSnapshot=%5.2fms, TmOutNowRq=%5.2fms",
+			" SendBatch=%5.2fms, TakeSnap=%5.2fms, TmOutNowRq=%5.2fms",
 		r.appendEntries, r.fsmApply, r.election, r.handleFsmSnapshot,
 		r.installSnapshot, r.processLogs, r.requestPreVote, r.requestVote,
 		r.sendBatch, r.takeSnapshot, r.timeoutNowRequest,
@@ -271,8 +272,8 @@ func (c *raftCounters) report(ls *leaderState) string {
 	var b strings.Builder
 	_, _ = fmt.Fprintf(&b,
 		"ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d "+
-			"BatchSkip=%d VerifyDone=%d VerifyWaited=%d AESent=%d "+
-			"VerifyRedispatched=%d VerifyRedispatchSuppressed=%d",
+			"BatchSkip=%d VrfDone=%d VrfWtd=%d AESent=%d "+
+			"VrfRedisp=%d VrfRedispSupp=%d",
 		peerSum(c.installSnapshotSent), c.installSnapshotReceived.Load(),
 		peerSum(c.installSnapshotSkippedStale), peerSum(c.appendEntriesRejected),
 		peerSum(c.nextIndexRejectionIgnored), c.snapshotLogBoundaryViolation.Load(),

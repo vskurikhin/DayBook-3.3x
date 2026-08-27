@@ -7,29 +7,36 @@ GOBASE=$(shell pwd)
 GOPATH="$(GOBASE)/vendor:$(GOBASE)"
 GOBIN=$(GOBASE)/bin
 GOCMD=$(GOBASE)/cmd
+
 TRACE=trace
 TRACE_LOG_LEVEL=0
+CONCURRENCY=8
+DURATION=5m
+GET_PERCENT=75
+REQUEST_RATE=200
+VALUE_SIZE=128
+VERIFY_PERCENT=33
 
-# Redirect error output to a file, so we can show it in development mode.
-STDERR=/tmp/.$(PROJECTNAME)kv-stderr.txt
+STAND=
+STAND_PREFIX := $(if $(STAND),$(STAND)_,"")
 
 NODES := 1 2 3
 
 # PID file will keep the process id of the raft
-pid_file   = /tmp/.$(PROJECTNAME)kv-$(1).pid
-PID_LOADKV = /tmp/.loadkv.pid
+pid_file   = $(GOBASE)/$(TRACE)/.$(STAND_PREFIX)$(PROJECTNAME)kv-$(1).pid
+PID_LOADKV = $(GOBASE)/$(TRACE)/.$(STAND_PREFIX)loadkv.pid
 
-trace_cm   = $(GOBASE)/$(TRACE)/$(PROJECTNAME)cm-$(1).trace
-trace_kv   = $(GOBASE)/$(TRACE)/$(PROJECTNAME)kv-$(1).trace
-stderr     = $(GOBASE)/$(TRACE)/$(PROJECTNAME)kv-$(1).stderr
-stdout     = $(GOBASE)/$(TRACE)/$(PROJECTNAME)kv-$(1).stdout
+trace_cm   = $(GOBASE)/$(TRACE)/$(STAND_PREFIX)$(PROJECTNAME)cm-$(1).trace
+trace_kv   = $(GOBASE)/$(TRACE)/$(STAND_PREFIX)$(PROJECTNAME)kv-$(1).trace
+stderr     = $(GOBASE)/$(TRACE)/$(STAND_PREFIX)$(PROJECTNAME)kv-$(1).stderr
+stdout     = $(GOBASE)/$(TRACE)/$(STAND_PREFIX)$(PROJECTNAME)kv-$(1).stdout
 
 # Списки всех pid/trace/stderr файлов, собираются из NODES:
-PID_FILES     = $(LOADKV_PID) $(foreach n,$(NODES),$(call pid_file,$(n)))
+PID_FILES     = $(PID_LOADKV) $(foreach n,$(NODES),$(call pid_file,$(n)))
 TRACE_FILES   = $(foreach n,$(NODES),$(call trace_cm,$(n)) $(call trace_kv,$(n)))
 STDERR_FILES  = $(foreach n,$(NODES),$(call stderr,$(n)))
 
-OUT_LOAD_KV_FILE = $(GOBASE)/$(TRACE)/loadkv.out
+OUT_LOAD_KV_FILE = $(GOBASE)/$(TRACE)/$(STAND_PREFIX)loadkv.out
 
 HTTP_PORTS = 8881 8882 8883
 RAFT_PORTS = 9991 9992 9993
@@ -67,7 +74,7 @@ lint: go-lint
 start: start-raft
 
 ## stop: Stop development mode. RAFT
-stop: stop-raft
+stop: stop-raft clean-pid-files
 
 start-raft: stop-raft
 	@for n in $(NODES); do \
@@ -86,11 +93,16 @@ start-raft: stop-raft
 		sed "/^/s/^/  \>  PID$$n: /" $(call pid_file,$$n); \
 	done
 	@sleep 2
-	@$(GOBIN)/loadkv \
-		-concurrency 10 \
-		-get-percent 75 \
-		-peers ":8881,:8882,:8883" \
-		-request-rate 700 \
+	@unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY; \
+	peers=$$(for p in $(NODES); do printf ':888%s,' $$p; done | sed 's/,$$//'); \
+	echo "peers=$$peers" ; $(GOBIN)/loadkv \
+		-concurrency $(CONCURRENCY) \
+		-duration $(DURATION) \
+		-get-percent $(GET_PERCENT) \
+		-peers "$$peers" \
+		-request-rate $(REQUEST_RATE) \
+		-value-size $(VALUE_SIZE) \
+		-verify-percent $(VERIFY_PERCENT) \
 		> $(OUT_LOAD_KV_FILE) 2>&1 & echo $$! > $(PID_LOADKV)
 	@sed "/^/s/^/  \>  PID4: /" $(PID_LOADKV)
 
@@ -109,7 +121,7 @@ restart-raft: stop-raft start-raft
 build: go-build-raft
 
 ## clean: Clean build files. Runs `go clean` internally.
-clean: clean-build-files clean-data-files clean-trace-files go-clean go-clean-test-cache
+clean: clean-build-files clean-data-files clean-pid-files clean-trace-files go-clean go-clean-test-cache
 	@rm -f $(PID_FILES)
 
 clean-build-files:
@@ -122,14 +134,17 @@ clean-data-files:
 	@rm -f ./data/node-?/* 2>/dev/null || true
 	@rmdir ./data/node-?/snapshots/* 2>/dev/null || true
 
+clean-pid-files:
+	@echo "  >  Clean PID files..."
+	@rm -f $(PID_FILES)
+
 clean-trace-files:
 	@echo "  >  Clean trace files..."
-	@rm -f $(OUT_LOAD_KV_FILE) \
-		$(wildcard $(GOBASE)/$(TRACE)/$(PROJECTNAME)cm-*.trace) \
-		$(wildcard $(GOBASE)/$(TRACE)/$(PROJECTNAME)kv-*.trace) \
-		$(wildcard $(GOBASE)/$(TRACE)/$(PROJECTNAME)kv-*.stderr) \
-		$(wildcard $(GOBASE)/$(TRACE)/$(PROJECTNAME)kv-*.stdout) \
-		$(STDERR)
+	rm -f $(OUT_LOAD_KV_FILE) \
+		$(wildcard $(GOBASE)/$(TRACE)/$(STAND_PREFIX)$(PROJECTNAME)cm-*.trace) \
+		$(wildcard $(GOBASE)/$(TRACE)/$(STAND_PREFIX)$(PROJECTNAME)kv-*.trace) \
+		$(wildcard $(GOBASE)/$(TRACE)/$(STAND_PREFIX)$(PROJECTNAME)kv-*.stderr) \
+		$(wildcard $(GOBASE)/$(TRACE)/$(STAND_PREFIX)$(PROJECTNAME)kv-*.stdout)
 
 go-compile: go-build-raft
 
@@ -146,10 +161,10 @@ go-coverage:
 	CVPKG=$(go list ./... | grep -v -e '/part\|/cmd' | tr '\n' ',')
 	# 2. Run tests with coverage analysis applied only to the specified packages
 	@echo "  >  Run tests with coverage analysis..."
-	@go test -coverprofile=coverage.out . ./pkg
+	@go test -coverprofile=docs/coverage.out . ./pkg
 	# 3. Generate the HTML report
 	@echo "  >  Generate the HTML report."
-	@go tool cover -html=coverage.out -o docs/coverage.html
+	@go tool cover -html=docs/coverage.out -o docs/coverage.html
 
 verify-imports:
 	@if grep -rn --include='*.go' -e 'vskurikhin/raft/pkg/raft"' \
