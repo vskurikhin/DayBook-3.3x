@@ -82,8 +82,6 @@ func (cm *ConsensusModule) handleFsmSnapshot(req *reqSnapshotFuture) {
 
 // Получает снимок от лидера, сохраняет в SnapshotStore,
 // восстанавливает FSM и заменяет журнал.
-//
-//nolint:funlen
 func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 	startTimeNow := time.Now()
 	defer func() { cm.latency.installSnapshot.observe(time.Since(startTimeNow)) }()
@@ -107,21 +105,11 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	}()
 
 	cm.mu.Lock()
-	// Term снимается под cm.mu: чтение cm.cmState.currentTerm
-	// вне критической секции — data race.
-	resp.Term = cm.cmState.currentTerm
-	if req.Term < cm.cmState.currentTerm {
-		cm.mu.Unlock()
+	proceed := cm.beginInstallSnapshotLocked(req, resp)
+	cm.mu.Unlock()
+	if !proceed {
 		return
 	}
-	if req.Term > cm.cmState.currentTerm {
-		cm.becomeFollowerLocked(req.Term)
-		resp.Term = req.Term
-	}
-	cm.cmState.electionResetEvent = time.Now()
-	cm.cmState.leaderLastContact = time.Now()
-	cm.cmState.leaderID = req.LeaderID
-	cm.mu.Unlock()
 
 	cfg, err := DecodeConfiguration(req.Configuration)
 	if err != nil {
@@ -153,45 +141,9 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 		return
 	}
 
-	sink, err := cm.snapshotStore.Create(req.LastLogIndex, req.LastLogTerm, cfg, req.ConfigIndex)
+	sinkID, err := cm.receiveAndSealSnapshot(rpc, req, cfg)
 	if err != nil {
 		rpcErr = err
-		return
-	}
-	if sink == nil {
-		rpcErr = fmt.Errorf("snapshotStore.Create returned nil sink without error")
-		return
-	}
-
-	if rpc.Reader == nil {
-		_ = sink.Cancel()
-		rpcErr = fmt.Errorf("InstallSnapshot with nil Reader")
-		return
-	}
-	n, err := io.Copy(sink, rpc.Reader)
-	if err != nil {
-		_ = sink.Cancel()
-		rpcErr = err
-		return
-	}
-	if req.DataSize > 0 && n != req.DataSize {
-		_ = sink.Cancel()
-		rpcErr = fmt.Errorf("snapshot size mismatch: got %d, expected %d", n, req.DataSize)
-		return
-	}
-
-	if err := sink.Close(); err != nil {
-		rpcErr = err
-		return
-	}
-
-	// Валидация ID снепшота перед Open.
-	// Некорректный ID (пустая строка) может вызвать панику
-	// в реализации SnapshotStore.
-	sinkID := sink.ID()
-	if sinkID == "" {
-		_ = sink.Cancel()
-		rpcErr = fmt.Errorf("sink.ID() is empty")
 		return
 	}
 
@@ -209,6 +161,41 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	}
 
 	cm.mu.Lock()
+	cm.installSnapshotStateLocked(meta)
+	cm.mu.Unlock()
+
+	cm.counters.installSnapshotReceived.Add(1)
+	resp.Success = true
+}
+
+// beginInstallSnapshotLocked снимает терм для ответа, отклоняет запрос
+// с устаревшим термом и обновляет отметки контакта с лидером. Возвращает
+// false, если снимок принимать не нужно.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) beginInstallSnapshotLocked(
+	req *InstallSnapshotRequest, resp *InstallSnapshotResponse,
+) (proceed bool) {
+	// Term снимается под cm.mu: чтение cm.cmState.currentTerm
+	// вне критической секции — data race.
+	resp.Term = cm.cmState.currentTerm
+	if req.Term < cm.cmState.currentTerm {
+		return false
+	}
+	if req.Term > cm.cmState.currentTerm {
+		cm.becomeFollowerLocked(req.Term)
+		resp.Term = req.Term
+	}
+	cm.cmState.electionResetEvent = time.Now()
+	cm.cmState.leaderLastContact = time.Now()
+	cm.cmState.leaderID = req.LeaderID
+	return true
+}
+
+// installSnapshotStateLocked заменяет состояние узла метаданными
+// принятого снимка: водяные знаки журнала и снимка, отметки применения
+// и фиксации, уплотнение журнала и запись постоянного состояния.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) installSnapshotStateLocked(meta *SnapshotMeta) {
 	cm.cmState.lastLogIndex = meta.Index
 	cm.cmState.lastLogTerm = meta.Term
 	cm.cmState.lastSnapshotIndex = meta.Index
@@ -241,10 +228,51 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	}
 	cm.cmState.logNeedsPersist = true
 	cm.persistToStorage()
-	cm.mu.Unlock()
+}
 
-	cm.counters.installSnapshotReceived.Add(1)
-	resp.Success = true
+// receiveAndSealSnapshot принимает тело снимка от лидера в приёмник
+// хранилища снимков и запечатывает его, возвращая идентификатор готового
+// снимка. На каждом ошибочном пути приёмник отменяется, а ошибка
+// возвращается вызывающему для ответа RPC.
+// Блокировку cm.mu не захватывает и не снимает.
+func (cm *ConsensusModule) receiveAndSealSnapshot(
+	rpc RPC, req *InstallSnapshotRequest, cfg Configuration,
+) (sinkID string, err error) {
+	sink, err := cm.snapshotStore.Create(req.LastLogIndex, req.LastLogTerm, cfg, req.ConfigIndex)
+	if err != nil {
+		return "", err
+	}
+	if sink == nil {
+		return "", fmt.Errorf("snapshotStore.Create returned nil sink without error")
+	}
+
+	if rpc.Reader == nil {
+		_ = sink.Cancel()
+		return "", fmt.Errorf("InstallSnapshot with nil Reader")
+	}
+	n, err := io.Copy(sink, rpc.Reader)
+	if err != nil {
+		_ = sink.Cancel()
+		return "", err
+	}
+	if req.DataSize > 0 && n != req.DataSize {
+		_ = sink.Cancel()
+		return "", fmt.Errorf("snapshot size mismatch: got %d, expected %d", n, req.DataSize)
+	}
+
+	if err := sink.Close(); err != nil {
+		return "", err
+	}
+
+	// Валидация ID снепшота перед Open.
+	// Некорректный ID (пустая строка) может вызвать панику
+	// в реализации SnapshotStore.
+	sinkID = sink.ID()
+	if sinkID == "" {
+		_ = sink.Cancel()
+		return "", fmt.Errorf("sink.ID() is empty")
+	}
+	return sinkID, nil
 }
 
 // runSnapshots — фоновая горутина управления снимками.
