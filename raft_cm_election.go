@@ -276,8 +276,6 @@ func (cm *ConsensusModule) runElectionTimer() {
 //   - обнаружении более высокого терма от другого узла → becomeFollowerLocked()
 //
 // Вызывается из runElectionTimer(), когда preVoteDisabled == false.
-//
-//nolint:gocognit,funlen
 func (cm *ConsensusModule) runPreCandidate() {
 	cm.mu.Lock()
 	if cm.cmState.state != Follower && cm.cmState.state != PreCandidate && cm.cmState.state != Candidate {
@@ -319,67 +317,106 @@ func (cm *ConsensusModule) runPreCandidate() {
 			continue
 		}
 		cm.goSpawn(func() {
-			cm.mu.Lock()
-			lastLogIndex, lastLogTerm := cm.lastLogIndexAndTerm()
-			savedTerm := cm.cmState.currentTerm
-			cm.mu.Unlock()
-
-			if cm.transport == nil {
-				cm.traceLogf(0, "runPreCandidate: transport is nil, cannot send to %d", peerID)
-				select {
-				case preVoteRespCh <- &RequestPreVoteReply{
-					RPCHeader:   RPCHeader{ProtocolVersion: ProtocolVersion, ServerID: cm.id},
-					Term:        savedTerm,
-					VoteGranted: false,
-				}:
-				case <-ctx.Done():
-				}
-				return
-			}
-
-			args := RequestPreVoteArgs{
-				RPCHeader: RPCHeader{
-					ProtocolVersion: ProtocolVersion,
-					ServerID:        cm.id,
-				},
-				Term:         proposedTerm,
-				LastLogIndex: lastLogIndex,
-				LastLogTerm:  lastLogTerm,
-			}
-
-			cm.traceLogf(4, "sending RequestPreVote to %d: %+v", peerID, args)
-			reply, err := cm.transport.RequestPreVote(ServerID(peerID), args)
-			if err != nil {
-				cm.traceLogf(4, "RequestPreVote to %d failed: %v", peerID, err)
-				var resp *RequestPreVoteReply
-				if err == ErrNotImplemented {
-					// Если транспорт не поддерживает PreVote, считаем голос
-					// предоставленным.
-					resp = &RequestPreVoteReply{
-						RPCHeader:   RPCHeader{ProtocolVersion: ProtocolVersion, ServerID: cm.id},
-						Term:        savedTerm,
-						VoteGranted: true,
-					}
-				} else {
-					resp = &RequestPreVoteReply{
-						RPCHeader:   RPCHeader{ProtocolVersion: ProtocolVersion, ServerID: cm.id},
-						Term:        savedTerm,
-						VoteGranted: false,
-					}
-				}
-				select {
-				case preVoteRespCh <- resp:
-				case <-ctx.Done():
-				}
-				return
-			}
-			select {
-			case preVoteRespCh <- &reply:
-			case <-ctx.Done():
-			}
+			cm.sendPreVoteToPeer(ctx, peerID, proposedTerm, preVoteRespCh)
 		})
 	}
 
+	cm.collectPreVoteReplies(voterCount, preVoteRespCh)
+}
+
+// sendPreVoteToPeer отправляет RequestPreVote одному соседу и помещает его
+// ответ в канал ответов. В запросе идёт предлагаемый терм выборов;
+// собственный терм узла при этом не меняется. Если транспорт отсутствует или
+// вызов завершился ошибкой, в канал помещается синтетический ответ: отказ, а
+// при отсутствии поддержки предварительного голосования у транспорта — грант,
+// ради совместимости с соседями. Каждая отправка уступает отмене контекста,
+// поэтому горутина не зависает, когда сбор ответов уже завершён.
+//
+// Самостоятельно захватывает и освобождает cm.mu: под блокировкой снимаются
+// только последний индекс и терм журнала вместе с текущим термом; вызов
+// транспорта происходит без блокировки. Канал в сигнатуре — только для
+// отправки.
+func (cm *ConsensusModule) sendPreVoteToPeer(
+	ctx context.Context,
+	peerID, proposedTerm int,
+	respCh chan<- *RequestPreVoteReply,
+) {
+	cm.mu.Lock()
+	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTerm()
+	savedTerm := cm.cmState.currentTerm
+	cm.mu.Unlock()
+
+	if cm.transport == nil {
+		cm.traceLogf(0, "runPreCandidate: transport is nil, cannot send to %d", peerID)
+		select {
+		case respCh <- &RequestPreVoteReply{
+			RPCHeader:   RPCHeader{ProtocolVersion: ProtocolVersion, ServerID: cm.id},
+			Term:        savedTerm,
+			VoteGranted: false,
+		}:
+		case <-ctx.Done():
+		}
+		return
+	}
+
+	args := RequestPreVoteArgs{
+		RPCHeader: RPCHeader{
+			ProtocolVersion: ProtocolVersion,
+			ServerID:        cm.id,
+		},
+		Term:         proposedTerm,
+		LastLogIndex: lastLogIndex,
+		LastLogTerm:  lastLogTerm,
+	}
+
+	cm.traceLogf(4, "sending RequestPreVote to %d: %+v", peerID, args)
+	reply, err := cm.transport.RequestPreVote(ServerID(peerID), args)
+	if err != nil {
+		cm.traceLogf(4, "RequestPreVote to %d failed: %v", peerID, err)
+		var resp *RequestPreVoteReply
+		if err == ErrNotImplemented {
+			// Если транспорт не поддерживает PreVote, считаем голос
+			// предоставленным.
+			resp = &RequestPreVoteReply{
+				RPCHeader:   RPCHeader{ProtocolVersion: ProtocolVersion, ServerID: cm.id},
+				Term:        savedTerm,
+				VoteGranted: true,
+			}
+		} else {
+			resp = &RequestPreVoteReply{
+				RPCHeader:   RPCHeader{ProtocolVersion: ProtocolVersion, ServerID: cm.id},
+				Term:        savedTerm,
+				VoteGranted: false,
+			}
+		}
+		select {
+		case respCh <- resp:
+		case <-ctx.Done():
+		}
+		return
+	}
+	select {
+	case respCh <- &reply:
+	case <-ctx.Done():
+	}
+}
+
+// collectPreVoteReplies собирает ответы соседей на предварительное голосование
+// и решает его исход. Голос за себя учтён заранее, каждый пришедший ответ
+// засчитывается до проверок роли и терма. Ответ с более высоким термом, как и
+// потеря роли, прекращает сбор. При наборе кворума узел выжидает случайную
+// паузу — чтобы несколько узлов не начали выборы лидера одновременно с
+// одинаковым термом — и, если он всё ещё кандидат предварительного
+// голосования, запускает выборы лидера. Истечение тайм-аута выборов и
+// исчерпание ответов без кворума возвращают узел в ведомые; остановка узла
+// прекращает сбор, не трогая состояния.
+//
+// Самостоятельно захватывает и освобождает cm.mu. Канал в сигнатуре — только
+// для приёма.
+func (cm *ConsensusModule) collectPreVoteReplies(
+	voterCount int,
+	respCh <-chan *RequestPreVoteReply,
+) {
 	grantedVotes := 1 // голос за себя
 	neededVotes := quorumSize(voterCount)
 	votersResponded := 0
@@ -390,7 +427,7 @@ func (cm *ConsensusModule) runPreCandidate() {
 	// Собирать ответы от соседей.
 	for votersResponded < totalVoters {
 		select {
-		case reply := <-preVoteRespCh:
+		case reply := <-respCh:
 			votersResponded++
 			cm.mu.Lock()
 			if cm.cmState.state != PreCandidate {
@@ -412,18 +449,7 @@ func (cm *ConsensusModule) runPreCandidate() {
 					grantedVotes, neededVotes,
 				)
 				if grantedVotes >= neededVotes {
-					// Jitter перед выборами, чтобы одновременно несколько узлов
-					// не перешли в Candidate с одинаковым term (split vote).
-					time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond)
-					cm.mu.Lock()
-					if cm.cmState.state == PreCandidate {
-						cm.traceLockedLogf(
-							4, "runPreCandidate: won pre-vote with %d votes, starting election",
-							grantedVotes,
-						)
-						cm.startElectionLocked()
-					}
-					cm.mu.Unlock()
+					cm.startElectionAfterPreVote(grantedVotes)
 					return
 				}
 			}
@@ -453,6 +479,29 @@ func (cm *ConsensusModule) runPreCandidate() {
 			return
 		}
 	}
+}
+
+// startElectionAfterPreVote запускает выборы лидера после победы в
+// предварительном голосовании. Перед переходом узел выжидает случайную паузу,
+// чтобы несколько узлов не начали выборы одновременно с одинаковым термом, и
+// начинает выборы, только если за время паузы он остался кандидатом
+// предварительного голосования.
+//
+// Самостоятельно захватывает и освобождает cm.mu: пауза выдерживается без
+// блокировки, под блокировкой выполняются перепроверка роли и запуск выборов.
+func (cm *ConsensusModule) startElectionAfterPreVote(grantedVotes int) {
+	// Jitter перед выборами, чтобы одновременно несколько узлов
+	// не перешли в Candidate с одинаковым term (split vote).
+	time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond)
+	cm.mu.Lock()
+	if cm.cmState.state == PreCandidate {
+		cm.traceLockedLogf(
+			4, "runPreCandidate: won pre-vote with %d votes, starting election",
+			grantedVotes,
+		)
+		cm.startElectionLocked()
+	}
+	cm.mu.Unlock()
 }
 
 // electionTimeout генерирует псевдослучайную длительность тайм-аута выборов.
