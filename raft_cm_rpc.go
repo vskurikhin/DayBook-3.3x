@@ -72,7 +72,11 @@ func (cm *ConsensusModule) respondRPC(rpc RPC, reply any, err error) {
 // возврата из обработчика, поэтому сохранение состояния выполняется до
 // возврата и покрывает все ветки, изменившие постоянное состояние.
 //
-//nolint:funlen,gocognit,gocritic
+// Обработчик принимает аргументы по значению: такая сигнатура — часть
+// экспортируемого API обработчиков RPC и согласована с контрактом транспорта,
+// поэтому предупреждение о тяжёлом параметре подавлено.
+//
+//nolint:gocritic
 func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) error {
 	startTimeNow := time.Now()
 	defer func() { cm.latency.appendEntries.observe(time.Since(startTimeNow)) }()
@@ -91,22 +95,7 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 		args.RPCHeader, args.Term, args.LeaderID, args.PrevLogIndex, args.PrevLogTerm, len(args.Entries),
 	)
 
-	// Candidate от leadership transfer не должен делать step-down
-	// при получении AppendEntries от старого лидера, если терм равен
-	// текущему или на 1 меньше. Исключение: терм строго больше нашего.
-	if cm.cmState.state == Candidate && cm.cmState.candidateFromLeadershipTransfer.Load() {
-		if args.Term > cm.cmState.currentTerm {
-			cm.traceLockedLogf(8, "... term out of date in AppendEntries (candidate from LT)")
-			cm.becomeFollowerLocked(args.Term)
-			cm.cmState.candidateFromLeadershipTransfer.Store(false)
-		}
-		reply.RPCHeader = RPCHeader{
-			ProtocolVersion: ProtocolVersion,
-			ServerID:        cm.id,
-		}
-		reply.Term = cm.cmState.currentTerm
-		reply.Success = false
-		cm.persistToStorage()
+	if cm.appendEntriesDuringLeadershipTransferLocked(&args, reply) {
 		return nil
 	}
 
@@ -130,87 +119,14 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 		// условие считается истинным автоматически.
 		if args.PrevLogIndex == -1 ||
 			(args.PrevLogIndex <= cm.cmState.lastLogIndex && cm.lookupTermLocked(args.PrevLogIndex) == args.PrevLogTerm) {
-			reply.Success = true
-
-			// Находит точку вставки — место, где происходит несовпадение термов
-			// между существующими записями журнала, начиная с PrevLogIndex+1,
-			// и новыми записями, отправленными лидером через RPC.
-			// Используем logPositionLocked для поиска позиции в срезе после сжатия.
-			logInsertIndex := args.PrevLogIndex + 1
-			logInsertPos := cm.logPositionLocked(logInsertIndex)
-			newEntriesIndex := 0
-
-			for logInsertPos < len(cm.cmState.log) && newEntriesIndex < len(args.Entries) {
-				if cm.cmState.log[logInsertPos].Term != args.Entries[newEntriesIndex].Term {
-					break
-				}
-				logInsertPos++
-				logInsertIndex++
-				newEntriesIndex++
-			}
-			// После завершения этого цикла:
-			// - logInsertIndex указывает на конец журнала
-			//   или на индекс, где терм записи отличается от записи лидера.
-			// - newEntriesIndex указывает на конец массива Entries
-			//   или на индекс, где терм записи отличается от соответствующей записи журнала.
-			if newEntriesIndex < len(args.Entries) {
-				cm.traceLockedLogf(
-					8, "... inserting entries %v from index %d",
-					args.Entries[newEntriesIndex:], logInsertIndex,
-				)
-				cm.cmState.log = append(cm.cmState.log[:logInsertPos], args.Entries[newEntriesIndex:]...)
-				cm.traceLockedLogf(16, "... log is now: %v", cm.cmState.log)
-				cm.rebuildLastLog()
-				cm.rebuildTermIndexMap()
-				cm.cmState.logNeedsPersist = true
-				// Если перезапись затронула конфигурацию, откатываем latest.
-				cm.processLogConflict(logInsertIndex)
-			}
-
-			// Обработать LogConfiguration записи в полученном диапазоне.
-			for _, entry := range args.Entries[newEntriesIndex:] {
-				if entry.Type == LogConfiguration {
-					cm.processConfigurationLogEntry(&entry)
-				}
-			}
-
-			if args.LeaderCommit > cm.cmState.commitIndex {
-				cm.cmState.commitIndex = min(args.LeaderCommit, cm.cmState.lastLogIndex)
-				cm.traceLockedLogf(8, "... setting commitIndex=%d", cm.cmState.commitIndex)
-				cm.persistToStorage()
-				commitIdx := cm.cmState.commitIndex
+			commitIdx, advanced := cm.appendMatchingEntriesLocked(&args, reply)
+			if advanced {
 				cm.mu.Unlock()
 				cm.processLogs(commitIdx)
 				cm.mu.Lock()
 			}
 		} else {
-			// Не найдено совпадение для PrevLogIndex/PrevLogTerm.
-			if args.PrevLogIndex > cm.cmState.lastLogIndex {
-				// Нижняя граница по границе снимка
-				// follower никогда не
-				// запрашивает записи, покрытые его собственным снимком.
-				// Обе величины совпадают; правило —
-				// дополнительная линия защиты.
-				reply.ConflictIndex = max(cm.cmState.lastLogIndex, cm.cmState.lastSnapshotIndex) + 1
-				reply.ConflictTerm = -1
-			} else {
-				reply.ConflictTerm = cm.lookupTermLocked(args.PrevLogIndex)
-				// Ищем первую запись с данным термом, двигаясь назад от PrevLogIndex.
-				// Используем бинарный поиск вместо линейного, так как лог может
-				// быть сжат, и prevLogIndex может быть вне среза.
-				pos := cm.logPositionLocked(args.PrevLogIndex)
-				i := pos - 1
-				for 0 <= i && i < len(cm.cmState.log) && cm.cmState.log[i].Term == reply.ConflictTerm {
-					i--
-				}
-				if i+1 < len(cm.cmState.log) {
-					reply.ConflictIndex = cm.cmState.log[i+1].Index
-				} else {
-					// Журнал пуст или conflictIndex вне диапазона.
-					// Используем PrevLogIndex как fallback.
-					reply.ConflictIndex = args.PrevLogIndex
-				}
-			}
+			cm.buildConflictReplyLocked(&args, reply)
 		}
 	}
 
@@ -227,6 +143,137 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 	reply.Term = cm.cmState.currentTerm
 	cm.traceLockedLogf(8, "AppendEntries reply: %+v", *reply)
 	return nil
+}
+
+// appendEntriesDuringLeadershipTransferLocked обрабатывает AppendEntries,
+// пришедший кандидату, выдвинутому передачей лидерства. Такой кандидат
+// отвечает отказом и сохраняет свою роль; в ведомые его возвращает только
+// строго больший терм. Возвращает true, когда ответ сформирован здесь и
+// обработчику больше делать нечего.
+//
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) appendEntriesDuringLeadershipTransferLocked(
+	args *AppendEntriesArgs, reply *AppendEntriesReply,
+) (handled bool) {
+	// Candidate от leadership transfer не должен делать step-down
+	// при получении AppendEntries от старого лидера, если терм равен
+	// текущему или на 1 меньше. Исключение: терм строго больше нашего.
+	if cm.cmState.state == Candidate && cm.cmState.candidateFromLeadershipTransfer.Load() {
+		if args.Term > cm.cmState.currentTerm {
+			cm.traceLockedLogf(8, "... term out of date in AppendEntries (candidate from LT)")
+			cm.becomeFollowerLocked(args.Term)
+			cm.cmState.candidateFromLeadershipTransfer.Store(false)
+		}
+		reply.RPCHeader = RPCHeader{
+			ProtocolVersion: ProtocolVersion,
+			ServerID:        cm.id,
+		}
+		reply.Term = cm.cmState.currentTerm
+		reply.Success = false
+		cm.persistToStorage()
+		return true
+	}
+	return false
+}
+
+// appendMatchingEntriesLocked выполняет путь успеха: журнал содержит запись
+// PrevLogIndex с термом PrevLogTerm. Метод находит точку вставки, дописывает
+// недостающие записи лидера, обрабатывает попавшие в диапазон записи
+// конфигурации и продвигает индекс фиксации. Возвращает индекс фиксации и
+// признак того, что продвижение состоялось; применение записей к машине
+// состояний остаётся за вызывающим и выполняется без удержания блокировки.
+//
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) appendMatchingEntriesLocked(
+	args *AppendEntriesArgs, reply *AppendEntriesReply,
+) (commitIdx int, advanced bool) {
+	reply.Success = true
+
+	// Находит точку вставки — место, где происходит несовпадение термов
+	// между существующими записями журнала, начиная с PrevLogIndex+1,
+	// и новыми записями, отправленными лидером через RPC.
+	// Используем logPositionLocked для поиска позиции в срезе после сжатия.
+	logInsertIndex := args.PrevLogIndex + 1
+	logInsertPos := cm.logPositionLocked(logInsertIndex)
+	newEntriesIndex := 0
+
+	for logInsertPos < len(cm.cmState.log) && newEntriesIndex < len(args.Entries) {
+		if cm.cmState.log[logInsertPos].Term != args.Entries[newEntriesIndex].Term {
+			break
+		}
+		logInsertPos++
+		logInsertIndex++
+		newEntriesIndex++
+	}
+	// После завершения этого цикла:
+	// - logInsertIndex указывает на конец журнала
+	//   или на индекс, где терм записи отличается от записи лидера.
+	// - newEntriesIndex указывает на конец массива Entries
+	//   или на индекс, где терм записи отличается от соответствующей записи журнала.
+	if newEntriesIndex < len(args.Entries) {
+		cm.traceLockedLogf(
+			8, "... inserting entries %v from index %d",
+			args.Entries[newEntriesIndex:], logInsertIndex,
+		)
+		cm.cmState.log = append(cm.cmState.log[:logInsertPos], args.Entries[newEntriesIndex:]...)
+		cm.traceLockedLogf(16, "... log is now: %v", cm.cmState.log)
+		cm.rebuildLastLog()
+		cm.rebuildTermIndexMap()
+		cm.cmState.logNeedsPersist = true
+		// Если перезапись затронула конфигурацию, откатываем latest.
+		cm.processLogConflict(logInsertIndex)
+	}
+
+	// Обработать LogConfiguration записи в полученном диапазоне.
+	for _, entry := range args.Entries[newEntriesIndex:] {
+		if entry.Type == LogConfiguration {
+			cm.processConfigurationLogEntry(&entry)
+		}
+	}
+
+	if args.LeaderCommit > cm.cmState.commitIndex {
+		cm.cmState.commitIndex = min(args.LeaderCommit, cm.cmState.lastLogIndex)
+		cm.traceLockedLogf(8, "... setting commitIndex=%d", cm.cmState.commitIndex)
+		cm.persistToStorage()
+		return cm.cmState.commitIndex, true
+	}
+	return 0, false
+}
+
+// buildConflictReplyLocked заполняет подсказку о конфликте, когда журнал не
+// содержит записи PrevLogIndex с термом PrevLogTerm: по паре
+// ConflictIndex/ConflictTerm лидер откатывает nextIndex за один шаг вместо
+// последовательного уменьшения.
+//
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) buildConflictReplyLocked(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+	// Не найдено совпадение для PrevLogIndex/PrevLogTerm.
+	if args.PrevLogIndex > cm.cmState.lastLogIndex {
+		// Нижняя граница по границе снимка
+		// follower никогда не
+		// запрашивает записи, покрытые его собственным снимком.
+		// Обе величины совпадают; правило —
+		// дополнительная линия защиты.
+		reply.ConflictIndex = max(cm.cmState.lastLogIndex, cm.cmState.lastSnapshotIndex) + 1
+		reply.ConflictTerm = -1
+	} else {
+		reply.ConflictTerm = cm.lookupTermLocked(args.PrevLogIndex)
+		// Ищем первую запись с данным термом, двигаясь назад от PrevLogIndex.
+		// Используем бинарный поиск вместо линейного, так как лог может
+		// быть сжат, и prevLogIndex может быть вне среза.
+		pos := cm.logPositionLocked(args.PrevLogIndex)
+		i := pos - 1
+		for 0 <= i && i < len(cm.cmState.log) && cm.cmState.log[i].Term == reply.ConflictTerm {
+			i--
+		}
+		if i+1 < len(cm.cmState.log) {
+			reply.ConflictIndex = cm.cmState.log[i+1].Index
+		} else {
+			// Журнал пуст или conflictIndex вне диапазона.
+			// Используем PrevLogIndex как fallback.
+			reply.ConflictIndex = args.PrevLogIndex
+		}
+	}
 }
 
 // RequestVote обрабатывает входящий запрос голосования (§5.4.1).

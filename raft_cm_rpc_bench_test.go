@@ -83,7 +83,7 @@ func BenchmarkCMAppendEntriesHeartbeat(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cm.AppendEntries(args, &reply)
+		_ = cm.AppendEntries(args, &reply)
 	}
 }
 
@@ -120,7 +120,7 @@ func BenchmarkCMAppendEntriesEntries(b *testing.B) {
 		}
 		b.StartTimer()
 
-		cm.AppendEntries(args, &reply)
+		_ = cm.AppendEntries(args, &reply)
 	}
 }
 
@@ -143,6 +143,6 @@ func BenchmarkCMAppendEntriesConflict(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cm.AppendEntries(args, &reply)
+		_ = cm.AppendEntries(args, &reply)
 	}
 }

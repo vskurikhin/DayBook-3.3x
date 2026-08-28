@@ -240,3 +240,75 @@ func TestAppendEntries_CandidateFromLeadershipTransfer_NoStepDown(t *testing.T) 
 		})
 	}
 }
+
+// TestAppendEntries_HigherTerm_StepsDownInHandler пинит ветку продвижения терма
+// самого обработчика: AppendEntries со строго большим термом обязан вернуть
+// узел в ведомые, поднять currentTerm, сбросить голос и сохранить состояние —
+// и только после этого исполняется ветка равного терма.
+//
+// Прицельный страж нужен отдельно: интеграционный
+// TestLeader_StepDown_AppendEntriesHigherTerm разрешает свой future и без этой
+// ветки, потому что изолированный лидер теряет лидерство и по потере кворума,
+// то есть удаление becomeFollowerLocked из обработчика тем тестом не ловится.
+func TestAppendEntries_HigherTerm_StepsDownInHandler(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	cm := &ConsensusModule{}
+	cm.id = 3
+	cm.storage = NewMapStorage()
+	cm.shutdownCh = make(chan struct{})
+	cm.cmState.state = Candidate
+	cm.cmState.currentTerm = 2
+	cm.cmState.votedFor = 3
+	cm.cmState.lastLogIndex = 0
+	cm.cmState.lastLogTerm = 2
+	cm.cmState.commitIndex = 0
+	cm.cmState.log = []LogEntry{{Index: 0, Term: 2, Type: LogCommand, Data: "x"}}
+	cm.cmState.termIndexMap = map[int]int{2: 0}
+	cm.cmState.electionTimerDone = make(chan struct{})
+	defer close(cm.shutdownCh)
+
+	var reply AppendEntriesReply
+	if err := cm.AppendEntries(AppendEntriesArgs{
+		RPCHeader:    RPCHeader{ProtocolVersion: ProtocolVersion, ServerID: 1},
+		Term:         5,
+		LeaderID:     1,
+		PrevLogIndex: -1,
+		PrevLogTerm:  -1,
+		LeaderCommit: -1,
+	}, &reply); err != nil {
+		t.Fatalf("AppendEntries: %v", err)
+	}
+
+	if reply.Term != 5 {
+		t.Fatalf("reply.Term = %d, want 5 (term advanced by the handler)", reply.Term)
+	}
+	if !reply.Success {
+		t.Fatal("reply.Success = false, want true (equal-term branch runs after step-down)")
+	}
+
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if cm.cmState.state != Follower {
+		t.Fatalf("state = %v, want Follower after AppendEntries with higher term", cm.cmState.state)
+	}
+	if cm.cmState.currentTerm != 5 {
+		t.Fatalf("currentTerm = %d, want 5", cm.cmState.currentTerm)
+	}
+	if cm.cmState.votedFor != -1 {
+		t.Fatalf("votedFor = %d, want -1 (vote reset on term advance)", cm.cmState.votedFor)
+	}
+	if cm.cmState.leaderID != 1 {
+		t.Fatalf("leaderID = %d, want 1 (contact triplet of the equal-term branch)", cm.cmState.leaderID)
+	}
+
+	data, ok := cm.storage.Get("currentTerm")
+	if !ok {
+		t.Fatal("currentTerm not persisted")
+	}
+	var stored int
+	gobDecode(t, data, &stored)
+	if stored != 5 {
+		t.Fatalf("persisted currentTerm = %d, want 5", stored)
+	}
+}
