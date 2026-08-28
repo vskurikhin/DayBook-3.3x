@@ -113,59 +113,74 @@ func (cm *ConsensusModule) startElectionLocked() {
 			continue
 		}
 		cm.goSpawnLocked(func() {
-			cm.mu.Lock()
-			savedLastLogIndex, savedLastLogTerm := cm.lastLogIndexAndTerm()
-			cm.mu.Unlock()
-
-			args := RequestVoteArgs{
-				RPCHeader: RPCHeader{
-					ProtocolVersion: ProtocolVersion,
-					ServerID:        cm.id,
-				},
-				Term:               savedCurrentTerm,
-				CandidateID:        cm.id,
-				LastLogIndex:       savedLastLogIndex,
-				LastLogTerm:        savedLastLogTerm,
-				LeadershipTransfer: isLeadershipTransfer,
-			}
-
-			cm.traceLogf(0, "sending RequestVote to %d: %+v", peerID, args)
-			reply, err := cm.transport.RequestVote(ServerID(peerID), args)
-			if err == nil {
-				cm.mu.Lock()
-				cm.traceLockedLogf(0, "received RequestVoteReply %+v", reply)
-
-				if cm.cmState.state != Candidate {
-					cm.traceLockedLogf(0, "while waiting for reply, state = %v", cm.cmState.state)
-					cm.mu.Unlock()
-					return
-				}
-
-				if reply.Term > cm.cmState.currentTerm {
-					cm.traceLockedLogf(0, "term out of date in RequestVoteReply")
-					cm.becomeFollowerLocked(reply.Term)
-					cm.mu.Unlock()
-					return
-				} else if reply.Term == cm.cmState.currentTerm {
-					if reply.VoteGranted {
-						votesReceived.Add(1)
-						if int(votesReceived.Load()) >= quorumSize(voterCount) {
-							// Выиграл выборы!
-							cm.traceLockedLogf(2, "wins election with %d votes", votesReceived.Load())
-							cm.startLeaderLocked()
-							cm.mu.Unlock()
-							slog.Info("wins election", slog.Int("votes", int(votesReceived.Load())))
-							return
-						}
-					}
-				}
-				cm.mu.Unlock()
-			}
+			cm.requestVoteFromPeer(peerID, savedCurrentTerm, voterCount, isLeadershipTransfer, &votesReceived)
 		})
 	}
 
 	// Запустить новый таймер выборов на случай, если текущие выборы не завершатся успешно.
 	cm.goSpawnLocked(cm.runElectionTimer)
+}
+
+// requestVoteFromPeer отправляет RequestVote одному соседу и учитывает ответ;
+// голос засчитывается, пока узел остаётся кандидатом того же терма.
+//
+// Самостоятельно захватывает и освобождает cm.mu: две короткие критические
+// секции — снимок lastLogIndexAndTerm() и разбор ответа; вызов транспорта
+// происходит между ними, без блокировки. votesReceived передаётся указателем,
+// чтобы общий счётчик голосов выборов разделялся между горутинами соседей.
+func (cm *ConsensusModule) requestVoteFromPeer(
+	peerID, savedCurrentTerm, voterCount int,
+	isLeadershipTransfer bool,
+	votesReceived *atomic.Int32,
+) {
+	cm.mu.Lock()
+	savedLastLogIndex, savedLastLogTerm := cm.lastLogIndexAndTerm()
+	cm.mu.Unlock()
+
+	args := RequestVoteArgs{
+		RPCHeader: RPCHeader{
+			ProtocolVersion: ProtocolVersion,
+			ServerID:        cm.id,
+		},
+		Term:               savedCurrentTerm,
+		CandidateID:        cm.id,
+		LastLogIndex:       savedLastLogIndex,
+		LastLogTerm:        savedLastLogTerm,
+		LeadershipTransfer: isLeadershipTransfer,
+	}
+
+	cm.traceLogf(0, "sending RequestVote to %d: %+v", peerID, args)
+	reply, err := cm.transport.RequestVote(ServerID(peerID), args)
+	if err == nil {
+		cm.mu.Lock()
+		cm.traceLockedLogf(0, "received RequestVoteReply %+v", reply)
+
+		if cm.cmState.state != Candidate {
+			cm.traceLockedLogf(0, "while waiting for reply, state = %v", cm.cmState.state)
+			cm.mu.Unlock()
+			return
+		}
+
+		if reply.Term > cm.cmState.currentTerm {
+			cm.traceLockedLogf(0, "term out of date in RequestVoteReply")
+			cm.becomeFollowerLocked(reply.Term)
+			cm.mu.Unlock()
+			return
+		} else if reply.Term == cm.cmState.currentTerm {
+			if reply.VoteGranted {
+				votesReceived.Add(1)
+				if int(votesReceived.Load()) >= quorumSize(voterCount) {
+					// Выиграл выборы!
+					cm.traceLockedLogf(2, "wins election with %d votes", votesReceived.Load())
+					cm.startLeaderLocked()
+					cm.mu.Unlock()
+					slog.Info("wins election", slog.Int("votes", int(votesReceived.Load())))
+					return
+				}
+			}
+		}
+		cm.mu.Unlock()
+	}
 }
 
 // runElectionTimer — фоновый таймер выборов.

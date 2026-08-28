@@ -1,8 +1,11 @@
 package raft
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/fortytw2/leaktest"
 )
 
 // Стресс‑режим для тестирования выборов: если задана переменная окружения,
@@ -103,4 +106,146 @@ func hookedShare(t *testing.T, hooked time.Duration) float64 {
 		}
 	}
 	return float64(exact) / float64(hookSamples)
+}
+
+// recordingVoteTransport — локальная заглушка транспорта (приём
+// blockingPreVoteTransport, prevote_test.go:347-359): встраивает интерфейс
+// Transport и переопределяет только RequestVote. Запоминает адресата и полную
+// копию RequestVoteArgs, возвращает ответ, не совпадающий по терму и не
+// дающий голоса. Остальные методы интерфейса остаются недостижимыми.
+type recordingVoteTransport struct {
+	Transport
+	peerID ServerID
+	args   RequestVoteArgs
+	calls  int
+}
+
+// RequestVote фиксирует исходящие аргументы для последующей проверки
+// плетения параметров requestVoteFromPeer.
+func (t *recordingVoteTransport) RequestVote(peerID ServerID, args RequestVoteArgs) (RequestVoteReply, error) {
+	t.peerID = peerID
+	t.args = args
+	t.calls++
+	return RequestVoteReply{Term: 0, VoteGranted: false}, nil
+}
+
+// newRequestVoteFromPeerTestCM собирает узел для прямого вызова
+// requestVoteFromPeer: кандидат с двумя голосующими (0, 1), явно заданными
+// кэшированными полями журнала. Приём сборки — newPreVoteTestCM
+// (prevote_test.go:301-325), но роль — Candidate, votedFor — 0, а
+// lastLogIndex/lastLogTerm — явными нетривиальными значениями, попарно
+// различными и отличными от peerID, voterCount и savedCurrentTerm, иначе
+// перестановка параметров осталась бы незамеченной.
+func newRequestVoteFromPeerTestCM(transport Transport, term, lastLogIndex, lastLogTerm int) *ConsensusModule {
+	cm := &ConsensusModule{
+		id:         0,
+		transport:  transport,
+		storage:    NewMapStorage(),
+		shutdownCh: make(chan struct{}),
+		cmState: cmState{
+			state:        Candidate,
+			currentTerm:  term,
+			votedFor:     0,
+			lastLogIndex: lastLogIndex,
+			lastLogTerm:  lastLogTerm,
+			configurations: configurations{
+				latest: Configuration{
+					ConfigServers: []ConfigServer{
+						{ID: 0, Suffrage: Voter},
+						{ID: 1, Suffrage: Voter},
+					},
+				},
+			},
+		},
+	}
+	cm.cmState.log = make([]LogEntry, 0)
+	return cm
+}
+
+// TestRequestVoteFromPeer_OutgoingArgs — белоящичный тест T-1 исходящих
+// аргументов RequestVote, формируемых requestVoteFromPeer. Страж мутации 2
+// AC-7 (плетение параметров пятиместной сигнатуры).
+//
+// Без кластера, без сети, без таймеров и без сна: requestVoteFromPeer
+// вызывается синхронно из горутины теста. Ответ заглушки (Term: 0,
+// VoteGranted: false) не совпадает по терму и не даёт голоса, поэтому разбор
+// ответа не меняет состояние, не вызывает becomeFollowerLocked/startLeaderLocked
+// и не порождает горутин.
+func TestRequestVoteFromPeer_OutgoingArgs(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	const (
+		// savedCurrentTerm — терм выборов, отличный от нуля и от peerID.
+		savedCurrentTerm = 5
+		peerID           = 1
+		voterCount       = 2
+		// lastLogIndex/lastLogTerm — попарно различные и отличные от
+		// peerID, voterCount и savedCurrentTerm, чтобы перестановка
+		// параметров осталась замеченной.
+		lastLogIndex = 7
+		lastLogTerm  = 3
+	)
+
+	// Оба подслучая обязательны: передача лидерства и обычные выборы.
+	subtests := []struct {
+		name                 string
+		isLeadershipTransfer bool
+		wantLT               bool
+	}{
+		{name: "leadership transfer", isLeadershipTransfer: true, wantLT: true},
+		{name: "обычные выборы", isLeadershipTransfer: false, wantLT: false},
+	}
+
+	for _, tc := range subtests {
+		t.Run(tc.name, func(t *testing.T) {
+			transport := &recordingVoteTransport{}
+			cm := newRequestVoteFromPeerTestCM(transport, savedCurrentTerm, lastLogIndex, lastLogTerm)
+
+			// Ожидаемые значения журнала читаем под cm.mu: lastLogIndexAndTerm
+			// требует удержания блокировки (raft_cm_log.go:12).
+			cm.mu.Lock()
+			wantLastLogIndex, wantLastLogTerm := cm.lastLogIndexAndTerm()
+			cm.mu.Unlock()
+
+			var votesReceived atomic.Int32
+			votesReceived.Store(1)
+
+			cm.requestVoteFromPeer(peerID, savedCurrentTerm, voterCount, tc.isLeadershipTransfer, &votesReceived)
+
+			// Общие утверждения обоих подслучаев (плетение параметров).
+			if transport.calls != 1 {
+				t.Fatalf("transport вызван %d раз, want 1", transport.calls)
+			}
+			if transport.peerID != ServerID(peerID) {
+				t.Errorf("адресат = %v, want %v", transport.peerID, ServerID(peerID))
+			}
+			if transport.args.Term != savedCurrentTerm {
+				t.Errorf("args.Term = %d, want %d", transport.args.Term, savedCurrentTerm)
+			}
+			if transport.args.CandidateID != cm.id {
+				t.Errorf("args.CandidateID = %d, want %d", transport.args.CandidateID, cm.id)
+			}
+			if transport.args.RPCHeader.ServerID != cm.id {
+				t.Errorf("args.RPCHeader.ServerID = %d, want %d", transport.args.RPCHeader.ServerID, cm.id)
+			}
+			if transport.args.RPCHeader.ProtocolVersion != ProtocolVersion {
+				t.Errorf(
+					"args.RPCHeader.ProtocolVersion = %d, want %d",
+					transport.args.RPCHeader.ProtocolVersion, ProtocolVersion,
+				)
+			}
+			if transport.args.LastLogIndex != wantLastLogIndex {
+				t.Errorf("args.LastLogIndex = %d, want %d", transport.args.LastLogIndex, wantLastLogIndex)
+			}
+			if transport.args.LastLogTerm != wantLastLogTerm {
+				t.Errorf("args.LastLogTerm = %d, want %d", transport.args.LastLogTerm, wantLastLogTerm)
+			}
+			if transport.args.LeadershipTransfer != tc.wantLT {
+				t.Errorf(
+					"args.LeadershipTransfer = %v, want %v",
+					transport.args.LeadershipTransfer, tc.wantLT,
+				)
+			}
+		})
+	}
 }
