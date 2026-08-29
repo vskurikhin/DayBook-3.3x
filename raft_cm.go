@@ -1,9 +1,7 @@
 package raft
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -373,17 +371,6 @@ func (cm *ConsensusModule) goSpawn(fn func()) {
 	cm.mu.Lock()
 	cm.goSpawnLocked(fn)
 	cm.mu.Unlock()
-}
-
-// debugLogf выводит отладочное сообщение.
-//
-//nolint:unused
-func (cm *ConsensusModule) debugLogf(format string, args ...any) {
-	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-		format = fmt.Sprintf("[%c,N:%d,T:%03d] ", stateLetter(cm.cmState.state), cm.id, cm.cmState.currentTerm) +
-			format
-		slog.Debug(fmt.Sprintf(format, args...))
-	}
 }
 
 func (cm *ConsensusModule) stdoutTracePrintln(msg string) {
