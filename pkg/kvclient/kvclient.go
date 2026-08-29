@@ -190,9 +190,8 @@ func (c *KVClient) send(ctx context.Context, route string, req any, resp api.Res
 // clientLogf выводит отладочное сообщение, если DebugClient > 0.
 func (c *KVClient) clientLogf(format string, args ...any) {
 	if DebugClient > 0 {
-		clientName := fmt.Sprintf("[client%03d]", c.clientID)
-		format = clientName + " " + format
-		log.Printf(format, args...)
+		clientName := fmt.Sprintf("[client%03d] ", c.clientID)
+		log.Printf(clientName+format, args...)
 	}
 }
 

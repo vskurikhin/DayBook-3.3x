@@ -459,7 +459,7 @@ func TestRestartServiceGetsNewPort(t *testing.T) {
 		t.Fatalf("service %d has no HTTP address after restart", victim)
 	}
 	if newAddr == oldAddr {
-		t.Fatalf("service %d reused address %q after restart on \":0\"", victim, newAddr)
+		t.Fatalf(`service %d reused address %q after restart on ":0"`, victim, newAddr)
 	}
 
 	// Перезапущенный сервис отвечает по НОВОМУ адресу: /verifyleader/

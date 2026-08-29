@@ -55,10 +55,7 @@ func (cm *ConsensusModule) nextIndexArgsEntries(peerID, savedCurrentTerm int) (i
 			entries = append([]LogEntry{}, cm.cmState.log[pos:]...)
 		} else {
 			cm.traceLockedLogf(1, "nextIndexArgsEntries: logPositionLocked(%d) out of range (len=%d)", ni, len(cm.cmState.log))
-			entries = nil
 		}
-	} else {
-		entries = nil
 	}
 	return ni, AppendEntriesArgs{
 		RPCHeader: RPCHeader{

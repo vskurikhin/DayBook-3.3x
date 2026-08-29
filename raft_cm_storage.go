@@ -67,29 +67,29 @@ func (cm *ConsensusModule) persistToStorage() {
 // из хранилища. Должен вызываться в конструкторе до запуска какой-либо
 // конкурентной работы.
 func (cm *ConsensusModule) restoreFromStorage() {
-	if termData, found := cm.storage.Get("currentTerm"); found {
-		d := gob.NewDecoder(bytes.NewBuffer(termData))
-		if err := d.Decode(&cm.cmState.currentTerm); err != nil {
-			log.Fatal(err)
-		}
-	} else {
+	termData, found := cm.storage.Get("currentTerm")
+	if !found {
 		log.Fatal("currentTerm not found in storage")
 	}
-	if votedData, found := cm.storage.Get("votedFor"); found {
-		d := gob.NewDecoder(bytes.NewBuffer(votedData))
-		if err := d.Decode(&cm.cmState.votedFor); err != nil {
-			log.Fatal(err)
-		}
-	} else {
+	d := gob.NewDecoder(bytes.NewBuffer(termData))
+	if err := d.Decode(&cm.cmState.currentTerm); err != nil {
+		log.Fatal(err)
+	}
+	votedData, found := cm.storage.Get("votedFor")
+	if !found {
 		log.Fatal("votedFor not found in storage")
 	}
-	if logData, found := cm.storage.Get("log"); found {
-		d := gob.NewDecoder(bytes.NewBuffer(logData))
-		if err := d.Decode(&cm.cmState.log); err != nil {
-			log.Fatal(err)
-		}
-	} else {
+	d = gob.NewDecoder(bytes.NewBuffer(votedData))
+	if err := d.Decode(&cm.cmState.votedFor); err != nil {
+		log.Fatal(err)
+	}
+	logData, found := cm.storage.Get("log")
+	if !found {
 		log.Fatal("log not found in storage")
+	}
+	d = gob.NewDecoder(bytes.NewBuffer(logData))
+	if err := d.Decode(&cm.cmState.log); err != nil {
+		log.Fatal(err)
 	}
 	if err := cm.checkSnapshotKeysConsistency(); err != nil {
 		log.Fatal(err)
