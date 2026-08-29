@@ -1399,6 +1399,29 @@ func TestConfiguration_GetConfigurationOnFollower(t *testing.T) {
 	t.Fatal("no follower found")
 }
 
+// TestGetConfiguration_ReturnsCopy проверяет, что срез ConfigServers,
+// полученный через публичный API, является защитной копией: его мутация
+// не влияет на следующую конфигурацию, возвращаемую GetConfiguration.
+func TestGetConfiguration_ReturnsCopy(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	cm := testServerWithFSM(t, &CaptureFSM{})
+	defer cm.Stop()
+
+	cfg := cm.GetConfiguration().Configuration()
+	if len(cfg.ConfigServers) < 1 {
+		t.Fatalf("expected at least one server, got %+v", cfg)
+	}
+	cfg.ConfigServers[0].ID = ServerID(99)
+
+	cfg2 := cm.GetConfiguration().Configuration()
+	if len(cfg2.ConfigServers) < 1 {
+		t.Fatalf("expected at least one server, got %+v", cfg2)
+	}
+	if cfg2.ConfigServers[0].ID == ServerID(99) {
+		t.Fatalf("GetConfiguration returned aliased config: %+v", cfg2)
+	}
+}
+
 // TestConfiguration_RejectNotLeader проверяет, что запрос к не-лидеру
 // возвращает ошибку.
 func TestConfiguration_RejectNotLeader(t *testing.T) {

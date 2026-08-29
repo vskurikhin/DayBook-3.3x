@@ -2,6 +2,7 @@ package raft
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -305,9 +306,10 @@ type cmState struct {
 func (cm *ConsensusModule) GetConfiguration() ConfigurationFuture {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	return &configurationsFuture{
-		config: cm.cmState.configurations.latest,
-	}
+	// Защитная копия среза на границе: мутация вызывающим не влияет на конфигурацию.
+	cfg := cm.cmState.configurations.latest
+	cfg.ConfigServers = slices.Clone(cfg.ConfigServers)
+	return &configurationsFuture{config: cfg}
 }
 
 // Report отчет о состоянии данного CM.

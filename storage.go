@@ -1,8 +1,14 @@
 package raft
 
-import "sync"
+import (
+	"slices"
+	"sync"
+)
 
 // Storage — интерфейс, реализуемый поставщиками постоянного хранилища.
+// Контракт границ: Set сохраняет копию переданного value; Get возвращает
+// защитную копию — вызывающий может мутировать полученный срез, не затрагивая
+// хранилище.
 type Storage interface {
 	Set(key string, value []byte)
 
@@ -33,13 +39,13 @@ func (ms *MapStorage) Get(key string) ([]byte, bool) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 	v, found := ms.m[key]
-	return v, found
+	return slices.Clone(v), found
 }
 
 func (ms *MapStorage) Set(key string, value []byte) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
-	ms.m[key] = value
+	ms.m[key] = slices.Clone(value)
 }
 
 func (ms *MapStorage) HasData() bool {
