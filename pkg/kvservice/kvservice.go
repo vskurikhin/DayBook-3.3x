@@ -65,7 +65,7 @@ type TraceConfig struct {
 // SetTrace — единственная точка конфигурации трассировки пакета.
 func SetTrace(cfg TraceConfig) error {
 	if traceConfigured.Load() || traceCMCreated.Load() {
-		return fmt.Errorf(
+		return errors.New(
 			"kvservice: trace configuration must be set exactly once, " +
 				"before the first KVService is created; repeated calls are forbidden",
 		)

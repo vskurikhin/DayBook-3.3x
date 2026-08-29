@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -647,7 +648,7 @@ func TestInmemAppendEntriesError(t *testing.T) {
 	go func() {
 		select {
 		case rpc := <-t2.Consumer():
-			rpc.RespChan <- RPCResponse{Error: fmt.Errorf("raft: test error")}
+			rpc.RespChan <- RPCResponse{Error: errors.New("raft: test error")}
 		case <-done:
 		}
 	}()

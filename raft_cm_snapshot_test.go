@@ -3,6 +3,7 @@ package raft
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -25,7 +26,7 @@ func (f *failingSnapshotStore) Create(_, _ int, _ Configuration, _ int) (Snapsho
 	f.mu.Lock()
 	f.creates++
 	f.mu.Unlock()
-	return nil, fmt.Errorf("create failed")
+	return nil, errors.New("create failed")
 }
 
 func (f *failingSnapshotStore) List() ([]*SnapshotMeta, error) {
@@ -33,7 +34,7 @@ func (f *failingSnapshotStore) List() ([]*SnapshotMeta, error) {
 }
 
 func (f *failingSnapshotStore) Open(_ string) (*SnapshotMeta, io.ReadCloser, error) {
-	return nil, nil, fmt.Errorf("open failed")
+	return nil, nil, errors.New("open failed")
 }
 
 func (f *failingSnapshotStore) createCount() int {

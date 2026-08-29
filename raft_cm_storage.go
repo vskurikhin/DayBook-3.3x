@@ -3,6 +3,7 @@ package raft
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -158,7 +159,7 @@ func (cm *ConsensusModule) restoreFromSnapshotStore() error {
 	if len(snapshots) > 0 {
 		latest := snapshots[0] // List упорядочен от новых к старым
 		if latest == nil || latest.ID == "" {
-			return fmt.Errorf("snapshot store returned invalid snapshot meta")
+			return errors.New("snapshot store returned invalid snapshot meta")
 		}
 		if latest.Index < cm.cmState.lastSnapshotIndex {
 			return fmt.Errorf(

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -179,7 +180,7 @@ func (c *KVClient) send(ctx context.Context, route string, req any, resp api.Res
 		case api.StatusOK:
 			return nil
 		case api.StatusFailedCommit:
-			return fmt.Errorf("commit failed; please retry")
+			return errors.New("commit failed; please retry")
 		default:
 			panic("unreachable")
 		}

@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -243,12 +244,12 @@ func (cm *ConsensusModule) receiveAndSealSnapshot(
 		return "", err
 	}
 	if sink == nil {
-		return "", fmt.Errorf("snapshotStore.Create returned nil sink without error")
+		return "", errors.New("snapshotStore.Create returned nil sink without error")
 	}
 
 	if rpc.Reader == nil {
 		_ = sink.Cancel()
-		return "", fmt.Errorf("InstallSnapshot with nil Reader")
+		return "", errors.New("InstallSnapshot with nil Reader")
 	}
 	n, err := io.Copy(sink, rpc.Reader)
 	if err != nil {
@@ -270,7 +271,7 @@ func (cm *ConsensusModule) receiveAndSealSnapshot(
 	sinkID = sink.ID()
 	if sinkID == "" {
 		_ = sink.Cancel()
-		return "", fmt.Errorf("sink.ID() is empty")
+		return "", errors.New("sink.ID() is empty")
 	}
 	return sinkID, nil
 }
@@ -338,7 +339,7 @@ func (cm *ConsensusModule) takeSnapshot() error {
 		return err
 	}
 	if snapReq.snapshot == nil {
-		return fmt.Errorf("takeSnapshot: snapshot is nil after successful FSM response")
+		return errors.New("takeSnapshot: snapshot is nil after successful FSM response")
 	}
 	defer snapReq.snapshot.Release()
 
@@ -352,7 +353,7 @@ func (cm *ConsensusModule) takeSnapshot() error {
 		return fmt.Errorf("failed to create snapshot: %w", err)
 	}
 	if sink == nil {
-		return fmt.Errorf("snapshotStore.Create returned nil sink without error")
+		return errors.New("snapshotStore.Create returned nil sink without error")
 	}
 
 	if err := snapReq.snapshot.Persist(sink); err != nil {

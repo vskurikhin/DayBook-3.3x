@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"hash"
 	"hash/crc32"
@@ -57,7 +58,7 @@ var _ SnapshotStore = (*FileSnapshotStore)(nil)
 // при создании нового снимка более старые удаляются.
 func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
 	if retain < 1 {
-		return nil, fmt.Errorf("raft: must retain at least one snapshot")
+		return nil, errors.New("raft: must retain at least one snapshot")
 	}
 	path := filepath.Join(base, snapshotsSubdir)
 	if err := os.MkdirAll(path, 0o700); err != nil {
@@ -287,7 +288,7 @@ func (s *FileSnapshotSink) Write(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return 0, fmt.Errorf("raft: snapshot sink is closed")
+		return 0, errors.New("raft: snapshot sink is closed")
 	}
 	return s.buffered.Write(p)
 }
