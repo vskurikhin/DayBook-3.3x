@@ -31,7 +31,7 @@ linters:
     - wsl_v5
   settings:
     funlen:
-      lines: 93
+      lines: 87
       statements: 61
       ignore-comments: true
     gocritic:
@@ -54,7 +54,7 @@ linters:
     lll:
       line-length: 130
     nestif:
-      min-complexity: 19
+      min-complexity: 9
     revive:
       rules:
         - name: indent-error-flow
