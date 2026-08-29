@@ -28,6 +28,8 @@ type PutResponse struct {
 	PrevValue  string
 }
 
+var _ Response = (*PutResponse)(nil)
+
 func (pr *PutResponse) Status() ResponseStatus {
 	return pr.RespStatus
 }
@@ -41,6 +43,8 @@ type GetResponse struct {
 	KeyFound   bool
 	Value      string
 }
+
+var _ Response = (*GetResponse)(nil)
 
 func (gr *GetResponse) Status() ResponseStatus {
 	return gr.RespStatus
@@ -57,6 +61,8 @@ type CASResponse struct {
 	KeyFound   bool
 	PrevValue  string
 }
+
+var _ Response = (*CASResponse)(nil)
 
 func (cr *CASResponse) Status() ResponseStatus {
 	return cr.RespStatus
@@ -76,6 +82,8 @@ const (
 type StatusResponse struct {
 	RespStatus ResponseStatus
 }
+
+var _ Response = (*StatusResponse)(nil)
 
 func (s *StatusResponse) Status() ResponseStatus {
 	return s.RespStatus

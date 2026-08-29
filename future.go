@@ -73,6 +73,8 @@ type verifyFuture struct {
 	enqueuedAtHeartbeat uint64
 }
 
+var _ Future = (*verifyFuture)(nil)
+
 // vote регистрирует голос узла peerID при подтверждении лидерства.
 // Если лидерство не подтверждено (leader == false), future завершается
 // с ErrNotLeader.
@@ -167,6 +169,8 @@ type logFuture struct {
 	dispatch time.Time
 }
 
+var _ ApplyFuture = (*logFuture)(nil)
+
 func (l *logFuture) Index() int {
 	return l.log.Index
 }
@@ -181,6 +185,8 @@ type configurationsFuture struct {
 
 	config Configuration
 }
+
+var _ ConfigurationFuture = (*configurationsFuture)(nil)
 
 func (f *configurationsFuture) Index() int {
 	return 0
@@ -203,10 +209,14 @@ type leadershipTransferFuture struct {
 	targetID ServerID
 }
 
+var _ LeadershipTransferFuture = (*leadershipTransferFuture)(nil)
+
 // errorFuture — future с заранее известной ошибкой.
 type errorFuture struct {
 	err error
 }
+
+var _ ApplyFuture = errorFuture{}
 
 func (e errorFuture) Error() error { return e.err }
 func (e errorFuture) ErrorCh() <-chan error {

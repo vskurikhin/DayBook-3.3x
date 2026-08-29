@@ -130,6 +130,8 @@ type KVService struct {
 	httpResponsesEnabled atomic.Bool
 }
 
+var _ raft.BatchingFSM = (*KVService)(nil)
+
 // Config — конфигурация для создания нового KVService.
 // Встраивает raft.Config и добавляет HTTPAddress — адрес,
 // на котором сервис будет принимать HTTP-запросы клиентов.

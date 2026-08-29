@@ -50,6 +50,8 @@ type FileSnapshotStore struct {
 	retain int
 }
 
+var _ SnapshotStore = (*FileSnapshotStore)(nil)
+
 // NewFileSnapshotStore создаёт FileSnapshotStore в поддиректории
 // snapshots каталога base. retain >= 1 — сколько снимков сохранять;
 // при создании нового снимка более старые удаляются.
@@ -277,6 +279,8 @@ type FileSnapshotSink struct {
 	mu     sync.Mutex
 	closed bool
 }
+
+var _ SnapshotSink = (*FileSnapshotSink)(nil)
 
 // Write пишет данные FSM в state.bin.
 func (s *FileSnapshotSink) Write(p []byte) (int, error) {

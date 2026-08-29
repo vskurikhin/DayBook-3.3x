@@ -48,6 +48,8 @@ type InmemSnapshotStore struct {
 	latest  *InmemSnapshotSink
 }
 
+var _ SnapshotStore = (*InmemSnapshotStore)(nil)
+
 // NewInmemSnapshotStore создаёт новый InmemSnapshotStore.
 func NewInmemSnapshotStore() *InmemSnapshotStore {
 	return &InmemSnapshotStore{}
@@ -105,6 +107,8 @@ type InmemSnapshotSink struct {
 	mu     sync.Mutex
 	closed bool
 }
+
+var _ SnapshotSink = (*InmemSnapshotSink)(nil)
 
 // Write пишет данные в буфер снимка, обновляя Size.
 func (s *InmemSnapshotSink) Write(p []byte) (int, error) {

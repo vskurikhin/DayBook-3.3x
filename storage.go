@@ -20,6 +20,8 @@ type MapStorage struct {
 	m  map[string][]byte
 }
 
+var _ Storage = (*MapStorage)(nil)
+
 func NewMapStorage() *MapStorage {
 	m := make(map[string][]byte)
 	return &MapStorage{

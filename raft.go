@@ -181,6 +181,8 @@ type configurationChangeFuture struct {
 	index int
 }
 
+var _ IndexFuture = (*configurationChangeFuture)(nil)
+
 func (f *configurationChangeFuture) Index() int {
 	return f.index
 }

@@ -99,6 +99,8 @@ type TCPTransport struct {
 	wg         sync.WaitGroup
 }
 
+var _ Transport = (*TCPTransport)(nil)
+
 // NewTCPTransport создаёт новый TCPTransport, слушающий на указанном адресе.
 // Принимает адрес для прослушивания, таймаут и максимальный размер пула
 // соединений (0 = defaultMaxPool). Запускает acceptLoop в отдельной горутине.

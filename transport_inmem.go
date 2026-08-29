@@ -25,6 +25,8 @@ type InmemTransport struct {
 	timeout    time.Duration
 }
 
+var _ Transport = (*InmemTransport)(nil)
+
 // NewInmemTransport создаёт новый InmemTransport с заданным локальным адресом.
 // Тайм-аут по умолчанию — 500ms.
 func NewInmemTransport(addr ServerAddress) *InmemTransport {

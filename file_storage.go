@@ -25,6 +25,8 @@ type FileStorage struct {
 	writes  int
 }
 
+var _ Storage = (*FileStorage)(nil)
+
 // NewFileStorage создаёт FileStorage в указанной директории, создавая её
 // при необходимости и загружая существующие .dat-файлы в in-memory кэш.
 func NewFileStorage(dir string) *FileStorage {
