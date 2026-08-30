@@ -17,6 +17,13 @@ const (
 	replicationAppend
 )
 
+// maxReplicationBackoff — потолок задержки повторов репликации на каждого
+// соседа (1000 мс). Объявлен на уровне пакета, а не внутри функции, чтобы
+// тестовые бюджеты ожидания схождения кластера выводились из него, а не
+// дублировали литерал. Значение ограничивает сверху задержку step-down
+// изолированного лидера прежнего терма.
+const maxReplicationBackoff = 1000 * time.Millisecond
+
 // nextIndexArgsEntries формирует аргументы для AppendEntries и сопутствующие данные
 // для отправки конкретному последователю (peerID).
 //
@@ -654,13 +661,6 @@ func failedAETrace(peerID, nextIndex, matchIndex, conflictIndex, conflictTerm in
 		peerID, nextIndex, conflictIndex, conflictTerm, matchIndex,
 	)
 }
-
-// maxReplicationBackoff — потолок задержки повторов репликации на каждого
-// соседа (1000 мс). Объявлен на уровне пакета, а не внутри функции, чтобы
-// тестовые бюджеты ожидания схождения кластера выводились из него, а не
-// дублировали литерал. Значение ограничивает сверху задержку step-down
-// изолированного лидера прежнего терма.
-const maxReplicationBackoff = 1000 * time.Millisecond
 
 // replicationBackoffDelay вычисляет задержку на каждого соседа между попытками
 // репликации по числу подряд идущих транспортных ошибок:

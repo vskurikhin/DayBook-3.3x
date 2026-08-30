@@ -17,18 +17,22 @@ type ConsensusModule struct {
 	// все горутины через wg.Wait().
 	wg sync.WaitGroup
 
-	// stopOnce — постусловие идемпотентного Stop(): любой возврат из Stop()
-	// (включая повторный/параллельный) гарантирует завершение всех горутин
-	// CM. sync.Once.Do блокирует параллельных вызывающих до завершения
-	// первого вызова.
-	stopOnce sync.Once
+	applyCh      chan *logFuture
+	commitCh     chan int
+	confChangeCh chan *configurationChangeFuture
+	shutdownCh   chan struct{}
+	stepDown     chan struct{}
+	verifyCh     chan *verifyFuture
 
-	// shutdownClosed — флаг, который становится true после установки state=Dead в методе Stop().
-	// Поле читается и изменяется только под блокировкой cm.mu.
-	// Он дублирует проверку state == Dead внутри goSpawnLocked: это необходимо, потому что
-	// закрытие канала shutdownCh происходит вне cm.mu, и по одному только состоянию канала
-	// нельзя атомарно определить, что модуль остановлен.
-	shutdownClosed bool
+	// cmState — состояние узла Raft (persistent + volatile + election + log + config).
+	// Все поля защищены cm.mu; cmState не содержит собственного mutex.
+	cmState cmState
+
+	fsm         FSM
+	fsmMutateCh chan []*commitTuple
+
+	// fsmSnapshotCh — небуферизированный канал для запроса снимка у runFSM.
+	fsmSnapshotCh chan *reqSnapshotFuture
 
 	// id — идентификатор сервера этого экземпляра CM (ConsensusModule).
 	id int
@@ -37,18 +41,11 @@ type ConsensusModule struct {
 	// storage — постоянное хранилище состояния узла.
 	storage Storage
 
-	transport Transport
-
-	fsm         FSM
-	fsmMutateCh chan []*commitTuple
-	shutdownCh  chan struct{}
-
-	applyCh  chan *logFuture
-	verifyCh chan *verifyFuture
-
-	commitCh     chan int
-	stepDown     chan struct{}
-	confChangeCh chan *configurationChangeFuture
+	// counters — счётчики ключевых событий репликации и снимков.
+	// Нулевое значение готово к использованию;
+	// карты «по каждому соседу» защищены cm.mu,
+	// глобальные поля — atomic.Int64.
+	counters raftCounters
 
 	// checkQuorumTimeout — предельный срок без ответов от кворума голосующих,
 	// после которого лидер шагает вниз, в ведомые. Значение по умолчанию —
@@ -57,48 +54,16 @@ type ConsensusModule struct {
 	// в цикле лидера под cm.mu.
 	checkQuorumTimeout time.Duration
 
-	// verifyRedispatchMinInterval — минимальный интервал между немедленными
-	// перерассылками AppendEntries одному соседу при неудовлетворённом
-	// verify-запросе. Значение по умолчанию — verifyRedispatchMinIntervalMs;
-	// поле, а не константа, чтобы тесты пакета могли задать заведомо малое
-	// значение (укороченное окно) для проверки границы частоты. Читается и
-	// записывается только под cm.mu в redispatchVerifyIfPendingLocked.
-	verifyRedispatchMinInterval time.Duration
+	// latency — структура с агрегированными показателями задержки (латентности) ConsensusModule.
+	// Нулевое значение структуры корректно и готово к использованию: явная инициализация не требуется.
+	// Все поля имеют тип atomic.Int64, поэтому безопасны для чтения из любого контекста —
+	// в том числе одновременно с удержанной блокировкой cm.mu.
+	latency cmLatency
 
 	// leaderLoopsAlive — число живых горутин цикла лидера на этом узле.
 	// Инвариант: значение не превышает 1. Увеличивается на входе в цикл
 	// и уменьшается при выходе, оба раза под cm.mu; читается тестами пакета.
 	leaderLoopsAlive int
-
-	// preVoteDisabled отключает механизм Pre-Vote.
-	// Если true, выборы начинаются сразу (как в классическом Raft).
-	// По умолчанию false — Pre-Vote включён.
-	preVoteDisabled bool
-
-	// snapshotStore — хранилище снимков. Если nil, снимки отключены.
-	snapshotStore SnapshotStore
-
-	// snapshotInterval — интервал проверки необходимости снимка.
-	snapshotInterval time.Duration
-
-	// snapshotThreshold — минимальное количество записей после
-	// последнего снимка для создания нового.
-	snapshotThreshold int
-
-	// trailingLogs — количество записей журнала, сохраняемых после
-	// последнего снимка.
-	trailingLogs int
-
-	// snapshotCh — канал для сигнала runSnapshots о необходимости
-	// проверки создания снимка. Буферизирован (cap=1).
-	snapshotCh chan struct{}
-
-	// fsmSnapshotCh — небуферизированный канал для запроса снимка у runFSM.
-	fsmSnapshotCh chan *reqSnapshotFuture
-
-	// cmState — состояние узла Raft (persistent + volatile + election + log + config).
-	// Все поля защищены cm.mu; cmState не содержит собственного mutex.
-	cmState cmState
 
 	// leaderState — состояние, актуальное только пока узел исполняет роль лидера.
 	// Все поля структуры защищены мьютексом cm.mu; отдельного мьютекса у неё нет.
@@ -108,145 +73,74 @@ type ConsensusModule struct {
 	// без этого вызов sendBatch приведёт к панике.
 	leaderState leaderState
 
-	// latency — структура с агрегированными показателями задержки (латентности) ConsensusModule.
-	// Нулевое значение структуры корректно и готово к использованию: явная инициализация не требуется.
-	// Все поля имеют тип atomic.Int64, поэтому безопасны для чтения из любого контекста —
-	// в том числе одновременно с удержанной блокировкой cm.mu.
-	latency cmLatency
+	// preVoteDisabled отключает механизм Pre-Vote.
+	// Если true, выборы начинаются сразу (как в классическом Raft).
+	// По умолчанию false — Pre-Vote включён.
+	preVoteDisabled bool
 
-	// counters — счётчики ключевых событий репликации и снимков.
-	// Нулевое значение готово к использованию;
-	// карты «по каждому соседу» защищены cm.mu,
-	// глобальные поля — atomic.Int64.
-	counters raftCounters
-}
+	// shutdownClosed — флаг, который становится true после установки state=Dead в методе Stop().
+	// Поле читается и изменяется только под блокировкой cm.mu.
+	// Он дублирует проверку state == Dead внутри goSpawnLocked: это необходимо, потому что
+	// закрытие канала shutdownCh происходит вне cm.mu, и по одному только состоянию канала
+	// нельзя атомарно определить, что модуль остановлен.
+	shutdownClosed bool
 
-type leaderState struct {
-	// nextIndex — индекс следующей записи журнала для отправки каждому соседу.
-	nextIndex map[int]int
+	// snapshotCh — канал для сигнала runSnapshots о необходимости
+	// проверки создания снимка. Буферизирован (cap=1).
+	snapshotCh chan struct{}
 
-	// matchIndex — индекс последней зафиксированной записи, реплицированной на каждом соседе.
-	matchIndex map[int]int
+	// snapshotInterval — интервал проверки необходимости снимка.
+	snapshotInterval time.Duration
 
-	// inflightAE — флаги по каждому соседу активных горутин AppendEntries.
-	//
-	// Дедуплицирует вызовы leaderSendAEs: если для соседа уже есть активная
-	// горутина leaderSendAEsToPeer, новая не создаётся.
-	// Это предотвращает гонку nextIndex и экспоненциальный рост горутин
-	// при частых пульсах.
-	//
-	// Доступ через atomic.CompareAndSwap без cm.mu — минимизация блокировок.
-	// Инвариант:
-	//		nil — сосед вне конфигурации;
-	//		false — нет активной горутины;
-	//		true — leaderSendAEsToPeer выполняется.
-	// Захват — только через CompareAndSwap(false, true), единый для всех
-	// точек запуска; сброс флага — только горутиной, владеющей им (признак
-	// владения передаётся в leaderSendAEsToPeer). Сброс также выполняется в
-	// runLeaderLoop и becomeFollowerLocked.
-	inflightAE map[int]*atomic.Bool
+	// snapshotStore — хранилище снимков. Если nil, снимки отключены.
+	snapshotStore SnapshotStore
 
-	// commitmentTracker — продвижение commitIndex на лидере.
-	commitmentTracker *commitmentTracker
+	// snapshotThreshold — минимальное количество записей после
+	// последнего снимка для создания нового.
+	snapshotThreshold int
 
-	// inflight — карта future по индексу записи в журнале.
-	// Обеспечивает O(1) поиск при отправке батча в FSM.
-	inflight map[int]*logFuture
+	// stopOnce — постусловие идемпотентного Stop(): любой возврат из Stop()
+	// (включая повторный/параллельный) гарантирует завершение всех горутин
+	// CM. sync.Once.Do блокирует параллельных вызывающих до завершения
+	// первого вызова.
+	stopOnce sync.Once
 
-	// pendingVerify — очередь verifyFuture, ожидающих подтверждения от ведомых.
-	// Успешный ответ AppendEntries голосует за все ожидающие verifyFuture,
-	// если AE отправлен не раньше постановки запроса (vf.epoch <= dispatchEpoch).
-	pendingVerify []*verifyFuture
+	transport Transport
 
-	// verifyEpoch — монотонный счётчик раундов верификации ReadIndex.
-	// Инкрементируется в leaderLoop при каждом verify‑запросе.
-	// Значение снимается в leaderSendAEs и передаётся как dispatchEpoch.
-	verifyEpoch uint64
+	// trailingLogs — количество записей журнала, сохраняемых после
+	// последнего снимка.
+	trailingLogs int
 
-	// heartbeatTicks — монотонный счётчик тиков пульса текущего лидерства.
-	// Инкрементируется в leaderLoop по тику пульса под cm.mu. Значение,
-	// снятое при постановке verify в pendingVerify, служит нижней границей
-	// «дождался ли запрос тика пульса» при его успешном завершении.
-	heartbeatTicks uint64
-
-	// leaderStartIndex — первый индекс текущего терма лидера.
-	leaderStartIndex int
-
-	// leadershipTransferCh — канал для запросов на передачу лидерства.
-	// Запросы обрабатываются в leaderLoop.
-	leadershipTransferCh chan *leadershipTransferFuture
-
-	// leadershipTransferInProgress — atomic-флаг, блокирующий Apply
-	// во время передачи лидерства.
-	leadershipTransferInProgress int32
-
-	// leadershipTransferFuture — текущий future передачи лидерства.
-	// Устанавливается в handleLeadershipTransfer, отвечается в stepDown.
-	leadershipTransferFuture *leadershipTransferFuture
-
-	// lastContact — время последнего ответа RPC без транспортной ошибки
-	// по каждому соседу. Ответ соседа любого содержания (в том числе отказ
-	// AppendEntries и ответ InstallSnapshot) доказывает, что сосед жив,
-	// поэтому отметка обновляется в тех же критических секциях, где
-	// сбрасывается задержка повторов.
-	//
-	// Жизненный цикл привязан к роли лидера: карта создаётся заново
-	// в startLeaderLocked (отметка «сейчас» для соседей актуальной
-	// конфигурации), пополняется в ensureReplicationForLocked при
-	// добавлении сервера и очищается от удалённых серверов в
-	// startStopReplicationLocked. Отсутствующая отметка трактуется как
-	// «контакт только что был» — льгота, защищающая от ложного шага вниз
-	// сразу после изменения состава кластера. Все обращения — под cm.mu.
-	lastContact map[int]time.Time
-
-	// replFailures — число подряд идущих транспортных ошибок по соседу.
-	// Жизненный цикл привязан к роли лидера: создаётся в startLeaderLocked,
-	// очищается в becomeFollowerLocked.
-	replFailures map[int]int
-
-	// lastAttempt — время последней попытки отправки RPC каждому соседу.
-	// Задержка повторов реализуется сравнением времени (без time.Sleep), чтобы
-	// не удерживать inflightAE[peer] и не задерживать восстановление узла.
-	lastAttempt map[int]time.Time
-
-	// nextVerifyRedispatchAt — момент, раньше которого немедленная
-	// перерассылка AppendEntries соседу не выполняется (окно троттлинга).
-	// Ограничивает частоту перерассылок доказуемой границей: не более одной
-	// перерассылки за verifyRedispatchMinInterval на каждого соседа, что
-	// исключает самоподдерживающуюся эстафету при плотном потоке verify.
-	//
-	// Жизненный цикл привязан к роли лидера: карта создаётся заново в
-	// startLeaderLocked (каждому лидерству — своя карта, по образцу
-	// lastContact), поэтому окно не переживает смену лидерства — первая
-	// перерассылка нового лидерства немедленна. Отсутствующий ключ — нулевое
-	// время, окно свободно (льгота, симметричная отсутствующей отметке
-	// контакта). Метка ставится только при фактической перерассылке под
-	// cm.mu; все обращения — под cm.mu.
-	nextVerifyRedispatchAt map[int]time.Time
+	// verifyRedispatchMinInterval — минимальный интервал между немедленными
+	// перерассылками AppendEntries одному соседу при неудовлетворённом
+	// verify-запросе. Значение по умолчанию — verifyRedispatchMinIntervalMs;
+	// поле, а не константа, чтобы тесты пакета могли задать заведомо малое
+	// значение (укороченное окно) для проверки границы частоты. Читается и
+	// записывается только под cm.mu в redispatchVerifyIfPendingLocked.
+	verifyRedispatchMinInterval time.Duration
 }
 
 // cmState — состояние узла Raft.
 // Не содержит собственного mutex: все поля защищены cm.mu в ConsensusModule.
 type cmState struct {
+	// candidateFromLeadershipTransfer — true, если данный узел стал
+	// кандидатом из-за получения TimeoutNow. Влияет на:
+	//   — пропуск PreVote в runElectionTimer
+	//   — обработку RequestVote (голосуем даже при известном лидере)
+	//   — обработку AppendEntries (не step-down от старого лидера)
+	candidateFromLeadershipTransfer atomic.Bool
+
+	// Непостоянное состояние Raft на всех серверах
+	commitIndex int
+
+	// configurations — текущие конфигурации кластера (committed/latest).
+	configurations configurations
+
 	// Постоянное состояние Raft на всех серверах
 	currentTerm     int
 	votedFor        int
 	log             []LogEntry
 	logNeedsPersist bool
-
-	// lastLogIndex — кэш индекса последней записи в журнале.
-	// Обновляется через setLastLog при любом изменении журнала.
-	lastLogIndex int
-	// lastLogTerm — кэш терма последней записи в журнале.
-	lastLogTerm int
-
-	// Непостоянное состояние Raft на всех серверах
-	commitIndex int
-	// lastApplied — максимальный индекс, диапазон до которого уже отправлен
-	// в очередь машины состояний (fsmMutateCh). Это отметка диспетчеризации,
-	// а не фактического применения: продвигается в processLogs до отправки
-	// батча.
-	lastApplied int
 
 	// fsmAppliedIndex — максимальный индекс записи журнала, который фактически
 	// был применён машиной состояний (т.е. для которого вызов apply вернул управление).
@@ -267,21 +161,18 @@ type cmState struct {
 	electionResetEvent time.Time
 	electionTimerDone  chan struct{}
 
-	// leaderLastContact — время последнего успешного AppendEntries от лидера.
-	// Используется в RequestPreVote для проверки: если недавно был контакт с
-	// лидером, Pre-Vote отклоняется.
-	leaderLastContact time.Time
+	// lastApplied — максимальный индекс, диапазон до которого уже отправлен
+	// в очередь машины состояний (fsmMutateCh). Это отметка диспетчеризации,
+	// а не фактического применения: продвигается в processLogs до отправки
+	// батча.
+	lastApplied int
 
-	// leaderID — ID текущего лидера (если известен).
-	// Устанавливается при получении AppendEntries от лидера.
-	leaderID int
+	// lastLogIndex — кэш индекса последней записи в журнале.
+	// Обновляется через setLastLog при любом изменении журнала.
+	lastLogIndex int
 
-	// candidateFromLeadershipTransfer — true, если данный узел стал
-	// кандидатом из-за получения TimeoutNow. Влияет на:
-	//   — пропуск PreVote в runElectionTimer
-	//   — обработку RequestVote (голосуем даже при известном лидере)
-	//   — обработку AppendEntries (не step-down от старого лидера)
-	candidateFromLeadershipTransfer atomic.Bool
+	// lastLogTerm — кэш терма последней записи в журнале.
+	lastLogTerm int
 
 	// lastSnapshotIndex — индекс последнего созданного снимка.
 	// Инициализируется как -1 (нет снимка).
@@ -290,15 +181,125 @@ type cmState struct {
 	// lastSnapshotTerm — терм последнего созданного снимка.
 	lastSnapshotTerm int
 
+	// leaderID — ID текущего лидера (если известен).
+	// Устанавливается при получении AppendEntries от лидера.
+	leaderID int
+
+	// leaderLastContact — время последнего успешного AppendEntries от лидера.
+	// Используется в RequestPreVote для проверки: если недавно был контакт с
+	// лидером, Pre-Vote отклоняется.
+	leaderLastContact time.Time
+
 	// termIndexMap — карта term → последний LogEntry.Index с этим term.
 	// O(1) lookup для ConflictTerm.
 	// Инкрементально обновляется в dispatchLogsUnsafe; перестраивается
 	// целиком при обрезке/сжатии/замене журнала.
 	// Требует удержания cm.mu (Lock) при чтении и записи.
 	termIndexMap map[int]int
+}
 
-	// configurations — текущие конфигурации кластера (committed/latest).
-	configurations configurations
+type leaderState struct {
+	// commitmentTracker — продвижение commitIndex на лидере.
+	commitmentTracker *commitmentTracker
+
+	// heartbeatTicks — монотонный счётчик тиков пульса текущего лидерства.
+	// Инкрементируется в leaderLoop по тику пульса под cm.mu. Значение,
+	// снятое при постановке verify в pendingVerify, служит нижней границей
+	// «дождался ли запрос тика пульса» при его успешном завершении.
+	heartbeatTicks uint64
+
+	// inflightAE — флаги по каждому соседу активных горутин AppendEntries.
+	//
+	// Дедуплицирует вызовы leaderSendAEs: если для соседа уже есть активная
+	// горутина leaderSendAEsToPeer, новая не создаётся.
+	// Это предотвращает гонку nextIndex и экспоненциальный рост горутин
+	// при частых пульсах.
+	//
+	// Доступ через atomic.CompareAndSwap без cm.mu — минимизация блокировок.
+	// Инвариант:
+	//		nil — сосед вне конфигурации;
+	//		false — нет активной горутины;
+	//		true — leaderSendAEsToPeer выполняется.
+	// Захват — только через CompareAndSwap(false, true), единый для всех
+	// точек запуска; сброс флага — только горутиной, владеющей им (признак
+	// владения передаётся в leaderSendAEsToPeer). Сброс также выполняется в
+	// runLeaderLoop и becomeFollowerLocked.
+	inflightAE map[int]*atomic.Bool
+
+	// inflight — карта future по индексу записи в журнале.
+	// Обеспечивает O(1) поиск при отправке батча в FSM.
+	inflight map[int]*logFuture
+
+	// lastAttempt — время последней попытки отправки RPC каждому соседу.
+	// Задержка повторов реализуется сравнением времени (без time.Sleep), чтобы
+	// не удерживать inflightAE[peer] и не задерживать восстановление узла.
+	lastAttempt map[int]time.Time
+
+	// lastContact — время последнего ответа RPC без транспортной ошибки
+	// по каждому соседу. Ответ соседа любого содержания (в том числе отказ
+	// AppendEntries и ответ InstallSnapshot) доказывает, что сосед жив,
+	// поэтому отметка обновляется в тех же критических секциях, где
+	// сбрасывается задержка повторов.
+	//
+	// Жизненный цикл привязан к роли лидера: карта создаётся заново
+	// в startLeaderLocked (отметка «сейчас» для соседей актуальной
+	// конфигурации), пополняется в ensureReplicationForLocked при
+	// добавлении сервера и очищается от удалённых серверов в
+	// startStopReplicationLocked. Отсутствующая отметка трактуется как
+	// «контакт только что был» — льгота, защищающая от ложного шага вниз
+	// сразу после изменения состава кластера. Все обращения — под cm.mu.
+	lastContact map[int]time.Time
+
+	// leaderStartIndex — первый индекс текущего терма лидера.
+	leaderStartIndex int
+
+	// leadershipTransferCh — канал для запросов на передачу лидерства.
+	// Запросы обрабатываются в leaderLoop.
+	leadershipTransferCh chan *leadershipTransferFuture
+
+	// leadershipTransferFuture — текущий future передачи лидерства.
+	// Устанавливается в handleLeadershipTransfer, отвечается в stepDown.
+	leadershipTransferFuture *leadershipTransferFuture
+
+	// leadershipTransferInProgress — atomic-флаг, блокирующий Apply
+	// во время передачи лидерства.
+	leadershipTransferInProgress int32
+
+	// matchIndex — индекс последней зафиксированной записи, реплицированной на каждом соседе.
+	matchIndex map[int]int
+
+	// nextIndex — индекс следующей записи журнала для отправки каждому соседу.
+	nextIndex map[int]int
+
+	// nextVerifyRedispatchAt — момент, раньше которого немедленная
+	// перерассылка AppendEntries соседу не выполняется (окно троттлинга).
+	// Ограничивает частоту перерассылок доказуемой границей: не более одной
+	// перерассылки за verifyRedispatchMinInterval на каждого соседа, что
+	// исключает самоподдерживающуюся эстафету при плотном потоке verify.
+	//
+	// Жизненный цикл привязан к роли лидера: карта создаётся заново в
+	// startLeaderLocked (каждому лидерству — своя карта, по образцу
+	// lastContact), поэтому окно не переживает смену лидерства — первая
+	// перерассылка нового лидерства немедленна. Отсутствующий ключ — нулевое
+	// время, окно свободно (льгота, симметричная отсутствующей отметке
+	// контакта). Метка ставится только при фактической перерассылке под
+	// cm.mu; все обращения — под cm.mu.
+	nextVerifyRedispatchAt map[int]time.Time
+
+	// replFailures — число подряд идущих транспортных ошибок по соседу.
+	// Жизненный цикл привязан к роли лидера: создаётся в startLeaderLocked,
+	// очищается в becomeFollowerLocked.
+	replFailures map[int]int
+
+	// pendingVerify — очередь verifyFuture, ожидающих подтверждения от ведомых.
+	// Успешный ответ AppendEntries голосует за все ожидающие verifyFuture,
+	// если AE отправлен не раньше постановки запроса (vf.epoch <= dispatchEpoch).
+	pendingVerify []*verifyFuture
+
+	// verifyEpoch — монотонный счётчик раундов верификации ReadIndex.
+	// Инкрементируется в leaderLoop при каждом verify‑запросе.
+	// Значение снимается в leaderSendAEs и передаётся как dispatchEpoch.
+	verifyEpoch uint64
 }
 
 // GetConfiguration возвращает текущую конфигурацию кластера.

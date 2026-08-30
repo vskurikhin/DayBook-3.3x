@@ -14,16 +14,16 @@ import (
 type Server struct {
 	mu sync.Mutex
 
-	serverID int
-	peerIds  []int
-	maxPool  int
-
-	storage       Storage
 	fsm           FSM
 	snapshotStore SnapshotStore
+	storage       Storage
 
-	transport *TCPTransport
 	cm        *ConsensusModule
+	transport *TCPTransport
+
+	maxPool  int
+	peerIds  []int
+	serverID int
 
 	ready <-chan any
 	quit  chan any

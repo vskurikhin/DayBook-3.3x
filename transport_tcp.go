@@ -27,10 +27,10 @@ const (
 // Типы RPC для фрейминга (1 байт вместо строки).
 const (
 	rpcAppendEntries byte = iota
-	rpcRequestVote
 	rpcInstallSnapshot
-	rpcTimeoutNow
 	rpcRequestPreVote
+	rpcRequestVote
+	rpcTimeoutNow
 )
 
 //nolint:gochecknoinits
@@ -95,12 +95,6 @@ type TCPTransport struct {
 
 var _ Transport = (*TCPTransport)(nil)
 
-// tcpRPCRequest — gob-структура RPC-запроса.
-type tcpRPCRequest struct {
-	Type byte
-	Args any
-}
-
 // NewTCPTransport создаёт новый TCPTransport, слушающий на указанном адресе.
 // Принимает адрес для прослушивания, таймаут и максимальный размер пула
 // соединений (0 = defaultMaxPool). Запускает acceptLoop в отдельной горутине.
@@ -126,6 +120,12 @@ func NewTCPTransport(addr string, timeout time.Duration, maxPool int) (*TCPTrans
 	t.wg.Add(1)
 	go t.acceptLoop()
 	return t, nil
+}
+
+// tcpRPCRequest — gob-структура RPC-запроса.
+type tcpRPCRequest struct {
+	Type byte
+	Args any
 }
 
 // Consumer возвращает небуферизированный канал входящих RPC.
@@ -265,15 +265,6 @@ func (t *TCPTransport) Close() {
 	t.wg.Wait()
 }
 
-// closeActiveConns закрывает все активные входящие соединения.
-func (t *TCPTransport) closeActiveConns() {
-	t.activeConnsLock.Lock()
-	defer t.activeConnsLock.Unlock()
-	for conn := range t.activeConns {
-		_ = conn.Close()
-	}
-}
-
 // CloseStreams закрывает все соединения в пуле и удаляет их.
 // Используется при реконфигурации кластера, когда адреса соседей
 // могли измениться.
@@ -295,6 +286,15 @@ func (t *TCPTransport) IsShutdown() bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// closeActiveConns закрывает все активные входящие соединения.
+func (t *TCPTransport) closeActiveConns() {
+	t.activeConnsLock.Lock()
+	defer t.activeConnsLock.Unlock()
+	for conn := range t.activeConns {
+		_ = conn.Close()
 	}
 }
 
