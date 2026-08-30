@@ -283,7 +283,11 @@ func TestConfiguration_AddVoterFromSingleVoter(t *testing.T) {
 	for _, ch := range []chan CommitEntry{commitChA, commitChB} {
 		select {
 		case entry := <-ch:
-			if entry.Data.(int) != cmd {
+			got, ok := entry.Data.(int)
+			if !ok {
+				t.Fatalf("committed %T, want int", entry.Data)
+			}
+			if got != cmd {
 				t.Fatalf("committed %v, want %d", entry.Data, cmd)
 			}
 		case <-time.After(5 * time.Second):

@@ -360,9 +360,13 @@ func TestSingleNodeApplyResponse(t *testing.T) {
 	if err := future.Error(); err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
-	resp := future.Response().(int)
-	if resp != future.Index() {
-		t.Fatalf("got Response=%d, want Index=%d", resp, future.Index())
+	raw := future.Response()
+	cmd, ok := raw.(int)
+	if !ok {
+		t.Fatalf("Response() = %T, want int", raw)
+	}
+	if cmd != future.Index() {
+		t.Fatalf("got Response=%d, want Index=%d", cmd, future.Index())
 	}
 	_ = capture
 }
@@ -443,11 +447,20 @@ func TestFSMApplyInOrder(t *testing.T) {
 	}
 
 	capture.mu.Lock()
-	entries := make([]int, len(capture.entries))
+	raw := make([]any, len(capture.entries))
 	for i, e := range capture.entries {
-		entries[i] = e.Data.(int)
+		raw[i] = e.Data
 	}
 	capture.mu.Unlock()
+
+	entries := make([]int, len(raw))
+	for i, d := range raw {
+		v, ok := d.(int)
+		if !ok {
+			t.Fatalf("entries[%d]: data %T is not int", i, d)
+		}
+		entries[i] = v
+	}
 
 	for i := 0; i < 5; i++ {
 		if entries[i] != i {
@@ -506,13 +519,22 @@ func TestBatchApplyOrderAndIndices(t *testing.T) {
 	}
 
 	capture.mu.Lock()
-	entries := make([]int, 0, len(capture.entries))
+	raw := make([]any, 0, len(capture.entries))
 	for _, e := range capture.entries {
 		if e.Type == LogCommand {
-			entries = append(entries, e.Data.(int))
+			raw = append(raw, e.Data)
 		}
 	}
 	capture.mu.Unlock()
+
+	entries := make([]int, len(raw))
+	for i, d := range raw {
+		v, ok := d.(int)
+		if !ok {
+			t.Fatalf("entries[%d]: data %T is not int", i, d)
+		}
+		entries[i] = v
+	}
 
 	for i, v := range values {
 		if entries[i] != v {

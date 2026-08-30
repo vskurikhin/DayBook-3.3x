@@ -326,7 +326,8 @@ func newPreVoteTestCM(transport Transport, term int) *ConsensusModule {
 
 // runPreCandidateOnce запускает runPreCandidate в отдельной горутине и ждёт
 // её завершения. Возвращает длительность перехода.
-func runPreCandidateOnce(cm *ConsensusModule) time.Duration {
+func runPreCandidateOnce(t *testing.T, cm *ConsensusModule) time.Duration {
+	t.Helper()
 	done := make(chan struct{})
 	start := time.Now()
 	go func() {
@@ -336,7 +337,7 @@ func runPreCandidateOnce(cm *ConsensusModule) time.Duration {
 	select {
 	case <-done:
 	case <-time.After(2 * time.Second):
-		panic("runPreCandidate did not return")
+		t.Fatal("runPreCandidate did not return")
 	}
 	return time.Since(start)
 }
@@ -405,7 +406,7 @@ func TestPreVote_CollectTimeout_StepsDownToFollower(t *testing.T) {
 	defer close(release)
 	defer close(cm.shutdownCh)
 
-	elapsed := runPreCandidateOnce(cm)
+	elapsed := runPreCandidateOnce(t, cm)
 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -431,7 +432,7 @@ func TestPreVote_QuorumLost_StepsDownToFollower(t *testing.T) {
 	cm := newPreVoteTestCM(&refusingPreVoteTransport{term: 2}, 2)
 	defer close(cm.shutdownCh)
 
-	elapsed := runPreCandidateOnce(cm)
+	elapsed := runPreCandidateOnce(t, cm)
 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -456,7 +457,7 @@ func TestPreVote_ErrNotImplemented_Granted(t *testing.T) {
 	cm := newPreVoteTestCM(&notImplementedPreVoteTransport{}, 2)
 	defer close(cm.shutdownCh)
 
-	runPreCandidateOnce(cm)
+	runPreCandidateOnce(t, cm)
 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()

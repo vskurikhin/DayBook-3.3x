@@ -214,9 +214,9 @@ func TestParseFlagsDataDirDefault(t *testing.T) {
 
 func TestValuesImplements(t *testing.T) {
 	v := Values{
-		RPCAddress: mustParseAddr("127.0.0.1:9990"),
+		RPCAddress: mustParseAddr(t, "127.0.0.1:9990"),
 		Number:     0,
-		Peers:      map[int]net.Addr{1: mustParseAddr("127.0.0.1:9991")},
+		Peers:      map[int]net.Addr{1: mustParseAddr(t, "127.0.0.1:9991")},
 	}
 	if v.Number != 0 {
 		t.Errorf("RequestRate = %d, want 0", v.Number)
@@ -229,10 +229,11 @@ func TestValuesImplements(t *testing.T) {
 	}
 }
 
-func mustParseAddr(s string) net.Addr {
+func mustParseAddr(t *testing.T, s string) net.Addr {
+	t.Helper()
 	addr, err := net.ResolveTCPAddr("tcp", s)
 	if err != nil {
-		panic(err)
+		t.Fatalf("parse addr %q: %v", s, err)
 	}
 	return addr
 }

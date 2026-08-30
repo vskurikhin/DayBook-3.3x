@@ -727,7 +727,11 @@ func TestInmemAppendEntriesWithEntries(t *testing.T) {
 	go func() {
 		select {
 		case rpc := <-t2.Consumer():
-			cmd := rpc.Command.(*AppendEntriesArgs)
+			cmd, ok := rpc.Command.(*AppendEntriesArgs)
+			if !ok {
+				t.Errorf("Command = %T, want *AppendEntriesArgs", rpc.Command)
+				return
+			}
 			rpc.RespChan <- RPCResponse{
 				Reply: &AppendEntriesReply{
 					Success:       true,
