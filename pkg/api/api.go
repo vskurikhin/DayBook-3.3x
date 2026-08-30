@@ -14,8 +14,8 @@ package api
 // идентификацию запроса.
 
 type PutRequest struct {
-	Key   string
-	Value string
+	Key   string `json:"Key"`
+	Value string `json:"Value"`
 }
 
 type Response interface {
@@ -23,9 +23,9 @@ type Response interface {
 }
 
 type PutResponse struct {
-	RespStatus ResponseStatus
-	KeyFound   bool
-	PrevValue  string
+	RespStatus ResponseStatus `json:"RespStatus"`
+	KeyFound   bool           `json:"KeyFound"`
+	PrevValue  string         `json:"PrevValue"`
 }
 
 var _ Response = (*PutResponse)(nil)
@@ -35,13 +35,13 @@ func (pr *PutResponse) Status() ResponseStatus {
 }
 
 type GetRequest struct {
-	Key string
+	Key string `json:"Key"`
 }
 
 type GetResponse struct {
-	RespStatus ResponseStatus
-	KeyFound   bool
-	Value      string
+	RespStatus ResponseStatus `json:"RespStatus"`
+	KeyFound   bool           `json:"KeyFound"`
+	Value      string         `json:"Value"`
 }
 
 var _ Response = (*GetResponse)(nil)
@@ -51,15 +51,15 @@ func (gr *GetResponse) Status() ResponseStatus {
 }
 
 type CASRequest struct {
-	Key          string
-	CompareValue string
-	Value        string
+	Key          string `json:"Key"`
+	CompareValue string `json:"CompareValue"`
+	Value        string `json:"Value"`
 }
 
 type CASResponse struct {
-	RespStatus ResponseStatus
-	KeyFound   bool
-	PrevValue  string
+	RespStatus ResponseStatus `json:"RespStatus"`
+	KeyFound   bool           `json:"KeyFound"`
+	PrevValue  string         `json:"PrevValue"`
 }
 
 var _ Response = (*CASResponse)(nil)
@@ -80,7 +80,7 @@ const (
 // StatusResponse — минимальный ответ, содержащий только статус.
 // Используется для VerifyLeader и других операций без данных.
 type StatusResponse struct {
-	RespStatus ResponseStatus
+	RespStatus ResponseStatus `json:"RespStatus"`
 }
 
 var _ Response = (*StatusResponse)(nil)

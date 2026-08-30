@@ -63,6 +63,10 @@ linters:
       checks:
         - -ST1000
         - all
+    tagliatelle:
+      case:
+        rules:
+          json: pascal
   exclusions:
     generated: lax
     presets:
