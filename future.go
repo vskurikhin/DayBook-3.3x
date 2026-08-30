@@ -57,6 +57,11 @@ type ConfigurationFuture interface {
 	Configuration() Configuration
 }
 
+// SnapshotFuture — публичный future для пользовательского Snapshot().
+type SnapshotFuture struct {
+	deferError
+}
+
 // deferError — базовая реализация Future с каналом завершения.
 type deferError struct {
 	err        error
@@ -178,11 +183,6 @@ type reqSnapshotFuture struct {
 	index    int
 	term     int
 	snapshot FSMSnapshot
-}
-
-// SnapshotFuture — публичный future для пользовательского Snapshot().
-type SnapshotFuture struct {
-	deferError
 }
 
 // verifyFuture — Future для подтверждения ReadIndex (Raft §8).

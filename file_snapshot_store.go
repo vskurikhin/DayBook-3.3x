@@ -74,19 +74,6 @@ func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
 	return store, nil
 }
 
-// testPermissions проверяет, что в каталог снимков можно писать.
-func (f *FileSnapshotStore) testPermissions() error {
-	path := filepath.Join(f.path, ".permissions-test")
-	fh, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	if err := fh.Close(); err != nil {
-		return err
-	}
-	return os.Remove(path)
-}
-
 // snapshotName генерирует имя директории снимка: <term>-<index>-<msec>.
 func snapshotName(term, index int, msec int64) string {
 	return fmt.Sprintf("%d-%d-%d", term, index, msec)
@@ -101,46 +88,6 @@ func snapshotName(term, index int, msec int64) string {
 // Проигравший вызывающий обрабатывает эту ошибку как обычную ошибку создания снимка.
 func (f *FileSnapshotStore) Create(index, term int, configuration Configuration, configIndex int) (SnapshotSink, error) {
 	return f.createAt(index, term, configIndex, configuration, time.Now())
-}
-
-// createAt — Create с инъекцией времени для детерминированных тестов
-// коллизии имени директории.
-func (f *FileSnapshotStore) createAt(
-	index, term, configIndex int, configuration Configuration, now time.Time,
-) (SnapshotSink, error) {
-	name := snapshotName(term, index, now.UnixNano()/int64(time.Millisecond))
-	path := filepath.Join(f.path, name+tmpSuffix)
-
-	if err := os.Mkdir(path, 0o700); err != nil {
-		return nil, fmt.Errorf("raft: failed to make snapshot directory %s: %w", path, err)
-	}
-
-	sink := &FileSnapshotSink{
-		store:     f,
-		dir:       path,
-		parentDir: f.path,
-		meta: fileSnapshotMeta{
-			SnapshotMeta: SnapshotMeta{
-				Version:       ProtocolVersion,
-				ID:            name,
-				Index:         index,
-				Term:          term,
-				Configuration: configuration,
-				ConfigIndex:   configIndex,
-			},
-		},
-	}
-
-	statePath := filepath.Join(path, stateFileName)
-	fh, err := os.Create(statePath)
-	if err != nil {
-		_ = os.RemoveAll(path)
-		return nil, fmt.Errorf("raft: failed to create state file: %v", err)
-	}
-	sink.stateFile = fh
-	sink.stateHash = crc32.NewIEEE()
-	sink.buffered = bufio.NewWriter(io.MultiWriter(sink.stateFile, sink.stateHash))
-	return sink, nil
 }
 
 // List возвращает метаданные всех доступных снимков, упорядоченные
@@ -187,6 +134,59 @@ func (f *FileSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, error
 	}
 
 	return &meta.SnapshotMeta, &bufferedReadCloser{Reader: bufio.NewReader(fh), fh: fh}, nil
+}
+
+// testPermissions проверяет, что в каталог снимков можно писать.
+func (f *FileSnapshotStore) testPermissions() error {
+	path := filepath.Join(f.path, ".permissions-test")
+	fh, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	if err := fh.Close(); err != nil {
+		return err
+	}
+	return os.Remove(path)
+}
+
+// createAt — Create с инъекцией времени для детерминированных тестов
+// коллизии имени директории.
+func (f *FileSnapshotStore) createAt(
+	index, term, configIndex int, configuration Configuration, now time.Time,
+) (SnapshotSink, error) {
+	name := snapshotName(term, index, now.UnixNano()/int64(time.Millisecond))
+	path := filepath.Join(f.path, name+tmpSuffix)
+
+	if err := os.Mkdir(path, 0o700); err != nil {
+		return nil, fmt.Errorf("raft: failed to make snapshot directory %s: %w", path, err)
+	}
+
+	sink := &FileSnapshotSink{
+		store:     f,
+		dir:       path,
+		parentDir: f.path,
+		meta: fileSnapshotMeta{
+			SnapshotMeta: SnapshotMeta{
+				Version:       ProtocolVersion,
+				ID:            name,
+				Index:         index,
+				Term:          term,
+				Configuration: configuration,
+				ConfigIndex:   configIndex,
+			},
+		},
+	}
+
+	statePath := filepath.Join(path, stateFileName)
+	fh, err := os.Create(statePath)
+	if err != nil {
+		_ = os.RemoveAll(path)
+		return nil, fmt.Errorf("raft: failed to create state file: %v", err)
+	}
+	sink.stateFile = fh
+	sink.stateHash = crc32.NewIEEE()
+	sink.buffered = bufio.NewWriter(io.MultiWriter(sink.stateFile, sink.stateHash))
+	return sink, nil
 }
 
 // getSnapshots возвращает все известные снимки, отсортированные
