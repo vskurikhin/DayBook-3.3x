@@ -171,3 +171,139 @@ func TestServeTCPRPCTimeout(t *testing.T) {
 		})
 	}
 }
+
+// TestDefaultSnapshotBarrier закрепляет экспортированные дефолты снимков
+// (AC-1): DefaultSnapshotInterval == 3 с и DefaultSnapshotThreshold == 1024.
+// Контрольная проверка отсутствия неэкспортированных имён выполняется
+// командным grep (см. отчёт задачи).
+func TestDefaultSnapshotBarrier(t *testing.T) {
+	if DefaultSnapshotInterval != 3*time.Second {
+		t.Fatalf("DefaultSnapshotInterval = %v, want 3s", DefaultSnapshotInterval)
+	}
+	if DefaultSnapshotThreshold != 1024 {
+		t.Fatalf("DefaultSnapshotThreshold = %d, want 1024", DefaultSnapshotThreshold)
+	}
+}
+
+// TestServeSnapshotConfig проверяет маршрут параметров снимков (AC-2):
+// значения SnapshotInterval/SnapshotThreshold из конфигурации доезжают
+// до ConsensusModule через сеттер в Serve, а trailingLogs не изменяется
+// (остаётся дефолтом конструктора).
+func TestServeSnapshotConfig(t *testing.T) {
+	commitChan := make(chan CommitEntry)
+	readerDone := make(chan any)
+	go func() {
+		defer close(readerDone)
+		for range commitChan {
+		}
+	}()
+
+	ready := make(chan any)
+	s := New(&Config{
+		Fsm:               NewCommitChannelFSM(commitChan),
+		PeerIds:           []int{},
+		RPCAddress:        "127.0.0.1:0",
+		ServerID:          1,
+		SnapshotInterval:  5 * time.Second,
+		SnapshotStore:     NewInmemSnapshotStore(),
+		SnapshotThreshold: 100,
+		Storage:           NewMapStorage(),
+		TCPRPCTimeout:     TCPRPCTimeout,
+	}, ready)
+	s.Serve("127.0.0.1:0")
+	close(ready)
+	t.Cleanup(func() {
+		s.Shutdown()
+		close(commitChan)
+		<-readerDone
+	})
+
+	if s.cm.snapshotInterval != 5*time.Second {
+		t.Fatalf("cm.snapshotInterval = %v, want 5s", s.cm.snapshotInterval)
+	}
+	if s.cm.snapshotThreshold != 100 {
+		t.Fatalf("cm.snapshotThreshold = %d, want 100", s.cm.snapshotThreshold)
+	}
+	if s.cm.trailingLogs != defaultTrailingLogs {
+		t.Fatalf("cm.trailingLogs = %d, want %d", s.cm.trailingLogs, defaultTrailingLogs)
+	}
+}
+
+// TestServeSnapshotConfigZeros проверяет контракт нулевых значений (AC-3):
+// нулевые поля снимков конфигурации заменяются дефолтами конструктора.
+func TestServeSnapshotConfigZeros(t *testing.T) {
+	commitChan := make(chan CommitEntry)
+	readerDone := make(chan any)
+	go func() {
+		defer close(readerDone)
+		for range commitChan {
+		}
+	}()
+
+	ready := make(chan any)
+	s := New(&Config{
+		Fsm:           NewCommitChannelFSM(commitChan),
+		PeerIds:       []int{},
+		RPCAddress:    "127.0.0.1:0",
+		ServerID:      1,
+		SnapshotStore: NewInmemSnapshotStore(),
+		Storage:       NewMapStorage(),
+		TCPRPCTimeout: TCPRPCTimeout,
+	}, ready)
+	s.Serve("127.0.0.1:0")
+	close(ready)
+	t.Cleanup(func() {
+		s.Shutdown()
+		close(commitChan)
+		<-readerDone
+	})
+
+	if s.cm.snapshotInterval != DefaultSnapshotInterval {
+		t.Fatalf("cm.snapshotInterval = %v, want %v", s.cm.snapshotInterval, DefaultSnapshotInterval)
+	}
+	if s.cm.snapshotThreshold != DefaultSnapshotThreshold {
+		t.Fatalf("cm.snapshotThreshold = %d, want %d", s.cm.snapshotThreshold, DefaultSnapshotThreshold)
+	}
+}
+
+// TestServeSnapshotConfigDisabled проверяет, что при выключенных снимках
+// (SnapshotStore == nil) сеттер не вызывается (AC-4): поля CM остаются
+// нулевыми, как и до введения маршрута.
+func TestServeSnapshotConfigDisabled(t *testing.T) {
+	commitChan := make(chan CommitEntry)
+	readerDone := make(chan any)
+	go func() {
+		defer close(readerDone)
+		for range commitChan {
+		}
+	}()
+
+	ready := make(chan any)
+	s := New(&Config{
+		Fsm:               NewCommitChannelFSM(commitChan),
+		PeerIds:           []int{},
+		RPCAddress:        "127.0.0.1:0",
+		ServerID:          1,
+		SnapshotInterval:  5 * time.Second,
+		SnapshotThreshold: 100,
+		Storage:           NewMapStorage(),
+		TCPRPCTimeout:     TCPRPCTimeout,
+	}, ready)
+	s.Serve("127.0.0.1:0")
+	close(ready)
+	t.Cleanup(func() {
+		s.Shutdown()
+		close(commitChan)
+		<-readerDone
+	})
+
+	if s.cm.snapshotStore != nil {
+		t.Fatalf("cm.snapshotStore = %v, want nil", s.cm.snapshotStore)
+	}
+	if s.cm.snapshotInterval != 0 {
+		t.Fatalf("cm.snapshotInterval = %v, want 0 (setter not called)", s.cm.snapshotInterval)
+	}
+	if s.cm.snapshotThreshold != 0 {
+		t.Fatalf("cm.snapshotThreshold = %d, want 0 (setter not called)", s.cm.snapshotThreshold)
+	}
+}

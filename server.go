@@ -28,7 +28,9 @@ type Server struct {
 	ready <-chan any
 	quit  chan any
 
-	tcpRPCTimeout time.Duration
+	tcpRPCTimeout     time.Duration
+	snapshotInterval  time.Duration
+	snapshotThreshold int
 }
 
 // Config — конфигурация для создания нового сервера Raft.
@@ -44,6 +46,14 @@ type Config struct {
 	// адрес (0 = defaultMaxPool).
 	MaxPool int
 
+	// SnapshotInterval — интервал проверки необходимости снимка
+	// (0 = дефолт конструктора).
+	SnapshotInterval time.Duration
+
+	// SnapshotThreshold — минимальное количество записей после последнего
+	// снимка, при котором создаётся новый снимок (0 = дефолт конструктора).
+	SnapshotThreshold int
+
 	// SnapshotStore — хранилище снимков. Если nil, снимки отключены.
 	SnapshotStore SnapshotStore
 
@@ -56,15 +66,17 @@ type Config struct {
 // каналом уведомления ready и FSM для применения зафиксированных записей журнала.
 func New(cfg *Config, ready <-chan any) *Server {
 	s := &Server{
-		fsm:           cfg.Fsm,
-		maxPool:       cfg.MaxPool,
-		peerIds:       cfg.PeerIds,
-		quit:          make(chan any),
-		ready:         ready,
-		serverID:      cfg.ServerID,
-		snapshotStore: cfg.SnapshotStore,
-		storage:       cfg.Storage,
-		tcpRPCTimeout: cfg.TCPRPCTimeout,
+		fsm:               cfg.Fsm,
+		maxPool:           cfg.MaxPool,
+		peerIds:           cfg.PeerIds,
+		quit:              make(chan any),
+		ready:             ready,
+		serverID:          cfg.ServerID,
+		snapshotInterval:  cfg.SnapshotInterval,
+		snapshotStore:     cfg.SnapshotStore,
+		snapshotThreshold: cfg.SnapshotThreshold,
+		storage:           cfg.Storage,
+		tcpRPCTimeout:     cfg.TCPRPCTimeout,
 	}
 	return s
 }
@@ -93,6 +105,24 @@ func (s *Server) Serve(address string) {
 	s.mu.Unlock()
 
 	s.cm = NewConsensusModule(s.serverID, s.peerIds, transport, s.storage, s.fsm, s.ready, s.snapshotStore)
+
+	// Применение параметров снимков из конфигурации сразу после создания
+	// CM и до закрытия ready — CM ещё не участвует в выборах. Выполняется
+	// только при включённых снимках (snapshotStore != nil); нулевые и
+	// отрицательные значения заменяются дефолтами конструктора. Сеттер —
+	// единая точка записи параметров снимков; сигнал snapshotCh безопасен
+	// (shouldSnapshot — фильтр) и лишь ускоряет применение нового интервала.
+	if s.snapshotStore != nil {
+		interval := s.snapshotInterval
+		if interval <= 0 {
+			interval = DefaultSnapshotInterval
+		}
+		threshold := s.snapshotThreshold
+		if threshold <= 0 {
+			threshold = DefaultSnapshotThreshold
+		}
+		s.cm.SetSnapshotConfig(threshold, interval, defaultTrailingLogs)
+	}
 }
 
 // Apply отправляет команду в Raft-кластер и возвращает ApplyFuture.

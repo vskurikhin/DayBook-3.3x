@@ -347,3 +347,50 @@ func TestParseFlagsTCPRPCTimeout(t *testing.T) {
 		t.Errorf("TCPRPCTimeout = %v, want 500ms", v.TCPRPCTimeout)
 	}
 }
+
+// TestParseFlagsSnapshotDefaults проверяет дефолты флагов снимков: без флага
+// поля Values.SnapshotInterval/SnapshotThreshold равны экспортированным
+// дефолтам пакета raft. Это защита от рассинхрона дефолтов между
+// internal/config и пакетом raft (RISK-023): единый источник —
+// raft.DefaultSnapshotInterval/raft.DefaultSnapshotThreshold.
+func TestParseFlagsSnapshotDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.SnapshotInterval != raft.DefaultSnapshotInterval {
+		t.Errorf("SnapshotInterval = %v, want default %v", v.SnapshotInterval, raft.DefaultSnapshotInterval)
+	}
+	if v.SnapshotThreshold != raft.DefaultSnapshotThreshold {
+		t.Errorf("SnapshotThreshold = %d, want default %d", v.SnapshotThreshold, raft.DefaultSnapshotThreshold)
+	}
+	if raft.DefaultSnapshotInterval != 3*time.Second {
+		t.Errorf("raft.DefaultSnapshotInterval = %v, want 3s", raft.DefaultSnapshotInterval)
+	}
+	if raft.DefaultSnapshotThreshold != 1024 {
+		t.Errorf("raft.DefaultSnapshotThreshold = %d, want 1024", raft.DefaultSnapshotThreshold)
+	}
+}
+
+// TestParseFlagsSnapshot проверяет, что нестандартные значения флагов
+// -snapshot-interval и -snapshot-threshold доезжают в поля Values.
+func TestParseFlagsSnapshot(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{
+		"raft", "-number", "1",
+		"--snapshot-interval", "10s",
+		"--snapshot-threshold", "2048",
+	}
+
+	v := ParseFlags()
+	if v.SnapshotInterval != 10*time.Second {
+		t.Errorf("SnapshotInterval = %v, want 10s", v.SnapshotInterval)
+	}
+	if v.SnapshotThreshold != 2048 {
+		t.Errorf("SnapshotThreshold = %d, want 2048", v.SnapshotThreshold)
+	}
+}

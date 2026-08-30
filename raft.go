@@ -50,17 +50,17 @@ const (
 	// кворума не позже, чем ведомый начинает выборы.
 	defaultCheckQuorumTimeout = 2 * defaultTCPRPCTimeout
 
-	// defaultSnapshotInterval — интервал проверки необходимости снимка.
+	// DefaultSnapshotInterval — интервал проверки необходимости снимка.
 	// Каждые 3 секунды runSnapshots проверяет, не превышен ли порог
-	// defaultSnapshotThreshold.
-	defaultSnapshotInterval = 3 * time.Second
+	// DefaultSnapshotThreshold.
+	DefaultSnapshotInterval = 3 * time.Second
 
-	// defaultSnapshotThreshold — минимальное количество записей после
+	// DefaultSnapshotThreshold — минимальное количество записей после
 	// последнего снимка, при котором создаётся новый снимок.
 	// Значение 1024 выбрано как компромисс: частые снимки создают
 	// нагрузку на FSM.Snapshot(), редкие — увеличивают время восстановления
 	// и объём журнала, который нужно передавать отстающим узлам.
-	defaultSnapshotThreshold = 1024
+	DefaultSnapshotThreshold = 1024
 
 	// defaultTakeSnapshotTimeout — тайм-аут отправки запроса на снимок
 	// в fsmSnapshotCh. Если runFSM не принимает запрос за это время,
@@ -265,8 +265,8 @@ func NewConsensusModule(
 	cm.cmState.lastSnapshotTerm = -1
 	if len(snapshots) > 0 && snapshots[0] != nil {
 		cm.snapshotStore = snapshots[0]
-		cm.snapshotThreshold = defaultSnapshotThreshold
-		cm.snapshotInterval = defaultSnapshotInterval
+		cm.snapshotThreshold = DefaultSnapshotThreshold
+		cm.snapshotInterval = DefaultSnapshotInterval
 		cm.trailingLogs = defaultTrailingLogs
 		cm.snapshotCh = make(chan struct{}, 1)
 		cm.fsmSnapshotCh = make(chan *reqSnapshotFuture)
