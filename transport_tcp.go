@@ -265,6 +265,15 @@ func (t *TCPTransport) Close() {
 	t.wg.Wait()
 }
 
+// closeActiveConns закрывает все активные входящие соединения.
+func (t *TCPTransport) closeActiveConns() {
+	t.activeConnsLock.Lock()
+	defer t.activeConnsLock.Unlock()
+	for conn := range t.activeConns {
+		_ = conn.Close()
+	}
+}
+
 // CloseStreams закрывает все соединения в пуле и удаляет их.
 // Используется при реконфигурации кластера, когда адреса соседей
 // могли измениться.
@@ -286,15 +295,6 @@ func (t *TCPTransport) IsShutdown() bool {
 		return true
 	default:
 		return false
-	}
-}
-
-// closeActiveConns закрывает все активные входящие соединения.
-func (t *TCPTransport) closeActiveConns() {
-	t.activeConnsLock.Lock()
-	defer t.activeConnsLock.Unlock()
-	for conn := range t.activeConns {
-		_ = conn.Close()
 	}
 }
 
