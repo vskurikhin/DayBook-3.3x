@@ -58,13 +58,17 @@ const (
 	CommandCAS
 )
 
-var commandName = map[CommandKind]string{
-	CommandInvalid: "invalid",
-	CommandGet:     "get",
-	CommandPut:     "put",
-	CommandCAS:     "cas",
-}
-
 func (ck CommandKind) String() string {
-	return commandName[ck]
+	switch ck {
+	case CommandInvalid:
+		return "invalid"
+	case CommandGet:
+		return "get"
+	case CommandPut:
+		return "put"
+	case CommandCAS:
+		return "cas"
+	default:
+		return ""
+	}
 }

@@ -89,13 +89,17 @@ func (s *StatusResponse) Status() ResponseStatus {
 	return s.RespStatus
 }
 
-var responseName = map[ResponseStatus]string{
-	StatusInvalid:      "invalid",
-	StatusOK:           "OK",
-	StatusNotLeader:    "NotLeader",
-	StatusFailedCommit: "FailedCommit",
-}
-
 func (rs ResponseStatus) String() string {
-	return responseName[rs]
+	switch rs {
+	case StatusInvalid:
+		return "invalid"
+	case StatusOK:
+		return "OK"
+	case StatusNotLeader:
+		return "NotLeader"
+	case StatusFailedCommit:
+		return "FailedCommit"
+	default:
+		return ""
+	}
 }

@@ -75,3 +75,27 @@ func TestJSONWireFormat(t *testing.T) {
 		})
 	}
 }
+
+// TestResponseStatusString фиксирует значения String() всех статусов
+// и возврат пустой строки для неизвестного значения — контракт
+// fmt-печати, сохраняемый при любом изменении реализации.
+func TestResponseStatusString(t *testing.T) {
+	tests := []struct {
+		name string
+		rs   ResponseStatus
+		want string
+	}{
+		{"StatusInvalid", StatusInvalid, "invalid"},
+		{"StatusOK", StatusOK, "OK"},
+		{"StatusNotLeader", StatusNotLeader, "NotLeader"},
+		{"StatusFailedCommit", StatusFailedCommit, "FailedCommit"},
+		{"unknown", ResponseStatus(42), ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.rs.String(); got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
