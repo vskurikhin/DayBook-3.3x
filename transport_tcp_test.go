@@ -633,3 +633,28 @@ func TestTCPTransportNoGoroutineLeak(t *testing.T) {
 	}
 	trans.Close()
 }
+
+// TestRPCFramingBytes фиксирует байты фрейминга TCP RPC: значения
+// используются как поле Type запроса, кодируются gob и уходят
+// в сеть, поэтому смена любого значения — изменение проводного
+// формата.
+func TestRPCFramingBytes(t *testing.T) {
+	tests := []struct {
+		name string
+		got  byte
+		want byte
+	}{
+		{"rpcAppendEntries", _rpcAppendEntries, 0},
+		{"rpcRequestVote", _rpcRequestVote, 1},
+		{"rpcInstallSnapshot", _rpcInstallSnapshot, 2},
+		{"rpcTimeoutNow", _rpcTimeoutNow, 3},
+		{"rpcRequestPreVote", _rpcRequestPreVote, 4},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Fatalf("got %d, want %d", tt.got, tt.want)
+			}
+		})
+	}
+}

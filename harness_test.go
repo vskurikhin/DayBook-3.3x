@@ -1201,13 +1201,6 @@ func (h *Harness) SubmitToServer(serverId int, cmd any) int {
 	}
 }
 
-// DisconnectAll отключает все соединения указанного транспорта.
-func (t *InmemTransport) DisconnectAll() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.peers = make(map[ServerID]*InmemTransport)
-}
-
 func tlog(format string, a ...any) {
 	format = "[TEST] " + format
 	log.Printf(format, a...)

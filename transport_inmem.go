@@ -296,6 +296,13 @@ func (t *InmemTransport) SetHeartbeatHandler(h func(RPC)) {
 	t.heartbeat = h
 }
 
+// DisconnectAll отключает все соединения указанного транспорта.
+func (t *InmemTransport) DisconnectAll() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.peers = make(map[ServerID]*InmemTransport)
+}
+
 // Connect добавляет peer в карту peers. Используется Harness для
 // установки логического соединения между двумя узлами.
 func (t *InmemTransport) Connect(peerID ServerID, transport *InmemTransport) {

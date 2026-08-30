@@ -61,8 +61,8 @@ linters:
         - name: use-any
     staticcheck:
       checks:
-        - -ST1000
         - all
+        - -ST1000
     tagliatelle:
       case:
         rules:
@@ -86,7 +86,7 @@ linters:
       - part3/
       - part4kv/
       - part5kv/
-      - testharness\.go$
+      - internal/_init/
       - .*_test.go$
 issues:
   max-issues-per-linter: 0

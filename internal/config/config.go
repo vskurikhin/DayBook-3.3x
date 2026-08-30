@@ -87,7 +87,8 @@ func ParseFlags() Values {
 	)
 	tcpRPCTimeoutFlag := fs.Duration(
 		"tcp-rpc-timeout", raft.TCPRPCTimeout,
-		"Timeout for TCP RPC calls to peers; also bases the leader check-quorum timeout (default 191ms)",
+		"Timeout for TCP RPC calls to peers; the leader check-quorum timeout "+
+			"stays fixed at 382ms and does NOT scale with this flag (default 191ms)",
 	)
 	traceCMLogFileFlag := fs.String("trace-cm-log-file", "", "Trace consensus module log file path (empty = stderr)")
 	traceKVLogFileFlag := fs.String("trace-kv-log-file", "", "Trace key-value database log file path (empty = stderr)")

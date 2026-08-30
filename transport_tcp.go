@@ -27,10 +27,10 @@ const (
 // Типы RPC для фрейминга (1 байт вместо строки).
 const (
 	_rpcAppendEntries byte = iota
-	_rpcInstallSnapshot
-	_rpcRequestPreVote
 	_rpcRequestVote
+	_rpcInstallSnapshot
 	_rpcTimeoutNow
+	_rpcRequestPreVote
 )
 
 //nolint:gochecknoinits

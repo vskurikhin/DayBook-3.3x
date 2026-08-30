@@ -537,6 +537,9 @@ func (cm *ConsensusModule) leaderSendAEsToPeerIfIdle(peerID, savedCurrentTerm in
 	}
 }
 
+// newInstallSnapshotRequest собирает запрос InstallSnapshot из
+// метаданных снимка и данных конфигурации для отправки отстающему
+// соседу.
 func (cm *ConsensusModule) newInstallSnapshotRequest(term int, meta *SnapshotMeta, cfgData []byte) InstallSnapshotRequest {
 	req := InstallSnapshotRequest{
 		RPCHeader: RPCHeader{
