@@ -78,13 +78,13 @@ func NewServer(serverID int, peerIds []int, fsm FSM, ready <-chan any) *Server {
 		Fsm:           fsm,
 		PeerIds:       peerIds,
 		Storage:       NewMapStorage(),
-		TCPRPCTimeout: TCPRPCTimeout,
+		TCPRPCTimeout: defaultTCPRPCTimeout,
 	}, ready)
 }
 
 // Serve запускает TCP-транспорт на указанном адресе и создаёт ConsensusModule.
 func (s *Server) Serve(address string) {
-	transport, err := NewTCPTransport(address, TCPRPCTimeout, s.maxPool)
+	transport, err := NewTCPTransport(address, s.tcpRPCTimeout, s.maxPool)
 	if err != nil {
 		log.Fatalf("raft: failed to create TCPTransport: %v", err)
 	}

@@ -90,7 +90,7 @@ func runWith(values *config.Values) (func(), error) {
 			ServerID:      values.Number,
 			SnapshotStore: snapshotStore,
 			Storage:       raft.NewFileStorage(dataDir),
-			TCPRPCTimeout: raft.TCPRPCTimeout,
+			TCPRPCTimeout: values.TCPRPCTimeout,
 			MaxPool:       maxPool,
 		},
 	}

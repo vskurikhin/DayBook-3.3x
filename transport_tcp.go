@@ -106,6 +106,14 @@ func NewTCPTransport(addr string, timeout time.Duration, maxPool int) (*TCPTrans
 	if maxPool <= 0 {
 		maxPool = defaultMaxPool
 	}
+	// Защитная проверка: нулевой тайм-аут (например, из нулевой конфигурации
+	// или неявного нуля в литерале) заменяется дефолтом, чтобы транспорт всегда
+	// имел действующие дедлайны соединения, отправки и чтения. Это защитная
+	// проверка, а не молчаливое исправление: недокументированная возможность
+	// «0 = без дедлайнов» изымается из контракта конструктора.
+	if timeout <= 0 {
+		timeout = defaultTCPRPCTimeout
+	}
 	t := &TCPTransport{
 		consumerCh:  make(chan RPC),
 		localAddr:   ServerAddress(listener.Addr().String()),

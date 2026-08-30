@@ -9,6 +9,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/vskurikhin/raft"
 )
 
 const (
@@ -40,6 +43,10 @@ type Values struct {
 	// MaxPool — максимальное количество соединений в пуле на один адрес
 	// соседа; ноль заменяется на DefaultMaxPool при сборке конфигурации узла.
 	MaxPool int
+	// TCPRPCTimeout — тайм-аут TCP RPC к соседям. Ноль — защитное значение:
+	// применяется дефолт транспорта (raft.TCPRPCTimeout, 191 мс). Связь
+	// значения с проверкой кворума лидера — в подсказке флага.
+	TCPRPCTimeout time.Duration
 
 	// PprofAddress — адрес отдельного HTTP-сервера профилирования;
 	// пустая строка выключает профилирование.
@@ -63,6 +70,8 @@ func ParseFlags() Values {
 	traceKVLogFileFlag := fs.String("trace-kv-log-file", "", "Trace key-value database log file path (empty = stderr)")
 	dataDirFlag := fs.String("data-dir", "", "Directory for persistent storage")
 	maxPoolFlag := fs.Int("max-pool", DefaultMaxPool, "Max connections pooled per peer address (0 = transport default)")
+	tcpRPCTimeoutFlag := fs.Duration("tcp-rpc-timeout", raft.TCPRPCTimeout,
+		"Timeout for TCP RPC calls to peers; also bases the leader check-quorum timeout (default 191ms)")
 	pprofAddressFlag := fs.String("pprof-addr", "", "Profiling HTTP server listen address (empty = disabled)")
 	blockProfileRateFlag := fs.Int("block-profile-rate", 0, "Block profile rate (0 = disabled)")
 	mutexProfileFractionFlag := fs.Int("mutex-profile-fraction", 0, "Mutex profile fraction (0 = disabled)")
@@ -97,6 +106,7 @@ func ParseFlags() Values {
 		TraceKVLogFile: *traceKVLogFileFlag,
 		DataDir:        *dataDirFlag,
 		MaxPool:        *maxPoolFlag,
+		TCPRPCTimeout:  *tcpRPCTimeoutFlag,
 
 		PprofAddress:         *pprofAddressFlag,
 		BlockProfileRate:     *blockProfileRateFlag,

@@ -19,11 +19,15 @@ const (
 	ReelectionTimeoutMs = 127 * Quantum
 	TickerTimeoutMs     = 7 * Quantum
 
-	// TCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
+	// defaultTCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
 	// в production-транспорте. Исходное значение 85ms получено из 382/2 при
 	// Quantum=3. Вынесено в независимую константу, чтобы изменение Quantum
 	// для ускорения тестов не влияло на production-развёртывание.
-	TCPRPCTimeout = 191 * time.Millisecond
+	defaultTCPRPCTimeout = 191 * time.Millisecond
+
+	// TCPRPCTimeout — алиас defaultTCPRPCTimeout, сохранённый для обратной
+	// совместимости публичного API.
+	TCPRPCTimeout = defaultTCPRPCTimeout
 
 	// applyBatchInterval — интервал, с которым runApplyLoop проверяет
 	// необходимость применения записей к FSM. Накопление commitCh
@@ -44,7 +48,7 @@ const (
 	// двукратный запас покрывает один полный тайм-аут RPC. Итоговая
 	// величина близка к ReelectionTimeoutMs: лидер обнаруживает потерю
 	// кворума не позже, чем ведомый начинает выборы.
-	defaultCheckQuorumTimeout = 2 * TCPRPCTimeout
+	defaultCheckQuorumTimeout = 2 * defaultTCPRPCTimeout
 
 	// defaultSnapshotInterval — интервал проверки необходимости снимка.
 	// Каждые 3 секунды runSnapshots проверяет, не превышен ли порог

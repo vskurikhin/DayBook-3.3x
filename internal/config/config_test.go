@@ -4,6 +4,9 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/vskurikhin/raft"
 )
 
 func TestParsePeerAddress(t *testing.T) {
@@ -306,5 +309,41 @@ func TestParseFlagsMaxPool(t *testing.T) {
 	v := ParseFlags()
 	if v.MaxPool != 8 {
 		t.Errorf("MaxPool = %d, want 8", v.MaxPool)
+	}
+}
+
+// TestParseFlagsTCPRPCTimeoutDefaults проверяет дефолт флага -tcp-rpc-timeout:
+// без флага поле Values.TCPRPCTimeout равно raft.TCPRPCTimeout (191 мс).
+// Одновременно это защита от рассинхрона дефолта между internal/config
+// и пакетом raft (RISK-023): единый источник — алиас raft.TCPRPCTimeout.
+func TestParseFlagsTCPRPCTimeoutDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.TCPRPCTimeout != raft.TCPRPCTimeout {
+		t.Errorf("TCPRPCTimeout = %v, want default %v", v.TCPRPCTimeout, raft.TCPRPCTimeout)
+	}
+	if raft.TCPRPCTimeout != 191*time.Millisecond {
+		t.Errorf("raft.TCPRPCTimeout = %v, want 191ms", raft.TCPRPCTimeout)
+	}
+}
+
+// TestParseFlagsTCPRPCTimeout проверяет, что нестандартное значение
+// флага -tcp-rpc-timeout доезжает в поле Values.TCPRPCTimeout.
+func TestParseFlagsTCPRPCTimeout(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{
+		"raft", "-number", "1",
+		"--tcp-rpc-timeout", "500ms",
+	}
+
+	v := ParseFlags()
+	if v.TCPRPCTimeout != 500*time.Millisecond {
+		t.Errorf("TCPRPCTimeout = %v, want 500ms", v.TCPRPCTimeout)
 	}
 }

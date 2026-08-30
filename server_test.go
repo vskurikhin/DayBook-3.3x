@@ -3,6 +3,7 @@ package raft
 import (
 	"net"
 	"testing"
+	"time"
 )
 
 func TestConfig(t *testing.T) {
@@ -97,6 +98,75 @@ func TestServeMaxPool(t *testing.T) {
 
 			if s.transport.maxPool != test.want {
 				t.Fatalf("transport.maxPool = %d, want %d", s.transport.maxPool, test.want)
+			}
+		})
+	}
+}
+
+// TestDefaultTCPRPCTimeoutBarrier закрепляет контракт дефолтов тайм-аута
+// (AC-1): алиас TCPRPCTimeout несёт то же значение, что и каноническое
+// внутреннее имя defaultTCPRPCTimeout (191 мс), а производная константа
+// проверки кворума остаётся ровно двукратной (инвариант 2×RPC на уровне
+// дефолтов, 382 мс).
+func TestDefaultTCPRPCTimeoutBarrier(t *testing.T) {
+	if TCPRPCTimeout != defaultTCPRPCTimeout {
+		t.Fatalf("TCPRPCTimeout = %v, want %v", TCPRPCTimeout, defaultTCPRPCTimeout)
+	}
+	if defaultTCPRPCTimeout != 191*time.Millisecond {
+		t.Fatalf("defaultTCPRPCTimeout = %v, want 191ms", defaultTCPRPCTimeout)
+	}
+	if defaultCheckQuorumTimeout != 382*time.Millisecond {
+		t.Fatalf("defaultCheckQuorumTimeout = %v, want 382ms", defaultCheckQuorumTimeout)
+	}
+	if defaultCheckQuorumTimeout != 2*defaultTCPRPCTimeout {
+		t.Fatalf("defaultCheckQuorumTimeout = %v, want 2*defaultTCPRPCTimeout = %v",
+			defaultCheckQuorumTimeout, 2*defaultTCPRPCTimeout)
+	}
+}
+
+// TestServeTCPRPCTimeout проверяет, что значение TCPRPCTimeout из конфигурации
+// доезжает до TCP-транспорта (мёртвый маршрут оживает, AC-3), а нулевая
+// конфигурация получает дефолт транспорта — те же эффективные 191 мс,
+// что и до починки маршрута (RISK-021 закрыт).
+func TestServeTCPRPCTimeout(t *testing.T) {
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		want    time.Duration
+	}{
+		{name: "explicit", timeout: 500 * time.Millisecond, want: 500 * time.Millisecond},
+		{name: "zero uses transport default", timeout: 0, want: TCPRPCTimeout},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			commitChan := make(chan CommitEntry)
+			readerDone := make(chan any)
+			go func() {
+				defer close(readerDone)
+				for range commitChan {
+				}
+			}()
+
+			ready := make(chan any)
+			s := New(&Config{
+				Fsm:           NewCommitChannelFSM(commitChan),
+				PeerIds:       []int{},
+				RPCAddress:    "127.0.0.1:0",
+				ServerID:      1,
+				Storage:       NewMapStorage(),
+				TCPRPCTimeout: test.timeout,
+			}, ready)
+			s.Serve("127.0.0.1:0")
+			close(ready)
+			t.Cleanup(func() {
+				s.Shutdown()
+				close(commitChan)
+				<-readerDone
+			})
+
+			if s.transport.timeout != test.want {
+				t.Fatalf("transport.timeout = %v, want %v", s.transport.timeout, test.want)
 			}
 		})
 	}
