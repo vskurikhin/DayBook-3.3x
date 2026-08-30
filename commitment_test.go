@@ -1,9 +1,1144 @@
 package raft
 
 import (
+	"errors"
 	"testing"
 	"time"
+
+	"github.com/fortytw2/leaktest"
 )
+
+// Матричные (table-driven) версии тестов из commitment_test.go.
+// Сценарии, шаги и ожидания перенесены без изменений; комментарии
+// перенесены дословно из исходного файла.
+
+// mInt возвращает указатель на значение для полей-ожиданий шага.
+func mInt(v int) *int { return &v }
+
+// commitmentStep — один шаг сценария над трекером.
+type commitmentStep struct {
+	op     string // setMatch | commit | setConfig | recalc | fillCh | drainCh
+	id     int
+	value  int
+	voters []int
+	want   *int // ожидаемый getCommitIndex() после шага
+}
+
+// commitmentCase — строка матрицы: конфигурация трекера и шаги.
+type commitmentCase struct {
+	name         string
+	selfID       int
+	term         int
+	startIdx     int
+	initVoters   []int
+	terms        map[int]int
+	emptyTracker bool
+	steps        []commitmentStep
+	// проверки внутреннего состояния после всех шагов
+	wantMatch      map[int]int
+	wantMatchLen   *int
+	wantMatchGone  []int
+	wantStartIndex *int
+}
+
+func (c commitmentCase) run(t *testing.T) {
+	t.Helper()
+	commitCh := make(chan int, 1)
+	lts := &lookupTermStub{terms: c.terms}
+	var ct *commitmentTracker
+	if c.emptyTracker {
+		ct = &commitmentTracker{
+			matchIndex:  map[int]int{},
+			commitIndex: -1,
+			selfID:      c.selfID,
+			startIndex:  c.startIdx,
+			commitCh:    commitCh,
+			term:        c.term,
+		}
+	} else {
+		ct = newCommitmentTracker(c.selfID, c.term, c.startIdx, commitCh)
+		if len(c.initVoters) > 0 {
+			ct.setConfiguration(c.initVoters, lts.lookup)
+		}
+	}
+	for i, s := range c.steps {
+		switch s.op {
+		case "setMatch":
+			ct.setMatch(s.id, s.value, lts.lookup)
+		case "commit":
+			ct.commit(s.value, lts.lookup)
+		case "setConfig":
+			ct.setConfiguration(s.voters, lts.lookup)
+		case "recalc":
+			ct.recalculateCommitIndex(lts.lookup)
+		case "fillCh":
+			commitCh <- s.value
+		case "drainCh":
+			select {
+			case got := <-commitCh:
+				if got != s.value {
+					t.Fatalf("step %d (%s): commitCh = %d, want %d", i, s.op, got, s.value)
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("step %d (%s): timeout waiting for commitCh", i, s.op)
+			}
+		default:
+			t.Fatalf("step %d: unknown op %q", i, s.op)
+		}
+		if s.want != nil {
+			if got := ct.getCommitIndex(); got != *s.want {
+				t.Fatalf("step %d (%s): getCommitIndex() = %d, want %d", i, s.op, got, *s.want)
+			}
+		}
+	}
+	for voter, want := range c.wantMatch {
+		if got := ct.matchIndex[voter]; got != want {
+			t.Fatalf("matchIndex[%d] = %d, want %d", voter, got, want)
+		}
+	}
+	if c.wantMatchLen != nil {
+		if got := len(ct.matchIndex); got != *c.wantMatchLen {
+			t.Fatalf("len(matchIndex) = %d, want %d", got, *c.wantMatchLen)
+		}
+	}
+	for _, voter := range c.wantMatchGone {
+		if _, ok := ct.matchIndex[voter]; ok {
+			t.Fatalf("matchIndex[%d] should not exist", voter)
+		}
+	}
+	if c.wantStartIndex != nil {
+		if got := ct.startIndex; got != *c.wantStartIndex {
+			t.Fatalf("startIndex = %d, want %d", got, *c.wantStartIndex)
+		}
+	}
+}
+
+// --- 1. Стандартное большинство (3 узла) ---
+
+func TestCommitmentMatrix_Majority(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "NoMatch",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			// Все matchIndex = -1 (начальное состояние), кворума нет.
+			steps: []commitmentStep{
+				{op: "recalc", want: mInt(-1)},
+			},
+		},
+		{
+			name:   "SelfOnly",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// Только сам лидер продвинулся — кворума нет (нужно 2 из 3).
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5, want: mInt(-1)},
+			},
+		},
+		{
+			name:   "SelfAndOnePeer",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// Лидер + один follower = 2 из 3 = кворум есть.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5, want: mInt(5)},
+			},
+		},
+		{
+			name:   "AllNodes",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{10: 1},
+			// Все три узла подтвердили — кворум 3/3.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 10},
+				{op: "setMatch", id: 1, value: 10},
+				{op: "setMatch", id: 2, value: 10, want: mInt(10)},
+			},
+		},
+		{
+			name:   "MedianOrdering_Odd",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2, 3, 4},
+			terms: map[int]int{-1: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1},
+			// 5 узлов, разные значения matchIndex. Медиана = элемент [2] из 5.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 1},
+				{op: "setMatch", id: 2, value: 2},
+				{op: "setMatch", id: 3, value: 3},
+				{op: "setMatch", id: 4, value: 4, want: mInt(3)},
+			},
+		},
+		{
+			name:   "MedianOrdering_Even",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2, 3},
+			terms: map[int]int{-1: 1, 1: 1, 2: 1, 3: 1},
+			// 4 узла (чётное количество голосующих). matchIndex:
+			// {0:3, 1:1, 2:2, 3:-1} -> sorted [-1, 1, 2, 3], len=4.
+			// Кворумный индекс n-quorumSize(n) = 4-3 = 1 -> values[1] = 1.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 3},
+				{op: "setMatch", id: 1, value: 1},
+				{op: "setMatch", id: 2, value: 2},
+				// sorted: [-1, 1, 2, 3], len=4, n-quorum = 1 -> values[1] = 1
+				{op: "setMatch", id: 3, value: -1, want: mInt(1)},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 2. Raft safety (проверка term и startIndex) ---
+
+func TestCommitmentMatrix_Safety(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "DifferentTerm",
+			selfID: 0, term: 2, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// term=2, но запись с индексом 5 принадлежит term=1 — фиксация невозможна.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5, want: mInt(-1)},
+			},
+		},
+		{
+			name:   "SameTerm",
+			selfID: 0, term: 2, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 2},
+			// term=2 и запись с индексом 5 принадлежит term=2 — фиксация разрешена.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5, want: mInt(5)},
+			},
+		},
+		{
+			name:   "MedianShifts",
+			selfID: 0, term: 2, initVoters: []int{0, 1, 2, 3},
+			terms: map[int]int{3: 1, 5: 2},
+			// Медиана скачком переходит с отвергнутого индекса на принятый.
+			// 4 voters (чётное n), term=2, terms = {3:1, 5:2}.
+			steps: []commitmentStep{
+				// Шаг 1: matchIndexes = {0:5, 1:3, 2:3, 3:-1}
+				// sorted = [-1, 3, 3, 5], кворумный индекс 4-3=1 -> 3.
+				// lookupTerm(3)=1 != 2 -> фиксация заблокирована.
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 3},
+				{op: "setMatch", id: 2, value: 3, want: mInt(-1)},
+				// Шаг 2: matchIndexes = {0:5, 1:3, 2:3, 3:5}
+				// sorted = [3, 3, 5, 5], кворумный индекс 4-3=1 -> 3 — это 2/4,
+				// кворума 3/4 нет: commitIndex остаётся -1.
+				{op: "setMatch", id: 3, value: 5, want: mInt(-1)},
+				// Шаг 3: matchIndexes = {0:5, 1:5, 2:3, 3:5}
+				// sorted = [3, 5, 5, 5], кворумный индекс 1 -> 5, lookupTerm(5)=2 == term
+				// -> 3/4 = кворум, commitIndex 5.
+				{op: "setMatch", id: 1, value: 5, want: mInt(5)},
+			},
+		},
+		{
+			name:   "StartIndex_BlocksCommit",
+			selfID: 0, term: 2, startIdx: 10, initVoters: []int{0, 1, 2},
+			terms: map[int]int{10: 2},
+			// startIndex=10, median=10 >= 10 ✅, lookupTerm(10)=2 == term ✅
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 10},
+				{op: "setMatch", id: 1, value: 10},
+				{op: "setMatch", id: 2, value: 10, want: mInt(10)},
+			},
+		},
+		{
+			name:   "StartIndex_PreventsOld",
+			selfID: 0, term: 2, startIdx: 10, initVoters: []int{0, 1, 2},
+			terms: map[int]int{8: 2},
+			// startIndex=10, median=8 < 10 — фиксация заблокирована.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 8},
+				{op: "setMatch", id: 1, value: 8},
+				{op: "setMatch", id: 2, value: 8, want: mInt(-1)},
+			},
+		},
+		{
+			name:   "StartIndex_Exact",
+			selfID: 0, term: 2, startIdx: 5, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 2},
+			// startIndex=5, median=5 >= 5 ✅
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5, want: mInt(5)},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 3. setConfiguration ---
+
+func TestCommitmentMatrix_SetConfiguration(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "Basic",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{},
+			// Установка конфигурации из трёх узлов после пустого конструктора.
+			wantMatch:    map[int]int{0: -1, 1: -1, 2: -1},
+			wantMatchLen: mInt(3),
+		},
+		{
+			name:   "PreservesMatchIndex",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// Смена конфигурации: добавляем новый узел, удаляем старый,
+			// matchIndex сохраняется для оставшихся.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 3},
+				// Меняем конфигурацию: убираем узел 2, добавляем узел 3
+				{op: "setConfig", voters: []int{0, 1, 3}},
+			},
+			wantMatch:     map[int]int{0: 5, 1: 3, 3: -1},
+			wantMatchGone: []int{2},
+		},
+		{
+			name:   "CommitAfterChange",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// После смены конфигурации commitIndex не сбрасывается.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5, want: mInt(5)},
+				// Меняем конфигурацию с 3 узлов на 2 узла
+				{op: "setConfig", voters: []int{0, 1}, want: mInt(5)},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 4. Продвижение commitIndex (incremental) ---
+
+func TestCommitmentMatrix_Progressive(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "Basic",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{3: 1, 5: 1},
+			// Постепенное продвижение commitIndex по мере получения matchIndex.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 3},
+				// matchIndexes = {0:3, 1:3, 2:-1} -> sorted [-1, 3, 3], median=3
+				{op: "setMatch", id: 1, value: 3, want: mInt(3)},
+				{op: "setMatch", id: 2, value: 5},
+				// matchIndexes = {0:3, 1:3, 2:5} -> sorted [3, 3, 5], median=3
+				// 3 == ct.commitIndex, поэтому не продвигается
+				{op: "recalc", want: mInt(3)},
+			},
+		},
+		{
+			name:   "LargeSteps",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{100: 1, 150: 1, 200: 1},
+			// Продвижение с большими скачками matchIndex.
+			steps: []commitmentStep{
+				// matchIndexes = {0:-1, 1:100, 2:-1} -> sorted [-1, -1, 100], median=-1
+				{op: "setMatch", id: 1, value: 100, want: mInt(-1)},
+				// matchIndexes = {0:-1, 1:100, 2:200} -> sorted [-1, 100, 200], median=100
+				{op: "setMatch", id: 2, value: 200, want: mInt(100)},
+				// matchIndexes = {0:150, 1:100, 2:200} -> sorted [100, 150, 200], median=150
+				{op: "setMatch", id: 0, value: 150, want: mInt(150)},
+			},
+		},
+		{
+			name:   "SelfCommit",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{10: 1},
+			// self.commit(10) — обновили selfID, но соседи не подтвердили.
+			steps: []commitmentStep{
+				// sorted [-1, -1, 10], median=-1 — кворума нет
+				{op: "commit", value: 10, want: mInt(-1)},
+			},
+		},
+		{
+			name:   "SelfCommit_SingleNode",
+			selfID: 0, term: 1, initVoters: []int{0},
+			terms: map[int]int{10: 1},
+			// Одиночный узел: self.commit(10) → median=10 → кворум 1/1.
+			steps: []commitmentStep{
+				{op: "commit", value: 10, want: mInt(10)},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 5. Граничные случаи setMatch ---
+
+func TestCommitmentMatrix_SetMatchEdge(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "SetMatchDecreasingIgnored",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{10: 1, 5: 1},
+			// Уменьшающийся matchIndex игнорируется (инвариант монотонности).
+			steps: []commitmentStep{
+				{op: "setMatch", id: 1, value: 10},
+				{op: "setMatch", id: 1, value: 5},
+			},
+			wantMatch: map[int]int{1: 10},
+		},
+		{
+			name:   "SetMatchUnknownPeer",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// setMatch для узла, не являющегося голосующим текущей конфигурации —
+			// no-op (membership guard): ghost-ключ НЕ добавляется в map
+			// и не участвует в кворуме.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 99, value: 5, want: mInt(-1)},
+			},
+			wantMatchLen:  mInt(3),
+			wantMatchGone: []int{99},
+		},
+		{
+			name:   "NegativeMatchIndex",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			// После конструктора и setConfiguration все matchIndex = -1.
+			steps: []commitmentStep{
+				{op: "recalc", want: mInt(-1)},
+			},
+		},
+		{
+			name:   "EmptyVoterList",
+			selfID: 0, term: 1, initVoters: []int{0},
+			terms: map[int]int{5: 1, -1: 0},
+			// Одиночный узел: setConfiguration([]int{0}) — один голосующий.
+			steps: []commitmentStep{
+				{op: "recalc", want: mInt(-1)},
+				// После commit(5) -> self matchIndex = 5, median = 5
+				{op: "commit", value: 5, want: mInt(5)},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 6. commitCh non-blocking send ---
+
+func TestCommitmentMatrix_Channel(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "ChannelNonBlocking",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// Не читаем из commitCh. setMatch не должен блокироваться.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5, want: mInt(5)},
+			},
+		},
+		{
+			name:   "ChannelDelivery",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// Проверка, что commitCh действительно получает новое значение.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "drainCh", value: 5},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 7. setTerm с startIndex ---
+//
+// Секция удалена вместе с методом setTerm (мёртвый код):
+// production-вызовов у setTerm не было, а term/startIndex трекера
+// устанавливаются только в newCommitmentTracker и не меняются
+// в течение лидерства.
+
+// --- 8. Множественные setMatch ---
+
+func TestCommitmentMatrix_MultipleSetMatch(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "MultipleSetMatchNoCommit",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1, 6: 1, 7: 1},
+			// Несколько setMatch без достижения кворума.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 1, value: 5},
+				// matchIndexes = {0:-1, 1:5, 2:6} -> sorted [-1, 5, 6], median=5
+				{op: "setMatch", id: 2, value: 6, want: mInt(5)},
+				// matchIndexes = {0:7, 1:5, 2:6} -> sorted [5, 6, 7], median=6
+				{op: "setMatch", id: 0, value: 7, want: mInt(6)},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 9. Дополнительные тесты ---
+
+func TestCommitmentMatrix_Additional(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "CommitThenSetMatch",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1, 8: 1},
+			// commit для selfID, затем setMatch для peer-ов.
+			steps: []commitmentStep{
+				// matchIndexes = {0:5, 1:-1, 2:-1} -> sorted [-1, -1, 5], median=-1
+				{op: "commit", value: 5, want: mInt(-1)},
+				// matchIndexes = {0:5, 1:8, 2:-1} -> sorted [-1, 5, 8], median=5
+				{op: "setMatch", id: 1, value: 8, want: mInt(5)},
+				// matchIndexes = {0:5, 1:8, 2:8} -> sorted [5, 8, 8], median=8
+				{op: "setMatch", id: 2, value: 8, want: mInt(8)},
+			},
+		},
+		{
+			name:   "FiveNodes",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2, 3, 4},
+			terms: map[int]int{10: 1, -1: 0},
+			// Кворум 3/5.
+			steps: []commitmentStep{
+				// self + 1 peer = 2/5 — кворума нет
+				{op: "setMatch", id: 0, value: 10},
+				{op: "setMatch", id: 1, value: 10, want: mInt(-1)},
+				// self + 2 peers = 3/5 — кворум есть
+				{op: "setMatch", id: 2, value: 10, want: mInt(10)},
+			},
+		},
+		{
+			name:   "commitChBufferSize1PreventsLoss",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1, 10: 1},
+			// Проверка, что commitCh с буфером 1 не теряет уведомления.
+			steps: []commitmentStep{
+				// Первый commit
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5},
+				{op: "drainCh", value: 5},
+				// Второй commit
+				{op: "setMatch", id: 0, value: 10},
+				{op: "setMatch", id: 1, value: 10},
+				{op: "setMatch", id: 2, value: 10},
+				{op: "drainCh", value: 10},
+			},
+		},
+		{
+			name:   "CommitIndexNeverDecreases",
+			selfID: 0, term: 2, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 2, 8: 1},
+			// commitIndex не уменьшается при попытке фиксации записи чужого term.
+			steps: []commitmentStep{
+				// term=2, median=5, lookupTerm(5)=2 ✅ → commitIndex=5
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5, want: mInt(5)},
+				// median=8, но lookupTerm(8)=1 != 2 ❌ → commitIndex не меняется
+				{op: "setMatch", id: 0, value: 8},
+				{op: "setMatch", id: 1, value: 8},
+				{op: "setMatch", id: 2, value: 8, want: mInt(5)},
+			},
+		},
+		{
+			name:   "RecalculateWithNegativeMatch",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{-1: 0, 3: 1},
+			// Медиана с отрицательным matchIndex (начальное состояние).
+			steps: []commitmentStep{
+				// matchIndexes = {0:3, 1:-1, 2:-1} -> sorted [-1, -1, 3], median=-1
+				{op: "setMatch", id: 0, value: 3, want: mInt(-1)},
+				// matchIndexes = {0:3, 1:3, 2:-1} -> sorted [-1, 3, 3], median=3
+				{op: "setMatch", id: 1, value: 3, want: mInt(3)},
+			},
+		},
+		{
+			name:   "EmptyMatchMap",
+			selfID: 0, term: 1, emptyTracker: true,
+			terms: map[int]int{},
+			// Пустой matchIndex — защита recalculateCommitIndex от паники.
+			steps: []commitmentStep{
+				{op: "recalc", want: mInt(-1)},
+			},
+		},
+		{
+			name:   "SetConfiguration_RecalculateOnConfigChange",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1, -1: 0},
+			// При смене конфигурации recalculateCommitIndex вызывается автоматически.
+			steps: []commitmentStep{
+				// Достигаем кворума с 3 узлами на индексе 5
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5, want: mInt(5)},
+				// Меняем конфигурацию на 2 узла — кворум 2/2 сохраняется
+				{op: "setConfig", voters: []int{0, 1}, want: mInt(5)},
+			},
+		},
+		{
+			name:   "SingleNode_AfterConfiguration",
+			selfID: 0, term: 1, initVoters: []int{0},
+			terms: map[int]int{10: 1},
+			// Одиночный узел после setConfiguration.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 10, want: mInt(10)},
+			},
+		},
+		{
+			name:   "ConfigurationChange_LostQuorum",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2, 3, 4},
+			terms: map[int]int{5: 1, -1: 0},
+			// Смена конфигурации с 5 узлов на 3: кворум был 2/5 (нет), стал 2/3 (есть).
+			steps: []commitmentStep{
+				// Только 2 узла из 5 — кворума нет
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5, want: mInt(-1)},
+				// Меняем конфигурацию на 3 узла: 0 и 1 подтвердили → кворум 2/3 есть
+				{op: "setConfig", voters: []int{0, 1, 2}, want: mInt(5)},
+			},
+		},
+		{
+			name:   "StartIndex_NotResetByConfigChange",
+			selfID: 0, term: 1, startIdx: 10, initVoters: []int{0, 1, 2},
+			terms: map[int]int{10: 1},
+			// Смена конфигурации не сбрасывает startIndex.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 10},
+				{op: "setMatch", id: 1, value: 10},
+				{op: "setMatch", id: 2, value: 10, want: mInt(10)},
+				// Смена конфигурации, startIndex не должен измениться
+				{op: "setConfig", voters: []int{0, 1}},
+			},
+			wantStartIndex: mInt(10),
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 10. Кворумная граница для чётных n ---
+
+func TestCommitmentMatrix_EvenQuorumBoundary(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "TwoNodes_SelfOnlyNoCommit",
+			selfID: 0, term: 1, initVoters: []int{0, 1},
+			terms: map[int]int{5: 1},
+			// n=2: только self продвинулся — 1/2 не является кворумом (нужно 2/2).
+			// Старый код с медианой n/2 фиксировал в одиночку (sorted[-1,5] → 5).
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5, want: mInt(-1)},
+			},
+		},
+		{
+			name:   "TwoNodes_BothCommit",
+			selfID: 0, term: 1, initVoters: []int{0, 1},
+			terms: map[int]int{5: 1},
+			// n=2: оба узла подтвердили 5 — кворум 2/2, commit 5.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5, want: mInt(5)},
+			},
+		},
+		{
+			name:   "FourNodes_QuorumBoundary",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2, 3},
+			terms: map[int]int{3: 1, 5: 1},
+			// n=4: кворум 3/4. {5,5,3,3} → commit 3 (2/4 на индексе 5 — не кворум;
+			// старый код давал 5). {5,5,5,3} → commit 5 (граница 3/4 достижима).
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 3},
+				// sorted [3, 3, 5, 5], индекс 4-3=1 → 3
+				{op: "setMatch", id: 3, value: 3, want: mInt(3)},
+				// sorted [3, 5, 5, 5], индекс 1 → 5
+				{op: "setMatch", id: 2, value: 5, want: mInt(5)},
+			},
+		},
+		{
+			name:   "SixNodes_QuorumBoundary",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2, 3, 4, 5},
+			terms: map[int]int{2: 1, 5: 1},
+			// n=6: кворум 4/6. {5,5,5,2,2,2} → commit 2 (старый код: 5);
+			// {5,5,5,5,2,2} → commit 5.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5},
+				{op: "setMatch", id: 3, value: 2},
+				{op: "setMatch", id: 4, value: 2},
+				// sorted [2, 2, 2, 5, 5, 5], индекс 6-4=2 → 2
+				{op: "setMatch", id: 5, value: 2, want: mInt(2)},
+				// sorted [2, 2, 5, 5, 5, 5], индекс 2 → 5
+				{op: "setMatch", id: 3, value: 5, want: mInt(5)},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 11. Membership guard (ghost-ключи) ---
+
+func TestCommitmentMatrix_MembershipGuard(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "GhostCannotCompleteQuorum",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1},
+			// 3 voters + ack неголосующего (ghost-голос) + ack одного голосующего.
+			// Без guard: ghost-ключ делает n=4 и «кворум 3 из 4» собирается из
+			// двух реальных голосующих (старый код: commit 5). С guard: ack
+			// неголосующего — no-op, 2/3 реальных голосующих не образуют кворум.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 99, value: 5},                // ghost: no-op по guard
+				{op: "setMatch", id: 1, value: 5, want: mInt(-1)}, // один реальный голосующий
+			},
+			wantMatchLen: mInt(3),
+		},
+		{
+			name:   "ConfigTransition_3to2_NoSelfCommit",
+			selfID: 0, term: 2, initVoters: []int{0, 1, 2},
+			terms: map[int]int{6: 2},
+			// Регрессия FINDING C: при переходе 3→2 синхронный premature commit
+			// config entry в appendConfigurationEntry (commit(M+1) без единого
+			// подтверждения) должен быть невозможен. voters {0,1,2}, match
+			// {5,3,3}, term=2, terms={6:2}; setConfiguration([0,1]); commit(6).
+			// Старый код: sorted[3,6] → медиана 6 → commit 6 без ack'ов.
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 3},
+				{op: "setMatch", id: 2, value: 3, want: mInt(-1)},
+				{op: "setConfig", voters: []int{0, 1}},
+				// sorted [3, 6], кворумный индекс 2-2=0 → 3; lookupTerm(3)=-1 != 2
+				{op: "commit", value: 6, want: mInt(-1)},
+			},
+		},
+		{
+			name:   "ConfigTransition_3to4_NewVoterLag",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{5: 1, 6: 1},
+			// 3 voters {5,5,5} → commit 5. setConfiguration([0,1,2,3]): новый
+			// голосующий стартует с -1 — пересчёт не занижает доказанную фиксацию.
+			// Новые записи фиксируются только при 3/4 (новый голосующий не образует
+			// кворум в одиночку/вдвоём с лидером).
+			steps: []commitmentStep{
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5},
+				{op: "setMatch", id: 2, value: 5, want: mInt(5)},
+				{op: "setConfig", voters: []int{0, 1, 2, 3}, want: mInt(5)},
+				// 2/4 (self + один старый голосующий) на индексе 6 — не кворум.
+				{op: "commit", value: 6},
+				{op: "setMatch", id: 1, value: 6, want: mInt(5)},
+				// 3/4 — кворум: commit 6.
+				{op: "setMatch", id: 2, value: 6, want: mInt(6)},
+			},
+		},
+		{
+			name:   "SelfRemoved_CommitNoOp",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{6: 1},
+			// После self-removal (setConfiguration без selfID) commit() — no-op:
+			// ghost-self не появляется в map, commitIndex не растёт.
+			steps: []commitmentStep{
+				{op: "setConfig", voters: []int{1, 2}},
+				{op: "commit", value: 6, want: mInt(-1)},
+			},
+			wantMatchGone: []int{0},
+			wantMatchLen:  mInt(2),
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// --- 12. Переотправка уведомления commitCh ---
+
+func TestCommitmentMatrix_NotifyRetry(t *testing.T) {
+	cases := []commitmentCase{
+		{
+			name:   "NotifyRetriedAfterLostSend",
+			selfID: 0, term: 1, initVoters: []int{0, 1, 2},
+			terms: map[int]int{3: 1, 5: 1},
+
+			// Канал commitCh (ёмкость 1) уже занят в момент попытки продвижения.
+			// Из‑за этого отправка нового commitIndex теряется (неблокирующая отправка не проходит).
+			// Флаг pendingNotify остаётся установленным, сигнализируя, что уведомление нужно повторить.
+			// После того как потребитель заберёт старое значение из канала, следующий пересчёт
+			// (даже если он не продвигает commitIndex) обязан заново отправить текущее значение.
+			steps: []commitmentStep{
+				// Занять канал «чужим» значением — имитация недренированного
+				// уведомления от предыдущей фиксации.
+				{op: "fillCh", value: 999},
+				// Попытка продвинуть commitIndex до 5. Неблокирующая отправка в commitCh
+				// не удаётся (канал полон), поэтому новое значение не уходит.
+				// При этом флаг pendingNotify остаётся активным — это означает, что
+				// позже нужно будет повторить отправку.
+				{op: "setMatch", id: 0, value: 5},
+				{op: "setMatch", id: 1, value: 5, want: mInt(5)},
+				// Потребитель забирает старое значение из канала (освобождает место).
+				{op: "drainCh", value: 999},
+				// Следующий пересчёт commitIndex не увеличивает его (медиана 3 ≤ текущего 5),
+				// но всё равно обязан отправить текущее значение commitIndex (5) в канал,
+				// потому что ранее отправка была потеряна.
+				{op: "setMatch", id: 2, value: 3},
+				{op: "drainCh", value: 5},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { c.run(t) })
+	}
+}
+
+// waitFuture ожидает завершения future через канал ErrorCh с дедлайном.
+// Единственная допустимая форма ожидания future в новых тестах:
+// у future нет собственного таймаута (future.go), поэтому f.Error()
+// при потере кворума завис бы навсегда вместо assert'а.
+func waitFuture(t *testing.T, f Future, timeout time.Duration) error {
+	t.Helper()
+	select {
+	case err := <-f.ErrorCh():
+		return err
+	case <-time.After(timeout):
+		t.Fatalf("future not resolved in %v", timeout)
+		return nil
+	}
+}
+
+// TestCommitmentE2E_FourNodes_TwoDownNoCommit — n=4 negative:
+// при двух отключённых ведомых (живы 2/4, кворум 3/4 недостижим)
+// команда лидера НЕ фиксируется и FSM её не применяет; после
+// восстановления связи фиксация проходит на реальном кворуме.
+func TestCommitmentE2E_FourNodes_TwoDownNoCommit(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	h := NewHarness(t, 4)
+	defer h.Shutdown()
+
+	lid, _ := h.CheckSingleLeader()
+
+	// Отключить двух ведомых — остаются лидер + 1 follower = 2/4.
+	f1 := (lid + 1) % 4
+	f2 := (lid + 2) % 4
+	h.DisconnectPeer(f1)
+	h.DisconnectPeer(f2)
+
+	cmd := 1001
+	future := h.cluster[lid].Apply(cmd, 0)
+
+	// Команда не фиксируется при 2/4: кворум 3/4 недостижим. Лидер,
+	// потерявший контакт с кворумом, шагает вниз и отклоняет ожидающую
+	// запись — ошибкой, а не фиксацией.
+	if err := waitFuture(t, future, checkQuorumBudget); !errors.Is(err, ErrLeadershipLost) {
+		t.Fatalf("pending Apply without quorum = %v, want %v", err, ErrLeadershipLost)
+	}
+	h.CheckNotCommitted(cmd)
+
+	// Восстановить связь — кворум 4/4 достижим, кластер снова фиксирует записи.
+	h.ReconnectPeer(f1)
+	h.ReconnectPeer(f2)
+
+	newLid, _ := h.WaitForSingleLeader(_leaderElectionBudget)
+	restored := 1011
+	if err := waitFuture(t, h.cluster[newLid].Apply(restored, 0), 3*time.Second); err != nil {
+		t.Fatalf("Apply failed after reconnect: %v", err)
+	}
+	// После реконнекта подключены все 4 узла: assert CheckCommittedN
+	// (выполняется WaitForCommit после ожидания сходимости) требует
+	// точного числа подключённых узлов.
+	h.WaitForCommit(restored, 4)
+}
+
+// TestCommitmentE2E_FourNodes_OneDownStillCommits — n=4 позитивный сценарий:
+// при одном отключённом ведомом (живы 3/4 = кворум) фиксация проходит.
+func TestCommitmentE2E_FourNodes_OneDownStillCommits(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	h := NewHarness(t, 4)
+	defer h.Shutdown()
+
+	lid, _ := h.CheckSingleLeader()
+
+	down := (lid + 1) % 4
+	h.DisconnectPeer(down)
+
+	cmd := 1002
+	future := h.cluster[lid].Apply(cmd, 0)
+	if err := waitFuture(t, future, 3*time.Second); err != nil {
+		t.Fatalf("Apply failed with 3/4 alive: %v", err)
+	}
+	h.WaitForCommit(cmd, 3)
+}
+
+// TestCommitmentE2E_TwoNodes_FollowerDownNoCommit — n=2 регрессия:
+// при отключённом ведомом (жив 1 из 2) команда НЕ фиксируется.
+func TestCommitmentE2E_TwoNodes_FollowerDownNoCommit(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	h := NewHarness(t, 2)
+	defer h.Shutdown()
+
+	lid, _ := h.CheckSingleLeader()
+	follower := (lid + 1) % 2
+	h.DisconnectPeer(follower)
+
+	cmd := 1003
+	future := h.cluster[lid].Apply(cmd, 0)
+
+	// При 1/2 фиксация невозможна (кворум 2/2): лидер шагает вниз по потере
+	// контакта и отклоняет ожидающую запись.
+	if err := waitFuture(t, future, checkQuorumBudget); !errors.Is(err, ErrLeadershipLost) {
+		t.Fatalf("pending Apply without quorum = %v, want %v", err, ErrLeadershipLost)
+	}
+	h.CheckNotCommitted(cmd)
+
+	h.ReconnectPeer(follower)
+	newLid, _ := h.WaitForSingleLeader(_leaderElectionBudget)
+	restored := 1013
+	if err := waitFuture(t, h.cluster[newLid].Apply(restored, 0), 3*time.Second); err != nil {
+		t.Fatalf("Apply failed after reconnect: %v", err)
+	}
+	h.WaitForCommit(restored, 2)
+}
+
+// TestCommitmentE2E_NoopCommitsAfterFailover — проверка фиксации noop после failover:
+//
+// Сценарий failover подразумевает, что недоступный узел (бывший лидер) должен быть
+// признан недоступным ДО начала выборов нового лидера.
+//
+// По завершении выборов нового лидера его noop‑запись текущего терма должна быть
+// зафиксирована без участия клиентских команд, что подтверждается условием:
+//
+//	cmState.commitIndex >= leaderStartIndex + 1
+//
+// При этом self‑match должен оставаться синхронизированным с noop‑записью.
+//
+// ВНИМАНИЕ: формулировка «отключить ведомого после завершения выборов лидера» некорректна:
+// она не учитывает требование кворума и тем самым нарушает гарантии консистентности.
+// В частности, операция noop должна считаться зафиксированной только при подтверждении
+// её репликации кворумом из трёх живых ведомых узлов. Использование логики,
+// игнорирующей этот кворум, запрещено.
+func TestCommitmentE2E_NoopCommitsAfterFailover(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	h := NewHarness(t, 4)
+	defer h.Shutdown()
+
+	lid, _ := h.CheckSingleLeader()
+
+	// Отключить действующего лидера до избрания нового.
+	h.DisconnectPeer(lid)
+
+	// Дождаться нового лидера среди трёх оставшихся узлов.
+	deadline := time.Now().Add(5 * time.Second)
+	newLeader := -1
+	for time.Now().Before(deadline) && newLeader < 0 {
+		for i := 0; i < h.n; i++ {
+			if i == lid || !h.connected[i] {
+				continue
+			}
+			if _, _, isLeader := h.cluster[i].Report(); isLeader {
+				newLeader = i
+				break
+			}
+		}
+		if newLeader < 0 {
+			// poll-интервал condition-wait (не фиксированная пауза).
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	if newLeader < 0 {
+		t.Fatalf("no new leader elected after disconnecting leader %d", lid)
+	}
+
+	// Поллинг: noop нового терма должен зафиксироваться без клиентских
+	// записей. Без §9 п.3 commitIndex остаётся <= leaderStartIndex
+	// (дискриминирует код без self-match с noop).
+	cm := h.cluster[newLeader]
+	deadline = time.Now().Add(5 * time.Second)
+	committed := false
+	for time.Now().Before(deadline) && !committed {
+		cm.mu.Lock()
+		committed = cm.cmState.commitIndex >= cm.leaderState.leaderStartIndex+1
+		cm.mu.Unlock()
+		if !committed {
+			// poll-интервал condition-wait (не фиксированная пауза).
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	if !committed {
+		cm.mu.Lock()
+		ci := cm.cmState.commitIndex
+		lsi := cm.leaderState.leaderStartIndex
+		cm.mu.Unlock()
+		t.Fatalf("noop of new leader not committed: commitIndex=%d leaderStartIndex=%d", ci, lsi)
+	}
+}
+
+// TestConfiguration_AddVoterFromSingleVoter — проверка добавления узла с правом голоса
+// в кластер, изначально состоящий из одного узла с правом голоса (bootstrap AddVoter).
+//
+// Harness неприменим для данного сценария, поскольку все его узлы обладают правом голоса.
+// Вследствие этого одноузловой кластер формируется вручную.
+//
+// Узел B инициализируется с peerIds=[0] (это обязательное условие).
+// Пустой список peerIds=[] недопустим: в таком случае узел B самостоятельно избирается
+// лидером в терме 1 и фиксирует собственную noop‑запись на индексе 0. Это приводит
+// к возникновению двух независимых «единиц истины» в рамках одного терма, что делает
+// результат теста недетерминированным (успех возможен лишь за счёт совпадения содержимого noop).
+//
+// Перед выполнением операции AddVoter фиксируется исходное состояние узла B:
+// он не является лидером, а currentTerm равен 0.
+//
+// При отсутствии add‑only репликации (начиная с момента append, см. §9 п. 4) тест
+// переходит в состояние бесконечного ожидания: конфигурационная запись не реплицируется
+// на узел B, но его подтверждение (ack) учитывается в кворуме 2/2. В результате
+// ожидание будущего (future) не завершается — поэтому использование дедлайна обязательно.
+func TestConfiguration_AddVoterFromSingleVoter(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	transportA := NewInmemTransport(ServerAddress("raft-A"))
+	transportB := NewInmemTransport(ServerAddress("raft-B"))
+	transportA.Connect(ServerID(1), transportB)
+	transportB.Connect(ServerID(0), transportA)
+
+	commitChA := make(chan CommitEntry, 16)
+	commitChB := make(chan CommitEntry, 16)
+	readyA := make(chan any)
+	readyB := make(chan any)
+
+	// Узел A: одноузловой кластер (голосующий только он сам).
+	cmA := NewConsensusModule(0, []int{}, transportA, NewMapStorage(),
+		NewCommitChannelFSM(commitChA), readyA)
+	defer cmA.Stop()
+	// Узел B: follower с известным соседом 0 (непустой peerIds).
+	// Готовность B закрывается ПОЗЖЕ — после избрания лидера A:
+	// иначе B (не получая AE, т.к. ещё не в конфигурации A) успевает
+	// самоизбраться в терме 1 и assert на currentTerm == 0 флакает.
+	cmB := NewConsensusModule(1, []int{0}, transportB, NewMapStorage(),
+		NewCommitChannelFSM(commitChB), readyB)
+	defer cmB.Stop()
+
+	// Сначала запускается только A и дожидается лидерства.
+	close(readyA)
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, _, isLeader := cmA.Report(); isLeader {
+			break
+		}
+		// poll-интервал condition-wait (не фиксированная пауза).
+		time.Sleep(10 * time.Millisecond)
+	}
+	if _, _, isLeader := cmA.Report(); !isLeader {
+		t.Fatal("node A did not become leader")
+	}
+
+	// Фиксация состояния B ДО запуска его election timer: B не лидер
+	// и currentTerm == 0 (узел не успевает самоизбраться).
+	if _, term, isLeader := cmB.Report(); isLeader || term != 0 {
+		t.Fatalf("B before ready: term=%d isLeader=%v, want term=0 isLeader=false", term, isLeader)
+	}
+
+	// Запуск B и немедленный AddVoter: AE с config entry доходят до B
+	// раньше, чем истекает его election timeout, поэтому B остаётся
+	// follower'ом (терм переходит в 1 от AE лидера — штатно).
+	close(readyB)
+	if _, term, isLeader := cmB.Report(); isLeader || term != 0 {
+		t.Fatalf("B before AddVoter: term=%d isLeader=%v, want term=0 isLeader=false", term, isLeader)
+	}
+
+	// Bootstrap AddVoter: config entry реплицируется на B (add-only
+	// репликация с момента append) и фиксируется 2/2.
+	future := cmA.AddVoter(ServerID(1), ServerAddress("raft-B"))
+	if err := waitFuture(t, future, 5*time.Second); err != nil {
+		t.Fatalf("AddVoter from single voter failed: %v", err)
+	}
+
+	// Конфигурация A содержит B как голосующего.
+	if !hasVote(cmA.GetConfiguration().Configuration(), 1) {
+		t.Fatal("node B is not a voter after AddVoter")
+	}
+
+	// Клиентская запись на A применяется на ОБОИХ узлах (B получает
+	// записи после добавления).
+	cmd := 2001
+	future = cmA.Apply(cmd, 0)
+	if err := waitFuture(t, future, 5*time.Second); err != nil {
+		t.Fatalf("Apply after AddVoter failed: %v", err)
+	}
+	for _, ch := range []chan CommitEntry{commitChA, commitChB} {
+		select {
+		case entry := <-ch:
+			got, ok := entry.Data.(int)
+			if !ok {
+				t.Fatalf("committed %T, want int", entry.Data)
+			}
+			if got != cmd {
+				t.Fatalf("committed %v, want %d", entry.Data, cmd)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for committed command")
+		}
+	}
+}
+
+// TestConfiguration_RemovedServerSeesRemoval — после
+// RemoveServer(non-leader) удалённый узел видит себя вне конфигурации
+// (GetConfiguration не содержит его как голосующего). Дискриминирует
+// симметричную форму §9 п.4: при останове репликации на момент append
+// удаляемый сервер не получает запись о собственном удалении и
+// остаётся «сиротой» (видит себя голосующим).
+func TestConfiguration_RemovedServerSeesRemoval(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	h := NewHarness(t, 3)
+	defer h.Shutdown()
+
+	lid, _ := h.CheckSingleLeader()
+	victim := (lid + 1) % 3
+
+	future := h.cluster[lid].RemoveServer(ServerID(victim))
+	if err := waitFuture(t, future, 5*time.Second); err != nil {
+		t.Fatalf("RemoveServer failed: %v", err)
+	}
+
+	// Поллинг на удалённом узле: запись об удалении доставляется ему
+	// best-effort репликацией (несколько heartbeat-интервалов).
+	deadline := time.Now().Add(3 * time.Second)
+	removed := false
+	for time.Now().Before(deadline) && !removed {
+		cfg := h.cluster[victim].GetConfiguration().Configuration()
+		removed = !hasVote(cfg, victim)
+		if !removed {
+			// poll-интервал condition-wait (не фиксированная пауза).
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	cfg := h.cluster[victim].GetConfiguration().Configuration()
+	if hasVote(cfg, victim) {
+		t.Fatalf("victim %d still sees itself as voter; cfg=%+v", victim, cfg.ConfigServers)
+	}
+}
 
 // lookupTermStub возвращает фиксированный term для заданного индекса.
 // Если index < 0, возвращает -1 (начальное состояние).
@@ -19,873 +1154,4 @@ func (l *lookupTermStub) lookup(index int) int {
 		return t
 	}
 	return -1
-}
-
-// newTracker создаёт commitmentTracker с начальной конфигурацией голосующих.
-// selfID и peerIDs формируют полный список голосующих узлов.
-// term — начальный term трекера. startIndex по умолчанию 0.
-func newTracker(t testing.TB, selfID int, peerIDs []int, term int) (*commitmentTracker, chan int) {
-	t.Helper()
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(selfID, term, 0, commitCh)
-	voters := make([]int, len(peerIDs)+1)
-	voters[0] = selfID
-	copy(voters[1:], peerIDs)
-	lts := &lookupTermStub{terms: map[int]int{}}
-	ct.setConfiguration(voters, lts.lookup)
-	return ct, commitCh
-}
-
-// --- 1. Стандартное большинство (3 узла) ---
-
-func TestCommitment_NoMatch(t *testing.T) {
-	// Все matchIndex = -1 (начальное состояние), кворума нет.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1", got)
-	}
-}
-
-func TestCommitment_SelfOnly(t *testing.T) {
-	// Только сам лидер продвинулся — кворума нет (нужно 2 из 3).
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1", got)
-	}
-}
-
-func TestCommitment_SelfAndOnePeer(t *testing.T) {
-	// Лидер + один follower = 2 из 3 = кворум есть.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("getCommitIndex() = %d, want 5", got)
-	}
-}
-
-func TestCommitment_AllNodes(t *testing.T) {
-	// Все три узла подтвердили — кворум 3/3.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{10: 1}}
-	ct.setMatch(0, 10, lts.lookup)
-	ct.setMatch(1, 10, lts.lookup)
-	ct.setMatch(2, 10, lts.lookup)
-	if got := ct.getCommitIndex(); got != 10 {
-		t.Fatalf("getCommitIndex() = %d, want 10", got)
-	}
-}
-
-func TestCommitment_MedianOrdering_Odd(t *testing.T) {
-	// 5 узлов, разные значения matchIndex. Медиана = элемент [2] из 5.
-	ct, _ := newTracker(t, 0, []int{1, 2, 3, 4}, 1)
-	lts := &lookupTermStub{terms: map[int]int{-1: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 1, lts.lookup)
-	ct.setMatch(2, 2, lts.lookup)
-	ct.setMatch(3, 3, lts.lookup)
-	ct.setMatch(4, 4, lts.lookup)
-	// sorted: [1, 2, 3, 4, 5], len=5, n/2=2 -> values[2] = 3
-	if got := ct.getCommitIndex(); got != 3 {
-		t.Fatalf("getCommitIndex() = %d, want 3", got)
-	}
-}
-
-func TestCommitment_MedianOrdering_Even(t *testing.T) {
-	// 4 узла (чётное количество голосующих). matchIndex:
-	// {0:3, 1:1, 2:2, 3:-1} -> sorted [-1, 1, 2, 3], len=4.
-	// Кворумный индекс n-quorumSize(n) = 4-3 = 1 -> values[1] = 1.
-	ct, _ := newTracker(t, 0, []int{1, 2, 3}, 1)
-	lts := &lookupTermStub{terms: map[int]int{-1: 1, 1: 1, 2: 1, 3: 1}}
-	ct.setMatch(0, 3, lts.lookup)
-	ct.setMatch(1, 1, lts.lookup)
-	ct.setMatch(2, 2, lts.lookup)
-	ct.setMatch(3, -1, lts.lookup)
-	// sorted: [-1, 1, 2, 3], len=4, n-quorum = 1 -> values[1] = 1
-	if got := ct.getCommitIndex(); got != 1 {
-		t.Fatalf("getCommitIndex() = %d, want 1", got)
-	}
-}
-
-// --- 2. Raft safety (проверка term и startIndex) ---
-
-func TestCommitment_Safety_DifferentTerm(t *testing.T) {
-	// term=2, но запись с индексом 5 принадлежит term=1 — фиксация невозможна.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 2)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1", got)
-	}
-}
-
-func TestCommitment_Safety_SameTerm(t *testing.T) {
-	// term=2 и запись с индексом 5 принадлежит term=2 — фиксация разрешена.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 2)
-	lts := &lookupTermStub{terms: map[int]int{5: 2}}
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("getCommitIndex() = %d, want 5", got)
-	}
-}
-
-func TestCommitment_Safety_MedianShifts(t *testing.T) {
-	// Медиана скачком переходит с отвергнутого индекса на принятый.
-	// 4 voters (чётное n), term=2, terms = {3:1, 5:2}.
-	ct, _ := newTracker(t, 0, []int{1, 2, 3}, 2)
-	lts := &lookupTermStub{terms: map[int]int{3: 1, 5: 2}}
-
-	// Шаг 1: matchIndexes = {0:5, 1:3, 2:3, 3:-1}
-	// sorted = [-1, 3, 3, 5], кворумный индекс 4-3=1 -> 3.
-	// lookupTerm(3)=1 != 2 -> фиксация заблокирована.
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 3, lts.lookup)
-	ct.setMatch(2, 3, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("step 1: getCommitIndex() = %d, want -1 (median 3 has term 1)", got)
-	}
-
-	// Шаг 2: matchIndexes = {0:5, 1:3, 2:3, 3:5}
-	// sorted = [3, 3, 5, 5], кворумный индекс 4-3=1 -> 3 — это 2/4,
-	// кворума 3/4 нет: commitIndex остаётся -1.
-	ct.setMatch(3, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("step 2: getCommitIndex() = %d, want -1 (2/4 is not a quorum)", got)
-	}
-
-	// Шаг 3: matchIndexes = {0:5, 1:5, 2:3, 3:5}
-	// sorted = [3, 5, 5, 5], кворумный индекс 1 -> 5, lookupTerm(5)=2 == term
-	// -> 3/4 = кворум, commitIndex 5.
-	ct.setMatch(1, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("step 3: getCommitIndex() = %d, want 5 (3/4 quorum)", got)
-	}
-}
-
-func TestCommitment_StartIndex_BlocksCommit(t *testing.T) {
-	// startIndex=10, median=10 >= 10 ✅, lookupTerm(10)=2 == term ✅
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 2, 10, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{10: 2}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-	ct.setMatch(0, 10, lts.lookup)
-	ct.setMatch(1, 10, lts.lookup)
-	ct.setMatch(2, 10, lts.lookup)
-	if got := ct.getCommitIndex(); got != 10 {
-		t.Fatalf("getCommitIndex() = %d, want 10", got)
-	}
-}
-
-func TestCommitment_StartIndex_PreventsOld(t *testing.T) {
-	// startIndex=10, median=8 < 10 — фиксация заблокирована.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 2, 10, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{8: 2}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-	ct.setMatch(0, 8, lts.lookup)
-	ct.setMatch(1, 8, lts.lookup)
-	ct.setMatch(2, 8, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1", got)
-	}
-}
-
-func TestCommitment_StartIndex_Exact(t *testing.T) {
-	// startIndex=5, median=5 >= 5 ✅
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 2, 5, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{5: 2}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("getCommitIndex() = %d, want 5", got)
-	}
-}
-
-// --- 3. setConfiguration ---
-
-func TestCommitment_SetConfiguration_Basic(t *testing.T) {
-	// Установка конфигурации из трёх узлов после пустого конструктора.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 0, commitCh)
-	lts := &lookupTermStub{}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-
-	if len(ct.matchIndex) != 3 {
-		t.Fatalf("matchIndex len = %d, want 3", len(ct.matchIndex))
-	}
-	for _, voter := range []int{0, 1, 2} {
-		if ct.matchIndex[voter] != -1 {
-			t.Fatalf("matchIndex[%d] = %d, want -1", voter, ct.matchIndex[voter])
-		}
-	}
-}
-
-func TestCommitment_SetConfiguration_PreservesMatchIndex(t *testing.T) {
-	// Смена конфигурации: добавляем новый узел, удаляем старый,
-	// matchIndex сохраняется для оставшихся.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 0, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 3, lts.lookup)
-
-	// Меняем конфигурацию: убираем узел 2, добавляем узел 3
-	ct.setConfiguration([]int{0, 1, 3}, lts.lookup)
-
-	if ct.matchIndex[0] != 5 {
-		t.Fatalf("matchIndex[0] = %d, want 5 (preserved)", ct.matchIndex[0])
-	}
-	if ct.matchIndex[1] != 3 {
-		t.Fatalf("matchIndex[1] = %d, want 3 (preserved)", ct.matchIndex[1])
-	}
-	if _, ok := ct.matchIndex[2]; ok {
-		t.Fatalf("matchIndex[2] should be removed")
-	}
-	if ct.matchIndex[3] != -1 {
-		t.Fatalf("matchIndex[3] = %d, want -1 (new voter)", ct.matchIndex[3])
-	}
-}
-
-func TestCommitment_SetConfiguration_CommitAfterChange(t *testing.T) {
-	// После смены конфигурации commitIndex не сбрасывается.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("before conf change: getCommitIndex() = %d, want 5", got)
-	}
-
-	// Меняем конфигурацию с 3 узлов на 2 узла
-	ct.setConfiguration([]int{0, 1}, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("after conf change: getCommitIndex() = %d, want 5 (no reset)", got)
-	}
-}
-
-// --- 4. Продвижение commitIndex (incremental) ---
-
-func TestCommitment_Progressive(t *testing.T) {
-	// Постепенное продвижение commitIndex по мере получения matchIndex.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{3: 1, 5: 1}}
-
-	ct.setMatch(0, 3, lts.lookup)
-	ct.setMatch(1, 3, lts.lookup)
-	// matchIndexes = {0:3, 1:3, 2:-1} -> sorted [-1, 3, 3], median=3
-	if got := ct.getCommitIndex(); got != 3 {
-		t.Fatalf("after first two: getCommitIndex() = %d, want 3", got)
-	}
-
-	ct.setMatch(2, 5, lts.lookup)
-	// matchIndexes = {0:3, 1:3, 2:5} -> sorted [3, 3, 5], median=3
-	// 3 == ct.commitIndex, поэтому не продвигается
-	if got := ct.getCommitIndex(); got != 3 {
-		t.Fatalf("after third: getCommitIndex() = %d, want 3", got)
-	}
-}
-
-func TestCommitment_Progressive_LargeSteps(t *testing.T) {
-	// Продвижение с большими скачками matchIndex.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{100: 1, 150: 1, 200: 1}}
-
-	ct.setMatch(1, 100, lts.lookup)
-	// matchIndexes = {0:-1, 1:100, 2:-1} -> sorted [-1, -1, 100], median=-1
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("after peer1: getCommitIndex() = %d, want -1", got)
-	}
-
-	ct.setMatch(2, 200, lts.lookup)
-	// matchIndexes = {0:-1, 1:100, 2:200} -> sorted [-1, 100, 200], median=100
-	if got := ct.getCommitIndex(); got != 100 {
-		t.Fatalf("after peer2: getCommitIndex() = %d, want 100", got)
-	}
-
-	ct.setMatch(0, 150, lts.lookup)
-	// matchIndexes = {0:150, 1:100, 2:200} -> sorted [100, 150, 200], median=150
-	if got := ct.getCommitIndex(); got != 150 {
-		t.Fatalf("after self: getCommitIndex() = %d, want 150", got)
-	}
-}
-
-func TestCommitment_SelfCommit(t *testing.T) {
-	// self.commit(10) — обновили selfID, но соседи не подтвердили.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{10: 1}}
-
-	ct.commit(10, lts.lookup)
-	// sorted [-1, -1, 10], median=-1 — кворума нет
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1 (no majority)", got)
-	}
-}
-
-func TestCommitment_SelfCommit_SingleNode(t *testing.T) {
-	// Одиночный узел: self.commit(10) → median=10 → кворум 1/1.
-	ct, _ := newTracker(t, 0, []int{}, 1)
-	lts := &lookupTermStub{terms: map[int]int{10: 1}}
-
-	ct.commit(10, lts.lookup)
-	if got := ct.getCommitIndex(); got != 10 {
-		t.Fatalf("getCommitIndex() = %d, want 10", got)
-	}
-}
-
-// --- 5. Граничные случаи setMatch ---
-
-func TestCommitment_SetMatchDecreasingIgnored(t *testing.T) {
-	// Уменьшающийся matchIndex игнорируется (инвариант монотонности).
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{10: 1, 5: 1}}
-
-	ct.setMatch(1, 10, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	if got := ct.matchIndex[1]; got != 10 {
-		t.Fatalf("matchIndex[1] = %d, want 10", got)
-	}
-}
-
-func TestCommitment_SetMatchUnknownPeer(t *testing.T) {
-	// setMatch для узла, не являющегося голосующим текущей конфигурации —
-	// no-op (membership guard): ghost-ключ НЕ добавляется в map
-	// и не участвует в кворуме. До фикса setMatch создавал ключ
-	// matchIndex[99] и искажал состав кворума.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-
-	ct.setMatch(99, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1", got)
-	}
-	if got := len(ct.matchIndex); got != 3 {
-		t.Fatalf("len(matchIndex) = %d, want 3 (ghost key must not be added)", got)
-	}
-	if _, ok := ct.matchIndex[99]; ok {
-		t.Fatal("matchIndex[99] must not exist (membership guard)")
-	}
-}
-
-func TestCommitment_NegativeMatchIndex(t *testing.T) {
-	// После конструктора и setConfiguration все matchIndex = -1.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("initial getCommitIndex() = %d, want -1", got)
-	}
-}
-
-func TestCommitment_EmptyVoterList(t *testing.T) {
-	// Одиночный узел: setConfiguration([]int{0}) — один голосующий.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 0, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{5: 1, -1: 0}}
-	ct.setConfiguration([]int{0}, lts.lookup)
-
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("initial getCommitIndex() = %d, want -1", got)
-	}
-
-	// После commit(5) -> self matchIndex = 5, median = 5
-	ct.commit(5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("after commit: getCommitIndex() = %d, want 5", got)
-	}
-}
-
-// --- 6. commitCh non-blocking send ---
-
-func TestCommitment_ChannelNonBlocking(t *testing.T) {
-	// Не читаем из commitCh. setMatch не должен блокироваться.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("getCommitIndex() = %d, want 5", got)
-	}
-}
-
-func TestCommitment_ChannelDelivery(t *testing.T) {
-	// Проверка, что commitCh действительно получает новое значение.
-	ct, commitCh := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-
-	select {
-	case got := <-commitCh:
-		if got != 5 {
-			t.Fatalf("commitCh = %d, want 5", got)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for commitCh")
-	}
-}
-
-// --- 7. setTerm с startIndex ---
-//
-// Секция удалена вместе с методом setTerm (мёртвый код):
-// production-вызовов у setTerm не было, а term/startIndex трекера
-// устанавливаются только в newCommitmentTracker и не меняются
-// в течение лидерства.
-
-// --- 8. Множественные setMatch ---
-
-func TestCommitment_MultipleSetMatchNoCommit(t *testing.T) {
-	// Несколько setMatch без достижения кворума.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1, 6: 1, 7: 1}}
-
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 6, lts.lookup)
-	// matchIndexes = {0:-1, 1:5, 2:6} -> sorted [-1, 5, 6], median=5
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("getCommitIndex() = %d, want 5", got)
-	}
-
-	ct.setMatch(0, 7, lts.lookup)
-	// matchIndexes = {0:7, 1:5, 2:6} -> sorted [5, 6, 7], median=6
-	if got := ct.getCommitIndex(); got != 6 {
-		t.Fatalf("getCommitIndex() = %d, want 6", got)
-	}
-}
-
-// --- 9. Дополнительные тесты ---
-
-func TestCommitment_CommitThenSetMatch(t *testing.T) {
-	// commit для selfID, затем setMatch для peer-ов.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1, 8: 1}}
-
-	ct.commit(5, lts.lookup)
-	// matchIndexes = {0:5, 1:-1, 2:-1} -> sorted [-1, -1, 5], median=-1
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("after commit only: getCommitIndex() = %d, want -1", got)
-	}
-
-	ct.setMatch(1, 8, lts.lookup)
-	// matchIndexes = {0:5, 1:8, 2:-1} -> sorted [-1, 5, 8], median=5
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("after peer1: getCommitIndex() = %d, want 5", got)
-	}
-
-	ct.setMatch(2, 8, lts.lookup)
-	// matchIndexes = {0:5, 1:8, 2:8} -> sorted [5, 8, 8], median=8
-	if got := ct.getCommitIndex(); got != 8 {
-		t.Fatalf("after peer2: getCommitIndex() = %d, want 8", got)
-	}
-}
-
-func TestCommitment_FiveNodes(t *testing.T) {
-	// Кворум 3/5.
-	ct, _ := newTracker(t, 0, []int{1, 2, 3, 4}, 1)
-	lts := &lookupTermStub{terms: map[int]int{10: 1, -1: 0}}
-
-	// self + 1 peer = 2/5 — кворума нет
-	ct.setMatch(0, 10, lts.lookup)
-	ct.setMatch(1, 10, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("2/5: getCommitIndex() = %d, want -1", got)
-	}
-
-	// self + 2 peers = 3/5 — кворум есть
-	ct.setMatch(2, 10, lts.lookup)
-	if got := ct.getCommitIndex(); got != 10 {
-		t.Fatalf("3/5: getCommitIndex() = %d, want 10", got)
-	}
-}
-
-func TestCommitment_commitChBufferSize1PreventsLoss(t *testing.T) {
-	// Проверка, что commitCh с буфером 1 не теряет уведомления.
-	ct, commitCh := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1, 10: 1}}
-
-	// Первый commit
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-
-	select {
-	case <-commitCh:
-	case <-time.After(time.Second):
-		t.Fatal("timeout reading first commitCh message")
-	}
-
-	// Второй commit
-	ct.setMatch(0, 10, lts.lookup)
-	ct.setMatch(1, 10, lts.lookup)
-	ct.setMatch(2, 10, lts.lookup)
-
-	select {
-	case got := <-commitCh:
-		if got != 10 {
-			t.Fatalf("commitCh = %d, want 10", got)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout reading second commitCh message")
-	}
-}
-
-func TestCommitment_CommitIndexNeverDecreases(t *testing.T) {
-	// commitIndex не уменьшается при попытке фиксации записи чужого term.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 2)
-	lts := &lookupTermStub{terms: map[int]int{5: 2, 8: 1}}
-
-	// term=2, median=5, lookupTerm(5)=2 ✅ → commitIndex=5
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("first: getCommitIndex() = %d, want 5", got)
-	}
-
-	// median=8, но lookupTerm(8)=1 != 2 ❌ → commitIndex не меняется
-	ct.setMatch(0, 8, lts.lookup)
-	ct.setMatch(1, 8, lts.lookup)
-	ct.setMatch(2, 8, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("second: getCommitIndex() = %d, want 5 (no regression)", got)
-	}
-}
-
-func TestCommitment_RecalculateWithNegativeMatch(t *testing.T) {
-	// Медиана с отрицательным matchIndex (начальное состояние).
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{-1: 0, 3: 1}}
-
-	ct.setMatch(0, 3, lts.lookup)
-	// matchIndexes = {0:3, 1:-1, 2:-1} -> sorted [-1, -1, 3], median=-1
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1", got)
-	}
-
-	ct.setMatch(1, 3, lts.lookup)
-	// matchIndexes = {0:3, 1:3, 2:-1} -> sorted [-1, 3, 3], median=3
-	if got := ct.getCommitIndex(); got != 3 {
-		t.Fatalf("getCommitIndex() = %d, want 3", got)
-	}
-}
-
-func TestCommitment_EmptyMatchMap(t *testing.T) {
-	// Пустой matchIndex — защита recalculateCommitIndex от паники.
-	ct := &commitmentTracker{
-		matchIndex:  map[int]int{},
-		commitIndex: -1,
-		selfID:      0,
-		startIndex:  0,
-		commitCh:    make(chan int, 1),
-		term:        1,
-	}
-	lts := &lookupTermStub{terms: map[int]int{}}
-	ct.recalculateCommitIndex(lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1", got)
-	}
-}
-
-func TestCommitment_SetConfiguration_RecalculateOnConfigChange(t *testing.T) {
-	// При смене конфигурации recalculateCommitIndex вызывается автоматически.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 0, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{5: 1, -1: 0}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-
-	// Достигаем кворума с 3 узлами на индексе 5
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("before config change: getCommitIndex() = %d, want 5", got)
-	}
-
-	// Меняем конфигурацию на 2 узла — кворум 2/2 сохраняется
-	ct.setConfiguration([]int{0, 1}, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("after config change: getCommitIndex() = %d, want 5", got)
-	}
-}
-
-func TestCommitment_SingleNode_AfterConfiguration(t *testing.T) {
-	// Одиночный узел после setConfiguration.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 0, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{10: 1}}
-	ct.setConfiguration([]int{0}, lts.lookup)
-
-	ct.setMatch(0, 10, lts.lookup)
-	if got := ct.getCommitIndex(); got != 10 {
-		t.Fatalf("getCommitIndex() = %d, want 10", got)
-	}
-}
-
-func TestCommitment_ConfigurationChange_LostQuorum(t *testing.T) {
-	// Смена конфигурации с 5 узлов на 3: кворум был 2/5 (нет), стал 2/3 (есть).
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 0, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{5: 1, -1: 0}}
-	ct.setConfiguration([]int{0, 1, 2, 3, 4}, lts.lookup)
-
-	// Только 2 узла из 5 — кворума нет
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("2/5: getCommitIndex() = %d, want -1", got)
-	}
-
-	// Меняем конфигурацию на 3 узла: 0 и 1 подтвердили → кворум 2/3 есть
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("after config change to 3 nodes: getCommitIndex() = %d, want 5", got)
-	}
-}
-
-func TestCommitment_StartIndex_NotResetByConfigChange(t *testing.T) {
-	// Смена конфигурации не сбрасывает startIndex.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 10, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{10: 1}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-
-	ct.setMatch(0, 10, lts.lookup)
-	ct.setMatch(1, 10, lts.lookup)
-	ct.setMatch(2, 10, lts.lookup)
-	if got := ct.getCommitIndex(); got != 10 {
-		t.Fatalf("after match: getCommitIndex() = %d, want 10", got)
-	}
-
-	// Смена конфигурации, startIndex не должен измениться
-	ct.setConfiguration([]int{0, 1}, lts.lookup)
-	if ct.startIndex != 10 {
-		t.Fatalf("startIndex = %d, want 10 (unchanged)", ct.startIndex)
-	}
-}
-
-// --- 10. Кворумная граница для чётных n ---
-
-func TestCommitment_TwoNodes_SelfOnlyNoCommit(t *testing.T) {
-	// n=2: только self продвинулся — 1/2 не является кворумом (нужно 2/2).
-	// Старый код с медианой n/2 фиксировал в одиночку (sorted[-1,5] → 5).
-	ct, _ := newTracker(t, 0, []int{1}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1 (self-only is not a quorum for n=2)", got)
-	}
-}
-
-func TestCommitment_TwoNodes_BothCommit(t *testing.T) {
-	// n=2: оба узла подтвердили 5 — кворум 2/2, commit 5.
-	ct, _ := newTracker(t, 0, []int{1}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("getCommitIndex() = %d, want 5", got)
-	}
-}
-
-func TestCommitment_FourNodes_QuorumBoundary(t *testing.T) {
-	// n=4: кворум 3/4. {5,5,3,3} → commit 3 (2/4 на индексе 5 — не кворум;
-	// старый код давал 5). {5,5,5,3} → commit 5 (граница 3/4 достижима).
-	ct, _ := newTracker(t, 0, []int{1, 2, 3}, 1)
-	lts := &lookupTermStub{terms: map[int]int{3: 1, 5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 3, lts.lookup)
-	ct.setMatch(3, 3, lts.lookup)
-	// sorted [3, 3, 5, 5], индекс 4-3=1 → 3
-	if got := ct.getCommitIndex(); got != 3 {
-		t.Fatalf("boundary low: getCommitIndex() = %d, want 3", got)
-	}
-
-	ct.setMatch(2, 5, lts.lookup)
-	// sorted [3, 5, 5, 5], индекс 1 → 5
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("boundary high: getCommitIndex() = %d, want 5", got)
-	}
-}
-
-func TestCommitment_SixNodes_QuorumBoundary(t *testing.T) {
-	// n=6: кворум 4/6. {5,5,5,2,2,2} → commit 2 (старый код: 5);
-	// {5,5,5,5,2,2} → commit 5.
-	ct, _ := newTracker(t, 0, []int{1, 2, 3, 4, 5}, 1)
-	lts := &lookupTermStub{terms: map[int]int{2: 1, 5: 1}}
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-	ct.setMatch(3, 2, lts.lookup)
-	ct.setMatch(4, 2, lts.lookup)
-	ct.setMatch(5, 2, lts.lookup)
-	// sorted [2, 2, 2, 5, 5, 5], индекс 6-4=2 → 2
-	if got := ct.getCommitIndex(); got != 2 {
-		t.Fatalf("boundary low: getCommitIndex() = %d, want 2", got)
-	}
-
-	ct.setMatch(3, 5, lts.lookup)
-	// sorted [2, 2, 5, 5, 5, 5], индекс 2 → 5
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("boundary high: getCommitIndex() = %d, want 5", got)
-	}
-}
-
-// --- 11. Membership guard (ghost-ключи) ---
-
-func TestCommitment_GhostCannotCompleteQuorum(t *testing.T) {
-	// 3 voters + ack неголосующего (ghost-голос) + ack одного голосующего.
-	// Без guard: ghost-ключ делает n=4 и «кворум 3 из 4» собирается из
-	// двух реальных голосующих (старый код: commit 5). С guard: ack
-	// неголосующего — no-op, 2/3 реальных голосующих не образуют кворум.
-	ct, _ := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{5: 1}}
-
-	ct.setMatch(99, 5, lts.lookup) // ghost: no-op по guard
-	ct.setMatch(1, 5, lts.lookup)  // один реальный голосующий
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1 (ghost ack must not complete quorum)", got)
-	}
-	if got := len(ct.matchIndex); got != 3 {
-		t.Fatalf("len(matchIndex) = %d, want 3", got)
-	}
-}
-
-func TestCommitment_ConfigTransition_3to2_NoSelfCommit(t *testing.T) {
-	// Регрессия FINDING C: при переходе 3→2 синхронный premature commit
-	// config entry в appendConfigurationEntry (commit(M+1) без единого
-	// подтверждения) должен быть невозможен. voters {0,1,2}, match
-	// {5,3,3}, term=2, terms={6:2}; setConfiguration([0,1]); commit(6).
-	// Старый код: sorted[3,6] → медиана 6 → commit 6 без ack'ов.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 2, 0, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{6: 2}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 3, lts.lookup)
-	ct.setMatch(2, 3, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("before transition: getCommitIndex() = %d, want -1", got)
-	}
-
-	ct.setConfiguration([]int{0, 1}, lts.lookup)
-	ct.commit(6, lts.lookup)
-	// sorted [3, 6], кворумный индекс 2-2=0 → 3; lookupTerm(3)=-1 != 2
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("after 3→2 transition: getCommitIndex() = %d, want -1 (no premature commit)", got)
-	}
-}
-
-func TestCommitment_ConfigTransition_3to4_NewVoterLag(t *testing.T) {
-	// 3 voters {5,5,5} → commit 5. setConfiguration([0,1,2,3]): новый
-	// голосующий стартует с -1 — пересчёт не занижает доказанную фиксацию.
-	// Новые записи фиксируются только при 3/4 (новый голосующий не образует
-	// кворум в одиночку/вдвоём с лидером).
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 0, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{5: 1, 6: 1}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	ct.setMatch(2, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("before transition: getCommitIndex() = %d, want 5", got)
-	}
-
-	ct.setConfiguration([]int{0, 1, 2, 3}, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("after transition: getCommitIndex() = %d, want 5 (not lowered by new voter)", got)
-	}
-
-	// 2/4 (self + один старый голосующий) на индексе 6 — не кворум.
-	ct.commit(6, lts.lookup)
-	ct.setMatch(1, 6, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("2/4 on index 6: getCommitIndex() = %d, want 5", got)
-	}
-
-	// 3/4 — кворум: commit 6.
-	ct.setMatch(2, 6, lts.lookup)
-	if got := ct.getCommitIndex(); got != 6 {
-		t.Fatalf("3/4 on index 6: getCommitIndex() = %d, want 6", got)
-	}
-}
-
-func TestCommitment_SelfRemoved_CommitNoOp(t *testing.T) {
-	// После self-removal (setConfiguration без selfID) commit() — no-op:
-	// ghost-self не появляется в map, commitIndex не растёт.
-	commitCh := make(chan int, 1)
-	ct := newCommitmentTracker(0, 1, 0, commitCh)
-	lts := &lookupTermStub{terms: map[int]int{6: 1}}
-	ct.setConfiguration([]int{0, 1, 2}, lts.lookup)
-
-	ct.setConfiguration([]int{1, 2}, lts.lookup)
-	ct.commit(6, lts.lookup)
-	if got := ct.getCommitIndex(); got != -1 {
-		t.Fatalf("getCommitIndex() = %d, want -1 (self removed)", got)
-	}
-	if _, ok := ct.matchIndex[0]; ok {
-		t.Fatal("matchIndex[0] must not exist after self-removal")
-	}
-	if got := len(ct.matchIndex); got != 2 {
-		t.Fatalf("len(matchIndex) = %d, want 2", got)
-	}
-}
-
-// --- 12. Переотправка уведомления commitCh ---
-
-func TestCommitment_NotifyRetriedAfterLostSend(t *testing.T) {
-	// Канал commitCh занят (cap 1) в момент продвижения — отправка
-	// потеряна. После дренажа следующий вызов recalculateCommitIndex
-	// (не продвигающий: median <= commitIndex) обязан переотправить
-	// ТЕКУЩИЙ commitIndex. Без фикса потребитель застревал бы навсегда
-	// (P2 lost notification).
-	ct, commitCh := newTracker(t, 0, []int{1, 2}, 1)
-	lts := &lookupTermStub{terms: map[int]int{3: 1, 5: 1}}
-
-	// Занять канал «чужим» значением — имитация недренированного
-	// уведомления от предыдущей фиксации.
-	commitCh <- 999
-
-	// Продвижение до 5: non-blocking send проваливается (канал полон),
-	// pendingNotify остаётся взведённым.
-	ct.setMatch(0, 5, lts.lookup)
-	ct.setMatch(1, 5, lts.lookup)
-	if got := ct.getCommitIndex(); got != 5 {
-		t.Fatalf("getCommitIndex() = %d, want 5", got)
-	}
-
-	// Дренаж: потребитель читает «старое» значение.
-	select {
-	case got := <-commitCh:
-		if got != 999 {
-			t.Fatalf("commitCh = %d, want 999", got)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout draining commitCh")
-	}
-
-	// Следующий recalc не продвигает (median 3 <= 5), но обязан
-	// переотправить текущий commitIndex 5.
-	ct.setMatch(2, 3, lts.lookup)
-
-	select {
-	case got := <-commitCh:
-		if got != 5 {
-			t.Fatalf("commitCh = %d, want 5 (retried current commitIndex)", got)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout: lost notification was not retried")
-	}
 }
