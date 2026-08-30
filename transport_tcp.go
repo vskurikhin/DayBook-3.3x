@@ -47,12 +47,6 @@ func init() {
 	gob.Register(InstallSnapshotResponse{})
 }
 
-// tcpRPCRequest — gob-структура RPC-запроса.
-type tcpRPCRequest struct {
-	Type byte
-	Args any
-}
-
 // tcpConn — обёртка над net.Conn с буферизированным writer и gob-кодеками.
 // Используется как для исходящих соединений (пул), так и для входящих
 // (handleConn). В исходящем случае буфер чтения не используется — декодирование
@@ -100,6 +94,12 @@ type TCPTransport struct {
 }
 
 var _ Transport = (*TCPTransport)(nil)
+
+// tcpRPCRequest — gob-структура RPC-запроса.
+type tcpRPCRequest struct {
+	Type byte
+	Args any
+}
 
 // NewTCPTransport создаёт новый TCPTransport, слушающий на указанном адресе.
 // Принимает адрес для прослушивания, таймаут и максимальный размер пула
@@ -265,15 +265,6 @@ func (t *TCPTransport) Close() {
 	t.wg.Wait()
 }
 
-// closeActiveConns закрывает все активные входящие соединения.
-func (t *TCPTransport) closeActiveConns() {
-	t.activeConnsLock.Lock()
-	defer t.activeConnsLock.Unlock()
-	for conn := range t.activeConns {
-		_ = conn.Close()
-	}
-}
-
 // CloseStreams закрывает все соединения в пуле и удаляет их.
 // Используется при реконфигурации кластера, когда адреса соседей
 // могли измениться.
@@ -295,6 +286,15 @@ func (t *TCPTransport) IsShutdown() bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// closeActiveConns закрывает все активные входящие соединения.
+func (t *TCPTransport) closeActiveConns() {
+	t.activeConnsLock.Lock()
+	defer t.activeConnsLock.Unlock()
+	for conn := range t.activeConns {
+		_ = conn.Close()
 	}
 }
 

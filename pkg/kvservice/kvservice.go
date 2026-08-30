@@ -173,6 +173,28 @@ func New(cfg *Config, readyChan <-chan any) *KVService {
 	return kvs
 }
 
+// NewKVService создаёт новый экземпляр KVService.
+//
+//   - address - адрес, который будет слушать Raft сервер.
+//   - id — идентификатор данного сервиса в кластере Raft.
+//   - peerIds — идентификаторы остальных узлов Raft в кластере.
+//   - storage — реализация интерфейса raft.Storage, используемая сервисом
+//     для долговременного хранения и сохранения своего состояния.
+//   - readyChan — канал уведомления, который должен быть закрыт после того,
+//     как кластер Raft будет готов к работе (все узлы запущены и соединены
+//     друг с другом).
+func NewKVService(address string, id int, peerIds []int, storage raft.Storage, readyChan <-chan any) *KVService {
+	return New(&Config{
+		Config: raft.Config{
+			RPCAddress: address,
+			ServerID:   id,
+			PeerIds:    peerIds,
+			Storage:    storage,
+		},
+	}, readyChan,
+	)
+}
+
 // Apply реализует raft.FSM. Вызывается Raft'ом для каждой зафиксированной
 // записи журнала. Команда применяется к DataStore, результат сохраняется
 // в полях ResultValue/ResultFound команды и возвращается в future клиента.
@@ -243,28 +265,6 @@ func (kvs *KVService) ApplyBatch(logs []*raft.LogEntry) []any {
 		results = append(results, cmd)
 	}
 	return results
-}
-
-// NewKVService создаёт новый экземпляр KVService.
-//
-//   - address - адрес, который будет слушать Raft сервер.
-//   - id — идентификатор данного сервиса в кластере Raft.
-//   - peerIds — идентификаторы остальных узлов Raft в кластере.
-//   - storage — реализация интерфейса raft.Storage, используемая сервисом
-//     для долговременного хранения и сохранения своего состояния.
-//   - readyChan — канал уведомления, который должен быть закрыт после того,
-//     как кластер Raft будет готов к работе (все узлы запущены и соединены
-//     друг с другом).
-func NewKVService(address string, id int, peerIds []int, storage raft.Storage, readyChan <-chan any) *KVService {
-	return New(&Config{
-		Config: raft.Config{
-			RPCAddress: address,
-			ServerID:   id,
-			PeerIds:    peerIds,
-			Storage:    storage,
-		},
-	}, readyChan,
-	)
 }
 
 // IsLeader проверяет, считает ли kvs себя лидером кластера Raft.
@@ -368,6 +368,25 @@ func (kvs *KVService) Shutdown() error {
 // по HTTP.
 func (kvs *KVService) ToggleHTTPResponsesEnabled(enable bool) {
 	kvs.httpResponsesEnabled.Store(enable)
+}
+
+// Следующие функции существуют исключительно для целей тестирования
+// и используются для моделирования различных сбоев.
+
+func (kvs *KVService) ConnectToRaftPeer(peerID int, addr net.Addr) error {
+	return kvs.rs.ConnectToPeerWithTimeout(peerID, addr, 2*raft.Quantum*time.Second)
+}
+
+func (kvs *KVService) DisconnectFromAllRaftPeers() {
+	kvs.rs.DisconnectAll()
+}
+
+func (kvs *KVService) DisconnectFromRaftPeer(peerID int) error {
+	return kvs.rs.DisconnectPeer(peerID)
+}
+
+func (kvs *KVService) GetRaftListenAddr() net.Addr {
+	return kvs.rs.GetListenAddr()
 }
 
 func (kvs *KVService) sendHTTPResponse(w http.ResponseWriter, v any) {
@@ -524,23 +543,4 @@ func (kvs *KVService) traceLogf(format string, args ...any) {
 		format = fmt.Sprintf("[kv %d] ", kvs.id) + format
 		_traceLogger.Printf(format, args...)
 	}
-}
-
-// Следующие функции существуют исключительно для целей тестирования
-// и используются для моделирования различных сбоев.
-
-func (kvs *KVService) ConnectToRaftPeer(peerID int, addr net.Addr) error {
-	return kvs.rs.ConnectToPeerWithTimeout(peerID, addr, 2*raft.Quantum*time.Second)
-}
-
-func (kvs *KVService) DisconnectFromAllRaftPeers() {
-	kvs.rs.DisconnectAll()
-}
-
-func (kvs *KVService) DisconnectFromRaftPeer(peerID int) error {
-	return kvs.rs.DisconnectPeer(peerID)
-}
-
-func (kvs *KVService) GetRaftListenAddr() net.Addr {
-	return kvs.rs.GetListenAddr()
 }

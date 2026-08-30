@@ -39,64 +39,6 @@ type Future interface {
 	ErrorCh() <-chan error
 }
 
-// verifyFuture — Future для подтверждения ReadIndex (Raft §8).
-// Помещается в verifyCh и обрабатывается в runLeaderLoop.
-// При получении кворумного подтверждения от большинства голосующих
-// вызывается respond(nil). Если лидер утратил лидерство — respond(ErrNotLeader).
-//
-// Поля votes, voted, quorumSize и epoch не требуют отдельного мьютекса:
-// оба места вызова vote() (обработчик verifyCh в runLeaderLoop и ветка
-// успешного ответа leaderSendAEsToPeer) выполняются под блокировкой cm.mu
-// ConsensusModule, что гарантирует потокобезопасность.
-type verifyFuture struct {
-	deferError
-
-	quorumSize int
-	votes      int
-
-	// voted — множество peerID, от которых голос уже учтён.
-	// Обеспечивает дедупликацию: повторные подтверждения пульса одного
-	// узла не накапливаются.
-	voted map[int]struct{}
-
-	// epoch — раунд верификации, к которому привязан запрос.
-	// Присваивается в leaderLoop при обработке запроса; голос
-	// засчитывается только от AE, отправленного с dispatchEpoch >= epoch
-	// (AE отправлен не раньше запроса, Raft §8).
-	epoch uint64
-
-	// enqueuedAtHeartbeat — значение leaderState.heartbeatTicks в момент
-	// постановки запроса в pendingVerify. При успешном завершении сравнивается
-	// с текущим значением счётчика тиков пульса: если тик успел сработать
-	// (значение больше), запрос «дождался пульса». Поле заполняется и читается
-	// только под cm.mu.
-	enqueuedAtHeartbeat uint64
-}
-
-var _ Future = (*verifyFuture)(nil)
-
-// vote регистрирует голос узла peerID при подтверждении лидерства.
-// Если лидерство не подтверждено (leader == false), future завершается
-// с ErrNotLeader.
-// Повторный голос от того же peerID игнорируется (дедупликация).
-// При достижении кворума (votes >= quorumSize) future завершается
-// успешно (nil).
-// Метод потокобезопасен, если все вызовы выполняются под блокировкой cm.mu.
-func (v *verifyFuture) vote(peerID int, leader bool) {
-	if !leader {
-		v.respond(ErrNotLeader)
-		return
-	}
-	if _, ok := v.voted[peerID]; ok {
-		return
-	}
-	v.voted[peerID] = struct{}{}
-	v.votes++
-	if v.votes >= v.quorumSize {
-		v.respond(nil)
-	}
-}
-
 // IndexFuture — Future, возвращающая индекс записи в журнале.
 type IndexFuture interface {
 	Future
@@ -115,6 +57,11 @@ type ConfigurationFuture interface {
 	Configuration() Configuration
 }
 
+// SnapshotFuture — публичный future для пользовательского Snapshot().
+type SnapshotFuture struct {
+	deferError
+}
+
 // deferError — базовая реализация Future с каналом завершения.
 type deferError struct {
 	err        error
@@ -123,11 +70,6 @@ type deferError struct {
 	responded  bool
 	mu         sync.Mutex
 	shutdownCh chan struct{}
-}
-
-func (d *deferError) init(shutdownCh chan struct{}) {
-	d.errCh = make(chan error, 1)
-	d.shutdownCh = shutdownCh
 }
 
 func (d *deferError) Error() error {
@@ -141,6 +83,17 @@ func (d *deferError) Error() error {
 	return d.err
 }
 
+// ErrorCh возвращает канал, по которому приходит ошибка выполнения future.
+// Позволяет использовать select для ожидания без создания го-рутины.
+func (d *deferError) ErrorCh() <-chan error {
+	return d.errCh
+}
+
+func (d *deferError) init(shutdownCh chan struct{}) {
+	d.errCh = make(chan error, 1)
+	d.shutdownCh = shutdownCh
+}
+
 func (d *deferError) respond(err error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -152,12 +105,6 @@ func (d *deferError) respond(err error) {
 	d.errCh <- err
 	close(d.errCh)
 	d.mu.Lock()
-}
-
-// ErrorCh возвращает канал, по которому приходит ошибка выполнения future.
-// Позволяет использовать select для ожидания без создания го-рутины.
-func (d *deferError) ErrorCh() <-chan error {
-	return d.errCh
 }
 
 // logFuture — future для одной записи журнала.
@@ -238,7 +185,60 @@ type reqSnapshotFuture struct {
 	snapshot FSMSnapshot
 }
 
-// SnapshotFuture — публичный future для пользовательского Snapshot().
-type SnapshotFuture struct {
+// verifyFuture — Future для подтверждения ReadIndex (Raft §8).
+// Помещается в verifyCh и обрабатывается в runLeaderLoop.
+// При получении кворумного подтверждения от большинства голосующих
+// вызывается respond(nil). Если лидер утратил лидерство — respond(ErrNotLeader).
+//
+// Поля votes, voted, quorumSize и epoch не требуют отдельного мьютекса:
+// оба места вызова vote() (обработчик verifyCh в runLeaderLoop и ветка
+// успешного ответа leaderSendAEsToPeer) выполняются под блокировкой cm.mu
+// ConsensusModule, что гарантирует потокобезопасность.
+type verifyFuture struct {
 	deferError
+
+	quorumSize int
+	votes      int
+
+	// voted — множество peerID, от которых голос уже учтён.
+	// Обеспечивает дедупликацию: повторные подтверждения пульса одного
+	// узла не накапливаются.
+	voted map[int]struct{}
+
+	// epoch — раунд верификации, к которому привязан запрос.
+	// Присваивается в leaderLoop при обработке запроса; голос
+	// засчитывается только от AE, отправленного с dispatchEpoch >= epoch
+	// (AE отправлен не раньше запроса, Raft §8).
+	epoch uint64
+
+	// enqueuedAtHeartbeat — значение leaderState.heartbeatTicks в момент
+	// постановки запроса в pendingVerify. При успешном завершении сравнивается
+	// с текущим значением счётчика тиков пульса: если тик успел сработать
+	// (значение больше), запрос «дождался пульса». Поле заполняется и читается
+	// только под cm.mu.
+	enqueuedAtHeartbeat uint64
+}
+
+var _ Future = (*verifyFuture)(nil)
+
+// vote регистрирует голос узла peerID при подтверждении лидерства.
+// Если лидерство не подтверждено (leader == false), future завершается
+// с ErrNotLeader.
+// Повторный голос от того же peerID игнорируется (дедупликация).
+// При достижении кворума (votes >= quorumSize) future завершается
+// успешно (nil).
+// Метод потокобезопасен, если все вызовы выполняются под блокировкой cm.mu.
+func (v *verifyFuture) vote(peerID int, leader bool) {
+	if !leader {
+		v.respond(ErrNotLeader)
+		return
+	}
+	if _, ok := v.voted[peerID]; ok {
+		return
+	}
+	v.voted[peerID] = struct{}{}
+	v.votes++
+	if v.votes >= v.quorumSize {
+		v.respond(nil)
+	}
 }

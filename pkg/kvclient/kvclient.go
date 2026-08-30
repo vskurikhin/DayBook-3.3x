@@ -62,18 +62,6 @@ func NewWithTimeout(serviceAddrs []string, timeout time.Duration) *KVClient {
 	}
 }
 
-// leader возвращает индекс адреса, который клиент сейчас считает лидером.
-func (c *KVClient) leader() int {
-	return int(c.assumedLeader.Load())
-}
-
-// nextLeader переводит клиента на следующий адрес списка. При одновременном
-// вызове из нескольких горутин один адрес может быть пропущен — это свойство
-// исходного алгоритма ротации сохраняется.
-func (c *KVClient) nextLeader() {
-	c.assumedLeader.Store(int64((c.leader() + 1) % len(c.addrs)))
-}
-
 // clientCount используется для назначения уникальных идентификаторов
 // различным клиентам.
 var clientCount atomic.Int32
@@ -193,6 +181,18 @@ func (c *KVClient) clientLogf(format string, args ...any) {
 		clientName := fmt.Sprintf("[client%03d] ", c.clientID)
 		log.Printf(clientName+format, args...)
 	}
+}
+
+// leader возвращает индекс адреса, который клиент сейчас считает лидером.
+func (c *KVClient) leader() int {
+	return int(c.assumedLeader.Load())
+}
+
+// nextLeader переводит клиента на следующий адрес списка. При одновременном
+// вызове из нескольких горутин один адрес может быть пропущен — это свойство
+// исходного алгоритма ротации сохраняется.
+func (c *KVClient) nextLeader() {
+	c.assumedLeader.Store(int64((c.leader() + 1) % len(c.addrs)))
 }
 
 func sendJSONRequest(ctx context.Context, path string, reqData, respData any) error {
