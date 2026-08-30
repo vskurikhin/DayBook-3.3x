@@ -92,6 +92,11 @@ func SetTrace(cfg TraceConfig) error {
 // возвращается ErrEnqueueTimeout.
 const requestTimeout = 10 * time.Second
 
+// httpShutdownTimeout — тайм-аут плавной остановки HTTP-сервера
+// сервиса: ожидание завершения обработчиков в Shutdown; по истечении
+// слушатель закрывается принудительно.
+const httpShutdownTimeout = 200 * time.Millisecond
+
 type KVService struct {
 	// id — идентификатор сервиса в кластере Raft.
 	id int
@@ -348,7 +353,7 @@ func (kvs *KVService) Shutdown() error {
 
 		if kvs.srv != nil {
 			kvs.traceLogf("shutting down HTTP server")
-			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
 			defer cancel()
 			// srv.Shutdown закрывает слушатель; ln.Close() дополнительно
 			// гарантирует освобождение порта при истечении ctx.

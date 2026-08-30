@@ -336,7 +336,7 @@ func (cm *ConsensusModule) Stop() {
 		cm.shutdownClosed = true
 		cm.mu.Unlock()
 
-		cm.traceLogf(0, "CM.Stop called / becomes Dead")
+		cm.traceLogf(traceLevelKeyEvents, "CM.Stop called / becomes Dead")
 		close(cm.shutdownCh)
 		cm.wg.Wait()
 	})

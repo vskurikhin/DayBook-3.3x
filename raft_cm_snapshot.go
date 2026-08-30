@@ -64,7 +64,8 @@ func (cm *ConsensusModule) handleFsmSnapshot(req *reqSnapshotFuture) {
 		// и снимок фиксировался с завышенным индексом.
 		cm.counters.snapshotIndexBehindDispatched.Add(1)
 		cm.traceLockedLogf(
-			4, "handleFsmSnapshot: FSM behind dispatch: fsmAppliedIndex=%d lastApplied=%d lastSnapshotIndex=%d",
+			traceLevelPreVote,
+			"handleFsmSnapshot: FSM behind dispatch: fsmAppliedIndex=%d lastApplied=%d lastSnapshotIndex=%d",
 			cm.cmState.fsmAppliedIndex, cm.cmState.lastApplied, cm.cmState.lastSnapshotIndex,
 		)
 	}
@@ -135,7 +136,8 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	cm.mu.Unlock()
 	if stale {
 		cm.traceLogf(
-			4, "InstallSnapshot skipped as no-op: LastLogIndex=%d <= lastSnapshotIndex=%d (leaderID=%d)",
+			traceLevelPreVote,
+			"InstallSnapshot skipped as no-op: LastLogIndex=%d <= lastSnapshotIndex=%d (leaderID=%d)",
 			req.LastLogIndex, lastSnapshotIndex, req.LeaderID,
 		)
 		resp.Success = true
@@ -223,7 +225,8 @@ func (cm *ConsensusModule) installSnapshotStateLocked(meta *SnapshotMeta) {
 	if err := cm.checkSnapshotLogContinuity(); err != nil {
 		cm.counters.snapshotLogBoundaryViolation.Add(1)
 		cm.traceLockedLogf(
-			0, "handleInstallSnapshot: snapshot/log boundary violation: %v (lastLogIndex=%d, lastSnapshotIndex=%d)",
+			traceLevelKeyEvents,
+			"handleInstallSnapshot: snapshot/log boundary violation: %v (lastLogIndex=%d, lastSnapshotIndex=%d)",
 			err, cm.cmState.lastLogIndex, cm.cmState.lastSnapshotIndex,
 		)
 	}
@@ -292,13 +295,13 @@ func (cm *ConsensusModule) runSnapshots() {
 				if err := cm.takeSnapshot(); err != nil {
 					// Ошибки создания снимка не должны быть тихими
 					// ретрай обеспечивает следующий цикл.
-					cm.traceLogf(0, "runSnapshots: takeSnapshot failed: %v", err)
+					cm.traceLogf(traceLevelKeyEvents, "runSnapshots: takeSnapshot failed: %v", err)
 				}
 			}
 		case <-time.After(interval):
 			if cm.shouldSnapshot() {
 				if err := cm.takeSnapshot(); err != nil {
-					cm.traceLogf(0, "runSnapshots: takeSnapshot failed: %v", err)
+					cm.traceLogf(traceLevelKeyEvents, "runSnapshots: takeSnapshot failed: %v", err)
 				}
 			}
 		case <-cm.shutdownCh:

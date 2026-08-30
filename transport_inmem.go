@@ -27,6 +27,12 @@ type InmemTransport struct {
 
 var _ Transport = (*InmemTransport)(nil)
 
+// inmemTransportTimeout — тайм-аут одного RPC внутрипроцессного
+// транспорта (500 мс). Корневой тестовый харнесс выводит свои
+// бюджеты ожидания из этой величины (inmemRPCTimeout), поэтому
+// изменение значения меняет и бюджеты тестов.
+const inmemTransportTimeout = 500 * time.Millisecond
+
 // NewInmemTransport создаёт новый InmemTransport с заданным локальным адресом.
 // Тайм-аут по умолчанию — 500ms.
 func NewInmemTransport(addr ServerAddress) *InmemTransport {
@@ -35,7 +41,7 @@ func NewInmemTransport(addr ServerAddress) *InmemTransport {
 		localAddr:  addr,
 		peers:      make(map[ServerID]*InmemTransport),
 		shutdownCh: make(chan struct{}),
-		timeout:    500 * time.Millisecond,
+		timeout:    inmemTransportTimeout,
 	}
 }
 

@@ -46,7 +46,7 @@ func (f *failingSnapshotStore) createCount() int {
 // TestRunSnapshots_TakeSnapshotErrorDoesNotCrash проверяет,
 // что ошибка takeSnapshot не роняет процесс: цикл снимков продолжает
 // работать и повторяет попытки (Create вызывается снова). Сама ошибка
-// логируется через traceLogf(0, ...) — проверка через перехват лога
+// логируется через traceLogf(traceLevelKeyEvents, ...) — проверка через перехват лога
 // не выполняется, чтобы не мутировать глобальный логгер из теста.
 func TestRunSnapshots_TakeSnapshotErrorDoesNotCrash(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()

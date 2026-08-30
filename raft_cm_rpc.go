@@ -26,7 +26,7 @@ func (cm *ConsensusModule) runRPCReader() {
 // Ответ отправляется с защитой от закрытого канала (select/default).
 // timeoutNow и handleInstallSnapshot сами управляют RespChan.
 func (cm *ConsensusModule) handleRPC(rpc RPC) {
-	cm.traceLogf(8, "handleRPC: %T", rpc.Command)
+	cm.traceLogf(traceLevelReplication, "handleRPC: %T", rpc.Command)
 
 	switch cmd := rpc.Command.(type) {
 	case *RequestVoteArgs:
@@ -57,7 +57,7 @@ func (cm *ConsensusModule) respondRPC(rpc RPC, reply any, err error) {
 	select {
 	case rpc.RespChan <- RPCResponse{Reply: reply, Error: err}:
 	default:
-		cm.traceLogf(1, "rpc.RespChan closed/unavailable for %T", rpc.Command)
+		cm.traceLogf(traceLevelLoops, "rpc.RespChan closed/unavailable for %T", rpc.Command)
 	}
 }
 
@@ -90,7 +90,8 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 		return err
 	}
 
-	cm.traceLockedLogf(8,
+	cm.traceLockedLogf(
+		traceLevelReplication,
 		"AppendEntries: %v, Term:%d LeaderID:%d PrevLogIndex:%d PrevLogTerm:%d len(Entries):%d",
 		args.RPCHeader, args.Term, args.LeaderID, args.PrevLogIndex, args.PrevLogTerm, len(args.Entries),
 	)
@@ -100,7 +101,7 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 	}
 
 	if args.Term > cm.cmState.currentTerm {
-		cm.traceLockedLogf(8, "... term out of date in AppendEntries")
+		cm.traceLockedLogf(traceLevelReplication, "... term out of date in AppendEntries")
 		cm.becomeFollowerLocked(args.Term)
 	}
 
@@ -141,7 +142,7 @@ func (cm *ConsensusModule) AppendEntries(args AppendEntriesArgs, reply *AppendEn
 		ServerID:        cm.id,
 	}
 	reply.Term = cm.cmState.currentTerm
-	cm.traceLockedLogf(8, "AppendEntries reply: %+v", *reply)
+	cm.traceLockedLogf(traceLevelReplication, "AppendEntries reply: %+v", *reply)
 	return nil
 }
 
@@ -160,7 +161,7 @@ func (cm *ConsensusModule) appendEntriesDuringLeadershipTransferLocked(
 	// текущему или на 1 меньше. Исключение: терм строго больше нашего.
 	if cm.cmState.state == Candidate && cm.cmState.candidateFromLeadershipTransfer.Load() {
 		if args.Term > cm.cmState.currentTerm {
-			cm.traceLockedLogf(8, "... term out of date in AppendEntries (candidate from LT)")
+			cm.traceLockedLogf(traceLevelReplication, "... term out of date in AppendEntries (candidate from LT)")
 			cm.becomeFollowerLocked(args.Term)
 			cm.cmState.candidateFromLeadershipTransfer.Store(false)
 		}
@@ -212,11 +213,12 @@ func (cm *ConsensusModule) appendMatchingEntriesLocked(
 	//   или на индекс, где терм записи отличается от соответствующей записи журнала.
 	if newEntriesIndex < len(args.Entries) {
 		cm.traceLockedLogf(
-			8, "... inserting entries %v from index %d",
+			traceLevelReplication,
+			"... inserting entries %v from index %d",
 			args.Entries[newEntriesIndex:], logInsertIndex,
 		)
 		cm.cmState.log = append(cm.cmState.log[:logInsertPos], args.Entries[newEntriesIndex:]...)
-		cm.traceLockedLogf(16, "... log is now: %v", cm.cmState.log)
+		cm.traceLockedLogf(traceLevelLogDump, "... log is now: %v", cm.cmState.log)
 		cm.rebuildLastLog()
 		cm.rebuildTermIndexMap()
 		cm.cmState.logNeedsPersist = true
@@ -233,7 +235,7 @@ func (cm *ConsensusModule) appendMatchingEntriesLocked(
 
 	if args.LeaderCommit > cm.cmState.commitIndex {
 		cm.cmState.commitIndex = min(args.LeaderCommit, cm.cmState.lastLogIndex)
-		cm.traceLockedLogf(8, "... setting commitIndex=%d", cm.cmState.commitIndex)
+		cm.traceLockedLogf(traceLevelReplication, "... setting commitIndex=%d", cm.cmState.commitIndex)
 		cm.persistToStorage()
 		return cm.cmState.commitIndex, true
 	}
@@ -295,7 +297,7 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 
 	// Nonvoter не может быть избран лидером — отклоняем запрос.
 	if !hasVote(cm.cmState.configurations.latest, args.GetRPCHeader().ServerID) {
-		cm.traceLockedLogf(4, "... RequestVote denied: not a voter")
+		cm.traceLockedLogf(traceLevelPreVote, "... RequestVote denied: not a voter")
 		reply.VoteGranted = false
 		reply.RPCHeader = RPCHeader{
 			ProtocolVersion: ProtocolVersion,
@@ -307,19 +309,20 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 
 	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTerm()
 	cm.traceLockedLogf(
-		4, "RequestVote: %+v [currentTerm=%d, votedFor=%d, log index/term=(%d, %d)]",
+		traceLevelPreVote,
+		"RequestVote: %+v [currentTerm=%d, votedFor=%d, log index/term=(%d, %d)]",
 		args, cm.cmState.currentTerm, cm.cmState.votedFor, lastLogIndex, lastLogTerm,
 	)
 
 	if args.Term > cm.cmState.currentTerm {
-		cm.traceLockedLogf(4, "... term out of date in RequestVote")
+		cm.traceLockedLogf(traceLevelPreVote, "... term out of date in RequestVote")
 		cm.becomeFollowerLocked(args.Term)
 	}
 
 	// Проверка наличия известного лидера.
 	// Если есть лидер, но это leadership transfer — голосуем (bypass).
 	if cm.cmState.leaderID >= 0 && cm.cmState.leaderID != args.CandidateID && !args.LeadershipTransfer {
-		cm.traceLockedLogf(4, "... leader known, denying vote for %d", args.CandidateID)
+		cm.traceLockedLogf(traceLevelPreVote, "... leader known, denying vote for %d", args.CandidateID)
 		reply.VoteGranted = false
 		reply.RPCHeader = RPCHeader{
 			ProtocolVersion: ProtocolVersion,
@@ -335,7 +338,7 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 		(args.LastLogTerm == lastLogTerm && args.LastLogIndex >= lastLogIndex)
 	if !termOk || !voteOk || !logOk {
 		cm.traceLockedLogf(
-			4,
+			traceLevelPreVote,
 			"... vote denied: termOk=%v (cur=%d, args=%d), voteOk=%v (votedFor=%d, cand=%d),"+
 				" logOk=%v (args=(%d,%d), local=(%d,%d))",
 			termOk, cm.cmState.currentTerm, args.Term, voteOk, cm.cmState.votedFor, args.CandidateID,
@@ -354,7 +357,7 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 	}
 	reply.Term = cm.cmState.currentTerm
 	cm.persistToStorage()
-	cm.traceLockedLogf(4, "... RequestVote reply: %+v", reply)
+	cm.traceLockedLogf(traceLevelPreVote, "... RequestVote reply: %+v", reply)
 	return nil
 }
 
@@ -385,7 +388,8 @@ func (cm *ConsensusModule) RequestPreVote(args RequestPreVoteArgs, reply *Reques
 
 	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTerm()
 	cm.traceLockedLogf(
-		4, "RequestPreVote: %+v [currentTerm=%d, log index/term=(%d, %d)]",
+		traceLevelPreVote,
+		"RequestPreVote: %+v [currentTerm=%d, log index/term=(%d, %d)]",
 		args, cm.cmState.currentTerm, lastLogIndex, lastLogTerm,
 	)
 
@@ -393,7 +397,7 @@ func (cm *ConsensusModule) RequestPreVote(args RequestPreVoteArgs, reply *Reques
 	// конфигурации. Это defense-in-depth: runPreCandidate уже фильтрует
 	// голосующих на стороне отправителя, но получатель тоже должен проверять.
 	if !hasVote(cm.cmState.configurations.latest, args.GetRPCHeader().ServerID) {
-		cm.traceLockedLogf(4, "... RequestPreVote denied: not a voter")
+		cm.traceLockedLogf(traceLevelPreVote, "... RequestPreVote denied: not a voter")
 		reply.RPCHeader = RPCHeader{
 			ProtocolVersion: ProtocolVersion,
 			ServerID:        cm.id,
@@ -412,7 +416,7 @@ func (cm *ConsensusModule) RequestPreVote(args RequestPreVoteArgs, reply *Reques
 
 	// Предлагаемый term должен быть не меньше текущего.
 	if args.Term < cm.cmState.currentTerm {
-		cm.traceLockedLogf(4, "... RequestPreVote denied: older term")
+		cm.traceLockedLogf(traceLevelPreVote, "... RequestPreVote denied: older term")
 		return nil
 	}
 
@@ -422,7 +426,7 @@ func (cm *ConsensusModule) RequestPreVote(args RequestPreVoteArgs, reply *Reques
 	if !cm.cmState.leaderLastContact.IsZero() {
 		leaderKnown := time.Since(cm.cmState.leaderLastContact) < cm.electionTimeout()
 		if leaderKnown && args.GetRPCHeader().ServerID != cm.cmState.leaderID {
-			cm.traceLockedLogf(4, "... RequestPreVote denied: leader known")
+			cm.traceLockedLogf(traceLevelPreVote, "... RequestPreVote denied: leader known")
 			return nil
 		}
 	}
@@ -430,11 +434,11 @@ func (cm *ConsensusModule) RequestPreVote(args RequestPreVoteArgs, reply *Reques
 	// Log-safety: отклонить, если лог получателя новее лога кандидата.
 	if lastLogTerm > args.LastLogTerm ||
 		(lastLogTerm == args.LastLogTerm && lastLogIndex > args.LastLogIndex) {
-		cm.traceLockedLogf(4, "... RequestPreVote denied: log is more up-to-date")
+		cm.traceLockedLogf(traceLevelPreVote, "... RequestPreVote denied: log is more up-to-date")
 		return nil
 	}
 
 	reply.VoteGranted = true
-	cm.traceLockedLogf(4, "... RequestPreVote granted")
+	cm.traceLockedLogf(traceLevelPreVote, "... RequestPreVote granted")
 	return nil
 }

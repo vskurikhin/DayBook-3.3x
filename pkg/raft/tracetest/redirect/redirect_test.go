@@ -71,7 +71,7 @@ func TestTraceRedirect(t *testing.T) {
 		<-readerDone
 	})
 
-	// Эмиттер трассировки — cm.Stop() (traceLogf(0, "CM.Stop called /
+	// Эмиттер трассировки — cm.Stop() (traceLogf(traceLevelKeyEvents, "CM.Stop called /
 	// becomes Dead"), печатается при traceCM=1 > 0): после Stop файл
 	// не пуст.
 	//

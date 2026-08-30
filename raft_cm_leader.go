@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// leadershipTransferPollInterval — период опроса nextIndex целевого
+// узла при догонке в передаче лидерства: до завершения догонки цикл
+// повторяет сигнал репликации с этим интервалом.
+const leadershipTransferPollInterval = 10 * time.Millisecond
+
 // AddNonvoter добавляет новый не голосующий сервер или обновляет адрес существующего.
 func (cm *ConsensusModule) AddNonvoter(id ServerID, addr ServerAddress) IndexFuture {
 	future := &configurationChangeFuture{
@@ -246,7 +251,7 @@ func (cm *ConsensusModule) appendConfigurationEntry(future *configurationChangeF
 	cm.leaderState.commitmentTracker.commit(cm.cmState.lastLogIndex, cm.lookupTermLocked)
 	savedCommitIndex := cm.cmState.commitIndex
 	if newCI := cm.leaderState.commitmentTracker.getCommitIndex(); newCI > cm.cmState.commitIndex {
-		cm.traceLockedLogf(2, "leader sets commitIndex := %d", newCI)
+		cm.traceLockedLogf(traceLevelProgress, "leader sets commitIndex := %d", newCI)
 		cm.cmState.commitIndex = newCI
 	}
 	// Значение снимается в критической секции до Unlock (RISK-002):
@@ -350,7 +355,7 @@ func (cm *ConsensusModule) handleLeadershipTransfer(future *leadershipTransferFu
 				cm.leaderSendAEsToPeerIfIdle(targetID, savedCurrentTerm)
 
 				// Ждём короткий интервал, затем проверяем nextIndex.
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(leadershipTransferPollInterval)
 
 				cm.mu.Lock()
 				if cm.leaderState.nextIndex[targetID] > lastIdx {
@@ -439,7 +444,7 @@ func (cm *ConsensusModule) runLeaderLoop() {
 		cm.leaderLoopExitCleanupLocked()
 		cm.mu.Unlock()
 		elapsed := time.Since(startNow)
-		cm.traceLogf(1, "leaderLoop exit: elapsed=%v", elapsed)
+		cm.traceLogf(traceLevelLoops, "leaderLoop exit: elapsed=%v", elapsed)
 	}()
 
 	heartbeatTicker := time.NewTicker(HeartbeatTimeoutMs * time.Millisecond)
@@ -478,7 +483,7 @@ func (cm *ConsensusModule) runLeaderLoop() {
 
 		case <-cm.stepDown:
 			cm.mu.Lock()
-			cm.traceLockedLogf(1, "leader stepping down")
+			cm.traceLockedLogf(traceLevelLoops, "leader stepping down")
 			if cm.leaderState.leadershipTransferFuture != nil {
 				atomic.StoreInt32(&cm.leaderState.leadershipTransferInProgress, 0)
 				cm.leaderState.leadershipTransferFuture.respond(nil)
@@ -532,7 +537,7 @@ func (cm *ConsensusModule) leaderLoopExitCleanupLocked() {
 		cm.leaderState.pendingVerify = nil
 	}
 	inflightCount := len(cm.leaderState.inflight)
-	cm.traceLockedLogf(1, "leaderLoop exit: responding to %d inflight futures", inflightCount)
+	cm.traceLockedLogf(traceLevelLoops, "leaderLoop exit: responding to %d inflight futures", inflightCount)
 	for _, future := range cm.leaderState.inflight {
 		future.respond(ErrLeadershipLost)
 	}
@@ -604,7 +609,7 @@ groupCommit:
 func (cm *ConsensusModule) handleLeaderCommitAdvance(newCommitIndex int) (keepRunning bool) {
 	cm.mu.Lock()
 	if newCommitIndex > cm.cmState.commitIndex {
-		cm.traceLockedLogf(2, "leader sets commitIndex := %d", newCommitIndex)
+		cm.traceLockedLogf(traceLevelProgress, "leader sets commitIndex := %d", newCommitIndex)
 		cm.cmState.commitIndex = newCommitIndex
 
 		// Обновить committed конфигурацию, если latest был зафиксирован.
@@ -616,7 +621,7 @@ func (cm *ConsensusModule) handleLeaderCommitAdvance(newCommitIndex int) (keepRu
 
 		// Проверить, остался ли лидер в committed конфигурации.
 		if !hasVote(cm.cmState.configurations.committed, cm.id) {
-			cm.traceLockedLogf(1, "leader stepping down: not in committed configuration")
+			cm.traceLockedLogf(traceLevelLoops, "leader stepping down: not in committed configuration")
 			cm.counters.stepDowns.configExit.Add(1)
 			cm.becomeFollowerLocked(cm.cmState.currentTerm)
 			cm.mu.Unlock()
@@ -705,7 +710,9 @@ func (cm *ConsensusModule) checkQuorumContact() {
 		return
 	}
 	cm.traceLockedLogf(
-		0, "leader stepping down: no contact with quorum of voters for %v", cm.checkQuorumTimeout,
+		traceLevelKeyEvents,
+		"leader stepping down: no contact with quorum of voters for %v",
+		cm.checkQuorumTimeout,
 	)
 	cm.counters.stepDowns.checkQuorum.Add(1)
 	cm.becomeFollowerLocked(cm.cmState.currentTerm)
@@ -782,7 +789,7 @@ func (cm *ConsensusModule) startLeaderLocked() {
 		cm.leaderState.inflightAE[peerID].Store(false)
 	}
 	cm.traceLockedLogf(
-		0, "becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; len(log)=%d",
+		traceLevelKeyEvents, "becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; len(log)=%d",
 		cm.cmState.currentTerm, cm.leaderState.nextIndex, cm.leaderState.matchIndex, len(cm.cmState.log),
 	)
 

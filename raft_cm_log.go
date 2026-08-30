@@ -170,7 +170,7 @@ func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 	savedCommitIndex := cm.cmState.commitIndex
 	newCommitIdx := cm.leaderState.commitmentTracker.getCommitIndex()
 	if newCommitIdx > cm.cmState.commitIndex {
-		cm.traceLockedLogf(2, "leader sets commitIndex := %d", newCommitIdx)
+		cm.traceLockedLogf(traceLevelProgress, "leader sets commitIndex := %d", newCommitIdx)
 		cm.cmState.commitIndex = newCommitIdx
 	}
 	newCommitIndex := cm.cmState.commitIndex

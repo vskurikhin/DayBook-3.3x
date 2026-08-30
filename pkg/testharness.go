@@ -56,6 +56,29 @@ const (
 	// (тот же порядок, что у клиентских запросов харнесса:
 	// 600*Quantum = 1.8 с).
 	serviceProbeTimeout = 600 * raft.Quantum * time.Millisecond
+
+	// clientOpTimeout — тайм-аут контекста клиентских операций Put/Get
+	// (600*Quantum = 1.8 с); тот же порядок величины, что у пробника
+	// готовности сервиса (serviceProbeTimeout).
+	clientOpTimeout = 600 * raft.Quantum * time.Millisecond
+
+	// clientOpTimeoutCAS — тайм-аут контекста CAS (800*Quantum =
+	// 2.4 с); увеличенный относительно Put/Get запас.
+	clientOpTimeoutCAS = 800 * raft.Quantum * time.Millisecond
+
+	// clientOpTimeoutProbe — тайм-аут контекста Get-пробников:
+	// проверка отсутствия ключа и одиночный запрос в ожидании
+	// значения (500*Quantum = 1.5 с).
+	clientOpTimeoutProbe = 500 * raft.Quantum * time.Millisecond
+
+	// clientOpTimeoutShort — короткий дедлайн Get в контроле истечения
+	// тайм-аута клиентом (300*Quantum = 0.9 с): сервис с отключёнными
+	// ответами не успевает зафиксировать команду за это время.
+	clientOpTimeoutShort = 300 * raft.Quantum * time.Millisecond
+
+	// waitKeyValueBudget — бюджет схождения значения ключа
+	// в ожидании WaitForKeyValue (2 с).
+	waitKeyValueBudget = 2 * time.Second
 )
 
 // Harness Тестовый стенд для системного тестирования kvservice и клиента.
@@ -498,7 +521,7 @@ func (h *Harness) CheckSingleLeader() int {
 // TryPut отправляет через клиента c запрос Put. Возвращает
 // (prevValue, keyFound, error) без обращения к *testing.T.
 func (h *Harness) TryPut(c *kvclient.KVClient, key, value string) (string, bool, error) {
-	ctx, cancel := context.WithTimeout(h.ctx, 600*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, clientOpTimeout)
 	defer cancel()
 	return c.Put(ctx, key, value)
 }
@@ -507,7 +530,7 @@ func (h *Harness) TryPut(c *kvclient.KVClient, key, value string) (string, bool,
 // найден и его значение совпадает с ожидаемым. Возвращает ошибку
 // без обращения к *testing.T.
 func (h *Harness) TryGet(c *kvclient.KVClient, key string, wantValue string) error {
-	ctx, cancel := context.WithTimeout(h.ctx, 600*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, clientOpTimeout)
 	defer cancel()
 	gv, f, err := c.Get(ctx, key)
 	if err != nil {
@@ -525,7 +548,7 @@ func (h *Harness) TryGet(c *kvclient.KVClient, key string, wantValue string) err
 // TryCAS отправляет через клиента c запрос CAS. Возвращает
 // (prevValue, keyFound, error) без обращения к *testing.T.
 func (h *Harness) TryCAS(c *kvclient.KVClient, key, compare, value string) (string, bool, error) {
-	ctx, cancel := context.WithTimeout(h.ctx, 800*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, clientOpTimeoutCAS)
 	defer cancel()
 	return c.CAS(ctx, key, compare, value)
 }
@@ -533,7 +556,7 @@ func (h *Harness) TryCAS(c *kvclient.KVClient, key, compare, value string) (stri
 // TryGetNotFound отправляет через клиента c запрос Get и проверяет,
 // что ключ отсутствует. Возвращает ошибку без обращения к *testing.T.
 func (h *Harness) TryGetNotFound(c *kvclient.KVClient, key string) error {
-	ctx, cancel := context.WithTimeout(h.ctx, 500*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, clientOpTimeoutProbe)
 	defer cancel()
 	_, f, err := c.Get(ctx, key)
 	if err != nil {
@@ -636,7 +659,7 @@ func (h *Harness) CheckGetNotFound(c *kvclient.KVClient, key string) {
 // поскольку клиент не сможет добиться фиксации своей команды сервисом.
 func (h *Harness) CheckGetTimesOut(c *kvclient.KVClient, key string) {
 	h.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 300*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), clientOpTimeoutShort)
 	defer cancel()
 	_, _, err := c.Get(ctx, key)
 	if err == nil {
@@ -660,9 +683,9 @@ func (h *Harness) CheckGetTimesOut(c *kvclient.KVClient, key string) {
 // h.CheckGet, который завершит тест с Fatal.
 func (h *Harness) WaitForKeyValue(c *kvclient.KVClient, key, expectedValue string) {
 	h.t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(waitKeyValueBudget)
 	for time.Now().Before(deadline) {
-		ctx, cancel := context.WithTimeout(h.ctx, 500*raft.Quantum*time.Millisecond)
+		ctx, cancel := context.WithTimeout(h.ctx, clientOpTimeoutProbe)
 		val, _, err := c.Get(ctx, key)
 		cancel()
 		if err == nil && val == expectedValue {

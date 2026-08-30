@@ -22,10 +22,10 @@ const (
 	// preVoteRound — worst-case раунда Pre-Vote (≈ maxElectionTimeout).
 	preVoteRound = maxElectionTimeout
 
-	// inmemRPCTimeout — именованная копия значения InmemTransport.timeout
-	// (transport_inmem.go:35). При рассинхроне с транспортом источник
-	// истины — транспорт.
-	inmemRPCTimeout = 500 * time.Millisecond
+	// inmemRPCTimeout — тайм-аут одного RPC внутрипроцессного
+	// транспорта; ссылается на inmemTransportTimeout, рассинхрон
+	// с транспортом исключён компилятором.
+	inmemRPCTimeout = inmemTransportTimeout
 
 	// commitBudgetSteady — бюджет ожидания фиксации при устоявшемся лидере:
 	// 4*(applyBatchInterval + inmemRPCTimeout) = 4*(50ms+500ms) = 2.2s.

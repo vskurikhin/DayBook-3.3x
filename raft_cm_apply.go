@@ -186,7 +186,8 @@ func (cm *ConsensusModule) sendBatch(start, end int) {
 		pos := cm.logPositionLocked(idx)
 		if pos >= len(cm.cmState.log) {
 			cm.traceLockedLogf(
-				0, "sendBatch: logPositionLocked(%d) returned %d, len(log)=%d",
+				traceLevelKeyEvents,
+				"sendBatch: logPositionLocked(%d) returned %d, len(log)=%d",
 				idx, pos, len(cm.cmState.log),
 			)
 			cm.counters.sendBatchEntrySkipped.Add(1)
@@ -197,7 +198,8 @@ func (cm *ConsensusModule) sendBatch(start, end int) {
 		// не соответствует idx и не должна применяться к FSM.
 		if cm.cmState.log[pos].Index != idx {
 			cm.traceLockedLogf(
-				0, "sendBatch: no log entry at index %d (entry=%d), skipping",
+				traceLevelKeyEvents,
+				"sendBatch: no log entry at index %d (entry=%d), skipping",
 				idx, cm.cmState.log[pos].Index,
 			)
 			cm.counters.sendBatchEntrySkipped.Add(1)
