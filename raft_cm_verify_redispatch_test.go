@@ -176,7 +176,7 @@ func waitFor(t *testing.T, desc string, budget time.Duration, cond func() bool) 
 		if cond() {
 			return
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 	t.Fatalf("не дождались условия: %s (за %v)", desc, budget)
 }
@@ -213,13 +213,13 @@ func TestVerifyRedispatch_AC1_CompletesBeforeHeartbeat(t *testing.T) {
 	// Активная горутина репликации на соседа 1: флаг занят, первый
 	// AppendEntries удерживается транспортом в полёте.
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	waitFor(t, "первый AppendEntries в полёте (флаг занят)", inmemRPCTimeout, func() bool {
+	waitFor(t, "первый AppendEntries в полёте (флаг занят)", _inmemRPCTimeout, func() bool {
 		return transport.calls.Load() >= 1 && cm.inflightAELoaded(1)
 	})
 
 	// VerifyLeader поставлен в момент активной горутины репликации.
 	future := cm.VerifyLeader()
-	waitFor(t, "verify-запрос в очереди pendingVerify", inmemRPCTimeout, func() bool {
+	waitFor(t, "verify-запрос в очереди pendingVerify", _inmemRPCTimeout, func() bool {
 		cm.mu.Lock()
 		n := len(cm.leaderState.pendingVerify)
 		cm.mu.Unlock()
@@ -234,7 +234,7 @@ func TestVerifyRedispatch_AC1_CompletesBeforeHeartbeat(t *testing.T) {
 	cm.mu.Lock()
 	hbAtEnqueue := cm.leaderState.heartbeatTicks
 	cm.mu.Unlock()
-	waitFor(t, "тик пульса после постановки verify-запроса", inmemRPCTimeout, func() bool {
+	waitFor(t, "тик пульса после постановки verify-запроса", _inmemRPCTimeout, func() bool {
 		cm.mu.Lock()
 		ticks := cm.leaderState.heartbeatTicks
 		cm.mu.Unlock()
@@ -368,7 +368,7 @@ func TestVerifyRedispatch_AC3_StaleEpochDoesNotVote(t *testing.T) {
 //   - при одном verify — порождает не более одной дополнительной рассылки на
 //     соседа (после завершения запроса очередь пуста, повторной перерассылки
 //     нет);
-//   - при завершении по replicationSkip — не порождает вовсе.
+//   - при завершении по _replicationSkip — не порождает вовсе.
 func TestVerifyRedispatch_AC4_NoSelfReproducingDispatch(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
@@ -378,11 +378,11 @@ func TestVerifyRedispatch_AC4_NoSelfReproducingDispatch(t *testing.T) {
 		cm.leaderState.pendingVerify = nil
 
 		cm.leaderSendAEsToPeerIfIdle(1, 1)
-		waitFor(t, "первый AppendEntries в полёте", inmemRPCTimeout, func() bool {
+		waitFor(t, "первый AppendEntries в полёте", _inmemRPCTimeout, func() bool {
 			return mock.callCount.Load() >= 1
 		})
 		close(mock.blockCh)
-		waitFor(t, "горутина репликации завершилась", inmemRPCTimeout, func() bool {
+		waitFor(t, "горутина репликации завершилась", _inmemRPCTimeout, func() bool {
 			return !cm.inflightAELoaded(1)
 		})
 
@@ -398,7 +398,7 @@ func TestVerifyRedispatch_AC4_NoSelfReproducingDispatch(t *testing.T) {
 		// Запуск летящего AE с dispatchEpoch = 0 (verifyEpoch на момент
 		// запуска): ответ этого AE голосом запросу эпохи 1 не является.
 		cm.leaderSendAEsToPeerIfIdle(1, 1)
-		waitFor(t, "первый AppendEntries в полёте", inmemRPCTimeout, func() bool {
+		waitFor(t, "первый AppendEntries в полёте", _inmemRPCTimeout, func() bool {
 			return mock.callCount.Load() >= 1
 		})
 		// Постановка verify-запроса после запуска AE: эпоха инкрементируется
@@ -412,7 +412,7 @@ func TestVerifyRedispatch_AC4_NoSelfReproducingDispatch(t *testing.T) {
 		close(mock.blockCh)
 		// Перерассылка отправляет второй AppendEntries, его ответ голосует и
 		// завершает запрос; после этого очередь пуста и третьей рассылки нет.
-		waitFor(t, "перерассылка и завершение запроса", inmemRPCTimeout, func() bool {
+		waitFor(t, "перерассылка и завершение запроса", _inmemRPCTimeout, func() bool {
 			if mock.callCount.Load() < 2 {
 				return false
 			}
@@ -428,23 +428,23 @@ func TestVerifyRedispatch_AC4_NoSelfReproducingDispatch(t *testing.T) {
 		}
 	})
 
-	t.Run("завершение по replicationSkip не перерассылает", func(t *testing.T) {
+	t.Run("завершение по _replicationSkip не перерассылает", func(t *testing.T) {
 		mock := &mockTransportAE{}
 		cm := newRedispatchReplicationCM(mock)
 		// Активная задержка повторов: одна транспортная ошибка и свежая
-		// попытка — planReplication вернёт replicationSkip.
+		// попытка — planReplication вернёт _replicationSkip.
 		cm.leaderState.replFailures[1] = 1
 		cm.leaderState.lastAttempt[1] = time.Now()
 		vf := newPendingVerify(1)
 		cm.leaderState.pendingVerify = []*verifyFuture{vf}
 
 		cm.leaderSendAEsToPeerIfIdle(1, 1)
-		waitFor(t, "горутина завершилась по replicationSkip", inmemRPCTimeout, func() bool {
+		waitFor(t, "горутина завершилась по _replicationSkip", _inmemRPCTimeout, func() bool {
 			return !cm.inflightAELoaded(1)
 		})
 
 		if got := mock.callCount.Load(); got != 0 {
-			t.Fatalf("AppendEntries calls = %d, want 0 (replicationSkip не перерассылает)", got)
+			t.Fatalf("AppendEntries calls = %d, want 0 (_replicationSkip не перерассылает)", got)
 		}
 		cm.mu.Lock()
 		stillPending := len(cm.leaderState.pendingVerify) == 1 && vf.votes == 1

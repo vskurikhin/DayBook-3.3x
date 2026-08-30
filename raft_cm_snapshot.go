@@ -64,7 +64,7 @@ func (cm *ConsensusModule) handleFsmSnapshot(req *reqSnapshotFuture) {
 		// и снимок фиксировался с завышенным индексом.
 		cm.counters.snapshotIndexBehindDispatched.Add(1)
 		cm.traceLockedLogf(
-			traceLevelPreVote,
+			_traceLevelPreVote,
 			"handleFsmSnapshot: FSM behind dispatch: fsmAppliedIndex=%d lastApplied=%d lastSnapshotIndex=%d",
 			cm.cmState.fsmAppliedIndex, cm.cmState.lastApplied, cm.cmState.lastSnapshotIndex,
 		)
@@ -99,9 +99,9 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	defer func() {
 		if rpc.Reader != nil {
 			// Drain остатка данных снимка с лимитом, чтобы не зависнуть
-			// при повреждённом соединении. Лимит maxSnapshotDataSize
+			// при повреждённом соединении. Лимит _maxSnapshotDataSize
 			// гарантирует завершение drain даже при некорректном DataSize.
-			_, _ = io.CopyN(io.Discard, rpc.Reader, maxSnapshotDataSize)
+			_, _ = io.CopyN(io.Discard, rpc.Reader, _maxSnapshotDataSize)
 		}
 		rpc.RespChan <- RPCResponse{Reply: resp, Error: rpcErr}
 	}()
@@ -120,7 +120,7 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	}
 
 	// Валидация DataSize: защита от паники io.Copy при некорректном размере.
-	if req.DataSize <= 0 || req.DataSize > maxSnapshotDataSize {
+	if req.DataSize <= 0 || req.DataSize > _maxSnapshotDataSize {
 		rpcErr = fmt.Errorf("invalid DataSize %d", req.DataSize)
 		return
 	}
@@ -136,7 +136,7 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	cm.mu.Unlock()
 	if stale {
 		cm.traceLogf(
-			traceLevelPreVote,
+			_traceLevelPreVote,
 			"InstallSnapshot skipped as no-op: LastLogIndex=%d <= lastSnapshotIndex=%d (leaderID=%d)",
 			req.LastLogIndex, lastSnapshotIndex, req.LeaderID,
 		)
@@ -225,7 +225,7 @@ func (cm *ConsensusModule) installSnapshotStateLocked(meta *SnapshotMeta) {
 	if err := cm.checkSnapshotLogContinuity(); err != nil {
 		cm.counters.snapshotLogBoundaryViolation.Add(1)
 		cm.traceLockedLogf(
-			traceLevelKeyEvents,
+			_traceLevelKeyEvents,
 			"handleInstallSnapshot: snapshot/log boundary violation: %v (lastLogIndex=%d, lastSnapshotIndex=%d)",
 			err, cm.cmState.lastLogIndex, cm.cmState.lastSnapshotIndex,
 		)
@@ -295,13 +295,13 @@ func (cm *ConsensusModule) runSnapshots() {
 				if err := cm.takeSnapshot(); err != nil {
 					// Ошибки создания снимка не должны быть тихими
 					// ретрай обеспечивает следующий цикл.
-					cm.traceLogf(traceLevelKeyEvents, "runSnapshots: takeSnapshot failed: %v", err)
+					cm.traceLogf(_traceLevelKeyEvents, "runSnapshots: takeSnapshot failed: %v", err)
 				}
 			}
 		case <-time.After(interval):
 			if cm.shouldSnapshot() {
 				if err := cm.takeSnapshot(); err != nil {
-					cm.traceLogf(traceLevelKeyEvents, "runSnapshots: takeSnapshot failed: %v", err)
+					cm.traceLogf(_traceLevelKeyEvents, "runSnapshots: takeSnapshot failed: %v", err)
 				}
 			}
 		case <-cm.shutdownCh:
@@ -322,7 +322,7 @@ func (cm *ConsensusModule) takeSnapshot() error {
 	case cm.fsmSnapshotCh <- snapReq:
 	case <-cm.shutdownCh:
 		return ErrRaftShutdown
-	case <-time.After(defaultTakeSnapshotTimeout):
+	case <-time.After(_defaultTakeSnapshotTimeout):
 		cm.mu.Lock()
 		applied := cm.cmState.fsmAppliedIndex
 		dispatched := cm.cmState.lastApplied

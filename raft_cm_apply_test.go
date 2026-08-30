@@ -162,7 +162,7 @@ func TestFSMRetainedEntryImmutable(t *testing.T) {
 
 	const k = 3
 	cm := &ConsensusModule{}
-	cm.fsmMutateCh = make(chan []*commitTuple, batchApplyBuffer)
+	cm.fsmMutateCh = make(chan []*commitTuple, _batchApplyBuffer)
 	cm.leaderState.inflight = make(map[int]*logFuture)
 	cm.cmState.log = []LogEntry{
 		{Index: 0, Term: 1, Type: LogCommand, Data: "v0"},
@@ -303,7 +303,7 @@ func TestClusterConvergence_ForcedReelections(t *testing.T) {
 	// Финальная сходимость — предикат committedOn (равные длины commits у
 	// всех подключённых узлов и одинаковый Index записи). Прежнее ad-hoc
 	// условие «команда присутствует в commits» строго слабее и удалено.
-	h.WaitForCommitAll(numCmds-1, commitBudgetAfterFailover)
+	h.WaitForCommitAll(numCmds-1, _commitBudgetAfterFailover)
 }
 
 // leaderObservation — наблюдённая смена лидера: кто стал лидером и в
@@ -318,7 +318,7 @@ func (o leaderObservation) String() string {
 }
 
 // submitBudget — общий дедлайн отправки одной команды с учётом повторов.
-const submitBudget = 3 * commitBudgetAfterFailover
+const submitBudget = 3 * _commitBudgetAfterFailover
 
 // maxSubmitAttempts — предел числа попыток отправки одной команды
 // (дополнительно к дедлайну submitBudget).
@@ -337,7 +337,7 @@ func submitToCurrentLeader(t *testing.T, h *Harness, cmd int) {
 	deadline := time.Now().Add(submitBudget)
 	for attempt := 1; ; attempt++ {
 		lid, _ := h.CheckSingleLeader()
-		err := waitFuture(t, h.cluster[lid].Apply(cmd, 0), commitBudgetAfterFailover)
+		err := waitFuture(t, h.cluster[lid].Apply(cmd, 0), _commitBudgetAfterFailover)
 		if err == nil {
 			return
 		}
@@ -371,7 +371,7 @@ func forceLeaderChange(t *testing.T, h *Harness) leaderObservation {
 	oldLeader, oldTerm := h.CheckSingleLeader()
 	h.DisconnectPeer(oldLeader)
 
-	newLeader, newTerm := waitForNewLeaderExcept(t, h, oldLeader, leaderElectionBudget)
+	newLeader, newTerm := waitForNewLeaderExcept(t, h, oldLeader, _leaderElectionBudget)
 	if newLeader == oldLeader {
 		t.Fatalf("смены лидера не произошло: лидером остался узел %d", oldLeader)
 	}
@@ -383,7 +383,7 @@ func forceLeaderChange(t *testing.T, h *Harness) leaderObservation {
 	}
 
 	h.ReconnectPeer(oldLeader)
-	h.WaitForSingleLeader(leaderElectionBudget)
+	h.WaitForSingleLeader(_leaderElectionBudget)
 
 	return leaderObservation{leaderID: newLeader, term: newTerm}
 }
@@ -396,7 +396,7 @@ func forceLeaderChange(t *testing.T, h *Harness) leaderObservation {
 func newAliasTestCM(k int) *ConsensusModule {
 	cm := &ConsensusModule{}
 	cm.storage = NewMapStorage()
-	cm.fsmMutateCh = make(chan []*commitTuple, batchApplyBuffer)
+	cm.fsmMutateCh = make(chan []*commitTuple, _batchApplyBuffer)
 	cm.shutdownCh = make(chan struct{})
 	cm.leaderState.inflight = make(map[int]*logFuture)
 	cm.cmState.state = Follower

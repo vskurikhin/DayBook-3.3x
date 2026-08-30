@@ -78,7 +78,7 @@ func (cm *ConsensusModule) applySingle(batch []*commitTuple) {
 
 // processLogs собирает зафиксированные записи от lastApplied+1 до commitIndex
 // и отправляет их в FSM goroutine. Диапазон делится на под-батчи размером
-// не более maxApplyBatchSize для снижения latency FSM.
+// не более _maxApplyBatchSize для снижения latency FSM.
 // Метод не требует удержания cm.mu при вызове, но сам захватывает её
 // внутри для чтения журнала и поиска future в карте inflight.
 func (cm *ConsensusModule) processLogs(commitIndex int) {
@@ -96,7 +96,7 @@ func (cm *ConsensusModule) processLogs(commitIndex int) {
 
 	start := lastApplied + 1
 	for start <= commitIndex {
-		end := start + maxApplyBatchSize - 1
+		end := start + _maxApplyBatchSize - 1
 		if end > commitIndex {
 			end = commitIndex
 		}
@@ -186,7 +186,7 @@ func (cm *ConsensusModule) sendBatch(start, end int) {
 		pos := cm.logPositionLocked(idx)
 		if pos >= len(cm.cmState.log) {
 			cm.traceLockedLogf(
-				traceLevelKeyEvents,
+				_traceLevelKeyEvents,
 				"sendBatch: logPositionLocked(%d) returned %d, len(log)=%d",
 				idx, pos, len(cm.cmState.log),
 			)
@@ -198,7 +198,7 @@ func (cm *ConsensusModule) sendBatch(start, end int) {
 		// не соответствует idx и не должна применяться к FSM.
 		if cm.cmState.log[pos].Index != idx {
 			cm.traceLockedLogf(
-				traceLevelKeyEvents,
+				_traceLevelKeyEvents,
 				"sendBatch: no log entry at index %d (entry=%d), skipping",
 				idx, cm.cmState.log[pos].Index,
 			)

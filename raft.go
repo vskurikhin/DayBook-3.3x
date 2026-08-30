@@ -19,27 +19,27 @@ const (
 	ReelectionTimeoutMs = 127 * Quantum
 	TickerTimeoutMs     = 7 * Quantum
 
-	// defaultTCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
+	// _defaultTCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
 	// в production-транспорте. Исходное значение 85ms получено из 382/2 при
 	// Quantum=3. Вынесено в независимую константу, чтобы изменение Quantum
 	// для ускорения тестов не влияло на production-развёртывание.
-	defaultTCPRPCTimeout = 191 * time.Millisecond
+	_defaultTCPRPCTimeout = 191 * time.Millisecond
 
-	// TCPRPCTimeout — алиас defaultTCPRPCTimeout, сохранённый для обратной
+	// TCPRPCTimeout — алиас _defaultTCPRPCTimeout, сохранённый для обратной
 	// совместимости публичного API.
-	TCPRPCTimeout = defaultTCPRPCTimeout
+	TCPRPCTimeout = _defaultTCPRPCTimeout
 
-	// applyBatchInterval — интервал, с которым runApplyLoop проверяет
+	// _applyBatchInterval — интервал, с которым runApplyLoop проверяет
 	// необходимость применения записей к FSM. Накопление commitCh
 	// уведомлений за этот интервал позволяет объединять несколько
 	// мелких фиксаций в один батч.
-	applyBatchInterval = 50 * time.Millisecond
+	_applyBatchInterval = 50 * time.Millisecond
 
-	// batchApplyBuffer — ёмкость fsmMutateCh для burst-устойчивости.
+	// _batchApplyBuffer — ёмкость fsmMutateCh для burst-устойчивости.
 	// Выбрана как 1024: при массовой фиксации processLogs не блокируется.
-	batchApplyBuffer = 1024
+	_batchApplyBuffer = 1024
 
-	// defaultCheckQuorumTimeout — предельный срок без ответов от кворума
+	// _defaultCheckQuorumTimeout — предельный срок без ответов от кворума
 	// голосующих, после которого лидер шагает вниз, в ведомые. Значение
 	// 2 × TCPRPCTimeout: отметка контакта по соседу обновляется не чаще,
 	// чем завершается один RPC (AppendEntries к одному соседу
@@ -48,7 +48,7 @@ const (
 	// двукратный запас покрывает один полный тайм-аут RPC. Итоговая
 	// величина близка к ReelectionTimeoutMs: лидер обнаруживает потерю
 	// кворума не позже, чем ведомый начинает выборы.
-	defaultCheckQuorumTimeout = 2 * defaultTCPRPCTimeout
+	_defaultCheckQuorumTimeout = 2 * _defaultTCPRPCTimeout
 
 	// DefaultSnapshotInterval — интервал проверки необходимости снимка.
 	// Каждые 3 секунды runSnapshots проверяет, не превышен ли порог
@@ -62,38 +62,38 @@ const (
 	// и объём журнала, который нужно передавать отстающим узлам.
 	DefaultSnapshotThreshold = 1024
 
-	// defaultTakeSnapshotTimeout — тайм-аут отправки запроса на снимок
+	// _defaultTakeSnapshotTimeout — тайм-аут отправки запроса на снимок
 	// в fsmSnapshotCh. Если runFSM не принимает запрос за это время,
 	// takeSnapshot возвращает ошибку вместо вечной блокировки.
 	// Значение 30 секунд выбрано как разумный максимум для создания
 	// снимка в production (запись состояния + persist на диск).
-	defaultTakeSnapshotTimeout = 30 * time.Second
+	_defaultTakeSnapshotTimeout = 30 * time.Second
 
-	// defaultTrailingLogs — количество записей журнала, сохраняемых
+	// _defaultTrailingLogs — количество записей журнала, сохраняемых
 	// после самого свежего снимка. Нужно для поддержки репликации
 	// без отправки полного снимка каждому новому follower.
 	// Значение 128 — разумный минимум для большинства сценариев.
-	defaultTrailingLogs = 128
+	_defaultTrailingLogs = 128
 
-	// leaderBatchSize — количество записей, которые лидер собирает из applyCh
+	// _leaderBatchSize — количество записей, которые лидер собирает из applyCh
 	// перед одним вызовом dispatchLogs. Компромисс между latency (одиночные
 	// записи) и throughput (групповой commit, Raft §5.1).
-	leaderBatchSize = 256
+	_leaderBatchSize = 256
 
-	// maxApplyBatchSize — максимальное количество записей в одном батче,
+	// _maxApplyBatchSize — максимальное количество записей в одном батче,
 	// отправляемом в fsmMutateCh. Если commitIndex - lastApplied превышает
 	// этот порог, processLogs делит диапазон на под-батчи.
-	maxApplyBatchSize = 512
+	_maxApplyBatchSize = 512
 
-	// maxSnapshotDataSize — максимальный допустимый размер данных снимка
+	// _maxSnapshotDataSize — максимальный допустимый размер данных снимка
 	// в байтах. Значение 1 ГБ выбрано как разумный предел для production
 	// (больше типичного размера состояния, но достаточно для обнаружения
 	// некорректного DataSize в запросе InstallSnapshot).
 	// Установлено в 1 << 30 для согласованности.
 	// Защита от паники io.Copy при повреждённом DataSize.
-	maxSnapshotDataSize = 1 << 30
+	_maxSnapshotDataSize = 1 << 30
 
-	// maxUncommittedEntries — предел незафиксированного хвоста журнала,
+	// _maxUncommittedEntries — предел незафиксированного хвоста журнала,
 	// при котором лидер перестаёт принимать новые команды клиентов.
 	// Это не протокольная гарантия, а ограничение ущерба: лидер, потерявший
 	// кворум, не должен наращивать журнал неограниченно. Предел действует
@@ -101,9 +101,9 @@ const (
 	// лидерство и записи конфигурации) им не проверяются, иначе кластер
 	// с накопленным хвостом не смог бы ни избрать лидера, ни изменить
 	// состав.
-	maxUncommittedEntries = 4096
+	_maxUncommittedEntries = 4096
 
-	// verifyRedispatchMinIntervalMs — минимальный интервал между немедленными
+	// _verifyRedispatchMinIntervalMs — минимальный интервал между немедленными
 	// перерассылками AppendEntries одному соседу при плотном потоке verify.
 	// Значение строго меньше HeartbeatTimeoutMs (33 мс), поэтому перерассылка
 	// остаётся быстрее пульса: первая перерассылка немедленна, а запрос,
@@ -111,14 +111,14 @@ const (
 	// пульса — не дольше пульса. По построению частота перерассылок на
 	// каждого соседа ограничена 1000/24 ≈ 41,7 перерассылок/с независимо от
 	// темпа клиентских запросов.
-	verifyRedispatchMinIntervalMs = 8 * Quantum
+	_verifyRedispatchMinIntervalMs = 8 * Quantum
 
-	// verifyChBuffer — ёмкость verifyCh, канала запросов проверки
+	// _verifyChBuffer — ёмкость verifyCh, канала запросов проверки
 	// лидера от клиентов. Читает единственный цикл лидера (по одному
 	// запросу за такт), буфер сглаживает пачки запросов между
 	// тактами; при заполнении VerifyLeader ожидает места или
 	// остановки узла, не блокируя горутины модуля.
-	verifyChBuffer = 64
+	_verifyChBuffer = 64
 )
 
 // CommitEntry — это данные, которые Raft отправляет в канал фиксации.
@@ -218,7 +218,7 @@ func NewConsensusModule(
 		log.Fatalln("raft: NewConsensusModule: transport is nil")
 	}
 	// Отмечаем факт создания CM для трассировки (set-once).
-	traceCMCreated.Store(true)
+	_traceCMCreated.Store(true)
 	cm := new(ConsensusModule)
 	cm.id = id
 	cm.peerIds = peerIds
@@ -226,14 +226,14 @@ func NewConsensusModule(
 	cm.storage = storage
 	cm.fsm = fsm
 	// Канал для передачи зафиксированных записей в runFSM.
-	// Ёмкость batchApplyBuffer обеспечивает устойчивость к всплескам:
+	// Ёмкость _batchApplyBuffer обеспечивает устойчивость к всплескам:
 	// при массовой фиксации processLogs отправляет записи батчем без блокировки.
-	cm.fsmMutateCh = make(chan []*commitTuple, batchApplyBuffer)
+	cm.fsmMutateCh = make(chan []*commitTuple, _batchApplyBuffer)
 	cm.shutdownCh = make(chan struct{})
 	cm.applyCh = make(chan *logFuture)
 	// Канал для ReadIndex‑подтверждения лидерства.
 	// Ёмкость 64 рассчитана на всплески нагрузки: при 10k RPS VerifyLeader не блокируется.
-	cm.verifyCh = make(chan *verifyFuture, verifyChBuffer)
+	cm.verifyCh = make(chan *verifyFuture, _verifyChBuffer)
 	cm.leaderState.inflight = make(map[int]*logFuture)
 	cm.commitCh = make(chan int, 1)
 	cm.stepDown = make(chan struct{}, 1)
@@ -249,8 +249,8 @@ func NewConsensusModule(
 	cm.leaderState.nextIndex = make(map[int]int)
 	cm.leaderState.matchIndex = make(map[int]int)
 	cm.leaderState.lastContact = make(map[int]time.Time)
-	cm.checkQuorumTimeout = defaultCheckQuorumTimeout
-	cm.verifyRedispatchMinInterval = verifyRedispatchMinIntervalMs * time.Millisecond
+	cm.checkQuorumTimeout = _defaultCheckQuorumTimeout
+	cm.verifyRedispatchMinInterval = _verifyRedispatchMinIntervalMs * time.Millisecond
 	cm.leaderState.inflightAE = make(map[int]*atomic.Bool)
 	cm.cmState.termIndexMap = make(map[int]int)
 	cm.cmState.electionTimerDone = make(chan struct{})
@@ -267,7 +267,7 @@ func NewConsensusModule(
 		cm.snapshotStore = snapshots[0]
 		cm.snapshotThreshold = DefaultSnapshotThreshold
 		cm.snapshotInterval = DefaultSnapshotInterval
-		cm.trailingLogs = defaultTrailingLogs
+		cm.trailingLogs = _defaultTrailingLogs
 		cm.snapshotCh = make(chan struct{}, 1)
 		cm.fsmSnapshotCh = make(chan *reqSnapshotFuture)
 	}

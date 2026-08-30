@@ -24,11 +24,11 @@ func TestLeaderApplyBatch_GroupCommitDrainsQueuedCommands(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	// queued — больше одной команды и заведомо меньше верхней границы
-	// выборки leaderBatchSize.
+	// выборки _leaderBatchSize.
 	const queued = 3
 
 	cm := newRedispatchLeaderCM(&mockTransportAE{})
-	cm.applyCh = make(chan *logFuture, leaderBatchSize)
+	cm.applyCh = make(chan *logFuture, _leaderBatchSize)
 	defer cm.Stop()
 
 	heartbeatTicker := time.NewTicker(HeartbeatTimeoutMs * time.Millisecond)

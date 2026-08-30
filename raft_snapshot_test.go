@@ -234,7 +234,7 @@ func (h *snapshotHarness) SubmitToServer(serverID int, cmd string) int {
 			return -1
 		}
 		return future.Index()
-	case <-time.After(submitTimeout):
+	case <-time.After(_submitTimeout):
 		return -1
 	}
 }
@@ -794,8 +794,8 @@ func (h *snapshotHarness) waitForSingleLeader() int {
 // прекращаются. При пороге 5 и 30 командах существовала бы необратимая
 // зона S ∈ {26..29}, из которой система по своим правилам не выходит.
 //
-// Бюджет каждого ожидания — snapshotConvergenceBudget: худший случай
-// схождения при интервале снимков 50 мс — applyBatchInterval + 2 интервала
+// Бюджет каждого ожидания — _snapshotConvergenceBudget: худший случай
+// схождения при интервале снимков 50 мс — _applyBatchInterval + 2 интервала
 // снимков = 150 мс, запас более чем 14-кратный.
 func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
@@ -815,7 +815,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	// cmState.state == Leader (чтение под cm.mu), а не фиксированные паузы.
 	err := waitCond(
 		"single node becomes leader",
-		leaderElectionBudget,
+		_leaderElectionBudget,
 		func() bool {
 			cm.mu.Lock()
 			defer cm.mu.Unlock()
@@ -854,7 +854,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 		t.Helper()
 		desc := fmt.Sprintf("lastSnapshotIndex >= %d", wantIdx)
 		err := waitCond(
-			desc, snapshotConvergenceBudget,
+			desc, _snapshotConvergenceBudget,
 			func() bool {
 				cm.mu.Lock()
 				defer cm.mu.Unlock()

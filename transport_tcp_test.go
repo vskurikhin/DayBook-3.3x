@@ -98,7 +98,7 @@ func TestTCPNewTransport(t *testing.T) {
 }
 
 // TestTCPNewTransportZeroTimeout проверяет защитную проверку конструктора
-// (AC-2): нулевой тайм-аут заменяется дефолтом defaultTCPRPCTimeout, чтобы
+// (AC-2): нулевой тайм-аут заменяется дефолтом _defaultTCPRPCTimeout, чтобы
 // транспорт всегда имел действующие дедлайны. Без этой проверки нулевая
 // конфигурация дала бы транспорт без дедлайнов (RISK-021).
 func TestTCPNewTransportZeroTimeout(t *testing.T) {
@@ -108,8 +108,8 @@ func TestTCPNewTransportZeroTimeout(t *testing.T) {
 		t.Fatalf("NewTCPTransport: %v", err)
 	}
 	defer trans.Close()
-	if trans.timeout != defaultTCPRPCTimeout {
-		t.Fatalf("timeout = %v, want default %v", trans.timeout, defaultTCPRPCTimeout)
+	if trans.timeout != _defaultTCPRPCTimeout {
+		t.Fatalf("timeout = %v, want default %v", trans.timeout, _defaultTCPRPCTimeout)
 	}
 	if trans.timeout != TCPRPCTimeout {
 		t.Fatalf("timeout = %v, want alias TCPRPCTimeout = %v", trans.timeout, TCPRPCTimeout)

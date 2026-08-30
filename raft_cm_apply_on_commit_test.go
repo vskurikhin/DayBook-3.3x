@@ -16,7 +16,7 @@ const (
 
 	// applyLatencyBudget — предел медианы промежутка «фиксация →
 	// применение». Заметно меньше интервала страховочного тика
-	// (applyBatchInterval): при применении по тику ожидание составляло бы
+	// (_applyBatchInterval): при применении по тику ожидание составляло бы
 	// в среднем около половины интервала.
 	applyLatencyBudget = 20 * time.Millisecond
 
@@ -119,7 +119,7 @@ func commitToApplyLatency(t *testing.T, leader *ConsensusModule, cmd int) time.D
 			return d
 		}
 		return 0
-	case <-time.After(leaderElectionBudget):
+	case <-time.After(_leaderElectionBudget):
 		t.Fatalf("commit of entry %d was not observed", target)
 		return 0
 	}
@@ -135,7 +135,7 @@ func TestApplyOnCommit_BatchingPreserved(t *testing.T) {
 	cm := testServerWithFSM(t, fsm)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, leaderElectionBudget)
+	waitForLeader(t, cm, _leaderElectionBudget)
 
 	var wg sync.WaitGroup
 	for i := 0; i < commands; i++ {
@@ -199,7 +199,7 @@ func TestApplyOnCommit_SafetyTickApplies(t *testing.T) {
 
 	if err := waitCond(
 		"entry is re-applied by the safety tick",
-		2*applyBatchInterval+leaderElectionBudget,
+		2*_applyBatchInterval+_leaderElectionBudget,
 		func() bool { return countApplied() == 2 },
 		func() string { return "applied count = " + itoa(countApplied()) },
 	); err != nil {
@@ -228,7 +228,7 @@ func TestApplyOnCommit_ConcurrentApplyWithLeaderChange(t *testing.T) {
 			future := h.cluster[leaderID].Apply(cmd, time.Second)
 			select {
 			case <-future.ErrorCh():
-			case <-time.After(leaderElectionBudget):
+			case <-time.After(_leaderElectionBudget):
 			}
 		}(9000 + i)
 	}
@@ -236,10 +236,10 @@ func TestApplyOnCommit_ConcurrentApplyWithLeaderChange(t *testing.T) {
 	future := h.LeadershipTransfer(leaderID, ServerID(target))
 	select {
 	case <-future.ErrorCh():
-	case <-time.After(leaderElectionBudget):
+	case <-time.After(_leaderElectionBudget):
 		t.Error("LeadershipTransfer did not complete")
 	}
 	wg.Wait()
 
-	h.WaitForSingleLeader(leaderElectionBudget)
+	h.WaitForSingleLeader(_leaderElectionBudget)
 }

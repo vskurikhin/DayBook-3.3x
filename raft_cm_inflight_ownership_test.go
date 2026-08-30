@@ -135,12 +135,12 @@ func TestInflightAE_SingleReplicationGoroutineUnderConcurrentPaths(t *testing.T)
 
 	// Первая отправка захватывает флаг и блокируется в транспорте.
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	deadline := time.Now().Add(inmemRPCTimeout)
+	deadline := time.Now().Add(_inmemRPCTimeout)
 	for mock.callCount.Load() == 0 {
 		if !time.Now().Before(deadline) {
-			t.Fatalf("AppendEntries не вызван за %v", inmemRPCTimeout)
+			t.Fatalf("AppendEntries не вызван за %v", _inmemRPCTimeout)
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 
 	// Пока первая горутина жива, конкурентные пути вызова не порождают

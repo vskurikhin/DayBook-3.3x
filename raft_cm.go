@@ -49,7 +49,7 @@ type ConsensusModule struct {
 
 	// checkQuorumTimeout — предельный срок без ответов от кворума голосующих,
 	// после которого лидер шагает вниз, в ведомые. Значение по умолчанию —
-	// defaultCheckQuorumTimeout; поле, а не константа, чтобы тесты пакета
+	// _defaultCheckQuorumTimeout; поле, а не константа, чтобы тесты пакета
 	// могли задать заведомо больший или меньший срок. Читается только
 	// в цикле лидера под cm.mu.
 	checkQuorumTimeout time.Duration
@@ -113,7 +113,7 @@ type ConsensusModule struct {
 
 	// verifyRedispatchMinInterval — минимальный интервал между немедленными
 	// перерассылками AppendEntries одному соседу при неудовлетворённом
-	// verify-запросе. Значение по умолчанию — verifyRedispatchMinIntervalMs;
+	// verify-запросе. Значение по умолчанию — _verifyRedispatchMinIntervalMs;
 	// поле, а не константа, чтобы тесты пакета могли задать заведомо малое
 	// значение (укороченное окно) для проверки границы частоты. Читается и
 	// записывается только под cm.mu в redispatchVerifyIfPendingLocked.
@@ -336,7 +336,7 @@ func (cm *ConsensusModule) Stop() {
 		cm.shutdownClosed = true
 		cm.mu.Unlock()
 
-		cm.traceLogf(traceLevelKeyEvents, "CM.Stop called / becomes Dead")
+		cm.traceLogf(_traceLevelKeyEvents, "CM.Stop called / becomes Dead")
 		close(cm.shutdownCh)
 		cm.wg.Wait()
 	})
@@ -382,11 +382,11 @@ func (cm *ConsensusModule) stdoutTracePrintln(msg string) {
 	cm.mu.Unlock()
 }
 
-// traceLockedLogf выводит отладочное сообщение, если traceCM > level.
+// traceLockedLogf выводит отладочное сообщение, если _traceCM > level.
 // Ожидается, что cm.mu уже заблокирован вызывающим кодом, поэтому
 // состояние (cm.cmState.state, cm.id, cm.cmState.currentTerm) читается напрямую.
 func (cm *ConsensusModule) traceLockedLogf(level int, format string, args ...any) {
-	if level < traceCM {
+	if level < _traceCM {
 		format = fmt.Sprintf("[%c,N:%d,T:%03d] ", stateLetter(cm.cmState.state), cm.id, cm.cmState.currentTerm) +
 			format
 		_traceLogger.Printf(format, args...)
@@ -398,7 +398,7 @@ func (cm *ConsensusModule) traceLockedLogf(level int, format string, args ...any
 // прочитать состояние без data race. Для вызовов из кода, который уже
 // держит cm.mu, используйте traceLockedLogf — иначе будет deadlock.
 func (cm *ConsensusModule) traceLogf(level int, format string, args ...any) {
-	if level < traceCM {
+	if level < _traceCM {
 		cm.mu.Lock()
 		cm.traceLockedLogf(level, format, args...)
 		cm.mu.Unlock()

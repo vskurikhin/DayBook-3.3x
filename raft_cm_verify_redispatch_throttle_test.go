@@ -102,7 +102,7 @@ func TestVerifyRedispatchThrottle_AC2_WindowSuppressesRedispatch(t *testing.T) {
 
 	// Первый AppendEntries в полёте с dispatchEpoch = 0.
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	waitFor(t, "первый AppendEntries в полёте", inmemRPCTimeout, func() bool {
+	waitFor(t, "первый AppendEntries в полёте", _inmemRPCTimeout, func() bool {
 		return tr.calls.Load() >= 1
 	})
 
@@ -116,7 +116,7 @@ func TestVerifyRedispatchThrottle_AC2_WindowSuppressesRedispatch(t *testing.T) {
 	// Освобождаем AppendEntries: defer перерассылает, метка окна ставится кодом
 	// (окно = now + большой интервал). Перерассланный AE придерживается в полёте.
 	tr.release <- struct{}{}
-	waitFor(t, "перерассылка в полёте", inmemRPCTimeout, func() bool {
+	waitFor(t, "перерассылка в полёте", _inmemRPCTimeout, func() bool {
 		return tr.calls.Load() >= 2
 	})
 	rd, _ := cm.redispatchCounters()
@@ -133,7 +133,7 @@ func TestVerifyRedispatchThrottle_AC2_WindowSuppressesRedispatch(t *testing.T) {
 	cm.leaderState.pendingVerify = []*verifyFuture{vf1, vf2}
 	cm.mu.Unlock()
 	tr.release <- struct{}{}
-	waitFor(t, "горутина репликации завершилась", inmemRPCTimeout, func() bool {
+	waitFor(t, "горутина репликации завершилась", _inmemRPCTimeout, func() bool {
 		return !cm.inflightAELoaded(1)
 	})
 
@@ -165,7 +165,7 @@ func TestVerifyRedispatchThrottle_AC3_PastWindowAllowsRedispatch(t *testing.T) {
 
 	// Первый AppendEntries в полёте с dispatchEpoch = 0.
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	waitFor(t, "первый AppendEntries в полёте", inmemRPCTimeout, func() bool {
+	waitFor(t, "первый AppendEntries в полёте", _inmemRPCTimeout, func() bool {
 		return tr.calls.Load() >= 1
 	})
 
@@ -178,7 +178,7 @@ func TestVerifyRedispatchThrottle_AC3_PastWindowAllowsRedispatch(t *testing.T) {
 
 	// Освобождаем AppendEntries: defer перерассылает (окно свободно).
 	tr.release <- struct{}{}
-	waitFor(t, "перерассылка в полёте", inmemRPCTimeout, func() bool {
+	waitFor(t, "перерассылка в полёте", _inmemRPCTimeout, func() bool {
 		return tr.calls.Load() >= 2
 	})
 
@@ -193,7 +193,7 @@ func TestVerifyRedispatchThrottle_AC3_PastWindowAllowsRedispatch(t *testing.T) {
 	// Дренируем перерассланный AppendEntries: его defer не перерассылает
 	// (verify эпохи 1 покрыт эпохой отправки 1).
 	tr.release <- struct{}{}
-	waitFor(t, "горутина перерассылки завершилась", inmemRPCTimeout, func() bool {
+	waitFor(t, "горутина перерассылки завершилась", _inmemRPCTimeout, func() bool {
 		return !cm.inflightAELoaded(1)
 	})
 	if got := tr.calls.Load(); got != 2 {
@@ -215,7 +215,7 @@ func TestVerifyRedispatchThrottle_AC3_IntervalExpiryAllowsRedispatch(t *testing.
 
 	// Первый AppendEntries в полёте (dispatchEpoch = 0).
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	waitFor(t, "первый AppendEntries в полёте", inmemRPCTimeout, func() bool {
+	waitFor(t, "первый AppendEntries в полёте", _inmemRPCTimeout, func() bool {
 		return tr.calls.Load() >= 1
 	})
 
@@ -226,7 +226,7 @@ func TestVerifyRedispatchThrottle_AC3_IntervalExpiryAllowsRedispatch(t *testing.
 	cm.leaderState.pendingVerify = []*verifyFuture{vf1}
 	cm.mu.Unlock()
 	tr.release <- struct{}{}
-	waitFor(t, "первая перерассылка в полёте", inmemRPCTimeout, func() bool {
+	waitFor(t, "первая перерассылка в полёте", _inmemRPCTimeout, func() bool {
 		return tr.calls.Load() >= 2
 	})
 	rd, _ := cm.redispatchCounters()
@@ -245,7 +245,7 @@ func TestVerifyRedispatchThrottle_AC3_IntervalExpiryAllowsRedispatch(t *testing.
 	cm.leaderState.pendingVerify = []*verifyFuture{vf1, vf2}
 	cm.mu.Unlock()
 	tr.release <- struct{}{}
-	waitFor(t, "подавление перерассылки окном", inmemRPCTimeout, func() bool {
+	waitFor(t, "подавление перерассылки окном", _inmemRPCTimeout, func() bool {
 		_, sup := cm.redispatchCounters()
 		return sup >= 1 && !cm.inflightAELoaded(1)
 	})
@@ -261,7 +261,7 @@ func TestVerifyRedispatchThrottle_AC3_IntervalExpiryAllowsRedispatch(t *testing.
 	}
 
 	// Ждём истечения интервала.
-	waitFor(t, "истечение интервала троттлинга", inmemRPCTimeout, func() bool {
+	waitFor(t, "истечение интервала троттлинга", _inmemRPCTimeout, func() bool {
 		return time.Since(windowStart) >= interval
 	})
 
@@ -269,7 +269,7 @@ func TestVerifyRedispatchThrottle_AC3_IntervalExpiryAllowsRedispatch(t *testing.
 	// verify эпохи 3, поставленный после отправки — завершение AE обязано
 	// перерасслать (окно свободно).
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	waitFor(t, "свежий AppendEntries в полёте", inmemRPCTimeout, func() bool {
+	waitFor(t, "свежий AppendEntries в полёте", _inmemRPCTimeout, func() bool {
 		return tr.calls.Load() >= 3
 	})
 	vf3 := newPendingVerify(3)
@@ -278,7 +278,7 @@ func TestVerifyRedispatchThrottle_AC3_IntervalExpiryAllowsRedispatch(t *testing.
 	cm.leaderState.pendingVerify = []*verifyFuture{vf3}
 	cm.mu.Unlock()
 	tr.release <- struct{}{}
-	waitFor(t, "перерассылка после истечения интервала", inmemRPCTimeout, func() bool {
+	waitFor(t, "перерассылка после истечения интервала", _inmemRPCTimeout, func() bool {
 		rd, _ := cm.redispatchCounters()
 		return rd >= 2
 	})
@@ -289,7 +289,7 @@ func TestVerifyRedispatchThrottle_AC3_IntervalExpiryAllowsRedispatch(t *testing.
 
 	// Дренируем последнюю перерассылку в полёте.
 	tr.release <- struct{}{}
-	waitFor(t, "горутина перерассылки завершилась", inmemRPCTimeout, func() bool {
+	waitFor(t, "горутина перерассылки завершилась", _inmemRPCTimeout, func() bool {
 		return !cm.inflightAELoaded(1)
 	})
 }
@@ -346,7 +346,7 @@ func TestVerifyRedispatchThrottle_AC5_FrequencyBound(t *testing.T) {
 
 	// Стартовый AppendEntries в полёте (dispatchEpoch = 0).
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	waitFor(t, "стартовый AppendEntries в полёте", inmemRPCTimeout, func() bool {
+	waitFor(t, "стартовый AppendEntries в полёте", _inmemRPCTimeout, func() bool {
 		return tr.calls.Load() >= 1
 	})
 
@@ -361,7 +361,7 @@ func TestVerifyRedispatchThrottle_AC5_FrequencyBound(t *testing.T) {
 		// Освобождаем завершающийся AE: defer либо перерассылает (окно истекло),
 		// либо подавляет (окно занято).
 		tr.release <- struct{}{}
-		waitFor(t, "перерассылка либо завершение горутины", inmemRPCTimeout, func() bool {
+		waitFor(t, "перерассылка либо завершение горутины", _inmemRPCTimeout, func() bool {
 			return tr.calls.Load() >= int32(epoch+1) || !cm.inflightAELoaded(1)
 		})
 		// Если горутина завершилась без перерассылки (подавление окном) —
@@ -380,7 +380,7 @@ func TestVerifyRedispatchThrottle_AC5_FrequencyBound(t *testing.T) {
 	cm.mu.Unlock()
 	if cm.inflightAELoaded(1) {
 		tr.release <- struct{}{}
-		waitFor(t, "дренаж горутины репликации", inmemRPCTimeout, func() bool {
+		waitFor(t, "дренаж горутины репликации", _inmemRPCTimeout, func() bool {
 			return !cm.inflightAELoaded(1)
 		})
 	}

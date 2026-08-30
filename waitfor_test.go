@@ -42,8 +42,8 @@ func TestWaitFor_ConditionAlreadyTrue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("waitFor returned %v, want nil", err)
 	}
-	if elapsed > pollInterval {
-		t.Fatalf("waitFor took %v, want immediate return (<= %v)", elapsed, pollInterval)
+	if elapsed > _pollInterval {
+		t.Fatalf("waitFor took %v, want immediate return (<= %v)", elapsed, _pollInterval)
 	}
 }
 
@@ -181,7 +181,7 @@ func TestCommittedOn_IgnoresDisconnected(t *testing.T) {
 }
 
 // TestWaitCond_Immediate: условие, истинное с самого начала, — возврат nil
-// без единой паузы опроса (элапс не превышает pollInterval).
+// без единой паузы опроса (элапс не превышает _pollInterval).
 func TestWaitCond_Immediate(t *testing.T) {
 	start := time.Now()
 	err := waitCond("always true", time.Second, func() bool { return true }, nil)
@@ -190,15 +190,15 @@ func TestWaitCond_Immediate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("waitCond returned %v, want nil", err)
 	}
-	if elapsed > pollInterval {
-		t.Fatalf("waitCond took %v, want immediate return (<= %v)", elapsed, pollInterval)
+	if elapsed > _pollInterval {
+		t.Fatalf("waitCond took %v, want immediate return (<= %v)", elapsed, _pollInterval)
 	}
 }
 
 // TestWaitCond_TimeoutWithDiag: условие никогда не истинно — ошибка
 // по исчерпании бюджета; текст содержит desc и результат diag.
 func TestWaitCond_TimeoutWithDiag(t *testing.T) {
-	budget := 3 * pollInterval
+	budget := 3 * _pollInterval
 	start := time.Now()
 	err := waitCond("counter reaches 5", budget, func() bool { return false }, func() string {
 		return "counter=3"
@@ -221,7 +221,7 @@ func TestWaitCond_TimeoutWithDiag(t *testing.T) {
 
 // TestWaitCond_NilDiag: diag == nil не приводит к панике при таймауте.
 func TestWaitCond_NilDiag(t *testing.T) {
-	err := waitCond("never true", 2*pollInterval, func() bool { return false }, nil)
+	err := waitCond("never true", 2*_pollInterval, func() bool { return false }, nil)
 	if err == nil {
 		t.Fatal("waitCond returned nil, want timeout error")
 	}
@@ -259,7 +259,7 @@ func TestCheckSingleLeader_SameTermFails(t *testing.T) {
 	h.cluster[2] = newFollowerDouble(2, 5)
 
 	start := time.Now()
-	_, _, err := h.pollSingleLeader(singleLeaderBudget)
+	_, _, err := h.pollSingleLeader(_singleLeaderBudget)
 	elapsed := time.Since(start)
 
 	if err == nil {
@@ -268,8 +268,8 @@ func TestCheckSingleLeader_SameTermFails(t *testing.T) {
 	if want := "servers 0 and 1 both think they're leaders in term 5"; !strings.Contains(err.Error(), want) {
 		t.Errorf("error %q does not contain %q", err, want)
 	}
-	if elapsed > pollInterval {
-		t.Fatalf("pollSingleLeader took %v, want immediate return (<= %v)", elapsed, pollInterval)
+	if elapsed > _pollInterval {
+		t.Fatalf("pollSingleLeader took %v, want immediate return (<= %v)", elapsed, _pollInterval)
 	}
 }
 
@@ -285,13 +285,13 @@ func TestCheckSingleLeader_DifferentTermsConverge(t *testing.T) {
 
 	// После нескольких опросов призрачный лидер уходит в step-down.
 	go func() {
-		time.Sleep(2 * pollInterval)
+		time.Sleep(2 * _pollInterval)
 		h.cluster[0].mu.Lock()
 		h.cluster[0].cmState.state = Follower
 		h.cluster[0].mu.Unlock()
 	}()
 
-	id, term, err := h.pollSingleLeader(singleLeaderBudget)
+	id, term, err := h.pollSingleLeader(_singleLeaderBudget)
 	if err != nil {
 		t.Fatalf("pollSingleLeader returned %v, want nil", err)
 	}
@@ -308,7 +308,7 @@ func TestCheckSingleLeader_MultiplePersistsFails(t *testing.T) {
 	h.cluster[0] = newLeaderDouble(0, 4)
 	h.cluster[1] = newLeaderDouble(1, 5)
 
-	_, _, err := h.pollSingleLeader(3 * pollInterval)
+	_, _, err := h.pollSingleLeader(3 * _pollInterval)
 	if err == nil {
 		t.Fatal("pollSingleLeader returned nil error with persistent multiple leaders; want budget exhaustion")
 	}
@@ -325,7 +325,7 @@ func TestCheckSingleLeader_NoLeaderFails(t *testing.T) {
 		h.cluster[i] = newFollowerDouble(i, 1)
 	}
 
-	_, _, err := h.pollSingleLeader(3 * pollInterval)
+	_, _, err := h.pollSingleLeader(3 * _pollInterval)
 	if err == nil {
 		t.Fatal("pollSingleLeader returned nil error with no leaders; want budget exhaustion")
 	}
@@ -372,7 +372,7 @@ func TestWaitForApplyInflight(t *testing.T) {
 
 	inflightBefore := h.applyInflightCount(lid)
 	future := h.cluster[lid].Apply(42, 0)
-	h.waitForApplyInflight(lid, inflightBefore+1, commitBudgetSteady)
+	h.waitForApplyInflight(lid, inflightBefore+1, _commitBudgetSteady)
 
 	// Возвращаем связность, чтобы future разрешился и тест не оставил
 	// висящих ожиданий.

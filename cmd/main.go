@@ -25,11 +25,11 @@ const (
 	MinimalDuration = 500
 	Try             = 4096
 
-	// pprofReadHeaderTimeout — предельное время чтения заголовков запроса
+	// _pprofReadHeaderTimeout — предельное время чтения заголовков запроса
 	// сервером профилирования.
-	pprofReadHeaderTimeout = 5 * time.Second
-	// pprofShutdownTimeout — предельное время остановки сервера профилирования.
-	pprofShutdownTimeout = 5 * time.Second
+	_pprofReadHeaderTimeout = 5 * time.Second
+	// _pprofShutdownTimeout — предельное время остановки сервера профилирования.
+	_pprofShutdownTimeout = 5 * time.Second
 )
 
 func main() {
@@ -49,7 +49,7 @@ func run() error {
 	select {} // работа узла до завершения процесса
 }
 
-var wg sync.WaitGroup
+var _wg sync.WaitGroup
 
 // runWith создаёт и запускает узел с заданными параметрами values и
 // возвращает stop-функцию для корректного завершения узла
@@ -97,11 +97,11 @@ func runWith(values *config.Values) (func(), error) {
 		},
 	}
 	kvs := kvservice.New(&cfg, ready)
-	wg.Add(len(nums) / 2)
+	_wg.Add(len(nums) / 2)
 	for _, num := range nums {
 		go connect(num, kvs, values, nums)
 	}
-	wg.Wait()
+	_wg.Wait()
 	close(ready)
 	if err := kvs.ServeHTTP(values.HTTPAddress.String()); err != nil {
 		if shutdownErr := kvs.Shutdown(); shutdownErr != nil {
@@ -137,7 +137,7 @@ func startPprof(values *config.Values) func() {
 	server := &http.Server{
 		Addr:              values.PprofAddress,
 		Handler:           pprofMux(),
-		ReadHeaderTimeout: pprofReadHeaderTimeout,
+		ReadHeaderTimeout: _pprofReadHeaderTimeout,
 	}
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -147,7 +147,7 @@ func startPprof(values *config.Values) func() {
 	log.Printf("profiling server is available at %s", values.PprofAddress)
 
 	return func() {
-		ctx, cancel := context.WithTimeout(context.Background(), pprofShutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), _pprofShutdownTimeout)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
 			log.Printf("warning: shutting down profiling server: %v", err)
@@ -169,8 +169,8 @@ func pprofMux() *http.ServeMux {
 }
 
 var (
-	count int
-	mu    sync.Mutex
+	_count int
+	_mu    sync.Mutex
 )
 
 func connect(n int, kvs *kvservice.KVService, values *config.Values, nums []int) {
@@ -184,10 +184,10 @@ func connect(n int, kvs *kvservice.KVService, values *config.Values, nums []int)
 	}
 	if err != nil {
 		log.Printf("warning connect to peer %d: error: %v", n, err)
-	} else if count < len(nums)/2 {
-		mu.Lock()
-		count++
-		wg.Done()
-		mu.Unlock()
+	} else if _count < len(nums)/2 {
+		_mu.Lock()
+		_count++
+		_wg.Done()
+		_mu.Unlock()
 	}
 }

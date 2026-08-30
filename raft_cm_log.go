@@ -136,7 +136,7 @@ func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 	// кворум, не наращивает журнал неограниченно. Это ограничение ущерба, а не
 	// протокольная гарантия, и действует только на клиентском пути — служебные
 	// записи идут через dispatchLogsUnsafe и лимитом не проверяются.
-	if room := maxUncommittedEntries - cm.uncommittedLogLenLocked(); room < len(applyLogs) {
+	if room := _maxUncommittedEntries - cm.uncommittedLogLenLocked(); room < len(applyLogs) {
 		if room < 0 {
 			room = 0
 		}
@@ -170,7 +170,7 @@ func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 	savedCommitIndex := cm.cmState.commitIndex
 	newCommitIdx := cm.leaderState.commitmentTracker.getCommitIndex()
 	if newCommitIdx > cm.cmState.commitIndex {
-		cm.traceLockedLogf(traceLevelProgress, "leader sets commitIndex := %d", newCommitIdx)
+		cm.traceLockedLogf(_traceLevelProgress, "leader sets commitIndex := %d", newCommitIdx)
 		cm.cmState.commitIndex = newCommitIdx
 	}
 	newCommitIndex := cm.cmState.commitIndex

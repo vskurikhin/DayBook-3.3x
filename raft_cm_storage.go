@@ -14,11 +14,11 @@ import (
 // персистентности: изменение ключа делает уже записанные данные
 // нечитаемыми без переименования файлов.
 const (
-	storageKeyCurrentTerm       = "currentTerm"
-	storageKeyVotedFor          = "votedFor"
-	storageKeyLog               = "log"
-	storageKeyLastSnapshotIndex = "lastSnapshotIndex"
-	storageKeyLastSnapshotTerm  = "lastSnapshotTerm"
+	_storageKeyCurrentTerm       = "currentTerm"
+	_storageKeyVotedFor          = "votedFor"
+	_storageKeyLog               = "log"
+	_storageKeyLastSnapshotIndex = "lastSnapshotIndex"
+	_storageKeyLastSnapshotTerm  = "lastSnapshotTerm"
 )
 
 // persistToStorage сохраняет постоянное состояние CM в cm.storage.
@@ -39,38 +39,38 @@ func (cm *ConsensusModule) persistToStorage() {
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
-		cm.traceLockedLogf(traceLevelProgress, "persistToStorage elapsed %s", elapsed)
+		cm.traceLockedLogf(_traceLevelProgress, "persistToStorage elapsed %s", elapsed)
 	}()
 	var termData bytes.Buffer
 	if err := gob.NewEncoder(&termData).Encode(cm.cmState.currentTerm); err != nil {
 		log.Fatal(err)
 	}
-	cm.storage.Set(storageKeyCurrentTerm, termData.Bytes())
+	cm.storage.Set(_storageKeyCurrentTerm, termData.Bytes())
 
 	var votedData bytes.Buffer
 	if err := gob.NewEncoder(&votedData).Encode(cm.cmState.votedFor); err != nil {
 		log.Fatal(err)
 	}
-	cm.storage.Set(storageKeyVotedFor, votedData.Bytes())
+	cm.storage.Set(_storageKeyVotedFor, votedData.Bytes())
 
 	var snapIdxData bytes.Buffer
 	if err := gob.NewEncoder(&snapIdxData).Encode(cm.cmState.lastSnapshotIndex); err != nil {
 		log.Fatal(err)
 	}
-	cm.storage.Set(storageKeyLastSnapshotIndex, snapIdxData.Bytes())
+	cm.storage.Set(_storageKeyLastSnapshotIndex, snapIdxData.Bytes())
 
 	var snapTermData bytes.Buffer
 	if err := gob.NewEncoder(&snapTermData).Encode(cm.cmState.lastSnapshotTerm); err != nil {
 		log.Fatal(err)
 	}
-	cm.storage.Set(storageKeyLastSnapshotTerm, snapTermData.Bytes())
+	cm.storage.Set(_storageKeyLastSnapshotTerm, snapTermData.Bytes())
 
 	if cm.cmState.logNeedsPersist {
 		var logData bytes.Buffer
 		if err := gob.NewEncoder(&logData).Encode(cm.cmState.log); err != nil {
 			log.Fatal(err)
 		}
-		cm.storage.Set(storageKeyLog, logData.Bytes())
+		cm.storage.Set(_storageKeyLog, logData.Bytes())
 		cm.cmState.logNeedsPersist = false
 	}
 }
@@ -79,7 +79,7 @@ func (cm *ConsensusModule) persistToStorage() {
 // из хранилища. Должен вызываться в конструкторе до запуска какой-либо
 // конкурентной работы.
 func (cm *ConsensusModule) restoreFromStorage() {
-	termData, found := cm.storage.Get(storageKeyCurrentTerm)
+	termData, found := cm.storage.Get(_storageKeyCurrentTerm)
 	if !found {
 		log.Fatal("currentTerm not found in storage")
 	}
@@ -87,7 +87,7 @@ func (cm *ConsensusModule) restoreFromStorage() {
 	if err := d.Decode(&cm.cmState.currentTerm); err != nil {
 		log.Fatal(err)
 	}
-	votedData, found := cm.storage.Get(storageKeyVotedFor)
+	votedData, found := cm.storage.Get(_storageKeyVotedFor)
 	if !found {
 		log.Fatal("votedFor not found in storage")
 	}
@@ -95,7 +95,7 @@ func (cm *ConsensusModule) restoreFromStorage() {
 	if err := d.Decode(&cm.cmState.votedFor); err != nil {
 		log.Fatal(err)
 	}
-	logData, found := cm.storage.Get(storageKeyLog)
+	logData, found := cm.storage.Get(_storageKeyLog)
 	if !found {
 		log.Fatal("log not found in storage")
 	}
@@ -111,13 +111,13 @@ func (cm *ConsensusModule) restoreFromStorage() {
 
 	cm.rebuildConfigurations()
 
-	if snapIdxData, found := cm.storage.Get(storageKeyLastSnapshotIndex); found {
+	if snapIdxData, found := cm.storage.Get(_storageKeyLastSnapshotIndex); found {
 		d := gob.NewDecoder(bytes.NewBuffer(snapIdxData))
 		if err := d.Decode(&cm.cmState.lastSnapshotIndex); err != nil {
 			log.Fatal(err)
 		}
 	}
-	if snapTermData, found := cm.storage.Get(storageKeyLastSnapshotTerm); found {
+	if snapTermData, found := cm.storage.Get(_storageKeyLastSnapshotTerm); found {
 		d := gob.NewDecoder(bytes.NewBuffer(snapTermData))
 		if err := d.Decode(&cm.cmState.lastSnapshotTerm); err != nil {
 			log.Fatal(err)
@@ -137,13 +137,13 @@ func (cm *ConsensusModule) checkSnapshotKeysConsistency() error {
 		return nil
 	}
 	firstIndex := cm.cmState.log[0].Index
-	if _, found := cm.storage.Get(storageKeyLastSnapshotIndex); !found {
+	if _, found := cm.storage.Get(_storageKeyLastSnapshotIndex); !found {
 		return fmt.Errorf(
 			"log compacted (first index %d) but lastSnapshotIndex missing in storage",
 			firstIndex,
 		)
 	}
-	if _, found := cm.storage.Get(storageKeyLastSnapshotTerm); !found {
+	if _, found := cm.storage.Get(_storageKeyLastSnapshotTerm); !found {
 		return fmt.Errorf(
 			"log compacted (first index %d) but lastSnapshotTerm missing in storage",
 			firstIndex,

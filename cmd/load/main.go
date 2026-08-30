@@ -23,59 +23,59 @@ const (
 	// RequestTimeout — предельное время одной операции сценария нагрузки.
 	RequestTimeout = 10 * time.Second
 
-	// latencyPrealloc — начальная ёмкость накопителей времени ответа.
-	latencyPrealloc = 4096
+	// _latencyPrealloc — начальная ёмкость накопителей времени ответа.
+	_latencyPrealloc = 4096
 
-	// traceLogLevelEnv — переменная окружения с уровнем трассировки узлов
+	// _traceLogLevelEnv — переменная окружения с уровнем трассировки узлов
 	// кластера; уровень фиксируется в статистике прогона, поскольку
 	// сравнивать прогоны на разных уровнях нельзя.
-	traceLogLevelEnv = "TRACE_LOG_LEVEL"
+	_traceLogLevelEnv = "TRACE_LOG_LEVEL"
 
-	// fillerAlphabet — символы, которыми значение дополняется до заданного
+	// _fillerAlphabet — символы, которыми значение дополняется до заданного
 	// размера.
-	fillerAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+	_fillerAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
 // errRequestRate — темп меньше одного тика в секунду не поддерживается.
 var errRequestRate = errors.New("invalid -request-rate: must be >= 1")
 
 var (
-	keys []string
+	_keys []string
 
-	getOK     atomic.Uint64
-	getFail   atomic.Uint64
-	putOK     atomic.Uint64
-	putFail   atomic.Uint64
-	verifyOK  atomic.Uint64
-	verifyBad atomic.Uint64
+	_getOK     atomic.Uint64
+	_getFail   atomic.Uint64
+	_putOK     atomic.Uint64
+	_putFail   atomic.Uint64
+	_verifyOK  atomic.Uint64
+	_verifyBad atomic.Uint64
 
-	// getDone, putDone, verifyDone — завершённые операции. Каждая выполненная
+	// _getDone, _putDone, _verifyDone — завершённые операции. Каждая выполненная
 	// операция увеличивает ровно один счётчик ровно один раз, включая пути
 	// ошибок.
-	getDone    atomic.Uint64
-	putDone    atomic.Uint64
-	verifyDone atomic.Uint64
+	_getDone    atomic.Uint64
+	_putDone    atomic.Uint64
+	_verifyDone atomic.Uint64
 
-	// dropped — тики, пришедшие при исчерпанной одновременности: заданный
+	// _dropped — тики, пришедшие при исчерпанной одновременности: заданный
 	// темп не достигнут.
-	dropped atomic.Uint64
+	_dropped atomic.Uint64
 
-	// latencyDropped — измерения, которые не удалось сохранить. Ненулевое
+	// _latencyDropped — измерения, которые не удалось сохранить. Ненулевое
 	// значение делает прогон непригодным как базовая линия.
-	latencyDropped atomic.Uint64
+	_latencyDropped atomic.Uint64
 
-	getLatency = newLatencyRecorder(latencyPrealloc, 0)
-	putLatency = newLatencyRecorder(latencyPrealloc, 0)
+	_getLatency = newLatencyRecorder(_latencyPrealloc, 0)
+	_putLatency = newLatencyRecorder(_latencyPrealloc, 0)
 
-	values config.Values
+	_values config.Values
 )
 
 //nolint:gochecknoinits
 func init() {
-	values = config.ParseFlags()
-	keys = make([]string, values.KeyCount)
-	for i := range keys {
-		keys[i] = fmt.Sprintf("key-%d", i)
+	_values = config.ParseFlags()
+	_keys = make([]string, _values.KeyCount)
+	for i := range _keys {
+		_keys[i] = fmt.Sprintf("key-%d", i)
 	}
 }
 
@@ -89,12 +89,12 @@ func main() {
 // runLoad проверяет параметры прогона, порождает запросы до отмены и печатает
 // итоговую статистику.
 func runLoad() error {
-	interval, err := tickInterval(values.RequestRate)
+	interval, err := tickInterval(_values.RequestRate)
 	if err != nil {
 		return err
 	}
-	peers := make([]string, 0, len(values.Peers))
-	for _, peer := range values.Peers {
+	peers := make([]string, 0, len(_values.Peers))
+	for _, peer := range _values.Peers {
 		peers = append(peers, peer.String())
 	}
 	client := kvclient.New(peers)
@@ -105,8 +105,8 @@ func runLoad() error {
 		syscall.SIGTERM,
 	)
 	defer cancel()
-	if values.Duration > 0 {
-		durationCtx, durationCancel := context.WithTimeout(ctx, values.Duration)
+	if _values.Duration > 0 {
+		durationCtx, durationCancel := context.WithTimeout(ctx, _values.Duration)
 		defer durationCancel()
 		ctx = durationCtx
 	}
@@ -117,7 +117,7 @@ func runLoad() error {
 		defer wg.Done()
 		stats(ctx)
 	}()
-	generate(ctx, client, interval, values.Concurrency)
+	generate(ctx, client, interval, _values.Concurrency)
 	wg.Wait()
 	summary()
 	return nil
@@ -135,7 +135,7 @@ func tickInterval(rate int) (time.Duration, error) {
 // generate порождает операции по тикам тикера. Тик задаёт момент старта
 // запроса, сам запрос выполняется в отдельной горутине; одновременность
 // ограничена ёмкостью семафора. Тик при занятом семафоре учитывается
-// счётчиком dropped. Возврат происходит после завершения всех начатых
+// счётчиком _dropped. Возврат происходит после завершения всех начатых
 // запросов.
 func generate(ctx context.Context, client *kvclient.KVClient, interval time.Duration, concurrency int) {
 	ticker := time.NewTicker(interval)
@@ -162,7 +162,7 @@ func generate(ctx context.Context, client *kvclient.KVClient, interval time.Dura
 					run(reqCtx, client)
 				}()
 			default:
-				dropped.Add(1)
+				_dropped.Add(1)
 			}
 		}
 	}
@@ -170,23 +170,23 @@ func generate(ctx context.Context, client *kvclient.KVClient, interval time.Dura
 
 // run выполняет одну операцию сценария нагрузки и учитывает её результат.
 func run(ctx context.Context, client *kvclient.KVClient) {
-	key := keys[rand.Intn(len(keys))]
-	if rand.Intn(100) < values.GetPercent {
+	key := _keys[rand.Intn(len(_keys))]
+	if rand.Intn(100) < _values.GetPercent {
 		get(ctx, client, key)
 		return
 	}
-	value := makeValue(key, values.ValueSize)
+	value := makeValue(key, _values.ValueSize)
 	start := time.Now()
 	_, _, err := client.Put(ctx, key, value)
-	observe(putLatency, time.Since(start))
-	putDone.Add(1)
+	observe(_putLatency, time.Since(start))
+	_putDone.Add(1)
 	if err != nil {
-		putFail.Add(1)
+		_putFail.Add(1)
 		fmt.Printf("PUT: %v\n", err)
 		return
 	}
-	putOK.Add(1)
-	if rand.Intn(100) < values.VerifyPercent {
+	_putOK.Add(1)
+	if rand.Intn(100) < _values.VerifyPercent {
 		verify(ctx, client, key, value)
 	}
 }
@@ -195,14 +195,14 @@ func run(ctx context.Context, client *kvclient.KVClient) {
 func get(ctx context.Context, client *kvclient.KVClient, key string) {
 	start := time.Now()
 	_, _, err := client.Get(ctx, key)
-	observe(getLatency, time.Since(start))
-	getDone.Add(1)
+	observe(_getLatency, time.Since(start))
+	_getDone.Add(1)
 	if err != nil {
-		getFail.Add(1)
+		_getFail.Add(1)
 		fmt.Printf("GET: %v\n", err)
 		return
 	}
-	getOK.Add(1)
+	_getOK.Add(1)
 }
 
 // verify перечитывает записанное значение; время чтения учитывается как GET,
@@ -211,13 +211,13 @@ func get(ctx context.Context, client *kvclient.KVClient, key string) {
 func verify(ctx context.Context, client *kvclient.KVClient, key, value string) {
 	start := time.Now()
 	got, found, err := client.Get(ctx, key)
-	observe(getLatency, time.Since(start))
-	verifyDone.Add(1)
+	observe(_getLatency, time.Since(start))
+	_verifyDone.Add(1)
 	if err != nil || !found || got != value {
-		verifyBad.Add(1)
+		_verifyBad.Add(1)
 		return
 	}
-	verifyOK.Add(1)
+	_verifyOK.Add(1)
 }
 
 // makeValue формирует значение размером size байт: детерминированный префикс
@@ -233,23 +233,23 @@ func makeValue(key string, size int) string {
 	value := make([]byte, size)
 	copy(value, prefix)
 	for i := len(prefix); i < size; i++ {
-		value[i] = fillerAlphabet[rand.Intn(len(fillerAlphabet))]
+		value[i] = _fillerAlphabet[rand.Intn(len(_fillerAlphabet))]
 	}
 	return string(value)
 }
 
 // observe сохраняет время выполнения операции. Путь записи не блокирует
 // горутину запроса; отклонённое измерение учитывается счётчиком
-// latencyDropped.
+// _latencyDropped.
 func observe(recorder *latencyRecorder, elapsed time.Duration) {
 	if !recorder.record(elapsed) {
-		latencyDropped.Add(1)
+		_latencyDropped.Add(1)
 	}
 }
 
 // doneTotal — число завершённых операций всех видов.
 func doneTotal() uint64 {
-	return getDone.Load() + putDone.Load() + verifyDone.Load()
+	return _getDone.Load() + _putDone.Load() + _verifyDone.Load()
 }
 
 // stats раз в секунду печатает достигнутую скорость и время ответа операций,
@@ -267,8 +267,8 @@ func stats(ctx context.Context) {
 			done := doneTotal()
 			rps := done - prevDone
 			prevDone = done
-			getSamples, getTotal := getLatency.from(getOffset)
-			putSamples, putTotal := putLatency.from(putOffset)
+			getSamples, getTotal := _getLatency.from(getOffset)
+			putSamples, putTotal := _putLatency.from(putOffset)
 			getOffset, putOffset = getTotal, putTotal
 			recent := make([]time.Duration, 0, len(getSamples)+len(putSamples))
 			recent = append(recent, getSamples...)
@@ -276,14 +276,14 @@ func stats(ctx context.Context) {
 			slices.Sort(recent)
 			slog.Info(fmt.Sprintf(
 				"RPS=%5d  p50=%7.2fms p80=%7.2fms p95=%7.2fms p99=%7.2fms"+
-					"  GET ok=%8d fail=%4d  PUT ok=%8d fail=%4d  VERIFY ok=%6d bad=%4d  dropped=%6d",
+					"  GET ok=%8d fail=%4d  PUT ok=%8d fail=%4d  VERIFY ok=%6d bad=%4d  _dropped=%6d",
 				rps,
 				percentile(recent, 50), percentile(recent, 80),
 				percentile(recent, 95), percentile(recent, 99),
-				getOK.Load(), getFail.Load(),
-				putOK.Load(), putFail.Load(),
-				verifyOK.Load(), verifyBad.Load(),
-				dropped.Load(),
+				_getOK.Load(), _getFail.Load(),
+				_putOK.Load(), _putFail.Load(),
+				_verifyOK.Load(), _verifyBad.Load(),
+				_dropped.Load(),
 			))
 		}
 	}
@@ -292,32 +292,32 @@ func stats(ctx context.Context) {
 // summary печатает параметры прогона, счётчики операций и распределение
 // времени ответа за весь прогон.
 func summary() {
-	getSamples, _ := getLatency.from(0)
-	putSamples, _ := putLatency.from(0)
-	traceLevel := os.Getenv(traceLogLevelEnv)
+	getSamples, _ := _getLatency.from(0)
+	putSamples, _ := _putLatency.from(0)
+	traceLevel := os.Getenv(_traceLogLevelEnv)
 	if traceLevel == "" {
 		traceLevel = "не задан"
 	}
 	slog.Info(fmt.Sprintf(
 		"run: concurrency=%d request-rate=%d value-size=%d duration=%v %s=%s",
-		values.Concurrency, values.RequestRate, values.ValueSize,
-		values.Duration, traceLogLevelEnv, traceLevel,
+		_values.Concurrency, _values.RequestRate, _values.ValueSize,
+		_values.Duration, _traceLogLevelEnv, traceLevel,
 	))
 	slog.Info(fmt.Sprintf(
 		"done: get=%d put=%d verify=%d  GET ok=%d fail=%d  PUT ok=%d fail=%d"+
-			"  VERIFY ok=%d bad=%d  dropped=%d latencyDropped=%d",
-		getDone.Load(), putDone.Load(), verifyDone.Load(),
-		getOK.Load(), getFail.Load(),
-		putOK.Load(), putFail.Load(),
-		verifyOK.Load(), verifyBad.Load(),
-		dropped.Load(), latencyDropped.Load(),
+			"  VERIFY ok=%d bad=%d  _dropped=%d _latencyDropped=%d",
+		_getDone.Load(), _putDone.Load(), _verifyDone.Load(),
+		_getOK.Load(), _getFail.Load(),
+		_putOK.Load(), _putFail.Load(),
+		_verifyOK.Load(), _verifyBad.Load(),
+		_dropped.Load(), _latencyDropped.Load(),
 	))
-	if bad := verifyBad.Load(); bad > 0 {
+	if bad := _verifyBad.Load(); bad > 0 {
 		// Перечитывание после записи не идемпотентно: повтор запроса клиентом
 		// мог записать значение позже проверки, поэтому расхождение требует
 		// разбора и само по себе не означает отказа сервиса.
 		slog.Info(fmt.Sprintf(
-			"verifyBad=%d: value mismatch on re-read, needs review (client retries are not idempotent)",
+			"_verifyBad=%d: value mismatch on re-read, needs review (client retries are not idempotent)",
 			bad,
 		))
 	}

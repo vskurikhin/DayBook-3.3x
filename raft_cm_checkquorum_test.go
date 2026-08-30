@@ -11,7 +11,7 @@ import (
 
 // checkQuorumBudget — запас времени на обнаружение потери кворума:
 // два срока checkQuorumTimeout плюс период тика пульса.
-const checkQuorumBudget = 2*defaultCheckQuorumTimeout + 4*HeartbeatTimeoutMs*time.Millisecond
+const checkQuorumBudget = 2*_defaultCheckQuorumTimeout + 4*HeartbeatTimeoutMs*time.Millisecond
 
 // withCheckQuorumTimeout — опция Harness: срок проверки кворума контактов.
 // Значение «заведомо большее» отключает шаг вниз по потере контакта,
@@ -141,7 +141,7 @@ func TestCheckQuorum_ApplyErrorsAfterStepDown(t *testing.T) {
 
 // TestCheckQuorum_UncommittedLimitBoundsLog — AC-3: при отключённой
 // проверке кворума рост незафиксированного хвоста ограничен
-// maxUncommittedEntries, а команда сверх предела отклоняется.
+// _maxUncommittedEntries, а команда сверх предела отклоняется.
 func TestCheckQuorum_UncommittedLimitBoundsLog(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 	h := NewHarnessWithOptions(t, 3, withCheckQuorumTimeout(time.Hour))
@@ -153,23 +153,23 @@ func TestCheckQuorum_UncommittedLimitBoundsLog(t *testing.T) {
 	h.DisconnectPeer(leaderID)
 
 	// Изолированный лидер фиксацию не продвигает: журнал растёт до предела.
-	for i := 0; i < maxUncommittedEntries+leaderBatchSize; i++ {
+	for i := 0; i < _maxUncommittedEntries+_leaderBatchSize; i++ {
 		leader.Apply(i, time.Second)
-		if uncommittedLogLen(leader) >= maxUncommittedEntries {
+		if uncommittedLogLen(leader) >= _maxUncommittedEntries {
 			break
 		}
 	}
 	if err := waitCond(
 		"uncommitted tail reaches the limit",
 		2*time.Second,
-		func() bool { return uncommittedLogLen(leader) >= maxUncommittedEntries },
+		func() bool { return uncommittedLogLen(leader) >= _maxUncommittedEntries },
 		func() string { return "uncommitted = " + itoa(uncommittedLogLen(leader)) },
 	); err != nil {
 		t.Fatal(err)
 	}
 
-	if got := uncommittedLogLen(leader); got > maxUncommittedEntries {
-		t.Fatalf("uncommitted tail = %d, want <= %d", got, maxUncommittedEntries)
+	if got := uncommittedLogLen(leader); got > _maxUncommittedEntries {
+		t.Fatalf("uncommitted tail = %d, want <= %d", got, _maxUncommittedEntries)
 	}
 	if state := nodeState(leader); state != Leader {
 		t.Fatalf("state = %v, want Leader (check-quorum must be disabled in this test)", state)
@@ -184,8 +184,8 @@ func TestCheckQuorum_UncommittedLimitBoundsLog(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("Apply over the limit was not rejected")
 	}
-	if got := uncommittedLogLen(leader); got > maxUncommittedEntries {
-		t.Fatalf("uncommitted tail = %d, want <= %d", got, maxUncommittedEntries)
+	if got := uncommittedLogLen(leader); got > _maxUncommittedEntries {
+		t.Fatalf("uncommitted tail = %d, want <= %d", got, _maxUncommittedEntries)
 	}
 }
 
@@ -202,16 +202,16 @@ func TestCheckQuorum_ServiceEntriesBypassLimit(t *testing.T) {
 
 	h.DisconnectPeer(leaderID)
 
-	for i := 0; i < maxUncommittedEntries+leaderBatchSize; i++ {
+	for i := 0; i < _maxUncommittedEntries+_leaderBatchSize; i++ {
 		leader.Apply(i, time.Second)
-		if uncommittedLogLen(leader) >= maxUncommittedEntries {
+		if uncommittedLogLen(leader) >= _maxUncommittedEntries {
 			break
 		}
 	}
 	if err := waitCond(
 		"uncommitted tail reaches the limit",
 		2*time.Second,
-		func() bool { return uncommittedLogLen(leader) >= maxUncommittedEntries },
+		func() bool { return uncommittedLogLen(leader) >= _maxUncommittedEntries },
 		func() string { return "uncommitted = " + itoa(uncommittedLogLen(leader)) },
 	); err != nil {
 		t.Fatal(err)
@@ -318,13 +318,13 @@ func TestCheckQuorum_LeadershipRegainedAfterStepDown(t *testing.T) {
 			if err != nil {
 				t.Fatalf("LeadershipTransfer to %d: %v", origLeaderID, err)
 			}
-		case <-time.After(leaderElectionBudget):
+		case <-time.After(_leaderElectionBudget):
 			t.Fatalf("LeadershipTransfer to %d did not complete", origLeaderID)
 		}
 	}
 	if err := waitCond(
 		"original node is leader again",
-		leaderElectionBudget,
+		_leaderElectionBudget,
 		func() bool { return nodeState(orig) == Leader },
 		func() string { return "state = " + nodeState(orig).String() },
 	); err != nil {
@@ -340,7 +340,7 @@ func TestCheckQuorum_LeadershipRegainedAfterStepDown(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Apply on the node that regained leadership: %v", err)
 		}
-	case <-time.After(leaderElectionBudget):
+	case <-time.After(_leaderElectionBudget):
 		t.Fatal("command submitted to the node that regained leadership was not committed")
 	}
 

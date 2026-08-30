@@ -105,22 +105,22 @@ func TestServeMaxPool(t *testing.T) {
 
 // TestDefaultTCPRPCTimeoutBarrier закрепляет контракт дефолтов тайм-аута
 // (AC-1): алиас TCPRPCTimeout несёт то же значение, что и каноническое
-// внутреннее имя defaultTCPRPCTimeout (191 мс), а производная константа
+// внутреннее имя _defaultTCPRPCTimeout (191 мс), а производная константа
 // проверки кворума остаётся ровно двукратной (инвариант 2×RPC на уровне
 // дефолтов, 382 мс).
 func TestDefaultTCPRPCTimeoutBarrier(t *testing.T) {
-	if TCPRPCTimeout != defaultTCPRPCTimeout {
-		t.Fatalf("TCPRPCTimeout = %v, want %v", TCPRPCTimeout, defaultTCPRPCTimeout)
+	if TCPRPCTimeout != _defaultTCPRPCTimeout {
+		t.Fatalf("TCPRPCTimeout = %v, want %v", TCPRPCTimeout, _defaultTCPRPCTimeout)
 	}
-	if defaultTCPRPCTimeout != 191*time.Millisecond {
-		t.Fatalf("defaultTCPRPCTimeout = %v, want 191ms", defaultTCPRPCTimeout)
+	if _defaultTCPRPCTimeout != 191*time.Millisecond {
+		t.Fatalf("_defaultTCPRPCTimeout = %v, want 191ms", _defaultTCPRPCTimeout)
 	}
-	if defaultCheckQuorumTimeout != 382*time.Millisecond {
-		t.Fatalf("defaultCheckQuorumTimeout = %v, want 382ms", defaultCheckQuorumTimeout)
+	if _defaultCheckQuorumTimeout != 382*time.Millisecond {
+		t.Fatalf("_defaultCheckQuorumTimeout = %v, want 382ms", _defaultCheckQuorumTimeout)
 	}
-	if defaultCheckQuorumTimeout != 2*defaultTCPRPCTimeout {
-		t.Fatalf("defaultCheckQuorumTimeout = %v, want 2*defaultTCPRPCTimeout = %v",
-			defaultCheckQuorumTimeout, 2*defaultTCPRPCTimeout)
+	if _defaultCheckQuorumTimeout != 2*_defaultTCPRPCTimeout {
+		t.Fatalf("_defaultCheckQuorumTimeout = %v, want 2*_defaultTCPRPCTimeout = %v",
+			_defaultCheckQuorumTimeout, 2*_defaultTCPRPCTimeout)
 	}
 }
 
@@ -224,8 +224,8 @@ func TestServeSnapshotConfig(t *testing.T) {
 	if s.cm.snapshotThreshold != 100 {
 		t.Fatalf("cm.snapshotThreshold = %d, want 100", s.cm.snapshotThreshold)
 	}
-	if s.cm.trailingLogs != defaultTrailingLogs {
-		t.Fatalf("cm.trailingLogs = %d, want %d", s.cm.trailingLogs, defaultTrailingLogs)
+	if s.cm.trailingLogs != _defaultTrailingLogs {
+		t.Fatalf("cm.trailingLogs = %d, want %d", s.cm.trailingLogs, _defaultTrailingLogs)
 	}
 }
 

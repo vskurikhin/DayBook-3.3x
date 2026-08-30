@@ -212,13 +212,13 @@ func TestLeaderSendAEs_Deduplication(t *testing.T) {
 	cm.leaderState.inflightAE[1].Store(false)
 	cm.leaderSendAEs()
 
-	deadline := time.Now().Add(inmemRPCTimeout)
+	deadline := time.Now().Add(_inmemRPCTimeout)
 	for mock.callCount.Load() == 0 {
 		if !time.Now().Before(deadline) {
 			t.Fatalf("expected AppendEntries call after inflightAE reset within %v, got 0",
-				inmemRPCTimeout)
+				_inmemRPCTimeout)
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 }
 
@@ -285,7 +285,7 @@ func TestInflightAE_DeferReset(t *testing.T) {
 //  1. ConsensusModule в состоянии Leader, lastSnapshotIndex = 3, журнал
 //     начинается после снимка (запись с индексом 4), nextIndex[1] = 3.
 //  2. Установить inflightAE[1] = true.
-//  3. Вызвать leaderSendAEsToPeer — предикат плана даёт replicationSnapshot
+//  3. Вызвать leaderSendAEsToPeer — предикат плана даёт _replicationSnapshot
 //     (prev = 2: 0 <= 2, 2 != lastSnapshotIndex = 3, 2 < first = 4), поэтому
 //     исполняется путь снимка (leaderSendSnapshot).
 //  4. Проверить, что InstallSnapshot действительно вызван (installCallCount

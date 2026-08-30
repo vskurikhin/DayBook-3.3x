@@ -557,12 +557,12 @@ func TestApplyInflightOnLeaderCrash(t *testing.T) {
 	}
 	// keep-класс (группа C: не commit-ожидание), но состояние
 	// наблюдаемо напрямую — ждём фактической изоляции лидера.
-	h.waitForIsolated(origLeaderId, commitBudgetSteady)
+	h.waitForIsolated(origLeaderId, _commitBudgetSteady)
 
 	inflightBefore := h.applyInflightCount(origLeaderId)
 	future := h.cluster[origLeaderId].Apply(42, 0)
 	// Ждём, пока runLeaderLoop поместит future в inflight, — до CrashPeer.
-	h.waitForApplyInflight(origLeaderId, inflightBefore+1, commitBudgetSteady)
+	h.waitForApplyInflight(origLeaderId, inflightBefore+1, _commitBudgetSteady)
 	h.CrashPeer(origLeaderId)
 
 	if err := future.Error(); err != ErrLeadershipLost && err != ErrRaftShutdown {
@@ -601,12 +601,12 @@ func TestApplyNoQuorumThenNewLeader(t *testing.T) {
 	h.DisconnectPeer((lid + 2) % 3)
 	// keep-класс (не commit-ожидание): состояние наблюдаемо — ждём
 	// фактической изоляции лидера.
-	h.waitForIsolated(lid, commitBudgetSteady)
+	h.waitForIsolated(lid, _commitBudgetSteady)
 
 	inflightBefore := h.applyInflightCount(lid)
 	future := h.cluster[lid].Apply(42, 0)
 	// Ждём, пока Apply попадёт в inflight лидера.
-	h.waitForApplyInflight(lid, inflightBefore+1, commitBudgetSteady)
+	h.waitForApplyInflight(lid, inflightBefore+1, _commitBudgetSteady)
 
 	// Force the leader to step down by sending AppendEntries with a higher term.
 	// This simulates a new leader being elected (in a higher term) without needing

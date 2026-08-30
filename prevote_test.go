@@ -41,13 +41,13 @@ func TestPreVote_DisconnectedFollower_NoElection(t *testing.T) {
 	h.DisconnectPeer(otherID)
 
 	// keep: budgeted negative window — проверяется, что за целый
-	// worst-case election timeout (maxElectionTimeout = 2*ReelectionTimeoutMs)
+	// worst-case election timeout (_maxElectionTimeout = 2*ReelectionTimeoutMs)
 	// отключённый узел НЕ увеличил term и не сменил лидера. Опрос
 	// не доказывает отсутствия события — окно осознанно временное;
 	// его уменьшение ослабило бы assert.
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
-	time.Sleep(maxElectionTimeout)
+	time.Sleep(_maxElectionTimeout)
 	newLid, newTerm := h.CheckSingleLeader()
 	if newLid != lid {
 		t.Errorf("leader changed from %d to %d, want same", lid, newLid)
@@ -80,7 +80,7 @@ func TestPreVote_CrashedLeader_NewElection(t *testing.T) {
 	h.CheckNoLeader()
 
 	// replace: позитивное ожидание — CheckSingleLeader сам опрашивает
-	// состояние до leaderElectionBudget (worst-case выборов), поэтому
+	// состояние до _leaderElectionBudget (worst-case выборов), поэтому
 	// отдельная фиксированная пауза не нужна.
 	newLid, _ := h.CheckSingleLeader()
 	if newLid == lid {
@@ -112,9 +112,9 @@ func TestPreVote_MajorityPartition(t *testing.T) {
 	h.DisconnectPeer(otherID)
 
 	// keep: budgeted negative window — за worst-case election timeout
-	// (maxElectionTimeout) minority не должен ни выиграть выборы,
+	// (_maxElectionTimeout) minority не должен ни выиграть выборы,
 	// ни увеличить term. Окно осознанно временное (см. выше).
-	time.Sleep(maxElectionTimeout)
+	time.Sleep(_maxElectionTimeout)
 	newLid, newTerm := h.CheckSingleLeader()
 	if newLid == otherID {
 		t.Errorf("minority node became leader, want majority")
@@ -194,14 +194,14 @@ func TestPreVote_Disabled(t *testing.T) {
 	// replace: позитивное ожидание — poll GetTerm с дедлайном вместо
 	// фиксированной паузы. В классическом Raft отключённый узел
 	// увеличивает term на каждом election timeout.
-	deadline := time.Now().Add(commitBudgetAfterFailover)
+	deadline := time.Now().Add(_commitBudgetAfterFailover)
 	disconnectedTerm := h.GetTerm(otherID)
 	for disconnectedTerm <= origTerm {
 		if !time.Now().Before(deadline) {
 			t.Fatalf("disconnected node term = %d, want > %d within %v",
-				disconnectedTerm, origTerm, commitBudgetAfterFailover)
+				disconnectedTerm, origTerm, _commitBudgetAfterFailover)
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 		disconnectedTerm = h.GetTerm(otherID)
 	}
 }

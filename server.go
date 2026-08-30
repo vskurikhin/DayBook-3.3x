@@ -43,7 +43,7 @@ type Config struct {
 	Fsm FSM
 
 	// MaxPool — максимальное количество соединений в пуле на один целевой
-	// адрес (0 = defaultMaxPool).
+	// адрес (0 = _defaultMaxPool).
 	MaxPool int
 
 	// SnapshotInterval — интервал проверки необходимости снимка
@@ -90,7 +90,7 @@ func NewServer(serverID int, peerIds []int, fsm FSM, ready <-chan any) *Server {
 		Fsm:           fsm,
 		PeerIds:       peerIds,
 		Storage:       NewMapStorage(),
-		TCPRPCTimeout: defaultTCPRPCTimeout,
+		TCPRPCTimeout: _defaultTCPRPCTimeout,
 	}, ready)
 }
 
@@ -121,7 +121,7 @@ func (s *Server) Serve(address string) {
 		if threshold <= 0 {
 			threshold = DefaultSnapshotThreshold
 		}
-		s.cm.SetSnapshotConfig(threshold, interval, defaultTrailingLogs)
+		s.cm.SetSnapshotConfig(threshold, interval, _defaultTrailingLogs)
 	}
 }
 

@@ -188,7 +188,7 @@ func TestLeadershipTransfer_ToUnknown_Fails(t *testing.T) {
 // Нижняя граница окна: ветка догоняющей репликации завершается только
 // по таймауту electionTimeout() >= ReelectionTimeoutMs = 381 мс, всё это
 // время флаг leadershipTransferInProgress удерживается — запас относительно
-// pollInterval не ниже 38x.
+// _pollInterval не ниже 38x.
 //
 // Верхняя граница окна: догоняющая репликация выполняется синхронно в цикле
 // лидера и блокирует его, поэтому рассылка пульсов единственному оставшемуся
@@ -197,7 +197,7 @@ func TestLeadershipTransfer_ToUnknown_Fails(t *testing.T) {
 // начала окна (его таймер выборов отсчитывается от последнего пульса, который
 // мог прийти не позднее чем за период пульса до начала окна). Следовательно
 // окно гарантированно живёт не меньше 348 мс при любом розыгрыше таймеров,
-// а флаг наблюдается не позднее чем через pollInterval = 10 мс после
+// а флаг наблюдается не позднее чем через _pollInterval = 10 мс после
 // установки — запас до гарантированного закрытия окна не меньше 338 мс.
 //
 // Восстановление связности цели в конце теста не требуется: Shutdown
@@ -221,7 +221,7 @@ func TestLeadershipTransfer_Concurrent_SecondFails(t *testing.T) {
 	// не получила, поэтому nextIndex[target] <= lastLogIndex и первая
 	// передача обязана войти в ветку догоняющей репликации.
 	h.SubmitToServer(origLeaderID, 100)
-	h.WaitForCommitBudget(100, 2, commitBudgetSteady)
+	h.WaitForCommitBudget(100, 2, _commitBudgetSteady)
 
 	// Первая передача — в горутине со структурированным жизненным циклом:
 	// буферизованный канал ёмкости 1, join до конца теста.
@@ -231,7 +231,7 @@ func TestLeadershipTransfer_Concurrent_SecondFails(t *testing.T) {
 		firstCh <- future.Error()
 	}()
 
-	waitForTransferInProgress(t, h, origLeaderID, commitBudgetSteady)
+	waitForTransferInProgress(t, h, origLeaderID, _commitBudgetSteady)
 	secondFuture := h.LeadershipTransfer(origLeaderID, ServerID(other))
 	if err := secondFuture.Error(); err != ErrLeadershipTransferInProgress {
 		t.Fatalf("second transfer: got %v, want ErrLeadershipTransferInProgress", err)
@@ -246,8 +246,8 @@ func TestLeadershipTransfer_Concurrent_SecondFails(t *testing.T) {
 		if err != ErrLeadershipLost {
 			t.Fatalf("first transfer: got %v, want ErrLeadershipLost", err)
 		}
-	case <-time.After(commitBudgetAfterFailover):
-		t.Fatalf("first transfer did not complete within %v", commitBudgetAfterFailover)
+	case <-time.After(_commitBudgetAfterFailover):
+		t.Fatalf("first transfer did not complete within %v", _commitBudgetAfterFailover)
 	}
 }
 
@@ -288,7 +288,7 @@ func TestLeadershipTransfer_ApplyBlocked(t *testing.T) {
 	}()
 
 	// Ждём, пока leadershipTransferInProgress установится в leaderLoop.
-	waitForTransferInProgress(t, h, origLeaderID, commitBudgetAfterFailover)
+	waitForTransferInProgress(t, h, origLeaderID, _commitBudgetAfterFailover)
 
 	// Apply во время catch-up должен вернуть ErrLeadershipTransferInProgress.
 	future := h.cluster[origLeaderID].Apply(44, 0)
@@ -377,7 +377,7 @@ func TestTimeoutNow_OnFollower_ImmediateElection(t *testing.T) {
 	// в состоянии Follower — из PreCandidate/Candidate он отвечает
 	// Success=false (raft_cm_election.go, timeoutNow). Признак того,
 	// что узел вернулся в Follower, — получение AppendEntries от лидера.
-	waitForKnownLeader(t, h, targetID, origLeaderID, commitBudgetAfterFailover)
+	waitForKnownLeader(t, h, targetID, origLeaderID, _commitBudgetAfterFailover)
 
 	// Отправляем TimeoutNow целевому узлу от текущего лидера.
 	reply, err := h.SendTimeoutNow(origLeaderID, targetID)
@@ -409,7 +409,7 @@ func TestTimeoutNow_OnFollower_ImmediateElection(t *testing.T) {
 			newTerm = term
 			break
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 
 	// Проверяем, что новый лидер — targetID.
@@ -481,7 +481,7 @@ func TestLeadershipTransfer_VoteBypass(t *testing.T) {
 
 	// replace: ждём наблюдаемого состояния — follower узнал о лидере
 	// (получил heartbeat), а не фиксированной паузы.
-	waitForKnownLeader(t, h, followerID, origLeaderID, commitBudgetAfterFailover)
+	waitForKnownLeader(t, h, followerID, origLeaderID, _commitBudgetAfterFailover)
 
 	// Отправляем RequestVote с LeadershipTransfer=true и term+1 (реальный
 	// leadership transfer increment term). follower должен проголосовать,
@@ -533,7 +533,7 @@ func TestLeadershipTransfer_SkipPreVote(t *testing.T) {
 
 	// Предусловие обработчика timeoutNow: целевой узел обязан быть
 	// в состоянии Follower (см. TestTimeoutNow_OnFollower_ImmediateElection).
-	waitForKnownLeader(t, h, followerID, origLeaderID, commitBudgetAfterFailover)
+	waitForKnownLeader(t, h, followerID, origLeaderID, _commitBudgetAfterFailover)
 
 	// Simulate the beginning of a leadership transfer: send TimeoutNow to follower.
 	reply, err := h.SendTimeoutNow(origLeaderID, followerID)
@@ -550,7 +550,7 @@ func TestLeadershipTransfer_SkipPreVote(t *testing.T) {
 	// узел может как выиграть выборы, так и вернуться в Follower по
 	// AppendEntries прежнего лидера — поэтому ожидание ограничено
 	// бюджетом и не является assert'ом.
-	waitForTermAbove(h, followerID, origTerm, commitBudgetAfterFailover)
+	waitForTermAbove(h, followerID, origTerm, _commitBudgetAfterFailover)
 
 	// Проверяем, что узел стал лидером (выборы прошли успешно).
 	// Поскольку лидер отключён не был, возможны два сценария:
@@ -568,7 +568,7 @@ func TestLeadershipTransfer_SkipPreVote(t *testing.T) {
 // CheckSingleLeaderNoFail — версия CheckSingleLeader, которая не вызывает
 // t.Fatalf при отсутствии лидера, а возвращает -1, -1.
 func (h *Harness) CheckSingleLeaderNoFail() (int, int) {
-	deadline := time.Now().Add(leaderElectionBudget)
+	deadline := time.Now().Add(_leaderElectionBudget)
 	for {
 		// connected снимается под h.mu, Report() опрашивается вне её
 		// (инвариант границ).
@@ -595,7 +595,7 @@ func (h *Harness) CheckSingleLeaderNoFail() (int, int) {
 		if !time.Now().Before(deadline) {
 			return -1, -1
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 }
 
@@ -611,7 +611,7 @@ func waitForTransferInProgress(t *testing.T, h *Harness, id int, budget time.Dur
 		if !time.Now().Before(deadline) {
 			t.Fatalf("server %d did not enter leadership transfer within %v", id, budget)
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 }
 
@@ -632,7 +632,7 @@ func waitForKnownLeader(t *testing.T, h *Harness, id, leaderID int, budget time.
 			t.Fatalf("server %d does not know leader %d within %v (leaderID=%d)",
 				id, leaderID, budget, known)
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 }
 
@@ -645,7 +645,7 @@ func waitForTermAbove(h *Harness, id, want int, budget time.Duration) {
 		if !time.Now().Before(deadline) {
 			return
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 }
 
@@ -726,7 +726,7 @@ func TestLeadershipTransfer_EnqueueConfigurationChangeBlocked(t *testing.T) {
 	}()
 
 	// Ждём, пока leadershipTransferInProgress установится в leaderLoop.
-	waitForTransferInProgress(t, h, origLeaderID, commitBudgetAfterFailover)
+	waitForTransferInProgress(t, h, origLeaderID, _commitBudgetAfterFailover)
 
 	// Попытка изменения конфигурации должна вернуть ErrLeadershipTransferInProgress.
 	future := h.cluster[origLeaderID].AddVoter(ServerID(100), ServerAddress("new-node"))
@@ -764,12 +764,12 @@ func TestLeadershipTransfer_CatchUpSendIsDeduplicated(t *testing.T) {
 
 	// Первая отправка захватывает флаг и блокируется в транспорте.
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	deadline := time.Now().Add(inmemRPCTimeout)
+	deadline := time.Now().Add(_inmemRPCTimeout)
 	for mock.callCount.Load() == 0 {
 		if !time.Now().Before(deadline) {
-			t.Fatalf("AppendEntries не вызван за %v", inmemRPCTimeout)
+			t.Fatalf("AppendEntries не вызван за %v", _inmemRPCTimeout)
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 
 	// Итерации догоняющего цикла, пока отправка активна.
@@ -777,7 +777,7 @@ func TestLeadershipTransfer_CatchUpSendIsDeduplicated(t *testing.T) {
 		cm.leaderSendAEsToPeerIfIdle(1, 1)
 		// keep: timing — воспроизводится интервал догоняющего цикла (10 мс);
 		// наблюдаемого признака состояния здесь нет.
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 	if calls := mock.callCount.Load(); calls != 1 {
 		t.Fatalf("AppendEntries calls = %d, want 1 — догоняющий цикл породил параллельного отправителя", calls)
@@ -792,12 +792,12 @@ func TestLeadershipTransfer_CatchUpSendIsDeduplicated(t *testing.T) {
 
 	// После снятия флага очередная итерация цикла снова отправляет RPC.
 	cm.leaderSendAEsToPeerIfIdle(1, 1)
-	deadline = time.Now().Add(inmemRPCTimeout)
+	deadline = time.Now().Add(_inmemRPCTimeout)
 	for mock.callCount.Load() < 2 {
 		if !time.Now().Before(deadline) {
 			t.Fatalf("AppendEntries calls = %d, want 2 после снятия флага", mock.callCount.Load())
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 	cm.wg.Wait()
 }

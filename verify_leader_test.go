@@ -278,7 +278,7 @@ func TestVerifyLeader_EpochFilter(t *testing.T) {
 		// достигнут, запрос остаётся в очереди, третьей отправки нет (эстафета
 		// конечна: 2 <= 2).
 		close(mock.gateCh)
-		waitFor(t, "перерассылка и голос перерассланного AE", inmemRPCTimeout, func() bool {
+		waitFor(t, "перерассылка и голос перерассланного AE", _inmemRPCTimeout, func() bool {
 			return mock.callCount.Load() >= 2 && !cm.inflightAELoaded(1)
 		})
 		if vf.votes != 1 {
@@ -440,7 +440,7 @@ func TestVerifyLeader_MultiplePendingDifferentEpochs(t *testing.T) {
 	// (кворум 3, повторный голос соседа дедуплицирован). Третьей отправки нет
 	// (5 <= 7 — повторная перерассылка не запускается).
 	close(mock.gateCh)
-	waitFor(t, "перерассылка и сходимость очереди", inmemRPCTimeout, func() bool {
+	waitFor(t, "перерассылка и сходимость очереди", _inmemRPCTimeout, func() bool {
 		if mock.callCount.Load() < 2 {
 			return false
 		}

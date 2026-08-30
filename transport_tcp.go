@@ -12,25 +12,25 @@ import (
 )
 
 const (
-	// connReceiveBufferSize — размер буфера для чтения входящих RPC (256KB).
-	connReceiveBufferSize = 256 * 1024
+	// _connReceiveBufferSize — размер буфера для чтения входящих RPC (256KB).
+	_connReceiveBufferSize = 256 * 1024
 
-	// connSendBufferSize — размер буфера для записи исходящих RPC (256KB).
-	connSendBufferSize = 256 * 1024
+	// _connSendBufferSize — размер буфера для записи исходящих RPC (256KB).
+	_connSendBufferSize = 256 * 1024
 
-	// defaultMaxPool — максимальное количество соединений в пуле на один
+	// _defaultMaxPool — максимальное количество соединений в пуле на один
 	// целевой адрес. Значение 2 позволяет переиспользовать соединения
 	// без избыточного удержания ресурсов.
-	defaultMaxPool = 2
+	_defaultMaxPool = 2
 )
 
 // Типы RPC для фрейминга (1 байт вместо строки).
 const (
-	rpcAppendEntries byte = iota
-	rpcInstallSnapshot
-	rpcRequestPreVote
-	rpcRequestVote
-	rpcTimeoutNow
+	_rpcAppendEntries byte = iota
+	_rpcInstallSnapshot
+	_rpcRequestPreVote
+	_rpcRequestVote
+	_rpcTimeoutNow
 )
 
 //nolint:gochecknoinits
@@ -97,14 +97,14 @@ var _ Transport = (*TCPTransport)(nil)
 
 // NewTCPTransport создаёт новый TCPTransport, слушающий на указанном адресе.
 // Принимает адрес для прослушивания, таймаут и максимальный размер пула
-// соединений (0 = defaultMaxPool). Запускает acceptLoop в отдельной горутине.
+// соединений (0 = _defaultMaxPool). Запускает acceptLoop в отдельной горутине.
 func NewTCPTransport(addr string, timeout time.Duration, maxPool int) (*TCPTransport, error) {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("raft: failed to listen on %s: %w", addr, err)
 	}
 	if maxPool <= 0 {
-		maxPool = defaultMaxPool
+		maxPool = _defaultMaxPool
 	}
 	// Защитная проверка: нулевой тайм-аут (например, из нулевой конфигурации
 	// или неявного нуля в литерале) заменяется дефолтом, чтобы транспорт всегда
@@ -112,7 +112,7 @@ func NewTCPTransport(addr string, timeout time.Duration, maxPool int) (*TCPTrans
 	// проверка, а не молчаливое исправление: недокументированная возможность
 	// «0 = без дедлайнов» изымается из контракта конструктора.
 	if timeout <= 0 {
-		timeout = defaultTCPRPCTimeout
+		timeout = _defaultTCPRPCTimeout
 	}
 	t := &TCPTransport{
 		consumerCh:  make(chan RPC),
@@ -158,28 +158,28 @@ func (t *TCPTransport) SetHeartbeatHandler(fn func(RPC)) {
 //nolint:gocritic
 func (t *TCPTransport) AppendEntries(peerID ServerID, args AppendEntriesArgs) (AppendEntriesReply, error) {
 	var reply AppendEntriesReply
-	err := t.genericRPC(peerID, rpcAppendEntries, &args, &reply)
+	err := t.genericRPC(peerID, _rpcAppendEntries, &args, &reply)
 	return reply, err
 }
 
 // RequestVote отправляет RequestVote указанному узлу через пул соединений.
 func (t *TCPTransport) RequestVote(peerID ServerID, args RequestVoteArgs) (RequestVoteReply, error) {
 	var reply RequestVoteReply
-	err := t.genericRPC(peerID, rpcRequestVote, &args, &reply)
+	err := t.genericRPC(peerID, _rpcRequestVote, &args, &reply)
 	return reply, err
 }
 
 // RequestPreVote отправляет PreVote RPC узлу peerID через пул соединений.
 func (t *TCPTransport) RequestPreVote(peerID ServerID, args RequestPreVoteArgs) (RequestPreVoteReply, error) {
 	var reply RequestPreVoteReply
-	err := t.genericRPC(peerID, rpcRequestPreVote, &args, &reply)
+	err := t.genericRPC(peerID, _rpcRequestPreVote, &args, &reply)
 	return reply, err
 }
 
 // TimeoutNow отправляет TimeoutNowRequest указанному узлу через пул соединений.
 func (t *TCPTransport) TimeoutNow(peerID ServerID, args TimeoutNowRequest) (TimeoutNowResponse, error) {
 	var reply TimeoutNowResponse
-	err := t.genericRPC(peerID, rpcTimeoutNow, &args, &reply)
+	err := t.genericRPC(peerID, _rpcTimeoutNow, &args, &reply)
 	return reply, err
 }
 
@@ -201,14 +201,14 @@ func (t *TCPTransport) InstallSnapshot(
 	defer func() { _ = conn.Release() }()
 
 	if t.timeout > 0 {
-		timeout := t.timeout * time.Duration(args.DataSize/int64(connSendBufferSize))
+		timeout := t.timeout * time.Duration(args.DataSize/int64(_connSendBufferSize))
 		if timeout < t.timeout {
 			timeout = t.timeout
 		}
 		_ = conn.conn.SetDeadline(time.Now().Add(timeout))
 	}
 
-	if err := t.sendRPC(conn, rpcInstallSnapshot, &args); err != nil {
+	if err := t.sendRPC(conn, _rpcInstallSnapshot, &args); err != nil {
 		return reply, err
 	}
 
@@ -349,7 +349,7 @@ func (t *TCPTransport) getConn(target ServerAddress) (*tcpConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := bufio.NewWriterSize(c, connSendBufferSize)
+	w := bufio.NewWriterSize(c, _connSendBufferSize)
 	return &tcpConn{
 		target: target,
 		conn:   c,
@@ -486,7 +486,7 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 	defer t.untrackConn(conn)
 	defer func() { _ = conn.Close() }()
 
-	r := bufio.NewReaderSize(conn, connReceiveBufferSize)
+	r := bufio.NewReaderSize(conn, _connReceiveBufferSize)
 	w := bufio.NewWriter(conn)
 	dec := gob.NewDecoder(r)
 	enc := gob.NewEncoder(w)
@@ -552,7 +552,7 @@ func (t *TCPTransport) handleCommand(r *bufio.Reader, _ net.Conn, dec *gob.Decod
 
 	// Heartbeat fast-path: если это heartbeat и установлен обработчик,
 	// вызываем его напрямую, минуя consumerCh.
-	if req.Type == rpcAppendEntries {
+	if req.Type == _rpcAppendEntries {
 		if args, ok := cmd.(*AppendEntriesArgs); ok {
 			if args.Term != 0 && args.LeaderCommit == 0 && len(args.Entries) == 0 {
 				t.heartbeatFnLock.Lock()
@@ -577,7 +577,7 @@ RESP:
 	var respReply any
 	respTimeout := t.timeout
 	if req, ok := cmd.(*InstallSnapshotRequest); ok && req.DataSize > 0 {
-		scaled := t.timeout * time.Duration(req.DataSize/int64(connSendBufferSize))
+		scaled := t.timeout * time.Duration(req.DataSize/int64(_connSendBufferSize))
 		if scaled > respTimeout {
 			respTimeout = scaled
 		}

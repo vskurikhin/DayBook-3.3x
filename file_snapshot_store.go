@@ -19,19 +19,19 @@ import (
 )
 
 const (
-	// snapshotsSubdir — поддиректория dataDir, в которой FileSnapshotStore
+	// _snapshotsSubdir — поддиректория dataDir, в которой FileSnapshotStore
 	// хранит снимки. Не конфликтует с FileStorage.loadAll: тот читает
 	// только *.dat-файлы в корне каталога.
-	snapshotsSubdir = "snapshots"
+	_snapshotsSubdir = "snapshots"
 
-	// metaFileName — имя файла метаданных внутри директории снимка.
-	metaFileName = "meta.dat"
+	// _metaFileName — имя файла метаданных внутри директории снимка.
+	_metaFileName = "meta.dat"
 
-	// stateFileName — имя файла данных FSM внутри директории снимка.
-	stateFileName = "state.bin"
+	// _stateFileName — имя файла данных FSM внутри директории снимка.
+	_stateFileName = "state.bin"
 
-	// tmpSuffix — суффикс временной директории незавершённого снимка.
-	tmpSuffix = ".tmp"
+	// _tmpSuffix — суффикс временной директории незавершённого снимка.
+	_tmpSuffix = ".tmp"
 )
 
 // fileSnapshotMeta — метаданные снимка на диске: SnapshotMeta
@@ -60,7 +60,7 @@ func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
 	if retain < 1 {
 		return nil, errors.New("raft: must retain at least one snapshot")
 	}
-	path := filepath.Join(base, snapshotsSubdir)
+	path := filepath.Join(base, _snapshotsSubdir)
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		return nil, fmt.Errorf("raft: snapshot path not accessible: %v", err)
 	}
@@ -113,7 +113,7 @@ func (f *FileSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, error
 		return nil, nil, fmt.Errorf("raft: snapshot %s is corrupt: %v", id, err)
 	}
 
-	statePath := filepath.Join(f.path, id, stateFileName)
+	statePath := filepath.Join(f.path, id, _stateFileName)
 	fh, err := os.Open(statePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("raft: failed to open snapshot state %s: %v", id, err)
@@ -155,7 +155,7 @@ func (f *FileSnapshotStore) createAt(
 	index, term, configIndex int, configuration Configuration, now time.Time,
 ) (SnapshotSink, error) {
 	name := snapshotName(term, index, now.UnixNano()/int64(time.Millisecond))
-	path := filepath.Join(f.path, name+tmpSuffix)
+	path := filepath.Join(f.path, name+_tmpSuffix)
 
 	if err := os.Mkdir(path, 0o700); err != nil {
 		return nil, fmt.Errorf("raft: failed to make snapshot directory %s: %w", path, err)
@@ -177,7 +177,7 @@ func (f *FileSnapshotStore) createAt(
 		},
 	}
 
-	statePath := filepath.Join(path, stateFileName)
+	statePath := filepath.Join(path, _stateFileName)
 	fh, err := os.Create(statePath)
 	if err != nil {
 		_ = os.RemoveAll(path)
@@ -199,7 +199,7 @@ func (f *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
 
 	var snapshots []*fileSnapshotMeta
 	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasSuffix(entry.Name(), tmpSuffix) {
+		if !entry.IsDir() || strings.HasSuffix(entry.Name(), _tmpSuffix) {
 			continue
 		}
 		meta, err := f.readMeta(entry.Name())
@@ -224,7 +224,7 @@ func (f *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
 
 // readMeta читает и декодирует meta.dat снимка id.
 func (f *FileSnapshotStore) readMeta(id string) (*fileSnapshotMeta, error) {
-	fh, err := os.Open(filepath.Join(f.path, id, metaFileName))
+	fh, err := os.Open(filepath.Join(f.path, id, _metaFileName))
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (s *FileSnapshotSink) Close() error {
 		return fmt.Errorf("raft: failed to close snapshot state: %v", err)
 	}
 
-	fi, err := os.Stat(filepath.Join(s.dir, stateFileName))
+	fi, err := os.Stat(filepath.Join(s.dir, _stateFileName))
 	if err != nil {
 		return fmt.Errorf("raft: failed to stat snapshot state: %v", err)
 	}
@@ -369,7 +369,7 @@ func (s *FileSnapshotSink) ID() string {
 
 // writeMeta записывает meta.dat с CRC32 и синхронизирует файл с диском.
 func (s *FileSnapshotSink) writeMeta() error {
-	fh, err := os.Create(filepath.Join(s.dir, metaFileName))
+	fh, err := os.Create(filepath.Join(s.dir, _metaFileName))
 	if err != nil {
 		return err
 	}

@@ -9,69 +9,69 @@ import (
 	"time"
 )
 
-const submitTimeout = 5 * time.Second
+const _submitTimeout = 5 * time.Second
 
 // Test-only константы бюджетов (единственный владелец).
 // Разделение Protocol timeout / Test deadline / Poll interval.
 
 const (
-	// maxElectionTimeout — максимальный election timeout:
+	// _maxElectionTimeout — максимальный election timeout:
 	// 2*ReelectionTimeoutMs = 762ms.
-	maxElectionTimeout = 2 * ReelectionTimeoutMs * time.Millisecond
+	_maxElectionTimeout = 2 * ReelectionTimeoutMs * time.Millisecond
 
-	// preVoteRound — worst-case раунда Pre-Vote (≈ maxElectionTimeout).
-	preVoteRound = maxElectionTimeout
+	// _preVoteRound — worst-case раунда Pre-Vote (≈ _maxElectionTimeout).
+	_preVoteRound = _maxElectionTimeout
 
-	// inmemRPCTimeout — тайм-аут одного RPC внутрипроцессного
-	// транспорта; ссылается на inmemTransportTimeout, рассинхрон
+	// _inmemRPCTimeout — тайм-аут одного RPC внутрипроцессного
+	// транспорта; ссылается на _inmemTransportTimeout, рассинхрон
 	// с транспортом исключён компилятором.
-	inmemRPCTimeout = inmemTransportTimeout
+	_inmemRPCTimeout = _inmemTransportTimeout
 
-	// commitBudgetSteady — бюджет ожидания фиксации при устоявшемся лидере:
-	// 4*(applyBatchInterval + inmemRPCTimeout) = 4*(50ms+500ms) = 2.2s.
-	commitBudgetSteady = 4 * (applyBatchInterval + inmemRPCTimeout)
+	// _commitBudgetSteady — бюджет ожидания фиксации при устоявшемся лидере:
+	// 4*(_applyBatchInterval + _inmemRPCTimeout) = 4*(50ms+500ms) = 2.2s.
+	_commitBudgetSteady = 4 * (_applyBatchInterval + _inmemRPCTimeout)
 
-	// failoverBudgetMargin — запас бюджета after-failover для поглощения
+	// _failoverBudgetMargin — запас бюджета after-failover для поглощения
 	// межфазных задержек (worst-case 2*762 + 762 + 50 + 200 ≈ 2.5s).
-	failoverBudgetMargin = 200 * time.Millisecond
+	_failoverBudgetMargin = 200 * time.Millisecond
 
-	// commitBudgetAfterFailover — бюджет ожидания фиксации для сценариев
+	// _commitBudgetAfterFailover — бюджет ожидания фиксации для сценариев
 	// с возможными перевыборами (disconnect/restart/leadership transfer):
-	// 2*maxElectionTimeout + preVoteRound + applyBatchInterval + запас ≈ 2.5–3s.
-	commitBudgetAfterFailover = 2*maxElectionTimeout + preVoteRound + applyBatchInterval + failoverBudgetMargin
+	// 2*_maxElectionTimeout + _preVoteRound + _applyBatchInterval + запас ≈ 2.5–3s.
+	_commitBudgetAfterFailover = 2*_maxElectionTimeout + _preVoteRound + _applyBatchInterval + _failoverBudgetMargin
 
 	// LeaktestBudget — единый бюджет leaktest:
-	// max(inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
+	// max(_inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
 	LeaktestBudget = 600 * time.Millisecond
 
-	// leaderElectionBudget — бюджет ожидания выборов лидера
-	// (§9 architecture.md): 2*maxElectionTimeout + preVoteRound ≈ 2.3s.
+	// _leaderElectionBudget — бюджет ожидания выборов лидера
+	// (§9 architecture.md): 2*_maxElectionTimeout + _preVoteRound ≈ 2.3s.
 	// Применяется CheckSingleLeader вместо прежнего необоснованного
 	// окна 8×150ms = 1.2s.
-	leaderElectionBudget = 2*maxElectionTimeout + preVoteRound
+	_leaderElectionBudget = 2*_maxElectionTimeout + _preVoteRound
 
-	// singleLeaderBudget — бюджет схождения кластера к единственному лидеру.
-	// Два независимых worst-case: выборы (leaderElectionBudget) и задержка
+	// _singleLeaderBudget — бюджет схождения кластера к единственному лидеру.
+	// Два независимых worst-case: выборы (_leaderElectionBudget) и задержка
 	// step-down призрачного лидера прежнего терма, ограниченная потолком
-	// задержки повторов репликации (maxReplicationBackoff):
+	// задержки повторов репликации (_maxReplicationBackoff):
 	// 2286ms + 1000ms = 3286ms.
-	singleLeaderBudget = leaderElectionBudget + maxReplicationBackoff
+	_singleLeaderBudget = _leaderElectionBudget + _maxReplicationBackoff
 
-	// snapshotConvergenceBudget — бюджет схождения снимка к вершине журнала.
+	// _snapshotConvergenceBudget — бюджет схождения снимка к вершине журнала.
 	// Вывод при интервале снимков, заданном тестом (например, 50 мс):
 	// после возврата последнего Apply машина состояний догоняет журнал
-	// не позднее чем за applyBatchInterval (50 мс), а ближайший тик цикла
+	// не позднее чем за _applyBatchInterval (50 мс), а ближайший тик цикла
 	// снимков создаёт снимок с индексом машины состояний; худший случай —
-	// applyBatchInterval + 2*snapshotInterval = 150 мс при интервале 50 мс.
-	// Значение берётся равным commitBudgetSteady = 2.2 с: тот же способ
+	// _applyBatchInterval + 2*snapshotInterval = 150 мс при интервале 50 мс.
+	// Значение берётся равным _commitBudgetSteady = 2.2 с: тот же способ
 	// вывода из констант, запас более чем 14-кратный, отдельная константа
 	// с литералом не вводится.
-	snapshotConvergenceBudget = commitBudgetSteady
+	_snapshotConvergenceBudget = _commitBudgetSteady
 
-	// pollInterval — интервал опроса condition-wait примитивов
+	// _pollInterval — интервал опроса condition-wait примитивов
 	// (Poll interval модели §9 architecture.md: 5–10ms). Не зависит
 	// от бюджета ожидания.
-	pollInterval = 10 * time.Millisecond
+	_pollInterval = 10 * time.Millisecond
 )
 
 func init() {
@@ -425,11 +425,11 @@ func (h *Harness) RestartPeer(id int) {
 // и транспорт узла подключён ко всем соседям, с которыми связь ожидается
 // (alive && connected — разрыв с логически отключённым соседом не является
 // неготовностью, иначе ожидание тянулось бы до исчерпания бюджета).
-// Бюджет — commitBudgetSteady (условия обычно истинны сразу — опрос
+// Бюджет — _commitBudgetSteady (условия обычно истинны сразу — опрос
 // немедленный).
 func (h *Harness) waitForPeerReady(id int) {
 	h.t.Helper()
-	deadline := time.Now().Add(commitBudgetSteady)
+	deadline := time.Now().Add(_commitBudgetSteady)
 	for time.Now().Before(deadline) {
 		// Значения alive/connected снимаются под h.mu, Report()
 		// вызывается вне её (инвариант границ).
@@ -455,7 +455,7 @@ func (h *Harness) waitForPeerReady(id int) {
 		// poll-интервал condition-wait (не фиксированная пауза).
 		time.Sleep(5 * time.Millisecond)
 	}
-	h.t.Fatalf("restarted peer %d did not become ready within %v", id, commitBudgetSteady)
+	h.t.Fatalf("restarted peer %d did not become ready within %v", id, _commitBudgetSteady)
 }
 
 // PeerDropCallsAfterN — больше не поддерживается (RPCProxy удалён).
@@ -477,9 +477,9 @@ func (h *Harness) PeerDontDropCalls(id int) {
 // допустимое переходное состояние: изолированный лидер прежнего терма не
 // имеет кворума, ничего не фиксирует и уходит в step-down только при первом
 // контакте с большим термом, который откладывается задержкой повторов
-// репликации до maxReplicationBackoff; опрос продолжается до схождения.
+// репликации до _maxReplicationBackoff; опрос продолжается до схождения.
 //
-// Бюджет — singleLeaderBudget = leaderElectionBudget + maxReplicationBackoff
+// Бюджет — _singleLeaderBudget = _leaderElectionBudget + _maxReplicationBackoff
 // (два независимых worst-case: выборы и step-down призрачного лидера).
 // Значения connected снимаются под h.mu, Report() опрашивается вне
 // блокировки (инвариант границ). По исчерпании бюджета (ноль лидеров либо
@@ -487,7 +487,7 @@ func (h *Harness) PeerDontDropCalls(id int) {
 // диагностикой nodeStates() (id, роль, терм, connected, alive).
 func (h *Harness) CheckSingleLeader() (int, int) {
 	h.t.Helper()
-	return h.waitSingleLeader(singleLeaderBudget)
+	return h.waitSingleLeader(_singleLeaderBudget)
 }
 
 // waitSingleLeader — общая логика опроса для CheckSingleLeader и
@@ -540,13 +540,13 @@ func (h *Harness) pollSingleLeader(budget time.Duration) (int, int, error) {
 		if !time.Now().Before(deadline) {
 			break
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 
 	return -1, -1, fmt.Errorf(
 		"no single leader within budget %v (polled %v):\n"+
 			"  expected: exactly one leader among connected peers (election safety)",
-		budget, pollInterval,
+		budget, _pollInterval,
 	)
 }
 
@@ -584,7 +584,7 @@ func (h *Harness) nodeStates() string {
 // логикой опроса (Election Safety: два лидера в одном терме — немедленный
 // фатальный отказ; в разных термах — переходное состояние, шаг-down
 // изолированного лидера откладывается задержкой повторов репликации
-// до maxReplicationBackoff). По исчерпании бюджета — фатальный отказ
+// до _maxReplicationBackoff). По исчерпании бюджета — фатальный отказ
 // с диагностикой nodeStates(), без повторного прохода по бюджету.
 func (h *Harness) WaitForSingleLeader(timeout time.Duration) (int, int) {
 	h.t.Helper()
@@ -617,7 +617,7 @@ func (h *Harness) CheckNoLeader() {
 	}
 }
 
-// waitFor опрашивает предикат cond с интервалом pollInterval, пока он
+// waitFor опрашивает предикат cond с интервалом _pollInterval, пока он
 // не станет истинным либо не истечёт budget.
 //
 // Контракт блокировки (§8 architecture.md,,): cond и diag
@@ -656,7 +656,7 @@ func (h *Harness) waitFor(desc string, budget time.Duration, cond func() bool, d
 	return fmt.Errorf("%s\n  %s", err, h.nodeStates())
 }
 
-// waitCond опрашивает предикат cond с интервалом pollInterval, пока он
+// waitCond опрашивает предикат cond с интервалом _pollInterval, пока он
 // не станет истинным либо не истечёт budget; возвращает nil при успехе,
 // иначе ошибку с бюджетом, описанием и деталями diag.
 //
@@ -680,7 +680,7 @@ func waitCond(desc string, budget time.Duration, cond func() bool, diag func() s
 		if !time.Now().Before(deadline) {
 			break
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 
 	details := ""
@@ -689,7 +689,7 @@ func waitCond(desc string, budget time.Duration, cond func() bool, diag func() s
 	}
 	return fmt.Errorf(
 		"wait timeout (budget %v, polled %v):\n  expected: %s\n  %s",
-		budget, pollInterval, desc, details,
+		budget, _pollInterval, desc, details,
 	)
 }
 
@@ -924,16 +924,16 @@ func (h *Harness) CheckCommittedN(cmd int, n int) {
 // подключённых серверах и затем проверяет фиксацию assert'ом
 // CheckCommittedN.
 //
-// Бюджет по умолчанию — commitBudgetAfterFailover: сценарий вызова
+// Бюджет по умолчанию — _commitBudgetAfterFailover: сценарий вызова
 // может содержать перевыборы. Для сценариев с заведомо устоявшимся
-// лидером используйте WaitForCommitBudget(cmd, n, commitBudgetSteady).
+// лидером используйте WaitForCommitBudget(cmd, n, _commitBudgetSteady).
 func (h *Harness) WaitForCommit(cmd int, n int) {
 	h.t.Helper()
-	h.WaitForCommitBudget(cmd, n, commitBudgetAfterFailover)
+	h.WaitForCommitBudget(cmd, n, _commitBudgetAfterFailover)
 }
 
 // WaitForCommitBudget — WaitForCommit с явным бюджетом ожидания
-// (commitBudgetSteady / commitBudgetAfterFailover —).
+// (_commitBudgetSteady / _commitBudgetAfterFailover —).
 //
 // Схема (§8 architecture.md): wait по предикату сходимости committedOn
 // (под h.mu) → assert CheckCommittedN (без h.mu). Раннего return без
@@ -994,10 +994,10 @@ func (h *Harness) WaitForCommitAll(cmd int, timeout time.Duration) {
 // незафиксированного хвоста), и это требование невыполнимо; для проверки
 // восстановления достаточно наличия команды по значению.
 //
-// Бюджет по умолчанию — commitBudgetAfterFailover.
+// Бюджет по умолчанию — _commitBudgetAfterFailover.
 func (h *Harness) WaitForCommitConvergedValues(cmd int, n int) {
 	h.t.Helper()
-	h.WaitForCommitConvergedValuesBudget(cmd, n, commitBudgetAfterFailover)
+	h.WaitForCommitConvergedValuesBudget(cmd, n, _commitBudgetAfterFailover)
 }
 
 // WaitForCommitConvergedValuesBudget — WaitForCommitConvergedValues
@@ -1044,12 +1044,12 @@ func (h *Harness) waitForSuffrage(observerID int, target ServerID, suffrage Serv
 		if !time.Now().Before(deadline) {
 			break
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 	h.t.Fatalf(
 		"waitForSuffrage timeout (budget %v, polled %v):\n"+
 			"  expected: server %d sees server %d with suffrage %v\n  %s",
-		budget, pollInterval, observerID, target, suffrage, h.nodeStates(),
+		budget, _pollInterval, observerID, target, suffrage, h.nodeStates(),
 	)
 }
 
@@ -1083,12 +1083,12 @@ func (h *Harness) waitForIsolated(id int, budget time.Duration) {
 		if !time.Now().Before(deadline) {
 			break
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 	h.t.Fatalf(
 		"waitForIsolated timeout (budget %v, polled %v):\n"+
 			"  expected: server %d is disconnected from every live peer\n  %s",
-		budget, pollInterval, id, h.nodeStates(),
+		budget, _pollInterval, id, h.nodeStates(),
 	)
 }
 
@@ -1125,12 +1125,12 @@ func (h *Harness) waitForApplyInflight(id int, want int, budget time.Duration) {
 		if !time.Now().Before(deadline) {
 			break
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 	h.t.Fatalf(
 		"waitForApplyInflight timeout (budget %v, polled %v):\n"+
 			"  expected: server %d has >=%d inflight Apply futures (got %d)\n  %s",
-		budget, pollInterval, id, want, h.applyInflightCount(id), h.nodeStates(),
+		budget, _pollInterval, id, want, h.applyInflightCount(id), h.nodeStates(),
 	)
 }
 
@@ -1200,7 +1200,7 @@ func (h *Harness) SubmitToServer(serverId int, cmd any) int {
 			return -1
 		}
 		return future.Index()
-	case <-time.After(submitTimeout):
+	case <-time.After(_submitTimeout):
 		return -1
 	}
 }

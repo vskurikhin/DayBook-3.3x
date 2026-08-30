@@ -55,7 +55,7 @@ func TestCommitmentE2E_FourNodes_TwoDownNoCommit(t *testing.T) {
 	h.ReconnectPeer(f1)
 	h.ReconnectPeer(f2)
 
-	newLid, _ := h.WaitForSingleLeader(leaderElectionBudget)
+	newLid, _ := h.WaitForSingleLeader(_leaderElectionBudget)
 	restored := 1011
 	if err := waitFuture(t, h.cluster[newLid].Apply(restored, 0), 3*time.Second); err != nil {
 		t.Fatalf("Apply failed after reconnect: %v", err)
@@ -108,7 +108,7 @@ func TestCommitmentE2E_TwoNodes_FollowerDownNoCommit(t *testing.T) {
 	h.CheckNotCommitted(cmd)
 
 	h.ReconnectPeer(follower)
-	newLid, _ := h.WaitForSingleLeader(leaderElectionBudget)
+	newLid, _ := h.WaitForSingleLeader(_leaderElectionBudget)
 	restored := 1013
 	if err := waitFuture(t, h.cluster[newLid].Apply(restored, 0), 3*time.Second); err != nil {
 		t.Fatalf("Apply failed after reconnect: %v", err)

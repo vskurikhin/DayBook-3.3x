@@ -21,9 +21,9 @@ import (
 const DebugClient = 0
 
 const (
-	// defaultRequestTimeout — таймаут на один HTTP-запрос.
+	// _defaultRequestTimeout — таймаут на один HTTP-запрос.
 	// При недоступности лидера клиент переключается на другой адрес.
-	defaultRequestTimeout = 500 * time.Millisecond
+	_defaultRequestTimeout = 500 * time.Millisecond
 )
 
 type KVClient struct {
@@ -39,16 +39,16 @@ type KVClient struct {
 	requestTimeout time.Duration
 
 	// clientID — уникальный идентификатор клиента. Управляется внутри этого
-	// файла путём увеличения глобального счётчика clientCount.
+	// файла путём увеличения глобального счётчика _clientCount.
 	clientID int32
 }
 
 // New создаёт новый экземпляр KVClient. serviceAddrs — список адресов
 // (каждый в формате "host:port") сервисов кластера KVService, с которыми
 // будет взаимодействовать клиент. Таймаут одного запроса —
-// defaultRequestTimeout.
+// _defaultRequestTimeout.
 func New(serviceAddrs []string) *KVClient {
-	return NewWithTimeout(serviceAddrs, defaultRequestTimeout)
+	return NewWithTimeout(serviceAddrs, _defaultRequestTimeout)
 }
 
 // NewWithTimeout создаёт экземпляр KVClient с заданным таймаутом одного
@@ -58,13 +58,13 @@ func NewWithTimeout(serviceAddrs []string, timeout time.Duration) *KVClient {
 	return &KVClient{
 		addrs:          serviceAddrs,
 		requestTimeout: timeout,
-		clientID:       clientCount.Add(1),
+		clientID:       _clientCount.Add(1),
 	}
 }
 
-// clientCount используется для назначения уникальных идентификаторов
+// _clientCount используется для назначения уникальных идентификаторов
 // различным клиентам.
-var clientCount atomic.Int32
+var _clientCount atomic.Int32
 
 // VerifyLeader проверяет, является ли assumedLeader действующим лидером,
 // используя ReadIndex-запрос (Raft §8). Возвращает leaderID или ошибку.

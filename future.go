@@ -15,7 +15,7 @@ var (
 	ErrLeadershipTransferInProgress = errors.New("raft: leadership transfer in progress")
 
 	// ErrTooManyUncommittedEntries возвращается клиенту, когда
-	// незафиксированный хвост журнала лидера достиг maxUncommittedEntries.
+	// незафиксированный хвост журнала лидера достиг _maxUncommittedEntries.
 	// Признак того, что фиксация не продвигается: кворум недоступен либо
 	// соседи не успевают за нагрузкой.
 	ErrTooManyUncommittedEntries = errors.New("raft: too many uncommitted log entries")

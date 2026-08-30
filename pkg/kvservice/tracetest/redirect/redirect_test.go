@@ -58,12 +58,12 @@ func TestTraceRedirect(t *testing.T) {
 		t.Errorf("contract error %q mentions ConsensusModule of another package", contractErr)
 	}
 
-	// Создаём KVService; сторожевой флаг traceCMCreated поднимается
+	// Создаём KVService; сторожевой флаг _traceCMCreated поднимается
 	// конструктором.
 	kvs := newTestService(t)
 
 	// Эмиттер трассировки — kvs.ServeHTTP (traceLogf("serving HTTP on %s"),
-	// печатается при traceKV=1 > 0): после запуска файл не пуст.
+	// печатается при _traceKV=1 > 0): после запуска файл не пуст.
 	if err := kvs.ServeHTTP(":0"); err != nil {
 		t.Fatalf("ServeHTTP: %v", err)
 	}

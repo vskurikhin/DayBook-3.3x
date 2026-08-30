@@ -9,20 +9,20 @@ import (
 type replicationPlan int
 
 const (
-	// replicationSkip — активна задержка повторов, попытка пропускается.
-	replicationSkip replicationPlan = iota
-	// replicationSnapshot — prev попадает в дыру между снимком и журналом.
-	replicationSnapshot
-	// replicationAppend — отправлять AppendEntries.
-	replicationAppend
+	// _replicationSkip — активна задержка повторов, попытка пропускается.
+	_replicationSkip replicationPlan = iota
+	// _replicationSnapshot — prev попадает в дыру между снимком и журналом.
+	_replicationSnapshot
+	// _replicationAppend — отправлять AppendEntries.
+	_replicationAppend
 )
 
-// maxReplicationBackoff — потолок задержки повторов репликации на каждого
+// _maxReplicationBackoff — потолок задержки повторов репликации на каждого
 // соседа (1000 мс). Объявлен на уровне пакета, а не внутри функции, чтобы
 // тестовые бюджеты ожидания схождения кластера выводились из него, а не
 // дублировали литерал. Значение ограничивает сверху задержку step-down
 // изолированного лидера прежнего терма.
-const maxReplicationBackoff = 1000 * time.Millisecond
+const _maxReplicationBackoff = 1000 * time.Millisecond
 
 // nextIndexArgsEntries формирует аргументы для AppendEntries и сопутствующие данные
 // для отправки конкретному последователю (peerID).
@@ -64,7 +64,7 @@ func (cm *ConsensusModule) nextIndexArgsEntries(
 			entries = append([]LogEntry{}, cm.cmState.log[pos:]...)
 		} else {
 			cm.traceLockedLogf(
-				traceLevelLoops,
+				_traceLevelLoops,
 				"nextIndexArgsEntries: logPositionLocked(%d) out of range (len=%d)",
 				ni, len(cm.cmState.log),
 			)
@@ -109,7 +109,7 @@ func (cm *ConsensusModule) planReplication(peerID, savedCurrentTerm int) replica
 	// Пропуск действует только для текущего лидерства: запоздавшие горутины
 	// прошлых термов не влияют на состояние нового лидера.
 	if cm.replicationBackoffActiveLocked(peerID, savedCurrentTerm) {
-		return replicationSkip
+		return _replicationSkip
 	}
 	first := cm.cmState.lastSnapshotIndex + 1
 	if len(cm.cmState.log) > 0 {
@@ -118,9 +118,9 @@ func (cm *ConsensusModule) planReplication(peerID, savedCurrentTerm int) replica
 	prev := cm.leaderState.nextIndex[peerID] - 1
 	if !isNilInterface(cm.snapshotStore) &&
 		prev >= 0 && prev != cm.cmState.lastSnapshotIndex && prev < first {
-		return replicationSnapshot
+		return _replicationSnapshot
 	}
-	return replicationAppend
+	return _replicationAppend
 }
 
 // recordAttemptIfLeader фиксирует момент реальной попытки отправки RPC соседу,
@@ -168,7 +168,7 @@ func (cm *ConsensusModule) incReplFailuresIfLeader(peerID, savedCurrentTerm int)
 // иначе она обнулила бы флаг параллельной горутины, запущенной другим путём.
 func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dispatchEpoch uint64, ownsInflight bool) {
 	// Решение предотправочной фазы снимается до объявления defer: defer
-	// должен знать, завершилась ли горутина веткой replicationSkip, чтобы не
+	// должен знать, завершилась ли горутина веткой _replicationSkip, чтобы не
 	// выполнять перерассылку при активной задержке повторов.
 	plan := cm.planReplication(peerID, savedCurrentTerm)
 	defer func() {
@@ -177,7 +177,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 			cm.leaderState.inflightAE[peerID].Store(false)
 			// Немедленная перерассылка при неудовлетворённом verify-запросе:
 			// только владелец флага и только вне ветки задержки повторов.
-			if plan != replicationSkip {
+			if plan != _replicationSkip {
 				cm.redispatchVerifyIfPendingLocked(peerID, savedCurrentTerm, dispatchEpoch)
 			}
 		}
@@ -185,12 +185,12 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 	}()
 
 	switch plan {
-	case replicationSkip:
+	case _replicationSkip:
 		return
-	case replicationSnapshot:
+	case _replicationSnapshot:
 		cm.leaderSendSnapshot(peerID, savedCurrentTerm)
 		return
-	case replicationAppend:
+	case _replicationAppend:
 		// Продолжение метода: подготовка запроса и отправка.
 	}
 
@@ -202,7 +202,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 		cm.leaderSendSnapshot(peerID, savedCurrentTerm)
 		return
 	}
-	cm.traceLogf(traceLevelReplication, "sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
+	cm.traceLogf(_traceLevelReplication, "sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
 	cm.recordAttemptIfLeader(peerID, savedCurrentTerm)
 	cm.countAEOutbound(peerID)
 
@@ -239,7 +239,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 // пульса (интервал строго меньше HeartbeatTimeoutMs). Перерассылка выполняется
 // только владельцем флага (инвариант «на одного соседа не более одной живой
 // горутины репликации»), поэтому каскад горутин невозможен. Ветка
-// replicationSkip не перерассылает: AE всё равно не был бы отправлен, а смена
+// _replicationSkip не перерассылает: AE всё равно не был бы отправлен, а смена
 // горутин без прогресса была бы бесполезной.
 //
 // Требует удержания cm.mu; блокировку не берёт и не снимает.
@@ -320,7 +320,7 @@ func (cm *ConsensusModule) handleAEReply(
 
 	cm.recordPeerReplyLocked(peerID, savedCurrentTerm)
 	if reply.Term > cm.cmState.currentTerm {
-		cm.traceLockedLogf(traceLevelReplication, "term out of date in heartbeat reply")
+		cm.traceLockedLogf(_traceLevelReplication, "term out of date in heartbeat reply")
 		cm.becomeFollowerLocked(reply.Term)
 		return
 	}
@@ -364,7 +364,7 @@ func (cm *ConsensusModule) applyAESuccessLocked(peerID, ni, sentEntries int) {
 
 	cm.leaderState.commitmentTracker.setMatch(peerID, cm.leaderState.matchIndex[peerID], cm.lookupTermLocked)
 	cm.traceLockedLogf(
-		traceLevelReplication,
+		_traceLevelReplication,
 		"AppendEntries reply from %d success: nextIndex := %v, matchIndex := %v; commitIndex := %d",
 		peerID, cm.leaderState.nextIndex, cm.leaderState.matchIndex, cm.leaderState.commitmentTracker.getCommitIndex(),
 	)
@@ -445,7 +445,7 @@ func (cm *ConsensusModule) handleFailedAEReplyLocked(peerID int, reply AppendEnt
 			cm.counters.nextIndexRejectionIgnored, peerID,
 		)
 		cm.traceLockedLogf(
-			traceLevelKeyEvents,
+			_traceLevelKeyEvents,
 			"AppendEntries reply from %d rejected (impossible):"+
 				" peer=%d term=%d ni=%d matchIndex=%d ConflictIndex=%d ConflictTerm=%d",
 			peerID, peerID, reply.Term, newNi, cm.leaderState.matchIndex[peerID],
@@ -454,7 +454,7 @@ func (cm *ConsensusModule) handleFailedAEReplyLocked(peerID int, reply AppendEnt
 		return
 	}
 	cm.leaderState.nextIndex[peerID] = newNi
-	cm.traceLockedLogf(traceLevelReplication, "%s", failedAETrace(
+	cm.traceLockedLogf(_traceLevelReplication, "%s", failedAETrace(
 		peerID, cm.leaderState.nextIndex[peerID], cm.leaderState.matchIndex[peerID],
 		reply.ConflictIndex, reply.ConflictTerm,
 	))
@@ -561,15 +561,15 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
-		cm.traceLogf(traceLevelPreVote, "leaderSendSnapshot elapsed %s", elapsed)
+		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot elapsed %s", elapsed)
 	}()
-	cm.traceLogf(traceLevelPreVote, "leaderSendSnapshot peer %d: term=%d", peerID, term)
+	cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot peer %d: term=%d", peerID, term)
 
 	// Защита от nil-хранилища. Инвариант проверяется и в вызывающем коде
 	// (leaderSendAEsToPeer), но при рефакторинге он может нарушиться,
 	// а паника здесь упала бы в отдельной горутине без recover().
 	if isNilInterface(cm.snapshotStore) {
-		cm.traceLogf(traceLevelPreVote, "leaderSendSnapshot: snapshotStore is nil, cannot send to %d", peerID)
+		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot: snapshotStore is nil, cannot send to %d", peerID)
 		return
 	}
 
@@ -579,7 +579,7 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 		// повреждения/удаления постоянного хранилища: диагностика
 		// и best-effort восстановление форсированием нового снимка.
 		cm.traceLogf(
-			traceLevelKeyEvents,
+			_traceLevelKeyEvents,
 			"leaderSendSnapshot: cannot send snapshot to %d: err=%v, snapshots=%d",
 			peerID, err, len(snapshots),
 		)
@@ -597,16 +597,16 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 	// List() может вернуть слайс с nil-элементом или пустым ID — оба
 	// случая приводят к панике или некорректной работе Open().
 	if snapshots[0] == nil {
-		cm.traceLogf(traceLevelPreVote, "leaderSendSnapshot: snapshots[0] is nil")
+		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot: snapshots[0] is nil")
 		return
 	}
 	if snapshots[0].ID == "" {
-		cm.traceLogf(traceLevelPreVote, "leaderSendSnapshot: snapshots[0].ID is empty")
+		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot: snapshots[0].ID is empty")
 		return
 	}
 	meta, reader, err := cm.snapshotStore.Open(snapshots[0].ID)
 	if err != nil {
-		cm.traceLogf(traceLevelKeyEvents, "leaderSendSnapshot: cannot open snapshot %s for peer %d: %v", snapshots[0].ID, peerID, err)
+		cm.traceLogf(_traceLevelKeyEvents, "leaderSendSnapshot: cannot open snapshot %s for peer %d: %v", snapshots[0].ID, peerID, err)
 		return
 	}
 	defer func() { _ = reader.Close() }()
@@ -670,7 +670,7 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 // печатается фактически присвоенное значение
 // nextIndex (ранее ошибочно печаталось ni-1), а также matchIndex и поля
 // конфликта ответа — ровно тот набор, которого не хватило при разборе
-// обоих инцидентов. Выделена в чистую функцию: мутация traceCM и
+// обоих инцидентов. Выделена в чистую функцию: мутация _traceCM и
 // _traceLogger в тестах запрещена, формат проверяется
 // unit-тестом функции.
 func failedAETrace(peerID, nextIndex, matchIndex, conflictIndex, conflictTerm int) string {
@@ -691,8 +691,8 @@ func replicationBackoffDelay(failures int) time.Duration {
 		return 0
 	}
 	delay := HeartbeatTimeoutMs * time.Millisecond * time.Duration(1<<min(failures, 5))
-	if delay > maxReplicationBackoff {
-		delay = maxReplicationBackoff
+	if delay > _maxReplicationBackoff {
+		delay = _maxReplicationBackoff
 	}
 	return delay
 }

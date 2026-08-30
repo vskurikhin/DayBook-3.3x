@@ -19,26 +19,26 @@ import (
 	"github.com/vskurikhin/raft/pkg/api"
 )
 
-// traceKV — порог детализации отладочных сообщений KV-сервиса (traceLogf).
-// Сообщение выводится, если traceKV > 0. Значение задаётся полем
+// _traceKV — порог детализации отладочных сообщений KV-сервиса (traceLogf).
+// Сообщение выводится, если _traceKV > 0. Значение задаётся полем
 // TraceConfig.Level единственного успешного вызова SetTrace, по
 // умолчанию 0. Изменяется только до старта горутин.
-var traceKV = 0
+var _traceKV = 0
 
 // _traceLogger — логгер отладочных сообщений KV-сервиса (traceLogf).
 // По умолчанию выводит в стандартный логгер (stderr). Перенаправляется
 // в файл функцией SetTrace.
 var _traceLogger = log.Default()
 
-// traceConfigured — сторожевой флаг строгого set-once: единственная
+// _traceConfigured — сторожевой флаг строгого set-once: единственная
 // успешная конфигурация трассировки на процесс уже выполнена.
 // Устанавливается только успешным вызовом SetTrace
 // (вызов, завершившийся ошибкой I/O, окно не расходует).
-var traceConfigured atomic.Bool
+var _traceConfigured atomic.Bool
 
-// traceCMCreated — сторожевой флаг: в процессе уже создавался
+// _traceCMCreated — сторожевой флаг: в процессе уже создавался
 // KVService. Устанавливается конструктором New/NewKVService.
-var traceCMCreated atomic.Bool
+var _traceCMCreated atomic.Bool
 
 // TraceConfig — параметры трассировки KV-сервиса, передаваемые SetTrace.
 // Тип является простым носителем значений: у него нет методов и он не
@@ -64,16 +64,16 @@ type TraceConfig struct {
 //
 // SetTrace — единственная точка конфигурации трассировки пакета.
 func SetTrace(cfg TraceConfig) error {
-	if traceConfigured.Load() || traceCMCreated.Load() {
+	if _traceConfigured.Load() || _traceCMCreated.Load() {
 		return errors.New(
 			"kvservice: trace configuration must be set exactly once, " +
 				"before the first KVService is created; repeated calls are forbidden",
 		)
 	}
 	if cfg.LogFile == "" {
-		traceKV = cfg.Level
+		_traceKV = cfg.Level
 		_traceLogger = log.Default()
-		traceConfigured.Store(true)
+		_traceConfigured.Store(true)
 		return nil
 	}
 	// Порог присваивается только после успешного открытия файла.
@@ -81,21 +81,21 @@ func SetTrace(cfg TraceConfig) error {
 	if err != nil {
 		return err
 	}
-	traceKV = cfg.Level
+	_traceKV = cfg.Level
 	_traceLogger = log.New(f, "", log.LstdFlags|log.Lmicroseconds)
-	traceConfigured.Store(true)
+	_traceConfigured.Store(true)
 	return nil
 }
 
-// requestTimeout — таймаут для Apply-операций (PUT, CAS).
+// _requestTimeout — таймаут для Apply-операций (PUT, CAS).
 // Если за это время не удалось отправить команду в applyCh лидера,
 // возвращается ErrEnqueueTimeout.
-const requestTimeout = 10 * time.Second
+const _requestTimeout = 10 * time.Second
 
-// httpShutdownTimeout — тайм-аут плавной остановки HTTP-сервера
+// _httpShutdownTimeout — тайм-аут плавной остановки HTTP-сервера
 // сервиса: ожидание завершения обработчиков в Shutdown; по истечении
 // слушатель закрывается принудительно.
-const httpShutdownTimeout = 200 * time.Millisecond
+const _httpShutdownTimeout = 200 * time.Millisecond
 
 type KVService struct {
 	// id — идентификатор сервиса в кластере Raft.
@@ -158,7 +158,7 @@ func New(cfg *Config, readyChan <-chan any) *KVService {
 
 	// Сторожевой флаг контракта трассировки: конфигурация SetTrace
 	// разрешена только до создания первого сервиса (строгий set-once).
-	traceCMCreated.Store(true)
+	_traceCMCreated.Store(true)
 
 	kvs := &KVService{
 		id:         cfg.ServerID,
@@ -353,7 +353,7 @@ func (kvs *KVService) Shutdown() error {
 
 		if kvs.srv != nil {
 			kvs.traceLogf("shutting down HTTP server")
-			ctx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), _httpShutdownTimeout)
 			defer cancel()
 			// srv.Shutdown закрывает слушатель; ln.Close() дополнительно
 			// гарантирует освобождение порта при истечении ctx.
@@ -429,7 +429,7 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 		ID:    kvs.id,
 	}
 
-	future := kvs.rs.Apply(cmd, requestTimeout)
+	future := kvs.rs.Apply(cmd, _requestTimeout)
 
 	select {
 	case err := <-future.ErrorCh():
@@ -514,7 +514,7 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 		ID:           kvs.id,
 	}
 
-	future := kvs.rs.Apply(cmd, requestTimeout)
+	future := kvs.rs.Apply(cmd, _requestTimeout)
 
 	select {
 	case err := <-future.ErrorCh():
@@ -542,9 +542,9 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// traceLogf выводит отладочное сообщение, если traceKV > 0.
+// traceLogf выводит отладочное сообщение, если _traceKV > 0.
 func (kvs *KVService) traceLogf(format string, args ...any) {
-	if traceKV > 0 {
+	if _traceKV > 0 {
 		format = fmt.Sprintf("[kv %d] ", kvs.id) + format
 		_traceLogger.Printf(format, args...)
 	}
