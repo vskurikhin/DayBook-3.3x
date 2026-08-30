@@ -40,10 +40,6 @@ const (
 	// 2*_maxElectionTimeout + _preVoteRound + _applyBatchInterval + запас ≈ 2.5–3s.
 	_commitBudgetAfterFailover = 2*_maxElectionTimeout + _preVoteRound + _applyBatchInterval + _failoverBudgetMargin
 
-	// LeaktestBudget — единый бюджет leaktest:
-	// max(_inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
-	LeaktestBudget = 600 * time.Millisecond
-
 	// _leaderElectionBudget — бюджет ожидания выборов лидера
 	// (§9 architecture.md): 2*_maxElectionTimeout + _preVoteRound ≈ 2.3s.
 	// Применяется CheckSingleLeader вместо прежнего необоснованного
@@ -660,7 +656,7 @@ func (h *Harness) waitFor(desc string, budget time.Duration, cond func() bool, d
 // не станет истинным либо не истечёт budget; возвращает nil при успехе,
 // иначе ошибку с бюджетом, описанием и деталями diag.
 //
-// Тестовая инфраструктура по назначению. Файл testharness.go размещён вне
+// Тестовая инфраструктура по назначению. Файл harness_test.go размещён вне
 // _test-сборки по историческим причинам (внешние потребители харнесса
 // живут в других пакетах) и компилируется в обычную сборку пакета raft,
 // поэтому waitCond попадает в production-бинарники как неиспользуемый код;

@@ -19,6 +19,10 @@ const (
 	ReelectionTimeoutMs = 127 * Quantum
 	TickerTimeoutMs     = 7 * Quantum
 
+	// LeaktestBudget — единый бюджет leaktest:
+	// max(_inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
+	LeaktestBudget = 600 * time.Millisecond
+
 	// _defaultTCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
 	// в production-транспорте. Исходное значение 85ms получено из 382/2 при
 	// Quantum=3. Вынесено в независимую константу, чтобы изменение Quantum
