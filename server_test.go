@@ -54,3 +54,50 @@ func TestNewServerWrapper(t *testing.T) {
 		t.Fatalf("expected 2 peers, got %d", len(s.peerIds))
 	}
 }
+
+// TestServeMaxPool проверяет, что значение MaxPool из конфигурации доезжает
+// до TCP-транспорта, а ноль заменяется значением по умолчанию транспорта.
+func TestServeMaxPool(t *testing.T) {
+	tests := []struct {
+		name    string
+		maxPool int
+		want    int
+	}{
+		{name: "explicit", maxPool: 7, want: 7},
+		{name: "zero uses transport default", maxPool: 0, want: 2},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			commitChan := make(chan CommitEntry)
+			readerDone := make(chan any)
+			go func() {
+				defer close(readerDone)
+				for range commitChan {
+				}
+			}()
+
+			ready := make(chan any)
+			s := New(&Config{
+				Fsm:           NewCommitChannelFSM(commitChan),
+				MaxPool:       test.maxPool,
+				PeerIds:       []int{},
+				RPCAddress:    "127.0.0.1:0",
+				ServerID:      1,
+				Storage:       NewMapStorage(),
+				TCPRPCTimeout: TCPRPCTimeout,
+			}, ready)
+			s.Serve("127.0.0.1:0")
+			close(ready)
+			t.Cleanup(func() {
+				s.Shutdown()
+				close(commitChan)
+				<-readerDone
+			})
+
+			if s.transport.maxPool != test.want {
+				t.Fatalf("transport.maxPool = %d, want %d", s.transport.maxPool, test.want)
+			}
+		})
+	}
+}

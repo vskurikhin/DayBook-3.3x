@@ -16,6 +16,11 @@ const (
 	PrefixRPC  = "rpc://"
 )
 
+// DefaultMaxPool — значение по умолчанию для количества соединений в пуле
+// на один адрес соседа у узла raftkv. Значение по умолчанию транспорта
+// в пакете raft другое и равно 2.
+const DefaultMaxPool = 4
+
 type Values struct {
 	HTTPAddress net.Addr
 	RPCAddress  net.Addr
@@ -32,6 +37,9 @@ type Values struct {
 	// DataDir — директория для persistent-хранилища узла;
 	// пустая строка — вычисляется путь по умолчанию в cmd/main.go.
 	DataDir string
+	// MaxPool — максимальное количество соединений в пуле на один адрес
+	// соседа; ноль заменяется на DefaultMaxPool при сборке конфигурации узла.
+	MaxPool int
 
 	// PprofAddress — адрес отдельного HTTP-сервера профилирования;
 	// пустая строка выключает профилирование.
@@ -54,6 +62,7 @@ func ParseFlags() Values {
 	traceCMLogFileFlag := fs.String("trace-cm-log-file", "", "Trace consensus module log file path (empty = stderr)")
 	traceKVLogFileFlag := fs.String("trace-kv-log-file", "", "Trace key-value database log file path (empty = stderr)")
 	dataDirFlag := fs.String("data-dir", "", "Directory for persistent storage")
+	maxPoolFlag := fs.Int("max-pool", DefaultMaxPool, "Max connections pooled per peer address (0 = transport default)")
 	pprofAddressFlag := fs.String("pprof-addr", "", "Profiling HTTP server listen address (empty = disabled)")
 	blockProfileRateFlag := fs.Int("block-profile-rate", 0, "Block profile rate (0 = disabled)")
 	mutexProfileFractionFlag := fs.Int("mutex-profile-fraction", 0, "Mutex profile fraction (0 = disabled)")
@@ -87,6 +96,7 @@ func ParseFlags() Values {
 		TraceCMLogFile: *traceCMLogFileFlag,
 		TraceKVLogFile: *traceKVLogFileFlag,
 		DataDir:        *dataDirFlag,
+		MaxPool:        *maxPoolFlag,
 
 		PprofAddress:         *pprofAddressFlag,
 		BlockProfileRate:     *blockProfileRateFlag,

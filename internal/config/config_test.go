@@ -278,3 +278,33 @@ func TestParseFlagsProfiling(t *testing.T) {
 		t.Errorf("MutexProfileFraction = %d, want 5", v.MutexProfileFraction)
 	}
 }
+
+func TestParseFlagsMaxPoolDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.MaxPool != DefaultMaxPool {
+		t.Errorf("MaxPool = %d, want default %d", v.MaxPool, DefaultMaxPool)
+	}
+	if DefaultMaxPool != 4 {
+		t.Errorf("DefaultMaxPool = %d, want 4", DefaultMaxPool)
+	}
+}
+
+func TestParseFlagsMaxPool(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{
+		"raft", "-number", "1",
+		"--max-pool", "8",
+	}
+
+	v := ParseFlags()
+	if v.MaxPool != 8 {
+		t.Errorf("MaxPool = %d, want 8", v.MaxPool)
+	}
+}

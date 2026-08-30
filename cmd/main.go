@@ -74,6 +74,13 @@ func runWith(values *config.Values) (func(), error) {
 		return nil, fmt.Errorf("failed to create file snapshot store in %s: %w", dataDir, err)
 	}
 
+	// Ноль в конфигурации узла означает значение по умолчанию узла,
+	// а не значение по умолчанию транспорта.
+	maxPool := values.MaxPool
+	if maxPool <= 0 {
+		maxPool = config.DefaultMaxPool
+	}
+
 	cfg := kvservice.Config{
 		HTTPAddress: values.HTTPAddress.String(),
 		Config: raft.Config{
@@ -84,7 +91,7 @@ func runWith(values *config.Values) (func(), error) {
 			SnapshotStore: snapshotStore,
 			Storage:       raft.NewFileStorage(dataDir),
 			TCPRPCTimeout: raft.TCPRPCTimeout,
-			MaxPool:       4,
+			MaxPool:       maxPool,
 		},
 	}
 	kvs := kvservice.New(&cfg, ready)
