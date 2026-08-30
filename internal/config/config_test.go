@@ -165,6 +165,36 @@ func TestParseFlagsTraceLogDefaults(t *testing.T) {
 	}
 }
 
+// TestParseFlagsNodeDefaults — сводная сверка контракта дефолтов четырёх
+// параметров узла. Таблица «флаг → ожидаемое значение» против единого
+// источника — raft.TCPRPCTimeout / DefaultMaxPool /
+// raft.DefaultSnapshotInterval / raft.DefaultSnapshotThreshold. Защита
+// от рассинхрона дефолтов между internal/config и пакетом raft (RISK-023).
+func TestParseFlagsNodeDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+
+	cases := []struct {
+		name string
+		got  any
+		want any
+	}{
+		{"tcp-rpc-timeout", v.TCPRPCTimeout, raft.TCPRPCTimeout},
+		{"max-pool", v.MaxPool, DefaultMaxPool},
+		{"snapshot-interval", v.SnapshotInterval, raft.DefaultSnapshotInterval},
+		{"snapshot-threshold", v.SnapshotThreshold, raft.DefaultSnapshotThreshold},
+	}
+	for _, tc := range cases {
+		if tc.got != tc.want {
+			t.Errorf("%s = %v, want default %v", tc.name, tc.got, tc.want)
+		}
+	}
+}
+
 func TestParseFlagsTraceLog(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })

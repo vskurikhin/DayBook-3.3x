@@ -113,6 +113,22 @@ func ParseFlags() Values {
 		peers = parsePeers(peers, *peersFlag)
 	}
 
+	// Ранняя отказка для недопустимых значений флагов узла: сообщение
+	// содержит имя флага, фактическое значение и требование. Верхняя
+	// граница тайм-аута не вводится.
+	if *tcpRPCTimeoutFlag <= 0 {
+		log.Fatalf("-tcp-rpc-timeout must be greater than 0, got %v", *tcpRPCTimeoutFlag)
+	}
+	if *maxPoolFlag < 0 {
+		log.Fatalf("-max-pool must not be negative, got %d", *maxPoolFlag)
+	}
+	if *snapshotIntervalFlag <= 0 {
+		log.Fatalf("-snapshot-interval must be greater than 0, got %v", *snapshotIntervalFlag)
+	}
+	if *snapshotThresholdFlag < 1 {
+		log.Fatalf("-snapshot-threshold must be at least 1, got %d", *snapshotThresholdFlag)
+	}
+
 	return Values{
 		HTTPAddress:       httpAddress,
 		RPCAddress:        rpcAddress,

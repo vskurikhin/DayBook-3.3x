@@ -31,6 +31,28 @@ func TestRunWithEmptyPeers(t *testing.T) {
 	t.Cleanup(stop)
 }
 
+// TestRunWithNonDefaultNodeFlags запускает узел с нестандартными значениями
+// всех четырёх параметров узла: тайм-аут TCP RPC, размер пула, интервал
+// и порог снимков. Проверка значений внутри узла — поведенческая
+// (старт/стоп без ошибок, leaktest чист); маршрут значений до
+// raft.Config/ConsensusModule доказан юнит-тестами server_test.go.
+func TestRunWithNonDefaultNodeFlags(t *testing.T) {
+	t.Cleanup(leaktest.CheckTimeout(t, raft.LeaktestBudget))
+
+	values := newTestValues(t)
+	values.Peers = map[int]net.Addr{}
+	values.TCPRPCTimeout = 500 * time.Millisecond
+	values.MaxPool = 8
+	values.SnapshotInterval = time.Second
+	values.SnapshotThreshold = 32
+
+	stop, err := runWith(&values)
+	if err != nil {
+		t.Fatalf("runWith with non-default node flags returned unexpectedly: %v", err)
+	}
+	t.Cleanup(stop)
+}
+
 // TestRunWithPeerConnect запускает узел, подключённый к серверу-соседу.
 func TestRunWithPeerConnect(t *testing.T) {
 	t.Cleanup(leaktest.CheckTimeout(t, raft.LeaktestBudget))
