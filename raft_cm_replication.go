@@ -140,7 +140,7 @@ func (cm *ConsensusModule) planReplication(peerID, savedCurrentTerm int) replica
 func (cm *ConsensusModule) recordAttemptIfLeader(peerID, savedCurrentTerm int) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	if cm.cmState.state == Leader && cm.cmState.currentTerm == savedCurrentTerm {
+	if cm.isLeaderForTermLocked(savedCurrentTerm) {
 		cm.recordAttemptLocked(peerID)
 	}
 }
@@ -152,9 +152,21 @@ func (cm *ConsensusModule) recordAttemptIfLeader(peerID, savedCurrentTerm int) {
 func (cm *ConsensusModule) incReplFailuresIfLeader(peerID, savedCurrentTerm int) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	if cm.cmState.state == Leader && cm.cmState.currentTerm == savedCurrentTerm {
+	if cm.isLeaderForTermLocked(savedCurrentTerm) {
 		cm.incReplFailuresLocked(peerID)
 	}
+}
+
+// isLeaderForTermLocked сообщает, является ли узел лидером в терме term:
+// роль Leader и совпадение текущего терма. Предикат сверяет только роль
+// и текущий терм и не заменяет сверку reply.Term на местах применения
+// результата — расширенные сверки (запоздалый или несогласованный сосед)
+// остаются инлайн в условиях вызова. Запоздалые горутины прошлых термов
+// и лидеры, шагнувшие вниз, получают false — состояние нового лидерства
+// ими не меняется.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) isLeaderForTermLocked(term int) bool {
+	return cm.cmState.state == Leader && cm.cmState.currentTerm == term
 }
 
 // leaderSendAEsToPeer отправляет AppendEntries указанному соседу и
@@ -270,7 +282,7 @@ func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentT
 	}
 	// Условие перерассылки — все три одновременно: узел всё ещё лидер того же
 	// терма и есть verify, поставленный позже отправки завершившегося AE.
-	if cm.cmState.state != Leader || cm.cmState.currentTerm != savedCurrentTerm {
+	if !cm.isLeaderForTermLocked(savedCurrentTerm) {
 		return
 	}
 	if !hasPendingVerifyAfterEpoch(cm.leaderState.pendingVerify, dispatchEpoch) {
@@ -348,8 +360,7 @@ func (cm *ConsensusModule) handleAEReply(
 	// Без сверки с текущим термом успех прежнего лидерства применился бы к
 	// свежим картам репликации нового лидерства, не сбрасывая при этом
 	// счётчик транспортных ошибок (recordPeerReplyLocked сверяет текущий терм).
-	if cm.cmState.state != Leader || savedCurrentTerm != reply.Term ||
-		savedCurrentTerm != cm.cmState.currentTerm {
+	if !cm.isLeaderForTermLocked(savedCurrentTerm) || savedCurrentTerm != reply.Term {
 		return
 	}
 	if !reply.Success {
@@ -429,7 +440,7 @@ func (cm *ConsensusModule) countVerifyVotesLocked(peerID int, dispatchEpoch uint
 // попытки прошло меньше задержки, вычисленной по числу транспортных
 // ошибок. Требует удержания cm.mu.
 func (cm *ConsensusModule) replicationBackoffActiveLocked(peerID, savedCurrentTerm int) bool {
-	if cm.cmState.state != Leader || cm.cmState.currentTerm != savedCurrentTerm {
+	if !cm.isLeaderForTermLocked(savedCurrentTerm) {
 		return false
 	}
 	delay := replicationBackoffDelay(cm.leaderState.replFailures[peerID])
@@ -641,7 +652,7 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 	// отправленных снимков: «лидер повторно шлёт
 	// снимок?» — инкремент на каждую реальную отправку через транспорт.
 	cm.mu.Lock()
-	if cm.cmState.state == Leader && cm.cmState.currentTerm == term {
+	if cm.isLeaderForTermLocked(term) {
 		cm.recordAttemptLocked(peerID)
 	}
 	cm.counters.installSnapshotSent = incPeerCount(cm.counters.installSnapshotSent, peerID)
@@ -652,7 +663,7 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 		// Задержка повторов активируется только транспортными ошибками
 		// для текущего лидерства.
 		cm.mu.Lock()
-		if cm.cmState.state == Leader && cm.cmState.currentTerm == term {
+		if cm.isLeaderForTermLocked(term) {
 			cm.incReplFailuresLocked(peerID)
 		}
 		cm.mu.Unlock()
@@ -675,8 +686,7 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 	// применяется только в терме отправки, совпадающем с текущим.
 	// Сверка с термом ответа сохранена как защита от несогласованного ответа
 	// соседа: при Success:true протокол гарантирует reply.Term == term.
-	if reply.Success && cm.cmState.state == Leader &&
-		cm.cmState.currentTerm == term && reply.Term == term {
+	if reply.Success && cm.isLeaderForTermLocked(term) && reply.Term == term {
 		cm.leaderState.nextIndex[peerID] = meta.Index + 1
 		cm.leaderState.matchIndex[peerID] = meta.Index
 		// matchIndex = meta.Index означает сохранённое на диске владение префиксом
@@ -735,7 +745,7 @@ func (cm *ConsensusModule) recordAttemptLocked(peerID int) {
 // лидерства: term — терм, снятый до отправки RPC.
 // Требует удержания cm.mu.
 func (cm *ConsensusModule) recordPeerReplyLocked(peerID, term int) {
-	if cm.cmState.state != Leader || cm.cmState.currentTerm != term {
+	if !cm.isLeaderForTermLocked(term) {
 		return
 	}
 	cm.resetReplFailuresLocked(peerID)
