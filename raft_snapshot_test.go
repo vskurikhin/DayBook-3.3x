@@ -1447,7 +1447,7 @@ func TestSnapshot_InstallIdempotency(t *testing.T) {
 	// Счётчик no-op'ов на follower'е учитывает обе отправки.
 	cm := h.cluster[followerID]
 	cm.mu.Lock()
-	stale := peerSum(cm.counters.installSnapshotSkippedStale)
+	stale := peerSumLocked(cm.counters.installSnapshotSkippedStale)
 	cm.mu.Unlock()
 	if stale < 2 {
 		t.Fatalf("installSnapshotSkippedStale = %d, want >= 2", stale)

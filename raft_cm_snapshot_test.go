@@ -252,7 +252,7 @@ func TestInstallSnapshot_StaleDoesNotRollBack(t *testing.T) {
 	if cm.cmState.lastSnapshotIndex != 10 {
 		t.Fatalf("lastSnapshotIndex = %d, want 10 (unchanged)", cm.cmState.lastSnapshotIndex)
 	}
-	if got := peerSum(cm.counters.installSnapshotSkippedStale); got < 1 {
+	if got := peerSumLocked(cm.counters.installSnapshotSkippedStale); got < 1 {
 		t.Fatalf("installSnapshotSkippedStale = %d, want >= 1", got)
 	}
 }

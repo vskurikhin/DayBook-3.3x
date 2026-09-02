@@ -285,7 +285,7 @@ func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentT
 	if !cm.isLeaderForTermLocked(savedCurrentTerm) {
 		return
 	}
-	if !hasPendingVerifyAfterEpoch(cm.leaderState.pendingVerify, dispatchEpoch) {
+	if !hasPendingVerifyAfterEpochLocked(cm.leaderState.pendingVerify, dispatchEpoch) {
 		return
 	}
 	// Окно троттлинга: не более одной перерассылки соседу за минимальный
@@ -294,7 +294,7 @@ func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentT
 	// отправка без фактической рассылки не должна подавлять перерассылку.
 	now := time.Now()
 	if !now.After(cm.leaderState.nextVerifyRedispatchAt[peerID]) {
-		cm.counters.verifyRedispatchSuppressed = incPeerCount(cm.counters.verifyRedispatchSuppressed, peerID)
+		cm.counters.verifyRedispatchSuppressed = incPeerCountLocked(cm.counters.verifyRedispatchSuppressed, peerID)
 		return
 	}
 	// Свежая эпоха под той же блокировкой: не меньше эпохи любого текущего
@@ -309,13 +309,14 @@ func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentT
 	// Метка окна и счётчик перерассылок — только при фактическом запуске
 	// горутины: неуспешный CAS выше вернулся бы до этой точки.
 	cm.leaderState.nextVerifyRedispatchAt[peerID] = now.Add(cm.verifyRedispatchMinInterval)
-	cm.counters.verifyRedispatched = incPeerCount(cm.counters.verifyRedispatched, peerID)
+	cm.counters.verifyRedispatched = incPeerCountLocked(cm.counters.verifyRedispatched, peerID)
 }
 
-// hasPendingVerifyAfterEpoch сообщает, есть ли в очереди verify-запрос с
-// эпохой позже dispatchEpoch — поставленный после отправки AppendEntries,
+// hasPendingVerifyAfterEpochLocked сообщает, есть ли в очереди verify-запрос
+// с эпохой позже dispatchEpoch — поставленный после отправки AppendEntries,
 // ответ которого такому запросу голосом не является.
-func hasPendingVerifyAfterEpoch(pending []*verifyFuture, dispatchEpoch uint64) bool {
+// Требует удержания cm.mu — мьютекса владельца очереди verify-запросов.
+func hasPendingVerifyAfterEpochLocked(pending []*verifyFuture, dispatchEpoch uint64) bool {
 	for _, vf := range pending {
 		if vf.epoch > dispatchEpoch {
 			return true
@@ -331,7 +332,7 @@ func hasPendingVerifyAfterEpoch(pending []*verifyFuture, dispatchEpoch uint64) b
 // Самостоятельно захватывает и освобождает cm.mu.
 func (cm *ConsensusModule) countAEOutbound(peerID int) {
 	cm.mu.Lock()
-	cm.counters.aeSentPerPeer = incPeerCount(cm.counters.aeSentPerPeer, peerID)
+	cm.counters.aeSentPerPeer = incPeerCountLocked(cm.counters.aeSentPerPeer, peerID)
 	cm.mu.Unlock()
 }
 
@@ -457,7 +458,7 @@ func (cm *ConsensusModule) replicationBackoffActiveLocked(peerID, savedCurrentTe
 func (cm *ConsensusModule) handleFailedAEReplyLocked(peerID int, reply AppendEntriesReply) {
 	// Счётчик отказов AE: «follower отвергает
 	// AppendEntries?» — ключевой признак цикла IS↔AE-fail.
-	cm.counters.appendEntriesRejected = incPeerCount(cm.counters.appendEntriesRejected, peerID)
+	cm.counters.appendEntriesRejected = incPeerCountLocked(cm.counters.appendEntriesRejected, peerID)
 	newNi := reply.ConflictIndex
 	if reply.ConflictTerm >= 0 {
 		if lastIndex, ok := cm.cmState.termIndexMap[reply.ConflictTerm]; ok {
@@ -471,7 +472,7 @@ func (cm *ConsensusModule) handleFailedAEReplyLocked(peerID int, reply AppendEnt
 	// прецедент etcd/raft Progress.MaybeDecrTo. Аномалия
 	// наблюдаема через счётчик и трассировку уровня 0.
 	if reply.ConflictIndex < 0 || newNi <= cm.leaderState.matchIndex[peerID] {
-		cm.counters.nextIndexRejectionIgnored = incPeerCount(
+		cm.counters.nextIndexRejectionIgnored = incPeerCountLocked(
 			cm.counters.nextIndexRejectionIgnored, peerID,
 		)
 		cm.traceLockedLogf(
@@ -655,7 +656,7 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 	if cm.isLeaderForTermLocked(term) {
 		cm.recordAttemptLocked(peerID)
 	}
-	cm.counters.installSnapshotSent = incPeerCount(cm.counters.installSnapshotSent, peerID)
+	cm.counters.installSnapshotSent = incPeerCountLocked(cm.counters.installSnapshotSent, peerID)
 	cm.mu.Unlock()
 
 	reply, err := cm.transport.InstallSnapshot(ServerID(peerID), req, reader)

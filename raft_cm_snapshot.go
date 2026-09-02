@@ -130,7 +130,7 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	cm.mu.Lock()
 	stale := req.LastLogIndex <= cm.cmState.lastSnapshotIndex
 	if stale {
-		cm.counters.installSnapshotSkippedStale = incPeerCount(cm.counters.installSnapshotSkippedStale, req.LeaderID)
+		cm.counters.installSnapshotSkippedStale = incPeerCountLocked(cm.counters.installSnapshotSkippedStale, req.LeaderID)
 	}
 	lastSnapshotIndex := cm.cmState.lastSnapshotIndex
 	cm.mu.Unlock()
