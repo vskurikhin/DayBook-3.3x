@@ -84,6 +84,17 @@ func (cm *ConsensusModule) nextIndexArgsEntries(
 	}, entries, snapshotNeeded
 }
 
+// prevInSnapshotHoleLocked сообщает, попадает ли индекс prev в интервал между
+// снимком и журналом: prev неотрицателен, не совпадает с границей снимка
+// (lastSnapshotIndex — при совпадении терм известен из метаданных снимка)
+// и меньше первого индекса, для которого лидер может сообщить терм.
+// Это единственный случай, когда lookupTermLocked(prev) возвращает -1
+// и вместо AppendEntries нужно отправить снимок.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) prevInSnapshotHoleLocked(prev, first int) bool {
+	return prev >= 0 && prev != cm.cmState.lastSnapshotIndex && prev < first
+}
+
 // planReplication выбирает действие репликации на соседа: пропустить попытку,
 // отправить снимок или отправить AppendEntries.
 //
@@ -116,8 +127,7 @@ func (cm *ConsensusModule) planReplication(peerID, savedCurrentTerm int) replica
 		first = cm.cmState.log[0].Index
 	}
 	prev := cm.leaderState.nextIndex[peerID] - 1
-	if !isNilInterface(cm.snapshotStore) &&
-		prev >= 0 && prev != cm.cmState.lastSnapshotIndex && prev < first {
+	if !isNilInterface(cm.snapshotStore) && cm.prevInSnapshotHoleLocked(prev, first) {
 		return _replicationSnapshot
 	}
 	return _replicationAppend
