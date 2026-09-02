@@ -321,7 +321,8 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 
 	// Проверка наличия известного лидера.
 	// Если есть лидер, но это leadership transfer — голосуем (bypass).
-	if cm.cmState.leaderID >= 0 && cm.cmState.leaderID != args.CandidateID && !args.LeadershipTransfer {
+	leaderIDKnown := cm.cmState.leaderID >= 0
+	if leaderIDKnown && cm.cmState.leaderID != args.CandidateID && !args.LeadershipTransfer {
 		cm.traceLockedLogf(_traceLevelPreVote, "... leader known, denying vote for %d", args.CandidateID)
 		reply.VoteGranted = false
 		reply.RPCHeader = RPCHeader{
@@ -432,8 +433,9 @@ func (cm *ConsensusModule) RequestPreVote(args RequestPreVoteArgs, reply *Reques
 	}
 
 	// Log-safety: отклонить, если лог получателя новее лога кандидата.
-	if lastLogTerm > args.LastLogTerm ||
-		(lastLogTerm == args.LastLogTerm && lastLogIndex > args.LastLogIndex) {
+	localLogNewer := lastLogTerm > args.LastLogTerm ||
+		(lastLogTerm == args.LastLogTerm && lastLogIndex > args.LastLogIndex)
+	if localLogNewer {
 		cm.traceLockedLogf(_traceLevelPreVote, "... RequestPreVote denied: log is more up-to-date")
 		return nil
 	}
