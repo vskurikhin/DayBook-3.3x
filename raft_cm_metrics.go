@@ -245,7 +245,8 @@ func (c *stepDownCounters) report() string {
 
 // incPeerCount инкрементирует счётчик по каждому соседу, лениво инициализируя
 // карту (нулевое значение raftCounters должно быть готово к использованию),
-// и возвращает (возможно, переаллоцированную) карту. Требует удержания cm.mu.
+// и возвращает (возможно, переаллоцированную) карту.
+// Требует удержания cm.mu.
 func incPeerCount(m map[int]int64, peerID int) map[int]int64 {
 	if m == nil {
 		m = make(map[int]int64)

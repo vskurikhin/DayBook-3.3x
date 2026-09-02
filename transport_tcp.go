@@ -539,15 +539,14 @@ func (t *TCPTransport) handleCommand(r *bufio.Reader, _ net.Conn, dec *gob.Decod
 		cmd = &v
 	}
 
-	// Для InstallSnapshot читаем данные снимка напрямую из TCP-соединения,
-	// минуя bufio.Reader, который используется gob.Decoder. После ошибок
-	// декодирования gob внутреннее состояние bufio (b.r/b.w) может быть
-	// повреждено, поэтому разделяем источники данных.
-	// conn.Read безопасен — handleConn не вызывает conn.Read до следующей
-	// итерации цикла (flush + decode).
+	// Данные снимка не входят в gob-команду — они идут следом в том же потоке.
+	// Поэтому для InstallSnapshot потребитель получает отдельный io.Reader
+	// поверх r, ограниченный DataSize.
+	snapReq, isSnapReq := cmd.(*InstallSnapshotRequest)
+	hasSnapshotData := isSnapReq && snapReq.DataSize > 0
 	var snapReader io.ReadCloser
-	if req, ok := cmd.(*InstallSnapshotRequest); ok && req.DataSize > 0 {
-		snapReader = io.NopCloser(io.LimitReader(r, req.DataSize))
+	if hasSnapshotData {
+		snapReader = io.NopCloser(io.LimitReader(r, snapReq.DataSize))
 	}
 
 	// Heartbeat fast-path: если это heartbeat и установлен обработчик,
@@ -576,8 +575,8 @@ RESP:
 	var respErr string
 	var respReply any
 	respTimeout := t.timeout
-	if req, ok := cmd.(*InstallSnapshotRequest); ok && req.DataSize > 0 {
-		scaled := t.timeout * time.Duration(req.DataSize/int64(_connSendBufferSize))
+	if hasSnapshotData {
+		scaled := t.timeout * time.Duration(snapReq.DataSize/int64(_connSendBufferSize))
 		if scaled > respTimeout {
 			respTimeout = scaled
 		}

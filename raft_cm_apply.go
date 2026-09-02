@@ -79,7 +79,7 @@ func (cm *ConsensusModule) applySingle(batch []*commitTuple) {
 // processLogs собирает зафиксированные записи от lastApplied+1 до commitIndex
 // и отправляет их в FSM goroutine. Диапазон делится на под-батчи размером
 // не более _maxApplyBatchSize для снижения latency FSM.
-// Метод не требует удержания cm.mu при вызове, но сам захватывает её
+// Метод НЕ ТРЕБУЕТ удержания cm.mu при вызове, но сам захватывает её
 // внутри для чтения журнала и поиска future в карте inflight.
 func (cm *ConsensusModule) processLogs(commitIndex int) {
 	startTimeNow := time.Now()
