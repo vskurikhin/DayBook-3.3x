@@ -183,7 +183,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 	plan := cm.planReplication(peerID, savedCurrentTerm)
 	defer func() {
 		cm.mu.Lock()
-		if ownsInflight && cm.leaderState.inflightAE != nil && cm.leaderState.inflightAE[peerID] != nil {
+		if ownsInflight && cm.inflightPresentLocked(peerID) {
 			cm.leaderState.inflightAE[peerID].Store(false)
 			// Немедленная перерассылка при неудовлетворённом verify-запросе:
 			// только владелец флага и только вне ветки задержки повторов.
@@ -224,6 +224,17 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 	cm.handleAEReply(peerID, savedCurrentTerm, ni, len(entries), reply, dispatchEpoch)
 }
 
+// inflightPresentLocked сообщает, существуют ли карта inflightAE и флаг
+// соседа в ней. nil-значения защищают от изменения конфигурации: сосед
+// мог быть исключён из состава кластера, пока выполнялась горутина
+// репликации. Существование флага не даёт права его сбрасывать: флаг
+// захватывается только через CompareAndSwap(false, true), сброс
+// выполняет только горутина-владелец.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) inflightPresentLocked(peerID int) bool {
+	return cm.leaderState.inflightAE != nil && cm.leaderState.inflightAE[peerID] != nil
+}
+
 // redispatchVerifyIfPendingLocked выполняет немедленную перерассылку
 // AppendEntries соседу после завершения горутины репликации, если остался
 // verify-запрос, поставленный позже момента отправки завершившегося AE.
@@ -254,9 +265,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 //
 // Требует удержания cm.mu; блокировку не берёт и не снимает.
 func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentTerm int, dispatchEpoch uint64) {
-	// nil-проверки защищают от изменения конфигурации: сосед мог быть
-	// исключён из состава кластера, пока выполнялась горутина репликации.
-	if cm.leaderState.inflightAE == nil || cm.leaderState.inflightAE[peerID] == nil {
+	if !cm.inflightPresentLocked(peerID) {
 		return
 	}
 	// Условие перерассылки — все три одновременно: узел всё ещё лидер того же
