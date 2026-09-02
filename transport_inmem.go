@@ -5,6 +5,8 @@ import (
 	"io"
 	"sync"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // InmemTransport — реализация Transport, работающая в оперативной памяти
@@ -14,7 +16,7 @@ import (
 //
 // Потокобезопасность: Connect/Disconnect/IsDisconnected защищены sync.Mutex.
 // Consumer() и LocalAddr() не требуют блокировки.
-// После Close() все методы возвращают ErrRaftShutdown.
+// После Close() все методы возвращают contract.ErrRaftShutdown.
 type InmemTransport struct {
 	consumerCh chan RPC
 	localAddr  ServerAddress
@@ -57,14 +59,14 @@ func (t *InmemTransport) LocalAddr() ServerAddress {
 
 // AppendEntries отправляет AppendEntries RPC узлу peerID.
 // Блокируется до получения ответа или тайм-аута. Тайм-аут — t.timeout (500ms).
-// Возвращает ErrNotReachable, ErrRaftShutdown или ErrEnqueueTimeout.
+// Возвращает contract.ErrNotReachable, contract.ErrRaftShutdown или contract.ErrEnqueueTimeout.
 //
 //nolint:gocritic
 func (t *InmemTransport) AppendEntries(peerID ServerID, args AppendEntriesArgs) (AppendEntriesReply, error) {
 	var zero AppendEntriesReply
 	select {
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	default:
 	}
 	peer, err := t.getPeer(peerID)
@@ -75,12 +77,12 @@ func (t *InmemTransport) AppendEntries(peerID ServerID, args AppendEntriesArgs) 
 	select {
 	case peer.consumerCh <- RPC{Command: &args, RespChan: respCh}:
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
 		// Таймаут защищает от вечной блокировки при остановленном получателе.
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 	select {
 	case resp := <-respCh:
@@ -93,11 +95,11 @@ func (t *InmemTransport) AppendEntries(peerID ServerID, args AppendEntriesArgs) 
 		}
 		return *reply, nil
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 }
 
@@ -107,7 +109,7 @@ func (t *InmemTransport) RequestVote(peerID ServerID, args RequestVoteArgs) (Req
 	var zero RequestVoteReply
 	select {
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	default:
 	}
 	peer, err := t.getPeer(peerID)
@@ -118,12 +120,12 @@ func (t *InmemTransport) RequestVote(peerID ServerID, args RequestVoteArgs) (Req
 	select {
 	case peer.consumerCh <- RPC{Command: &args, RespChan: respCh}:
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
 		// Таймаут защищает от вечной блокировки при остановленном получателе.
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 	select {
 	case resp := <-respCh:
@@ -136,11 +138,11 @@ func (t *InmemTransport) RequestVote(peerID ServerID, args RequestVoteArgs) (Req
 		}
 		return *reply, nil
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 }
 
@@ -150,7 +152,7 @@ func (t *InmemTransport) RequestPreVote(peerID ServerID, args RequestPreVoteArgs
 	var zero RequestPreVoteReply
 	select {
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	default:
 	}
 	peer, err := t.getPeer(peerID)
@@ -161,15 +163,15 @@ func (t *InmemTransport) RequestPreVote(peerID ServerID, args RequestPreVoteArgs
 	select {
 	case peer.consumerCh <- RPC{Command: &args, RespChan: respCh}:
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
 		// Ограничение блокировки отправителя:
 		// при остановленном получателе с ещё открытым транспортом
 		// enqueue не должен блокироваться навсегда — join в Stop()
 		// обязан оставаться конечным.
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 	select {
 	case resp := <-respCh:
@@ -182,11 +184,11 @@ func (t *InmemTransport) RequestPreVote(peerID ServerID, args RequestPreVoteArgs
 		}
 		return *reply, nil
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 }
 
@@ -197,7 +199,7 @@ func (t *InmemTransport) TimeoutNow(peerID ServerID, args TimeoutNowRequest) (Ti
 	var zero TimeoutNowResponse
 	select {
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	default:
 	}
 	peer, err := t.getPeer(peerID)
@@ -208,15 +210,15 @@ func (t *InmemTransport) TimeoutNow(peerID ServerID, args TimeoutNowRequest) (Ti
 	select {
 	case peer.consumerCh <- RPC{Command: &args, RespChan: respCh}:
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
 		// Ограничение блокировки отправителя:
 		// при остановленном получателе с ещё открытым транспортом
 		// enqueue не должен блокироваться навсегда — join в Stop()
 		// обязан оставаться конечным.
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 	select {
 	case resp := <-respCh:
@@ -229,11 +231,11 @@ func (t *InmemTransport) TimeoutNow(peerID ServerID, args TimeoutNowRequest) (Ti
 		}
 		return *reply, nil
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 }
 
@@ -248,7 +250,7 @@ func (t *InmemTransport) InstallSnapshot(
 	var zero InstallSnapshotResponse
 	select {
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	default:
 	}
 	peer, err := t.getPeer(peerID)
@@ -259,11 +261,11 @@ func (t *InmemTransport) InstallSnapshot(
 	select {
 	case peer.consumerCh <- RPC{Command: &req, Reader: data, RespChan: respCh}:
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 	select {
 	case resp := <-respCh:
@@ -276,17 +278,17 @@ func (t *InmemTransport) InstallSnapshot(
 		}
 		return *reply, nil
 	case <-peer.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-t.shutdownCh:
-		return zero, ErrRaftShutdown
+		return zero, contract.ErrRaftShutdown
 	case <-time.After(t.timeout):
-		return zero, ErrEnqueueTimeout
+		return zero, contract.ErrEnqueueTimeout
 	}
 }
 
 // AppendEntriesPipeline возвращает конвейер. Не реализован.
 func (t *InmemTransport) AppendEntriesPipeline(_ ServerID) (AppendPipeline, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 // SetHeartbeatHandler сохраняет обработчик heartbeat-сообщений.
@@ -331,7 +333,7 @@ func (t *InmemTransport) IsDisconnected(peerID ServerID) bool {
 // Close завершает работу транспорта: закрывает shutdownCh, дренирует consumerCh
 // и очищает карту peers.
 //
-// После Close все вызовы AppendEntries/RequestVote вернут ErrRaftShutdown.
+// После Close все вызовы AppendEntries/RequestVote вернут contract.ErrRaftShutdown.
 // consumerCh не закрывается — runRPCReader выходит по shutdownCh.
 // Close идемпотентен: повторный вызов — no-op.
 //
@@ -369,7 +371,7 @@ func (t *InmemTransport) getPeer(peerID ServerID) (*InmemTransport, error) {
 	defer t.mu.Unlock()
 	peer, ok := t.peers[peerID]
 	if !ok {
-		return nil, ErrNotReachable
+		return nil, contract.ErrNotReachable
 	}
 	return peer, nil
 }

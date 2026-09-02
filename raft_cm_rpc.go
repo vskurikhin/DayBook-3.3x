@@ -2,6 +2,8 @@ package raft
 
 import (
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // runRPCReader — горутина, читающая входящие RPC-запросы из транспорта
@@ -46,7 +48,7 @@ func (cm *ConsensusModule) handleRPC(rpc RPC) {
 	case *InstallSnapshotRequest:
 		cm.handleInstallSnapshot(rpc, cmd)
 	default:
-		cm.respondRPC(rpc, nil, ErrNotImplemented)
+		cm.respondRPC(rpc, nil, contract.ErrNotImplemented)
 	}
 }
 

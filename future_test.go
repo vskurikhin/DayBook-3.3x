@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // --- deferError ---
@@ -46,7 +47,7 @@ func TestDeferErrorShutdown(t *testing.T) {
 	d := &deferError{}
 	d.init(shutdownCh)
 	close(shutdownCh)
-	if err := d.Error(); err != ErrRaftShutdown {
+	if err := d.Error(); err != contract.ErrRaftShutdown {
 		t.Fatalf("got %v, want ErrRaftShutdown", err)
 	}
 }
@@ -113,7 +114,7 @@ func TestDeferErrorConcurrentCalls(t *testing.T) {
 	wg.Wait()
 
 	for i, err := range errs {
-		if err != ErrRaftShutdown {
+		if err != contract.ErrRaftShutdown {
 			t.Errorf("errs[%d] = %v, want ErrRaftShutdown", i, err)
 		}
 	}
@@ -186,11 +187,11 @@ func (f *CaptureFSM) Entries() []LogEntry {
 }
 
 func (f *CaptureFSM) Snapshot() (FSMSnapshot, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 func (f *CaptureFSM) Restore(_ io.ReadCloser) error {
-	return ErrNotImplemented
+	return contract.ErrNotImplemented
 }
 
 // captureCommitFSM отправляет данные и в CaptureFSM, и в CommitChannelFSM.
@@ -399,7 +400,7 @@ func TestApplyAfterShutdown(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	future := cm.Apply("cmd", 0)
-	if err := future.Error(); err != ErrRaftShutdown {
+	if err := future.Error(); err != contract.ErrRaftShutdown {
 		t.Fatalf("got %v, want ErrRaftShutdown", err)
 	}
 }
@@ -565,7 +566,7 @@ func TestApplyInflightOnLeaderCrash(t *testing.T) {
 	h.waitForApplyInflight(origLeaderId, inflightBefore+1, _commitBudgetSteady)
 	h.CrashPeer(origLeaderId)
 
-	if err := future.Error(); err != ErrLeadershipLost && err != ErrRaftShutdown {
+	if err := future.Error(); err != ErrLeadershipLost && err != contract.ErrRaftShutdown {
 		t.Fatalf("got %v, want ErrLeadershipLost or ErrRaftShutdown", err)
 	}
 }

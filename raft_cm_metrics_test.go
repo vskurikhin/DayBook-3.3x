@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // -- Тесты подсистемы latency-метрик. ---
@@ -534,7 +535,7 @@ func (f *countBatchesFSM) appliedCount() int {
 func (f *countBatchesFSM) Apply(*LogEntry) any { return nil }
 
 // Snapshot — заглушка; в T9 снимки не используются.
-func (f *countBatchesFSM) Snapshot() (FSMSnapshot, error) { return nil, ErrNotImplemented }
+func (f *countBatchesFSM) Snapshot() (FSMSnapshot, error) { return nil, contract.ErrNotImplemented }
 
 // Restore — заглушка; в T9 восстановление не используется.
-func (f *countBatchesFSM) Restore(io.ReadCloser) error { return ErrNotImplemented }
+func (f *countBatchesFSM) Restore(io.ReadCloser) error { return contract.ErrNotImplemented }

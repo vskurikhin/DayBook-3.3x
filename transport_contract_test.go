@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // transportPairFactory создаёт пару соединённых транспортов (client, server, cleanup)
@@ -262,18 +263,18 @@ func TestTransportStubsReturnNotImplemented(t *testing.T) {
 			client, _, cleanup := tt.fn(t)
 			defer cleanup()
 
-			if _, err := client.RequestPreVote(1, RequestPreVoteArgs{}); err == nil || err == ErrNotImplemented {
+			if _, err := client.RequestPreVote(1, RequestPreVoteArgs{}); err == nil || err == contract.ErrNotImplemented {
 				t.Fatalf("RequestPreVote: want transport error, got %v", err)
 			}
-			if _, err := client.TimeoutNow(1, TimeoutNowRequest{}); err == nil || err == ErrNotImplemented {
+			if _, err := client.TimeoutNow(1, TimeoutNowRequest{}); err == nil || err == contract.ErrNotImplemented {
 				t.Fatalf("TimeoutNow: want transport error, got %v", err)
 			}
-			// InmemTransport реализует InstallSnapshot и возвращает ErrNotReachable
-			// (или другую транспортную ошибку), а TCPTransport — ErrNotImplemented.
+			// InmemTransport реализует InstallSnapshot и возвращает contract.ErrNotReachable
+			// (или другую транспортную ошибку), а TCPTransport — contract.ErrNotImplemented.
 			if _, err := client.InstallSnapshot(1, InstallSnapshotRequest{}, nil); err == nil {
 				t.Fatalf("InstallSnapshot: want error, got nil")
 			}
-			if _, err := client.AppendEntriesPipeline(1); err != ErrNotImplemented {
+			if _, err := client.AppendEntriesPipeline(1); err != contract.ErrNotImplemented {
 				t.Fatalf("AppendEntriesPipeline: want ErrNotImplemented, got %v", err)
 			}
 		})

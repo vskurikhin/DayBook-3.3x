@@ -4,13 +4,13 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 var (
 	ErrNotLeader                    = errors.New("raft: not leader")
 	ErrLeadershipLost               = errors.New("raft: leadership lost while committing")
-	ErrRaftShutdown                 = errors.New("raft: raft is shutdown")
-	ErrEnqueueTimeout               = errors.New("raft: timeout enqueuing operation")
 	ErrUnsupportedProtocol          = errors.New("raft: unsupported protocol version")
 	ErrLeadershipTransferInProgress = errors.New("raft: leadership transfer in progress")
 
@@ -77,7 +77,7 @@ func (d *deferError) Error() error {
 		select {
 		case d.err = <-d.errCh:
 		case <-d.shutdownCh:
-			d.err = ErrRaftShutdown
+			d.err = contract.ErrRaftShutdown
 		}
 	})
 	return d.err

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // newInmemPair создаёт два соединённых InmemTransport с уникальными адресами.
@@ -128,7 +129,7 @@ func TestInmemAppendEntriesDisconnectedPeer(t *testing.T) {
 	// Не вызываем Connect()
 	args := AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrNotReachable {
+	if err != contract.ErrNotReachable {
 		t.Fatalf("want ErrNotReachable, got %v", err)
 	}
 }
@@ -146,7 +147,7 @@ func TestInmemAppendEntriesAfterClose(t *testing.T) {
 
 	args := AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
@@ -161,7 +162,7 @@ func TestInmemAppendEntriesPeerClosed(t *testing.T) {
 
 	args := AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
@@ -188,7 +189,7 @@ func TestInmemAppendEntriesTimeout(t *testing.T) {
 
 	args := AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrEnqueueTimeout {
+	if err != contract.ErrEnqueueTimeout {
 		t.Fatalf("want ErrEnqueueTimeout, got %v", err)
 	}
 }
@@ -228,7 +229,7 @@ func TestInmemRequestVoteDisconnectedPeer(t *testing.T) {
 
 	args := RequestVoteArgs{Term: 1}
 	_, err := t1.RequestVote(1, args)
-	if err != ErrNotReachable {
+	if err != contract.ErrNotReachable {
 		t.Fatalf("want ErrNotReachable, got %v", err)
 	}
 }
@@ -246,7 +247,7 @@ func TestInmemRequestVoteAfterClose(t *testing.T) {
 
 	args := RequestVoteArgs{Term: 1}
 	_, err := t1.RequestVote(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
@@ -261,7 +262,7 @@ func TestInmemRequestVotePeerClosed(t *testing.T) {
 
 	args := RequestVoteArgs{Term: 1}
 	_, err := t1.RequestVote(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
@@ -299,7 +300,7 @@ func TestInmemDisconnect(t *testing.T) {
 	// Убедимся, что после Disconnect отправка не работает
 	args := AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrNotReachable {
+	if err != contract.ErrNotReachable {
 		t.Fatalf("want ErrNotReachable, got %v", err)
 	}
 }
@@ -368,7 +369,7 @@ func TestInmemConnectThenSend(t *testing.T) {
 
 	// После Disconnect — отправка не работает
 	_, err = t1.AppendEntries(1, args)
-	if err != ErrNotReachable {
+	if err != contract.ErrNotReachable {
 		t.Fatalf("want ErrNotReachable, got %v", err)
 	}
 }
@@ -386,7 +387,7 @@ func TestInmemClose(t *testing.T) {
 
 	args := AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
@@ -426,7 +427,7 @@ func TestInmemCloseConsumerDrain(t *testing.T) {
 	// Проверяем, что AppendEntries завершился с ошибкой, а не заблокировался навсегда
 	select {
 	case err := <-errCh:
-		if err != ErrRaftShutdown {
+		if err != contract.ErrRaftShutdown {
 			t.Fatalf("want ErrRaftShutdown, got %v", err)
 		}
 	case <-time.After(time.Second):
@@ -435,7 +436,7 @@ func TestInmemCloseConsumerDrain(t *testing.T) {
 }
 
 // TestInmemStubsReturnNotImplemented проверяет, что stub-методы
-// возвращают ErrNotImplemented. RequestPreVote не проверяется —
+// возвращают contract.ErrNotImplemented. RequestPreVote не проверяется —
 // он реализован для InmemTransport.
 func TestInmemStubsReturnNotImplemented(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
@@ -443,28 +444,28 @@ func TestInmemStubsReturnNotImplemented(t *testing.T) {
 	defer trans.Close()
 	t.Run("TimeoutNow", func(t *testing.T) {
 		_, err := trans.TimeoutNow(1, TimeoutNowRequest{})
-		if err != ErrNotReachable {
+		if err != contract.ErrNotReachable {
 			t.Fatalf("want ErrNotReachable, got %v", err)
 		}
 	})
 	t.Run("InstallSnapshot", func(t *testing.T) {
 		_, err := trans.InstallSnapshot(1, InstallSnapshotRequest{}, nil)
-		// InstallSnapshot теперь реализован — peer не подключён, ошибка ErrNotReachable.
-		if err != ErrNotReachable {
+		// InstallSnapshot теперь реализован — peer не подключён, ошибка contract.ErrNotReachable.
+		if err != contract.ErrNotReachable {
 			t.Fatalf("want ErrNotReachable, got %v", err)
 		}
 	})
 }
 
 // TestInmemAppendPipelineReturnsNotImplemented проверяет, что
-// AppendEntriesPipeline возвращает ErrNotImplemented.
+// AppendEntriesPipeline возвращает contract.ErrNotImplemented.
 func TestInmemAppendPipelineReturnsNotImplemented(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 	trans := NewInmemTransport("test")
 	defer trans.Close()
 
 	_, err := trans.AppendEntriesPipeline(1)
-	if err != ErrNotImplemented {
+	if err != contract.ErrNotImplemented {
 		t.Fatalf("want ErrNotImplemented, got %v", err)
 	}
 }
@@ -671,14 +672,14 @@ func TestInmemRequestVoteError(t *testing.T) {
 	go func() {
 		select {
 		case rpc := <-t2.Consumer():
-			rpc.RespChan <- RPCResponse{Error: ErrRaftShutdown}
+			rpc.RespChan <- RPCResponse{Error: contract.ErrRaftShutdown}
 		case <-done:
 		}
 	}()
 	defer close(done)
 
 	_, err := t1.RequestVote(1, RequestVoteArgs{Term: 1})
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
@@ -708,7 +709,7 @@ func TestInmemCloseWithPendingRPC(t *testing.T) {
 
 	select {
 	case err := <-errCh:
-		if err != ErrRaftShutdown {
+		if err != contract.ErrRaftShutdown {
 			t.Fatalf("want ErrRaftShutdown, got %v", err)
 		}
 	case <-time.After(time.Second):

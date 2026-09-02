@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // --- Pre-Vote: защита от лишних выборов при сетевых сбоях (§4) ---
@@ -380,13 +381,13 @@ func (m *refusingPreVoteTransport) RequestVote(_ ServerID, _ RequestVoteArgs) (R
 }
 
 // notImplementedPreVoteTransport — транспорт, чей RequestPreVote возвращает
-// ErrNotImplemented: ошибка засчитывается как выданный голос.
+// contract.ErrNotImplemented: ошибка засчитывается как выданный голос.
 type notImplementedPreVoteTransport struct {
 	Transport
 }
 
 func (m *notImplementedPreVoteTransport) RequestPreVote(_ ServerID, _ RequestPreVoteArgs) (RequestPreVoteReply, error) {
-	return RequestPreVoteReply{}, ErrNotImplemented
+	return RequestPreVoteReply{}, contract.ErrNotImplemented
 }
 
 func (m *notImplementedPreVoteTransport) RequestVote(_ ServerID, _ RequestVoteArgs) (RequestVoteReply, error) {
@@ -448,7 +449,7 @@ func TestPreVote_QuorumLost_StepsDownToFollower(t *testing.T) {
 }
 
 // TestPreVote_ErrNotImplemented_Granted пинирует грант pre-vote при
-// ErrNotImplemented: транспорт, не поддерживающий PreVote, засчитывает голос
+// contract.ErrNotImplemented: транспорт, не поддерживающий PreVote, засчитывает голос
 // предоставленным. Узел переходит к выборам — состояние становится Candidate
 // (или Leader), currentTerm инкрементирован на 1.
 func TestPreVote_ErrNotImplemented_Granted(t *testing.T) {

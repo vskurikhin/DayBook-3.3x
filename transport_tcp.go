@@ -9,6 +9,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 const (
@@ -35,16 +37,25 @@ const (
 
 //nolint:gochecknoinits
 func init() {
-	gob.Register(AppendEntriesArgs{})
-	gob.Register(AppendEntriesReply{})
-	gob.Register(RequestVoteArgs{})
-	gob.Register(RequestVoteReply{})
-	gob.Register(TimeoutNowRequest{})
-	gob.Register(TimeoutNowResponse{})
-	gob.Register(RequestPreVoteArgs{})
-	gob.Register(RequestPreVoteReply{})
-	gob.Register(InstallSnapshotRequest{})
-	gob.Register(InstallSnapshotResponse{})
+	// Метки закреплены полным путём импорта корневого пакета
+	// github.com/vskurikhin/raft. Исторически RPC-типы были
+	// объявлены в корневом пакете, и gob строит имя конкретного
+	// типа из полного пути импорта пакета объявления. После
+	// переноса типов в pkg/raft/contract смена метки разорвала
+	// бы декодирование RPC между узлами разных версий
+	// (обновление кластера по одному узлу), поэтому метки
+	// осознанно сохраняют путь корневого пакета; заменять их
+	// на contract.<ИмяТипа> нельзя.
+	gob.RegisterName("github.com/vskurikhin/raft.AppendEntriesArgs", AppendEntriesArgs{})
+	gob.RegisterName("github.com/vskurikhin/raft.AppendEntriesReply", AppendEntriesReply{})
+	gob.RegisterName("github.com/vskurikhin/raft.RequestVoteArgs", RequestVoteArgs{})
+	gob.RegisterName("github.com/vskurikhin/raft.RequestVoteReply", RequestVoteReply{})
+	gob.RegisterName("github.com/vskurikhin/raft.TimeoutNowRequest", TimeoutNowRequest{})
+	gob.RegisterName("github.com/vskurikhin/raft.TimeoutNowResponse", TimeoutNowResponse{})
+	gob.RegisterName("github.com/vskurikhin/raft.RequestPreVoteArgs", RequestPreVoteArgs{})
+	gob.RegisterName("github.com/vskurikhin/raft.RequestPreVoteReply", RequestPreVoteReply{})
+	gob.RegisterName("github.com/vskurikhin/raft.InstallSnapshotRequest", InstallSnapshotRequest{})
+	gob.RegisterName("github.com/vskurikhin/raft.InstallSnapshotResponse", InstallSnapshotResponse{})
 }
 
 // tcpConn — обёртка над net.Conn с буферизированным writer и gob-кодеками.
@@ -226,7 +237,7 @@ func (t *TCPTransport) InstallSnapshot(
 
 // AppendEntriesPipeline не реализован.
 func (t *TCPTransport) AppendEntriesPipeline(_ ServerID) (AppendPipeline, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 // Connect сохраняет адрес для указанного соседа. Если адрес изменился —
@@ -421,10 +432,10 @@ func (t *TCPTransport) decodeResponse(conn *tcpConn, reply any) (bool, error) {
 	}
 	if rpcError != "" {
 		switch rpcError {
-		case ErrRaftShutdown.Error():
-			return true, ErrRaftShutdown
-		case ErrEnqueueTimeout.Error():
-			return true, ErrEnqueueTimeout
+		case contract.ErrRaftShutdown.Error():
+			return true, contract.ErrRaftShutdown
+		case contract.ErrEnqueueTimeout.Error():
+			return true, contract.ErrEnqueueTimeout
 		default:
 			return true, fmt.Errorf("raft: RPC error from peer: %s", rpcError)
 		}
@@ -568,7 +579,7 @@ func (t *TCPTransport) handleCommand(r *bufio.Reader, _ net.Conn, dec *gob.Decod
 	select {
 	case t.consumerCh <- RPC{Command: cmd, Reader: snapReader, RespChan: respCh}:
 	case <-t.shutdownCh:
-		return ErrRaftShutdown
+		return contract.ErrRaftShutdown
 	}
 
 RESP:
@@ -588,9 +599,9 @@ RESP:
 		}
 		respReply = resp.Reply
 	case <-t.shutdownCh:
-		return ErrRaftShutdown
+		return contract.ErrRaftShutdown
 	case <-time.After(respTimeout):
-		respErr = ErrEnqueueTimeout.Error()
+		respErr = contract.ErrEnqueueTimeout.Error()
 	}
 
 	if err := enc.Encode(respErr); err != nil {

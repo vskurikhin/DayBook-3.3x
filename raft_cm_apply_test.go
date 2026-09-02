@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // TestSendBatch_SkipsMissingPrefix проверяет, что sendBatch не добавляет
@@ -469,10 +470,10 @@ func (f *gateBatchFSM) ApplyBatch(logs []*LogEntry) []any {
 func (f *gateBatchFSM) Apply(*LogEntry) any { return nil }
 
 // Snapshot — заглушка; в этих тестах снимки не используются.
-func (f *gateBatchFSM) Snapshot() (FSMSnapshot, error) { return nil, ErrNotImplemented }
+func (f *gateBatchFSM) Snapshot() (FSMSnapshot, error) { return nil, contract.ErrNotImplemented }
 
 // Restore — заглушка; в этих тестах восстановление не используется.
-func (f *gateBatchFSM) Restore(io.ReadCloser) error { return ErrNotImplemented }
+func (f *gateBatchFSM) Restore(io.ReadCloser) error { return contract.ErrNotImplemented }
 
 // getApplied возвращает копию применённых Data (потокобезопасно).
 func (f *gateBatchFSM) getApplied() []any {

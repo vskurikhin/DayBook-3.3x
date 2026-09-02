@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // stressIterationBudget — граница одной итерации стресс-тестов:
@@ -128,7 +129,7 @@ func TestJoinFiniteWhenReceiverStopped(t *testing.T) {
 
 	start := time.Now()
 	_, err := h.transports[0].AppendEntries(ServerID(1), AppendEntriesArgs{})
-	if !errors.Is(err, ErrEnqueueTimeout) {
+	if !errors.Is(err, contract.ErrEnqueueTimeout) {
 		t.Fatalf("AppendEntries: got %v, want ErrEnqueueTimeout", err)
 	}
 	if elapsed := time.Since(start); elapsed > 2*_inmemRPCTimeout {

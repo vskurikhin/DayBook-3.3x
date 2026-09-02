@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // newTCPPair создаёт два соединённых TCPTransport на localhost:0.
@@ -249,7 +250,7 @@ func TestTCPAppendEntriesTimeout(t *testing.T) {
 
 	args := AppendEntriesArgs{Term: 1}
 	_, err = client.AppendEntries(1, args)
-	if err != ErrEnqueueTimeout {
+	if err != contract.ErrEnqueueTimeout {
 		t.Fatalf("want ErrEnqueueTimeout, got %v", err)
 	}
 }
@@ -502,14 +503,14 @@ func TestTCPAppendEntriesError(t *testing.T) {
 	go func() {
 		select {
 		case rpc := <-server.Consumer():
-			rpc.RespChan <- RPCResponse{Error: ErrRaftShutdown}
+			rpc.RespChan <- RPCResponse{Error: contract.ErrRaftShutdown}
 		case <-done:
 		}
 	}()
 	defer close(done)
 
 	_, err := client.AppendEntries(1, AppendEntriesArgs{Term: 1})
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
@@ -548,7 +549,7 @@ func TestTCPLocalAddr(t *testing.T) {
 }
 
 // TestTCPStubsReturnNotImplemented проверяет, что нереализованные методы возвращают
-// ErrNotImplemented, а реализованные (RequestPreVote, TimeoutNow) — транспортную ошибку.
+// contract.ErrNotImplemented, а реализованные (RequestPreVote, TimeoutNow) — транспортную ошибку.
 func TestTCPStubsReturnNotImplemented(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 	trans, err := NewTCPTransport("127.0.0.1:0", 100*time.Millisecond, 2)
@@ -559,13 +560,13 @@ func TestTCPStubsReturnNotImplemented(t *testing.T) {
 
 	t.Run("RequestPreVote", func(t *testing.T) {
 		_, err := trans.RequestPreVote(1, RequestPreVoteArgs{})
-		if err == nil || err == ErrNotImplemented {
+		if err == nil || err == contract.ErrNotImplemented {
 			t.Fatalf("want transport error, got %v", err)
 		}
 	})
 	t.Run("TimeoutNow", func(t *testing.T) {
 		_, err := trans.TimeoutNow(1, TimeoutNowRequest{})
-		if err == nil || err == ErrNotImplemented {
+		if err == nil || err == contract.ErrNotImplemented {
 			t.Fatalf("want transport error, got %v", err)
 		}
 	})
@@ -577,7 +578,7 @@ func TestTCPStubsReturnNotImplemented(t *testing.T) {
 	})
 	t.Run("AppendEntriesPipeline", func(t *testing.T) {
 		_, err := trans.AppendEntriesPipeline(1)
-		if err != ErrNotImplemented {
+		if err != contract.ErrNotImplemented {
 			t.Fatalf("want ErrNotImplemented, got %v", err)
 		}
 	})

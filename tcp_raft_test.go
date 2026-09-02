@@ -4,6 +4,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // NoOpFSM — пустая реализация FSM для тестов.
@@ -14,11 +16,11 @@ func (f NoOpFSM) Apply(_ *LogEntry) any {
 }
 
 func (f NoOpFSM) Snapshot() (FSMSnapshot, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 func (f NoOpFSM) Restore(_ io.ReadCloser) error {
-	return ErrNotImplemented
+	return contract.ErrNotImplemented
 }
 
 // tcpHarness — минимальный тестовый стенд для TCP-кластера Raft.

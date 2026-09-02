@@ -89,7 +89,7 @@ func SetTrace(cfg TraceConfig) error {
 
 // _requestTimeout — таймаут для Apply-операций (PUT, CAS).
 // Если за это время не удалось отправить команду в applyCh лидера,
-// возвращается ErrEnqueueTimeout.
+// возвращается contract.ErrEnqueueTimeout.
 const _requestTimeout = 10 * time.Second
 
 // _httpShutdownTimeout — тайм-аут плавной остановки HTTP-сервера

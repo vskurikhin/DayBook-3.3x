@@ -7,6 +7,8 @@ import (
 	"os"
 	"sync/atomic"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // _preVoteJitterMs — верхняя граница случайной паузы (миллисекунды)
@@ -384,7 +386,7 @@ func (cm *ConsensusModule) sendPreVoteToPeer(
 	if err != nil {
 		cm.traceLogf(_traceLevelPreVote, "RequestPreVote to %d failed: %v", peerID, err)
 		var resp *RequestPreVoteReply
-		if err == ErrNotImplemented {
+		if err == contract.ErrNotImplemented {
 			// Если транспорт не поддерживает PreVote, считаем голос
 			// предоставленным.
 			resp = &RequestPreVoteReply{

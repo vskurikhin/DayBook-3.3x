@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 func TestElectionBasic(t *testing.T) {
@@ -1713,10 +1714,10 @@ func TestLeader_Shutdown_NoInflight(t *testing.T) {
 // незавершённом Apply. Гарантия: остановка не оставляет клиентское
 // обещание неразрешённым — ответ обязан прийти по каналу ErrorCh в
 // пределах бюджета. Ожидание идёт через ErrorCh, а не через Error:
-// после остановки Error возвращает ErrRaftShutdown по запасному
+// после остановки Error возвращает contract.ErrRaftShutdown по запасному
 // исходу даже для неотвеченного обещания. Из-за гонки между Apply и
 // остановкой законны исходы: nil (запись успела зафиксироваться и
-// примениться), ErrLeadershipLost, ErrRaftShutdown, ErrNotLeader;
+// примениться), ErrLeadershipLost, contract.ErrRaftShutdown, ErrNotLeader;
 // иная ошибка — отказ. При nil у записи обязан быть присвоенный
 // индекс журнала.
 func TestLeader_Shutdown_DuringApply(t *testing.T) {
@@ -1735,7 +1736,7 @@ func TestLeader_Shutdown_DuringApply(t *testing.T) {
 		if future.Index() < 1 {
 			t.Fatalf("got success without a log index: Index() = %d", future.Index())
 		}
-	case ErrLeadershipLost, ErrRaftShutdown, ErrNotLeader:
+	case ErrLeadershipLost, contract.ErrRaftShutdown, ErrNotLeader:
 		// Штатные исходы гонки между Apply и остановкой.
 	default:
 		t.Fatalf("got %v, want nil or ErrLeadershipLost or ErrRaftShutdown or ErrNotLeader", err)
@@ -1824,7 +1825,7 @@ func TestCommitmentInteg_NoCommitWithoutMajority(t *testing.T) {
 		if err == nil {
 			t.Fatal("Apply succeeded without majority, expected error")
 		}
-		// Ошибка ErrLeadershipLost или ErrRaftShutdown — допустимо.
+		// Ошибка ErrLeadershipLost или contract.ErrRaftShutdown — допустимо.
 	case <-time.After(1000 * time.Millisecond):
 		// Future заблокирован — это ожидаемое поведение (нет кворума).
 	}
@@ -2127,11 +2128,11 @@ func (f *RecordingBatchingFSM) Apply(_ *LogEntry) any {
 }
 
 func (f *RecordingBatchingFSM) Snapshot() (FSMSnapshot, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 func (f *RecordingBatchingFSM) Restore(_ io.ReadCloser) error {
-	return ErrNotImplemented
+	return contract.ErrNotImplemented
 }
 
 func (f *RecordingBatchingFSM) ApplyBatch(logs []*LogEntry) []any {
@@ -2368,7 +2369,7 @@ func (f *mismatchBatchingFSM) ApplyBatch(logs []*LogEntry) []any {
 //     ошибка ErrBatchFSMResponseMismatch доставляется через future
 //     немедленно. Если бы runFSM упала при первом нарушении контракта,
 //     этот future остался бы без ответа (таймаут) или завершился бы
-//     ErrRaftShutdown только при Stop().
+//     contract.ErrRaftShutdown только при Stop().
 //
 // Примечание: часть записей могла уйти отдельными батчами, поэтому на
 // ошибку проверяется каждый future из первоначальной пачки команд;
@@ -2404,7 +2405,7 @@ func TestBatchingFSM_ApplyBatchResponseMismatch(t *testing.T) {
 	f := cm.Apply(1000, 0)
 	select {
 	case err := <-f.ErrorCh():
-		if errors.Is(err, ErrRaftShutdown) {
+		if errors.Is(err, contract.ErrRaftShutdown) {
 			t.Fatalf("runFSM appears dead after mismatch: got ErrRaftShutdown")
 		}
 		if err != nil && !errors.Is(err, ErrBatchFSMResponseMismatch) {
@@ -2835,14 +2836,14 @@ func TestVerifyLeader_Timeout(t *testing.T) {
 }
 
 // TestApply_Timeout проверяет, что Apply с ненулевым таймаутом возвращает
-// ErrEnqueueTimeout при недоступности лидера.
+// contract.ErrEnqueueTimeout при недоступности лидера.
 func TestApply_Timeout(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 	h := NewHarness(t, 1)
 	defer h.Shutdown()
 
 	future := h.cluster[0].Apply(42, 10*time.Millisecond)
-	if err := future.Error(); err != ErrNotLeader && err != ErrEnqueueTimeout {
+	if err := future.Error(); err != ErrNotLeader && err != contract.ErrEnqueueTimeout {
 		t.Fatalf("expected ErrNotLeader or ErrEnqueueTimeout, got %v", err)
 	}
 }
@@ -2854,7 +2855,7 @@ func TestApply_TimeoutDoesNotBlock(t *testing.T) {
 	h := NewHarness(t, 1)
 	h.Shutdown()
 	future := h.cluster[0].Apply(42, 0)
-	if err := future.Error(); err != ErrRaftShutdown {
+	if err := future.Error(); err != contract.ErrRaftShutdown {
 		t.Fatalf("expected ErrRaftShutdown, got %v", err)
 	}
 }

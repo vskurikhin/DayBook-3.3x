@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // snapshotTestFSM — тестовая FSM с поддержкой снимков.
@@ -161,7 +162,7 @@ func TestSnapshotTestFSM_Empty(t *testing.T) {
 }
 
 // TestCommitChannelFSM_SnapshotStub проверяет, что заглушки
-// CommitChannelFSM.Snapshot/Restore возвращают ErrNotImplemented.
+// CommitChannelFSM.Snapshot/Restore возвращают contract.ErrNotImplemented.
 func TestCommitChannelFSM_SnapshotStub(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
@@ -169,10 +170,10 @@ func TestCommitChannelFSM_SnapshotStub(t *testing.T) {
 	fsm := NewCommitChannelFSM(ch)
 	close(ch)
 
-	if _, err := fsm.Snapshot(); err != ErrNotImplemented {
+	if _, err := fsm.Snapshot(); err != contract.ErrNotImplemented {
 		t.Fatalf("Snapshot: want ErrNotImplemented, got %v", err)
 	}
-	if err := fsm.Restore(nil); err != ErrNotImplemented {
+	if err := fsm.Restore(nil); err != contract.ErrNotImplemented {
 		t.Fatalf("Restore: want ErrNotImplemented, got %v", err)
 	}
 }

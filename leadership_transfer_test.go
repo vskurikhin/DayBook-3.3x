@@ -650,7 +650,7 @@ func waitForTermAbove(h *Harness, id, want int, budget time.Duration) {
 }
 
 // TestLeadershipTransfer_AfterShutdown проверяет, что LeadershipTransfer
-// после остановки модуля возвращает ошибку (ErrNotLeader или ErrRaftShutdown).
+// после остановки модуля возвращает ошибку (ErrNotLeader или contract.ErrRaftShutdown).
 func TestLeadershipTransfer_AfterShutdown(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // SetSnapshotConfig обновляет параметры снимков и сигнализирует
@@ -321,7 +323,7 @@ func (cm *ConsensusModule) takeSnapshot() error {
 	select {
 	case cm.fsmSnapshotCh <- snapReq:
 	case <-cm.shutdownCh:
-		return ErrRaftShutdown
+		return contract.ErrRaftShutdown
 	case <-time.After(_defaultTakeSnapshotTimeout):
 		cm.mu.Lock()
 		applied := cm.cmState.fsmAppliedIndex
