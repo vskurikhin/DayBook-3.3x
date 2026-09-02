@@ -13,6 +13,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 func TestElectionBasic(t *testing.T) {
@@ -721,7 +722,7 @@ func TestDisconnectAfterSubmit(t *testing.T) {
 
 // getPersistedTerm считывает значение currentTerm из указанного хранилища
 // (используя тот же формат кодирования, что и persistToStorage).
-func getPersistedTerm(storage *MapStorage) int {
+func getPersistedTerm(storage *store.MapStorage) int {
 	data, found := storage.Get("currentTerm")
 	if !found {
 		return 0
@@ -1074,7 +1075,7 @@ func TestBecomeFollowerDoubleClose(t *testing.T) {
 		},
 
 		id:           1,
-		storage:      NewMapStorage(),
+		storage:      store.NewMapStorage(),
 		applyCh:      make(chan *logFuture),
 		verifyCh:     make(chan *verifyFuture, 64),
 		shutdownCh:   make(chan struct{}),
@@ -3383,7 +3384,7 @@ func TestIntegration_TermIndexAfterLogTruncation(t *testing.T) {
 func TestRace_TermIndexMapDispatchAndConflict(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	mock := &mockTransportConflict{replyTerm: 1, success: false, conflictTerm: 1}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
@@ -3497,7 +3498,7 @@ func TestRace_TermIndexMapCompactAndRead(t *testing.T) {
 			matchIndex: map[int]int{},
 		},
 
-		storage:    NewMapStorage(),
+		storage:    store.NewMapStorage(),
 		shutdownCh: make(chan struct{}),
 		cmState: cmState{
 			state:        Follower,

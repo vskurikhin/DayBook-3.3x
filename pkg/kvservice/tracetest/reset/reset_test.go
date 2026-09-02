@@ -14,6 +14,7 @@ import (
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/pkg/kvservice"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // buf — синхронизированный приёмник стандартного логгера: запись
@@ -78,7 +79,7 @@ func newTestService(t *testing.T) *kvservice.KVService {
 		Config: raft.Config{
 			PeerIds:   []int{},
 			ServerID:  7,
-			Storage:   raft.NewMapStorage(),
+			Storage:   store.NewMapStorage(),
 			Transport: transport,
 		},
 	}

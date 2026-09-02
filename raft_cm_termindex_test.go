@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // mockTransportConflict — минимальная реализация Transport для тестов
@@ -41,7 +42,7 @@ func (m *mockTransportConflict) AppendEntries(_ ServerID, _ AppendEntriesArgs) (
 func TestTermIndexMap_AppendEntries(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	cm := &ConsensusModule{
 		leaderState: leaderState{
 			matchIndex: map[int]int{0: 0},
@@ -169,7 +170,7 @@ func TestTermIndexMap_AppendEntriesConflict(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{
-		storage:    NewMapStorage(),
+		storage:    store.NewMapStorage(),
 		shutdownCh: make(chan struct{}),
 		cmState: cmState{
 			state:        Follower,
@@ -250,7 +251,7 @@ func TestTermIndexMap_AppendEntriesConflict(t *testing.T) {
 func TestTermIndexMap_RestoreFromStorage(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	ready := make(chan any)
 	close(ready)
 	cm := NewConsensusModule(0, []int{}, NewInmemTransport("test"), storage, newSnapshotTestFSM(), ready)

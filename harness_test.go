@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 const _submitTimeout = 5 * time.Second
@@ -99,7 +101,7 @@ type Harness struct {
 	// transports — in-memory транспорты для каждого узла.
 	transports []*InmemTransport
 
-	storage []*MapStorage
+	storage []*store.MapStorage
 
 	// commitChans содержит по одному каналу фиксации для каждого сервера.
 	commitChans []chan CommitEntry
@@ -165,7 +167,7 @@ func NewHarnessWithOptions(t *testing.T, n int, opts ...HarnessOption) *Harness 
 	commitChans := make([]chan CommitEntry, n)
 	commits := make([][]CommitEntry, n)
 	ready := make(chan any)
-	storage := make([]*MapStorage, n)
+	storage := make([]*store.MapStorage, n)
 
 	// Создаём транспорты и соединяем их все друг с другом.
 	for i := 0; i < n; i++ {
@@ -191,7 +193,7 @@ func NewHarnessWithOptions(t *testing.T, n int, opts ...HarnessOption) *Harness 
 			}
 		}
 
-		storage[i] = NewMapStorage()
+		storage[i] = store.NewMapStorage()
 		commitChans[i] = make(chan CommitEntry)
 		cluster[i] = NewConsensusModule(
 			i, peerIds, transports[i],

@@ -11,6 +11,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // --- deferError ---
@@ -216,7 +217,7 @@ func copyBytes(b []byte) []byte {
 // testServerWithFSM creates a single-node ConsensusModule with the given FSM.
 func testServerWithFSM(t testing.TB, fsm FSM) *ConsensusModule {
 	t.Helper()
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(0); err != nil {
 		t.Fatal(err)
@@ -248,7 +249,7 @@ func testFSMHarness(t *testing.T) (*Harness, *CaptureFSM) {
 	n := 1
 	cluster := make([]*ConsensusModule, n)
 	transports := make([]*InmemTransport, n)
-	storage := make([]*MapStorage, n)
+	storage := make([]*store.MapStorage, n)
 	commitChans := make([]chan CommitEntry, n)
 	commits := make([][]CommitEntry, n)
 	connected := make([]bool, n)
@@ -258,7 +259,7 @@ func testFSMHarness(t *testing.T) (*Harness, *CaptureFSM) {
 	capture := &CaptureFSM{}
 
 	transports[0] = NewInmemTransport("single-0")
-	storage[0] = NewMapStorage()
+	storage[0] = store.NewMapStorage()
 	commitChans[0] = make(chan CommitEntry)
 	fsm := &captureCommitFSM{
 		CaptureFSM:    capture,

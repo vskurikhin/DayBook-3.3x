@@ -1,4 +1,4 @@
-package raft
+package store
 
 import (
 	"bufio"
@@ -16,10 +16,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 const (
-	// _snapshotsSubdir — поддиректория dataDir, в которой FileSnapshotStore
+	// _snapshotsSubdir — поддиректория dataDir, в которой FileSnapshot
 	// хранит снимки. Не конфликтует с FileStorage.loadAll: тот читает
 	// только *.dat-файлы в корне каталога.
 	_snapshotsSubdir = "snapshots"
@@ -37,26 +39,26 @@ const (
 // fileSnapshotMeta — метаданные снимка на диске: SnapshotMeta
 // с контрольной суммой CRC32 данных FSM.
 type fileSnapshotMeta struct {
-	SnapshotMeta
+	contract.SnapshotMeta
 
 	CRC []byte
 }
 
-// FileSnapshotStore — файловая реализация SnapshotStore с сохранением на диск.
+// FileSnapshot — файловая реализация SnapshotStore с сохранением на диск.
 // Снимки хранятся в <base>/snapshots/<term>-<index>-<msec>/;
 // запись атомарна (временная директория + rename + fsync), целостность
 // данных проверяется CRC32. Переживает рестарт процесса.
-type FileSnapshotStore struct {
+type FileSnapshot struct {
 	path   string
 	retain int
 }
 
-var _ SnapshotStore = (*FileSnapshotStore)(nil)
+var _ contract.SnapshotStore = (*FileSnapshot)(nil)
 
-// NewFileSnapshotStore создаёт FileSnapshotStore в поддиректории
+// NewFileSnapshot создаёт FileSnapshot в поддиректории
 // snapshots каталога base. retain >= 1 — сколько снимков сохранять;
 // при создании нового снимка более старые удаляются.
-func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
+func NewFileSnapshot(base string, retain int) (*FileSnapshot, error) {
 	if retain < 1 {
 		return nil, errors.New("raft: must retain at least one snapshot")
 	}
@@ -64,7 +66,7 @@ func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		return nil, fmt.Errorf("raft: snapshot path not accessible: %v", err)
 	}
-	store := &FileSnapshotStore{
+	store := &FileSnapshot{
 		path:   path,
 		retain: retain,
 	}
@@ -86,19 +88,21 @@ func snapshotName(term, index int, msec int64) string {
 // Если одновременно запускается несколько Create для одной пары (term, index)
 // (в пределах миллисекунды), один из вызовов получит os.IsExist.
 // Проигравший вызывающий обрабатывает эту ошибку как обычную ошибку создания снимка.
-func (f *FileSnapshotStore) Create(index, term int, configuration Configuration, configIndex int) (SnapshotSink, error) {
+func (f *FileSnapshot) Create(
+	index, term int, configuration contract.Configuration, configIndex int,
+) (contract.SnapshotSink, error) {
 	return f.createAt(index, term, configIndex, configuration, time.Now())
 }
 
 // List возвращает метаданные всех доступных снимков, упорядоченные
 // от новых к старым (по Term, затем Index, затем ID). Повреждённые
 // снимки пропускаются с логированием.
-func (f *FileSnapshotStore) List() ([]*SnapshotMeta, error) {
+func (f *FileSnapshot) List() ([]*contract.SnapshotMeta, error) {
 	snapshots, err := f.getSnapshots()
 	if err != nil {
 		return nil, err
 	}
-	var metas []*SnapshotMeta
+	var metas []*contract.SnapshotMeta
 	for _, meta := range snapshots {
 		metas = append(metas, &meta.SnapshotMeta)
 	}
@@ -107,7 +111,7 @@ func (f *FileSnapshotStore) List() ([]*SnapshotMeta, error) {
 
 // Open открывает снимок по ID, проверяет CRC32 данных и возвращает
 // метаданные с reader. Вызывающий обязан закрыть reader.
-func (f *FileSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, error) {
+func (f *FileSnapshot) Open(id string) (*contract.SnapshotMeta, io.ReadCloser, error) {
 	meta, err := f.readMeta(id)
 	if err != nil {
 		return nil, nil, fmt.Errorf("raft: snapshot %s is corrupt: %v", id, err)
@@ -119,12 +123,12 @@ func (f *FileSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, error
 		return nil, nil, fmt.Errorf("raft: failed to open snapshot state %s: %v", id, err)
 	}
 
-	hash := crc32.NewIEEE()
-	if _, err := io.Copy(hash, fh); err != nil {
+	h := crc32.NewIEEE()
+	if _, err := io.Copy(h, fh); err != nil {
 		_ = fh.Close()
 		return nil, nil, fmt.Errorf("raft: failed to read snapshot state %s: %v", id, err)
 	}
-	if !bytes.Equal(meta.CRC, hash.Sum(nil)) {
+	if !bytes.Equal(meta.CRC, h.Sum(nil)) {
 		_ = fh.Close()
 		return nil, nil, fmt.Errorf("raft: snapshot %s CRC mismatch", id)
 	}
@@ -137,7 +141,7 @@ func (f *FileSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, error
 }
 
 // testPermissions проверяет, что в каталог снимков можно писать.
-func (f *FileSnapshotStore) testPermissions() error {
+func (f *FileSnapshot) testPermissions() error {
 	path := filepath.Join(f.path, ".permissions-test")
 	fh, err := os.Create(path)
 	if err != nil {
@@ -151,9 +155,9 @@ func (f *FileSnapshotStore) testPermissions() error {
 
 // createAt — Create с инъекцией времени для детерминированных тестов
 // коллизии имени директории.
-func (f *FileSnapshotStore) createAt(
-	index, term, configIndex int, configuration Configuration, now time.Time,
-) (SnapshotSink, error) {
+func (f *FileSnapshot) createAt(
+	index, term, configIndex int, configuration contract.Configuration, now time.Time,
+) (contract.SnapshotSink, error) {
 	name := snapshotName(term, index, now.UnixNano()/int64(time.Millisecond))
 	path := filepath.Join(f.path, name+_tmpSuffix)
 
@@ -166,8 +170,8 @@ func (f *FileSnapshotStore) createAt(
 		dir:       path,
 		parentDir: f.path,
 		meta: fileSnapshotMeta{
-			SnapshotMeta: SnapshotMeta{
-				Version:       ProtocolVersion,
+			SnapshotMeta: contract.SnapshotMeta{
+				Version:       contract.ProtocolVersion,
 				ID:            name,
 				Index:         index,
 				Term:          term,
@@ -191,7 +195,7 @@ func (f *FileSnapshotStore) createAt(
 
 // getSnapshots возвращает все известные снимки, отсортированные
 // от новых к старым.
-func (f *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
+func (f *FileSnapshot) getSnapshots() ([]*fileSnapshotMeta, error) {
 	entries, err := os.ReadDir(f.path)
 	if err != nil {
 		return nil, fmt.Errorf("raft: failed to scan snapshot directory: %v", err)
@@ -223,7 +227,7 @@ func (f *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
 }
 
 // readMeta читает и декодирует meta.dat снимка id.
-func (f *FileSnapshotStore) readMeta(id string) (*fileSnapshotMeta, error) {
+func (f *FileSnapshot) readMeta(id string) (*fileSnapshotMeta, error) {
 	fh, err := os.Open(filepath.Join(f.path, id, _metaFileName))
 	if err != nil {
 		return nil, err
@@ -239,7 +243,7 @@ func (f *FileSnapshotStore) readMeta(id string) (*fileSnapshotMeta, error) {
 // removeOldSnapshots удаляет снимки сверх retain (самые старые).
 // Ошибки удаления отдельных директорий логируются, чтобы не ломать
 // успешно завершившийся Close.
-func (f *FileSnapshotStore) removeOldSnapshots() error {
+func (f *FileSnapshot) removeOldSnapshots() error {
 	snapshots, err := f.getSnapshots()
 	if err != nil {
 		return err
@@ -268,7 +272,7 @@ func (b *bufferedReadCloser) Close() error {
 // FileSnapshotSink — реализация SnapshotSink, пишущая данные FSM
 // во временную директорию снимка.
 type FileSnapshotSink struct {
-	store     *FileSnapshotStore
+	store     *FileSnapshot
 	dir       string
 	parentDir string
 	meta      fileSnapshotMeta
@@ -281,7 +285,7 @@ type FileSnapshotSink struct {
 	closed bool
 }
 
-var _ SnapshotSink = (*FileSnapshotSink)(nil)
+var _ contract.SnapshotSink = (*FileSnapshotSink)(nil)
 
 // Write пишет данные FSM в state.bin.
 func (s *FileSnapshotSink) Write(p []byte) (int, error) {

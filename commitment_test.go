@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // Матричные (table-driven) версии тестов из commitment_test.go.
@@ -1029,14 +1030,14 @@ func TestConfiguration_AddVoterFromSingleVoter(t *testing.T) {
 	readyB := make(chan any)
 
 	// Узел A: одноузловой кластер (голосующий только он сам).
-	cmA := NewConsensusModule(0, []int{}, transportA, NewMapStorage(),
+	cmA := NewConsensusModule(0, []int{}, transportA, store.NewMapStorage(),
 		NewCommitChannelFSM(commitChA), readyA)
 	defer cmA.Stop()
 	// Узел B: follower с известным соседом 0 (непустой peerIds).
 	// Готовность B закрывается ПОЗЖЕ — после избрания лидера A:
 	// иначе B (не получая AE, т.к. ещё не в конфигурации A) успевает
 	// самоизбраться в терме 1 и assert на currentTerm == 0 флакает.
-	cmB := NewConsensusModule(1, []int{0}, transportB, NewMapStorage(),
+	cmB := NewConsensusModule(1, []int{0}, transportB, store.NewMapStorage(),
 		NewCommitChannelFSM(commitChB), readyB)
 	defer cmB.Stop()
 

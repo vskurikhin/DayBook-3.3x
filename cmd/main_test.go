@@ -12,6 +12,7 @@ import (
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/internal/config"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // TestRunWithEmptyPeers запускает узел без соседей через runWith и
@@ -75,7 +76,7 @@ func TestRunWithPeerConnect(t *testing.T) {
 		Fsm:       raft.NewCommitChannelFSM(commitChannel),
 		PeerIds:   []int{},
 		ServerID:  1,
-		Storage:   raft.NewMapStorage(),
+		Storage:   store.NewMapStorage(),
 		Transport: peerTransport,
 	}, peerReady)
 	peer.Serve()
@@ -197,8 +198,10 @@ func TestStartPprofServesProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("GET %s: status = %d, want 200", url, resp.StatusCode)
+	if resp != nil {
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("GET %s: status = %d, want 200", url, resp.StatusCode)
+		}
 	}
 }

@@ -7,17 +7,18 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // clusterNode — файловый стенд одного узла для теста полного рестарта
-// кластера: FileStorage + FileSnapshotStore в отдельной директории.
+// кластера: FileStorage + FileSnapshot в отдельной директории.
 type clusterNode struct {
 	id        int
 	dir       string
 	cm        *ConsensusModule
 	fsm       *snapshotTestFSM
-	storage   *FileStorage
-	store     *FileSnapshotStore
+	storage   *store.FileStorage
+	store     *store.FileSnapshot
 	transport *InmemTransport
 	peerIds   []int
 }
@@ -43,16 +44,16 @@ func newClusterNode(t *testing.T, id, n int, baseDir string) *clusterNode {
 // start создаёт хранилища, транспорт, CM и готовит канал ready.
 func (n *clusterNode) start(t *testing.T) {
 	t.Helper()
-	n.storage = NewFileStorage(n.dir)
-	store, err := NewFileSnapshotStore(n.dir, 2)
+	n.storage = store.NewFileStorage(n.dir)
+	stor, err := store.NewFileSnapshot(n.dir, 2)
 	if err != nil {
-		t.Fatalf("node %d: NewFileSnapshotStore failed: %v", n.id, err)
+		t.Fatalf("node %d: NewFileSnapshot failed: %v", n.id, err)
 	}
-	n.store = store
+	n.store = stor
 	n.fsm = newSnapshotTestFSM()
 	n.transport = NewInmemTransport(ServerAddress(fmt.Sprintf("raft-cluster-%d", n.id)))
 	ready := make(chan any)
-	n.cm = NewConsensusModule(n.id, n.peerIds, n.transport, n.storage, n.fsm, ready, store)
+	n.cm = NewConsensusModule(n.id, n.peerIds, n.transport, n.storage, n.fsm, ready, stor)
 	close(ready)
 }
 

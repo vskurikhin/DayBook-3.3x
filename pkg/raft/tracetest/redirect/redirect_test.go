@@ -12,6 +12,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // traceLevel — порог трассировки бинарника. Задаётся явно: эмиттер
@@ -62,7 +63,7 @@ func TestTraceRedirect(t *testing.T) {
 	ready := make(chan any)
 	cm := raft.NewConsensusModule(
 		0, []int{}, raft.NewInmemTransport("trace-redirect"),
-		raft.NewMapStorage(), raft.NewCommitChannelFSM(commitCh), ready,
+		store.NewMapStorage(), raft.NewCommitChannelFSM(commitCh), ready,
 	)
 	close(ready)
 	t.Cleanup(func() {

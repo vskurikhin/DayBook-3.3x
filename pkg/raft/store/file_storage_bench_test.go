@@ -1,8 +1,7 @@
-package raft
+package store
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math/rand"
 	"testing"
 )
@@ -47,14 +46,14 @@ func BenchmarkFileStorageSetSameValue(b *testing.B) {
 			// Измеряется установившийся режим, в котором значение на диске
 			// уже совпадает с записываемым.
 			storage.Set("log", value)
-			before := storage.writeCount()
+			before := storage.WriteCount()
 			b.SetBytes(int64(variant.size))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				storage.Set("log", value)
 			}
 			b.StopTimer()
-			b.ReportMetric(float64(storage.writeCount()-before)/float64(b.N), "writes/op")
+			b.ReportMetric(float64(storage.WriteCount()-before)/float64(b.N), "writes/op")
 		})
 	}
 }
@@ -78,23 +77,7 @@ func BenchmarkFileStorageSetChangedValue(b *testing.B) {
 				storage.Set("log", next)
 			}
 			b.StopTimer()
-			b.ReportMetric(float64(storage.writeCount())/float64(b.N), "writes/op")
+			b.ReportMetric(float64(storage.WriteCount())/float64(b.N), "writes/op")
 		})
 	}
-}
-
-// benchLogEntries формирует журнал, кодированный размер которого близок
-// к totalBytes: полезная нагрузка распределена по entries записям.
-func benchLogEntries(entries, totalBytes int) []LogEntry {
-	payload := totalBytes / entries
-	log := make([]LogEntry, 0, entries)
-	for i := 0; i < entries; i++ {
-		log = append(log, LogEntry{
-			Index: i,
-			Term:  1,
-			Type:  LogCommand,
-			Data:  fmt.Sprintf("%0*d", payload, i),
-		})
-	}
-	return log
 }

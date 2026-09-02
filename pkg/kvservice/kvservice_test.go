@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/vskurikhin/raft"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 func TestConfig(t *testing.T) {
@@ -25,7 +26,7 @@ func TestConfig(t *testing.T) {
 }
 
 func TestNewKVService(t *testing.T) {
-	storage := raft.NewMapStorage()
+	storage := store.NewMapStorage()
 	ready := make(chan any)
 	transport, err := raft.NewTCPTransport(":0", 0, 0)
 	if err != nil {
@@ -51,7 +52,7 @@ func TestNewKVService(t *testing.T) {
 }
 
 func TestNewKVServiceWrapper(t *testing.T) {
-	storage := raft.NewMapStorage()
+	storage := store.NewMapStorage()
 	ready := make(chan any)
 
 	kvs := NewKVService(":0", 1, []int{0, 2}, storage, ready)
@@ -62,8 +63,8 @@ func TestNewKVServiceWrapper(t *testing.T) {
 }
 
 func TestConnectToRaftPeer(t *testing.T) {
-	storage0 := raft.NewMapStorage()
-	storage1 := raft.NewMapStorage()
+	storage0 := store.NewMapStorage()
+	storage1 := store.NewMapStorage()
 	ready0 := make(chan any)
 	ready1 := make(chan any)
 

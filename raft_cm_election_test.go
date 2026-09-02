@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // Стресс‑режим для тестирования выборов: если задана переменная окружения,
@@ -140,7 +141,7 @@ func newRequestVoteFromPeerTestCM(transport Transport, term, lastLogIndex, lastL
 	cm := &ConsensusModule{
 		id:         0,
 		transport:  transport,
-		storage:    NewMapStorage(),
+		storage:    store.NewMapStorage(),
 		shutdownCh: make(chan struct{}),
 		cmState: cmState{
 			state:        Candidate,

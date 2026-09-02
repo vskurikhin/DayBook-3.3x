@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // Тесты счётчиков verify-запросов: verifyCompleted (знаменатель доли
@@ -199,7 +200,7 @@ func newRedispatchLeaderCM(transport Transport) *ConsensusModule {
 		confChangeCh:       make(chan *configurationChangeFuture, 1),
 		verifyCh:           make(chan *verifyFuture, 64),
 		checkQuorumTimeout: time.Hour,
-		storage:            NewMapStorage(),
+		storage:            store.NewMapStorage(),
 		fsm:                NewCommitChannelFSM(make(chan CommitEntry)),
 		leaderState: leaderState{
 			nextIndex:              map[int]int{1: 1},
@@ -1650,8 +1651,8 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 		// на снимок состояние репликации не изменяет: проверяется только
 		// отсутствие голоса.
 		mock := &mockTransportAE{replyTerm: 1, installReplyTermSet: true, installReplyTerm: 0}
-		store := NewInmemSnapshotStore()
-		sink, err := store.Create(3, 1, Configuration{}, 0)
+		stor := store.NewInmemSnapshot()
+		sink, err := stor.Create(3, 1, Configuration{}, 0)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -1663,7 +1664,7 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 		}
 		// prev = nextIndex-1 = 4 попадает в дыру между границей снимка (3)
 		// и первой записью журнала (5) — отправляется снимок.
-		cm, vf := newCM(mock, store, 3, 5, []LogEntry{{Index: 5, Term: 1}})
+		cm, vf := newCM(mock, stor, 3, 5, []LogEntry{{Index: 5, Term: 1}})
 
 		cm.leaderSendAEsToPeer(1, 1, 0, true)
 

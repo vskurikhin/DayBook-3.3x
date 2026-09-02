@@ -5,6 +5,8 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 var _ TransportManager = (*TCPTransport)(nil)
@@ -63,7 +65,7 @@ func (stubTransportManager) DisconnectAll()                {}
 func (stubTransportManager) Close()                        {}
 
 func TestNewServer(t *testing.T) {
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	commitChan := make(chan CommitEntry, 10)
 	ready := make(chan any)
 
@@ -140,9 +142,9 @@ func TestServeSnapshotConfig(t *testing.T) {
 		PeerIds:           []int{},
 		ServerID:          1,
 		SnapshotInterval:  5 * time.Second,
-		SnapshotStore:     NewInmemSnapshotStore(),
+		SnapshotStore:     store.NewInmemSnapshot(),
 		SnapshotThreshold: 100,
-		Storage:           NewMapStorage(),
+		Storage:           store.NewMapStorage(),
 		Transport:         transport,
 	}, ready)
 	s.Serve()
@@ -184,8 +186,8 @@ func TestServeSnapshotConfigZeros(t *testing.T) {
 		Fsm:           NewCommitChannelFSM(commitChan),
 		PeerIds:       []int{},
 		ServerID:      1,
-		SnapshotStore: NewInmemSnapshotStore(),
-		Storage:       NewMapStorage(),
+		SnapshotStore: store.NewInmemSnapshot(),
+		Storage:       store.NewMapStorage(),
 		Transport:     transport,
 	}, ready)
 	s.Serve()
@@ -227,7 +229,7 @@ func TestServeSnapshotConfigDisabled(t *testing.T) {
 		ServerID:          1,
 		SnapshotInterval:  5 * time.Second,
 		SnapshotThreshold: 100,
-		Storage:           NewMapStorage(),
+		Storage:           store.NewMapStorage(),
 		Transport:         transport,
 	}, ready)
 	s.Serve()

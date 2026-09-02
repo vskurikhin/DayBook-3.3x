@@ -2,6 +2,8 @@ package raft
 
 import (
 	"testing"
+
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // Размер базового журнала ведомого во всех трёх формах бенчмарка и размер
@@ -25,7 +27,7 @@ const (
 // тестов обработчика и не содержит недостижимых сочетаний.
 func newAppendEntriesBenchCM(n int) *ConsensusModule {
 	cm := &ConsensusModule{}
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.cmState.state = Follower
 	cm.cmState.currentTerm = 1
 	cm.cmState.votedFor = -1

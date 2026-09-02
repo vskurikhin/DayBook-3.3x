@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // NoOpFSM — пустая реализация FSM для тестов.
@@ -29,7 +30,7 @@ type tcpHarness struct {
 	t          *testing.T
 	cluster    []*ConsensusModule
 	transports []*TCPTransport
-	storage    []*MapStorage
+	storage    []*store.MapStorage
 	alive      []bool
 	ready      chan any
 	n          int
@@ -40,7 +41,7 @@ func newTCPHarness(t *testing.T, n int) *tcpHarness {
 	t.Helper()
 
 	transports := make([]*TCPTransport, n)
-	storage := make([]*MapStorage, n)
+	storage := make([]*store.MapStorage, n)
 	cluster := make([]*ConsensusModule, n)
 	alive := make([]bool, n)
 	ready := make(chan any)
@@ -72,7 +73,7 @@ func newTCPHarness(t *testing.T, n int) *tcpHarness {
 			}
 		}
 
-		storage[i] = NewMapStorage()
+		storage[i] = store.NewMapStorage()
 		cluster[i] = NewConsensusModule(
 			i, peerIds, transports[i],
 			storage[i], NoOpFSM{}, ready,

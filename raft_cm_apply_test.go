@@ -11,6 +11,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // TestSendBatch_SkipsMissingPrefix проверяет, что sendBatch не добавляет
@@ -397,7 +398,7 @@ func forceLeaderChange(t *testing.T, h *Harness) leaderObservation {
 // fsm и запуск runFSM выполняет вызывающий.
 func newAliasTestCM(k int) *ConsensusModule {
 	cm := &ConsensusModule{}
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.fsmMutateCh = make(chan []*commitTuple, _batchApplyBuffer)
 	cm.shutdownCh = make(chan struct{})
 	cm.leaderState.inflight = make(map[int]*logFuture)

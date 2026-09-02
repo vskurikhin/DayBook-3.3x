@@ -10,18 +10,19 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // snapshotHarness — тестовый стенд для интеграционных тестов снимков.
 // Отличается от Harness тем, что использует snapshotTestFSM и
-// InmemSnapshotStore для каждого узла.
+// InmemSnapshot для каждого узла.
 type snapshotHarness struct {
 	t          *testing.T
 	n          int
 	cluster    []*ConsensusModule
 	fsms       []*snapshotTestFSM
-	stores     []*InmemSnapshotStore
-	storage    []*MapStorage
+	stores     []*store.InmemSnapshot
+	storage    []*store.MapStorage
 	transports []*InmemTransport
 	alive      []bool
 	connected  []bool
@@ -76,8 +77,8 @@ func newSnapshotHarness(t *testing.T, n int) *snapshotHarness {
 
 	cluster := make([]*ConsensusModule, n)
 	fsms := make([]*snapshotTestFSM, n)
-	stores := make([]*InmemSnapshotStore, n)
-	storage := make([]*MapStorage, n)
+	stores := make([]*store.InmemSnapshot, n)
+	storage := make([]*store.MapStorage, n)
 	transports := make([]*InmemTransport, n)
 	alive := make([]bool, n)
 	connected := make([]bool, n)
@@ -107,9 +108,9 @@ func newSnapshotHarness(t *testing.T, n int) *snapshotHarness {
 			}
 		}
 
-		storage[i] = NewMapStorage()
+		storage[i] = store.NewMapStorage()
 		fsms[i] = newSnapshotTestFSM()
-		stores[i] = NewInmemSnapshotStore()
+		stores[i] = store.NewInmemSnapshot()
 
 		cluster[i] = NewConsensusModule(
 			i, peerIds, &snapshotCountingTransport{InmemTransport: transports[i], counters: counters},
@@ -208,11 +209,11 @@ func (h *snapshotHarness) RestartPeer(id int) {
 	// restoreFromSnapshotStore (пустой store при усечённом логе).
 	fsm := newSnapshotTestFSM()
 	h.fsms[id] = fsm
-	store := h.stores[id]
+	stor := h.stores[id]
 
 	h.cluster[id] = NewConsensusModule(
 		id, peerIds, &snapshotCountingTransport{InmemTransport: h.transports[id], counters: h.isCounters},
-		h.storage[id], fsm, ready, store,
+		h.storage[id], fsm, ready, stor,
 	)
 	close(ready)
 	h.alive[id] = true
@@ -603,7 +604,7 @@ func (h *snapshotHarness) waitForFSMStateEqual(a, b int, timeout time.Duration) 
 // TestCompactLog_Basic проверяет базовое сжатие журнала.
 func TestCompactLog_Basic(t *testing.T) {
 	// Создаём CM с 5 записями в логе (Index: 1, 2, 3, 4, 5).
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	ready := make(chan any)
 	close(ready)
 	cm := NewConsensusModule(0, []int{}, NewInmemTransport("test"), storage, newSnapshotTestFSM(), ready)
@@ -786,7 +787,7 @@ func (h *snapshotHarness) waitForSingleLeader() int {
 }
 
 // TestSnapshot_MultipleSnapshots проверяет, что при множественных снимках
-// InmemSnapshotStore хранит только последний, а журнал сжимается.
+// InmemSnapshot хранит только последний, а журнал сжимается.
 //
 // Порог снимков 1: при любом lastSnapshotIndex < lastLogIndex выполняется
 // delta >= 1, и ближайший тик цикла снимков создаёт снимок — процесс
@@ -801,14 +802,14 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	// Одноузловой кластер с порогом 1.
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	fsm := newSnapshotTestFSM()
-	store := NewInmemSnapshotStore()
+	stor := store.NewInmemSnapshot()
 	ready := make(chan any)
 	close(ready)
 
 	transport := NewInmemTransport("single")
-	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, store)
+	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, stor)
 	defer cm.Stop()
 
 	// replace: ожидание лидерства — condition-wait по наблюдаемому признаку
@@ -904,7 +905,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	if s2 <= s1 {
 		t.Fatalf("S2 = %d, want > S1 = %d (multiple snapshots expected)", s2, s1)
 	}
-	list, _ := store.List()
+	list, _ := stor.List()
 	if len(list) != 1 {
 		t.Fatalf("store has %d snapshots, want 1", len(list))
 	}
@@ -921,7 +922,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	}
 
 	// Проверяем, что данные снимка корректны.
-	meta, reader, err := store.Open(list[0].ID)
+	meta, reader, err := stor.Open(list[0].ID)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -931,7 +932,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 
 	// Восстанавливаем новую FSM из снимка.
 	fsm2 := newSnapshotTestFSM()
-	_, r2, err := store.Open(list[0].ID)
+	_, r2, err := stor.Open(list[0].ID)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -950,22 +951,22 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 // снимка, сжатия журнала на диске и полного рестарта узла FSM
 // обязан восстановиться из снимка на диске (включая ключи до линии
 // сжатия), а суффикс лога — доиграться существующим механизмом.
-// Используются реальные FileStorage и FileSnapshotStore в одной директории.
+// Используются реальные FileStorage и FileSnapshot в одной директории.
 func TestSnapshot_RestartRestoresFSM(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	dir := t.TempDir()
-	storage := NewFileStorage(dir)
-	store, err := NewFileSnapshotStore(dir, 2)
+	storage := store.NewFileStorage(dir)
+	snapStore, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 	fsm := newSnapshotTestFSM()
 	ready := make(chan any)
 	close(ready)
 	transport := NewInmemTransport("single")
 
-	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, store)
+	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, snapStore)
 	waitForLeader(t, cm, 5*time.Second)
 
 	cm.SetSnapshotConfig(8, 50*time.Millisecond, 2)
@@ -994,10 +995,10 @@ func TestSnapshot_RestartRestoresFSM(t *testing.T) {
 	transport.Close()
 
 	// Полный рестарт: новые экземпляры хранилищ и FSM в той же директории.
-	storage2 := NewFileStorage(dir)
-	store2, err := NewFileSnapshotStore(dir, 2)
+	storage2 := store.NewFileStorage(dir)
+	store2, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore (restart) failed: %v", err)
+		t.Fatalf("NewFileSnapshot (restart) failed: %v", err)
 	}
 	fsm2 := newSnapshotTestFSM()
 	ready2 := make(chan any)

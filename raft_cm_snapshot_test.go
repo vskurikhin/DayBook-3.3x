@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // failingSnapshotStore — тестовый двойник SnapshotStore, чей Create
@@ -54,10 +55,10 @@ func TestRunSnapshots_TakeSnapshotErrorDoesNotCrash(t *testing.T) {
 	fsm := newSnapshotTestFSM()
 	ready := make(chan any)
 	close(ready)
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	transport := NewInmemTransport("single")
-	store := &failingSnapshotStore{}
-	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, store)
+	stor := &failingSnapshotStore{}
+	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, stor)
 	defer cm.Stop()
 
 	// Состояние, при котором shouldSnapshot вернёт true, а FSM-снимок
@@ -78,7 +79,7 @@ func TestRunSnapshots_TakeSnapshotErrorDoesNotCrash(t *testing.T) {
 	// ждём и убеждаемся, что CM жив и попытки повторяются циклом.
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if store.createCount() >= 1 {
+		if stor.createCount() >= 1 {
 			return
 		}
 		// poll-интервал condition-wait (не фиксированная пауза).
@@ -94,7 +95,7 @@ func TestLeaderSendSnapshot_EmptyListSignalsSnapshot(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{
-		snapshotStore: NewInmemSnapshotStore(),
+		snapshotStore: store.NewInmemSnapshot(),
 		snapshotCh:    make(chan struct{}, 1),
 	}
 	cm.cmState.lastSnapshotIndex = 5
@@ -114,26 +115,26 @@ func TestLeaderSendSnapshot_EmptyListSignalsSnapshot(t *testing.T) {
 
 // -- Тесты идемпотентности InstallSnapshot. ---
 
-// countingSnapshotStore — обёртка над InmemSnapshotStore, считающая
+// countingSnapshotStore — обёртка над InmemSnapshot, считающая
 // вызовы Create: признак «снимок действительно применялся».
 type countingSnapshotStore struct {
-	*InmemSnapshotStore
+	*store.InmemSnapshot
 	creates atomic.Int64
 }
 
 func (s *countingSnapshotStore) Create(index, term int, configuration Configuration, configIndex int) (SnapshotSink, error) {
 	s.creates.Add(1)
-	return s.InmemSnapshotStore.Create(index, term, configuration, configIndex)
+	return s.InmemSnapshot.Create(index, term, configuration, configIndex)
 }
 
 // newInstallSnapshotCM собирает литеральный CM с уже установленным
 // снимком (lastSnapshotIndex=10, term 2, пустой журнал) для прямого
 // вызова handleInstallSnapshot.
 func newInstallSnapshotCM() (*ConsensusModule, *countingSnapshotStore) {
-	store := &countingSnapshotStore{InmemSnapshotStore: NewInmemSnapshotStore()}
+	countingStore := &countingSnapshotStore{InmemSnapshot: store.NewInmemSnapshot()}
 	cm := &ConsensusModule{
-		storage:       NewMapStorage(),
-		snapshotStore: store,
+		storage:       store.NewMapStorage(),
+		snapshotStore: countingStore,
 		fsm:           newSnapshotTestFSM(),
 	}
 	cm.cmState.state = Follower
@@ -147,7 +148,7 @@ func newInstallSnapshotCM() (*ConsensusModule, *countingSnapshotStore) {
 	cm.cmState.fsmAppliedIndex = 10
 	cm.cmState.commitIndex = 10
 	cm.cmState.termIndexMap = make(map[int]int)
-	return cm, store
+	return cm, countingStore
 }
 
 // installSnapshotRequestData — gob-данные снимка для snapshotTestFSM.
@@ -198,7 +199,7 @@ func driveInstallSnapshotRPC(t *testing.T, cm *ConsensusModule, req *InstallSnap
 func TestInstallSnapshot_RepeatedIsNoOp(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	cm, store := newInstallSnapshotCM()
+	cm, stor := newInstallSnapshotCM()
 	data := installSnapshotRequestData(t, map[string]string{"k0": "v0"})
 	req := installSnapshotRequest(99, 12, 2, data) // новее имеющегося (10)
 
@@ -207,7 +208,7 @@ func TestInstallSnapshot_RepeatedIsNoOp(t *testing.T) {
 	if !reply.Success {
 		t.Fatalf("first InstallSnapshot: Success=false: %+v", reply)
 	}
-	if got := store.creates.Load(); got != 1 {
+	if got := stor.creates.Load(); got != 1 {
 		t.Fatalf("Create calls = %d, want 1 after first install", got)
 	}
 	if cm.cmState.lastSnapshotIndex != 12 {
@@ -219,7 +220,7 @@ func TestInstallSnapshot_RepeatedIsNoOp(t *testing.T) {
 	if !reply.Success {
 		t.Fatalf("repeated InstallSnapshot: Success=false, want true (idempotent no-op)")
 	}
-	if got := store.creates.Load(); got != 1 {
+	if got := stor.creates.Load(); got != 1 {
 		t.Fatalf("Create calls = %d after repeat, want 1 (no-op must not create)", got)
 	}
 	if cm.cmState.lastSnapshotIndex != 12 || cm.cmState.commitIndex != 12 || cm.cmState.lastApplied != 12 {
@@ -234,7 +235,7 @@ func TestInstallSnapshot_RepeatedIsNoOp(t *testing.T) {
 func TestInstallSnapshot_StaleDoesNotRollBack(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	cm, store := newInstallSnapshotCM() // lastSnapshotIndex = commitIndex = 10
+	cm, stor := newInstallSnapshotCM() // lastSnapshotIndex = commitIndex = 10
 	data := installSnapshotRequestData(t, map[string]string{"k0": "v0"})
 	req := installSnapshotRequest(99, 5, 2, data) // старее 10
 
@@ -242,7 +243,7 @@ func TestInstallSnapshot_StaleDoesNotRollBack(t *testing.T) {
 	if !reply.Success {
 		t.Fatalf("stale InstallSnapshot: Success=false, want true (no-op)")
 	}
-	if got := store.creates.Load(); got != 0 {
+	if got := stor.creates.Load(); got != 0 {
 		t.Fatalf("Create calls = %d, want 0 (stale snapshot must not be applied)", got)
 	}
 	if cm.cmState.commitIndex != 10 || cm.cmState.lastApplied != 10 {
@@ -306,7 +307,7 @@ func TestInstallSnapshot_NoOpKeepsTCPConnectionUsable(t *testing.T) {
 
 	ready := make(chan any)
 	close(ready)
-	cm := NewConsensusModule(1, []int{}, server, NewMapStorage(), newSnapshotTestFSM(), ready, NewInmemSnapshotStore())
+	cm := NewConsensusModule(1, []int{}, server, store.NewMapStorage(), newSnapshotTestFSM(), ready, store.NewInmemSnapshot())
 	defer cm.Stop()
 
 	// Узел уже владеет снимком на индексе 10.
@@ -443,24 +444,24 @@ func waitForAllKeys(t *testing.T, fsm *snapshotTestFSM, n int, budget time.Durat
 
 // TestSnapshotContent_MatchesMetaIndex — валидация содержимого снимков:
 // сценарий аналитика (10 команд, порог 4, интервал 50 мс, хвост 2) на
-// FileStorage + FileSnapshotStore. Каждый снимок обязан содержать
+// FileStorage + FileSnapshot. Каждый снимок обязан содержать
 // результат применения всех команд с индексом не выше своего meta.Index.
 // На коде до исправления новейший снимок регулярно оказывается дефектным.
 func TestSnapshotContent_MatchesMetaIndex(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	dir := t.TempDir()
-	storage := NewFileStorage(dir)
-	store, err := NewFileSnapshotStore(dir, 2)
+	storage := store.NewFileStorage(dir)
+	stor, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore: %v", err)
+		t.Fatalf("NewFileSnapshot: %v", err)
 	}
 	fsm := newSnapshotTestFSM()
 	ready := make(chan any)
 	close(ready)
 	transport := NewInmemTransport("snapshot-content")
 
-	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, store)
+	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, stor)
 	defer cm.Stop()
 	waitForLeader(t, cm, 5*time.Second)
 	cm.SetSnapshotConfig(4, 50*time.Millisecond, 2)
@@ -479,7 +480,7 @@ func TestSnapshotContent_MatchesMetaIndex(t *testing.T) {
 	waitForSnapshotAndCompaction(t, cm, numCommands)
 	waitForSnapshotQuiescence(t, cm, storage, 10*time.Second)
 
-	checkSnapshotsContainAppliedCommands(t, store, byIndex)
+	checkSnapshotsContainAppliedCommands(t, stor, byIndex)
 }
 
 // TestSnapshotIndexProperty_BothSelectBranches — property-тест обоих
@@ -495,13 +496,13 @@ func TestSnapshotIndexProperty_BothSelectBranches(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	fsm := newGatedTestFSM(64)
-	store := NewInmemSnapshotStore()
+	snapStore := store.NewInmemSnapshot()
 	ready := make(chan any)
 	close(ready)
 
 	cm := NewConsensusModule(
 		0, []int{}, NewInmemTransport("snapshot-property"),
-		NewMapStorage(), fsm, ready, store,
+		store.NewMapStorage(), fsm, ready, snapStore,
 	)
 	defer cm.Stop()
 	defer fsm.release(8)
@@ -550,7 +551,7 @@ func TestSnapshotIndexProperty_BothSelectBranches(t *testing.T) {
 			t.Fatalf("iteration %d: takeSnapshot: %v", i, err)
 		}
 
-		metas, err := store.List()
+		metas, err := snapStore.List()
 		if err != nil {
 			t.Fatalf("iteration %d: List: %v", i, err)
 		}
@@ -558,7 +559,7 @@ func TestSnapshotIndexProperty_BothSelectBranches(t *testing.T) {
 			continue
 		}
 		meta := metas[0]
-		_, reader, err := store.Open(meta.ID)
+		_, reader, err := snapStore.Open(meta.ID)
 		if err != nil {
 			t.Fatalf("iteration %d: Open %s: %v", i, meta.ID, err)
 		}
@@ -609,15 +610,15 @@ func TestSnapshot_RestartFromSnapshotProducesNewSnapshot(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	dir := t.TempDir()
-	storage := NewFileStorage(dir)
-	store, err := NewFileSnapshotStore(dir, 2)
+	storage := store.NewFileStorage(dir)
+	snapStore, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore: %v", err)
+		t.Fatalf("NewFileSnapshot: %v", err)
 	}
 	ready := make(chan any)
 	close(ready)
 	transport := NewInmemTransport("restart-snapshot")
-	cm := NewConsensusModule(0, []int{}, transport, storage, newSnapshotTestFSM(), ready, store)
+	cm := NewConsensusModule(0, []int{}, transport, storage, newSnapshotTestFSM(), ready, snapStore)
 	waitForLeader(t, cm, 5*time.Second)
 	cm.SetSnapshotConfig(4, 50*time.Millisecond, 2)
 
@@ -633,10 +634,10 @@ func TestSnapshot_RestartFromSnapshotProducesNewSnapshot(t *testing.T) {
 	transport.Close()
 
 	// Перезапуск в той же директории.
-	storage2 := NewFileStorage(dir)
-	store2, err := NewFileSnapshotStore(dir, 2)
+	storage2 := store.NewFileStorage(dir)
+	store2, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore (restart): %v", err)
+		t.Fatalf("NewFileSnapshot (restart): %v", err)
 	}
 	ready2 := make(chan any)
 	close(ready2)
@@ -717,16 +718,16 @@ func TestSnapshot_UnappliedBatchesReplayedAfterRestart(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	dir := t.TempDir()
-	storage := NewFileStorage(dir)
-	store, err := NewFileSnapshotStore(dir, 2)
+	storage := store.NewFileStorage(dir)
+	snapStore, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore: %v", err)
+		t.Fatalf("NewFileSnapshot: %v", err)
 	}
 	fsm := newGatedTestFSM(16)
 	ready := make(chan any)
 	close(ready)
 	transport := NewInmemTransport("stop-with-pending")
-	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, store)
+	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, snapStore)
 	waitForLeader(t, cm, 5*time.Second)
 	cm.SetSnapshotConfig(2, 50*time.Millisecond, 2)
 
@@ -787,10 +788,10 @@ func TestSnapshot_UnappliedBatchesReplayedAfterRestart(t *testing.T) {
 	}
 
 	// Перезапуск в той же директории: все записи обязаны присутствовать.
-	storage2 := NewFileStorage(dir)
-	store2, err := NewFileSnapshotStore(dir, 2)
+	storage2 := store.NewFileStorage(dir)
+	store2, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore (restart): %v", err)
+		t.Fatalf("NewFileSnapshot (restart): %v", err)
 	}
 	// Тип машины состояний обязан совпадать: снимок сериализован её
 	// собственным форматом. Шлюз открыт заранее — перезапуск применяет
@@ -828,7 +829,7 @@ func TestSnapshot_UnappliedBatchesReplayedAfterRestart(t *testing.T) {
 // нулевые значения (готовы к использованию).
 func newFsmSnapshotCM(fsmApplied, dispatched, lastSnapshotIndex int) *ConsensusModule {
 	cm := &ConsensusModule{
-		storage:    NewMapStorage(),
+		storage:    store.NewMapStorage(),
 		fsm:        newSnapshotTestFSM(),
 		shutdownCh: make(chan struct{}),
 	}
@@ -897,10 +898,10 @@ func TestSnapshotCounter_IncrementedWhenFSMBehind(t *testing.T) {
 func TestSnapshotGuard_NothingNewAtSnapshotIndex(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	store := &countingSnapshotStore{InmemSnapshotStore: NewInmemSnapshotStore()}
+	countingStore := &countingSnapshotStore{InmemSnapshot: store.NewInmemSnapshot()}
 	cm := &ConsensusModule{
-		storage:       NewMapStorage(),
-		snapshotStore: store,
+		storage:       store.NewMapStorage(),
+		snapshotStore: countingStore,
 		fsm:           newSnapshotTestFSM(),
 		shutdownCh:    make(chan struct{}),
 		fsmMutateCh:   make(chan []*commitTuple, 1),
@@ -917,7 +918,7 @@ func TestSnapshotGuard_NothingNewAtSnapshotIndex(t *testing.T) {
 	if err := cm.takeSnapshot(); err != nil {
 		t.Fatalf("takeSnapshot = %v, want nil (nothing new to snapshot)", err)
 	}
-	if got := store.creates.Load(); got != 0 {
+	if got := countingStore.creates.Load(); got != 0 {
 		t.Fatalf("Create calls = %d, want 0 (snapshot index would not advance)", got)
 	}
 }
@@ -965,7 +966,7 @@ func TestSnapshotIndexNotAheadOfFSM_Deterministic(t *testing.T) {
 			close(ready)
 			cm := NewConsensusModule(
 				0, []int{}, NewInmemTransport(ServerAddress("watermark-"+tc.name)),
-				NewMapStorage(), tc.fsm, ready, NewInmemSnapshotStore(),
+				store.NewMapStorage(), tc.fsm, ready, store.NewInmemSnapshot(),
 			)
 			defer cm.Stop()
 			// Освобождение шлюза обязано выполниться раньше Stop:
@@ -1035,10 +1036,10 @@ func TestSnapshotIndexNotAheadOfFSM_Deterministic(t *testing.T) {
 func TestFsmAppliedIndex_EmptyStartHasNothingToSnapshot(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	store := &countingSnapshotStore{InmemSnapshotStore: NewInmemSnapshotStore()}
+	countingStore := &countingSnapshotStore{InmemSnapshot: store.NewInmemSnapshot()}
 	cm := &ConsensusModule{
-		storage:       NewMapStorage(),
-		snapshotStore: store,
+		storage:       store.NewMapStorage(),
+		snapshotStore: countingStore,
 		fsm:           newGatedTestFSM(1),
 		shutdownCh:    make(chan struct{}),
 		fsmMutateCh:   make(chan []*commitTuple, 1),
@@ -1053,7 +1054,7 @@ func TestFsmAppliedIndex_EmptyStartHasNothingToSnapshot(t *testing.T) {
 	if err := cm.takeSnapshot(); err != nil {
 		t.Fatalf("takeSnapshot on empty FSM = %v, want nil", err)
 	}
-	if got := store.creates.Load(); got != 0 {
+	if got := countingStore.creates.Load(); got != 0 {
 		t.Fatalf("Create calls = %d, want 0 (nothing applied yet)", got)
 	}
 }
@@ -1070,7 +1071,7 @@ func TestFsmAppliedIndex_FreshStartAdvancesOnFirstBatch(t *testing.T) {
 	ready := make(chan any)
 	cm := NewConsensusModule(
 		0, []int{}, NewInmemTransport("fresh-start"),
-		NewMapStorage(), fsm, ready, NewInmemSnapshotStore(),
+		store.NewMapStorage(), fsm, ready, store.NewInmemSnapshot(),
 	)
 	defer cm.Stop()
 	defer fsm.release(4)

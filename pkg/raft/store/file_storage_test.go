@@ -1,4 +1,4 @@
-package raft
+package store
 
 import (
 	"bytes"
@@ -8,100 +8,14 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/fortytw2/leaktest"
+
+	"github.com/vskurikhin/raft"
 )
 
-// TestFileStorage_RestartRestoresState проверяет, что после рестарта
-// ConsensusModule с FileStorage состояние (currentTerm, votedFor, log,
-// lastLogIndex) восстанавливается с диска и узел не стартует с пустым
-// журналом (lastLogIndex == -1), что является условием цикла
-// PreCandidate -> Follower -> PreCandidate.
-func TestFileStorage_RestartRestoresState(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
-
-	dir := t.TempDir()
-	storage := NewFileStorage(dir)
-	fsm1 := newSnapshotTestFSM()
-	ready1 := make(chan any)
-	close(ready1)
-	transport1 := NewInmemTransport("single")
-
-	cm1 := NewConsensusModule(0, []int{}, transport1, storage, fsm1, ready1)
-	defer cm1.Stop()
-
-	// Ждём, пока одиночный узел станет лидером.
-	waitForLeader(t, cm1, 2*time.Second)
-
-	// Записываем несколько команд (int — не требует gob.Register(Command{})).
-	const numCommands = 10
-	for i := 0; i < numCommands; i++ {
-		future := cm1.Apply(i, 0)
-		if err := future.Error(); err != nil {
-			t.Fatalf("Apply(%d) failed: %v", i, err)
-		}
-	}
-
-	// Запоминаем состояние до рестарта.
-	cm1.mu.Lock()
-	prevTerm := cm1.cmState.currentTerm
-	prevVotedFor := cm1.cmState.votedFor
-	prevLogLen := len(cm1.cmState.log)
-	prevLastLogIndex := cm1.cmState.lastLogIndex
-	cm1.mu.Unlock()
-
-	if prevLastLogIndex < 0 {
-		t.Fatal("leader did not write any log entries before restart")
-	}
-
-	// Симулируем рестарт: останавливаем CM и транспорт, создаём новый
-	// FileStorage в той же директории и новый CM.
-	cm1.Stop()
-	transport1.Close()
-
-	fsm2 := newSnapshotTestFSM()
-	ready2 := make(chan any)
-	close(ready2)
-	transport2 := NewInmemTransport("single-2")
-	storage2 := NewFileStorage(dir)
-
-	cm2 := NewConsensusModule(0, []int{}, transport2, storage2, fsm2, ready2)
-	defer cm2.Stop()
-
-	// Проверяем восстановление состояния с диска.
-	cm2.mu.Lock()
-	restoredTerm := cm2.cmState.currentTerm
-	restoredVotedFor := cm2.cmState.votedFor
-	restoredLogLen := len(cm2.cmState.log)
-	restoredLastLogIndex := cm2.cmState.lastLogIndex
-	cm2.mu.Unlock()
-
-	if !cm2.storage.HasData() {
-		t.Fatal("HasData() == false after restart, want true")
-	}
-	if restoredTerm != prevTerm {
-		t.Fatalf("currentTerm = %d after restart, want %d", restoredTerm, prevTerm)
-	}
-	if restoredVotedFor != prevVotedFor {
-		t.Fatalf("votedFor = %d after restart, want %d", restoredVotedFor, prevVotedFor)
-	}
-	if restoredLogLen != prevLogLen {
-		t.Fatalf("log length = %d after restart, want %d", restoredLogLen, prevLogLen)
-	}
-	if restoredLastLogIndex != prevLastLogIndex {
-		t.Fatalf("lastLogIndex = %d after restart, want %d", restoredLastLogIndex, prevLastLogIndex)
-	}
-	if restoredLastLogIndex < 0 {
-		t.Fatal("lastLogIndex == -1 after restart: pre-vote loop condition not eliminated")
-	}
-
-	// Проверяем, что восстановленный узел работоспособен: одиночный узел
-	// снова становится лидером (lastLogIndex != -1 не мешает выиграть выборы).
-	waitForLeader(t, cm2, 2*time.Second)
-}
-
 // gobEncode кодирует value в gob-формат, как это делает raft_cm_storage.go.
+// Локальная копия, предназначенная для тестов пакета store.
 func gobEncode(t *testing.T, value any) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -112,6 +26,7 @@ func gobEncode(t *testing.T, value any) []byte {
 }
 
 // gobDecode декодирует data в value, как это делает raft_cm_storage.go.
+// Локальная копия, предназначенная для тестов пакета store.
 func gobDecode(t *testing.T, data []byte, value any) {
 	t.Helper()
 	if err := gob.NewDecoder(bytes.NewBuffer(data)).Decode(value); err != nil {
@@ -155,7 +70,7 @@ func TestFileStorage_RestartSimulation(t *testing.T) {
 	fs1 := NewFileStorage(dir)
 	fs1.Set("currentTerm", gobEncode(t, 3))
 	fs1.Set("votedFor", gobEncode(t, 2))
-	log := []LogEntry{
+	log := []raft.LogEntry{
 		{Index: 1, Term: 1, Data: 10},
 		{Index: 2, Term: 1, Data: 20},
 		{Index: 3, Term: 2, Data: 30},
@@ -181,7 +96,7 @@ func TestFileStorage_RestartSimulation(t *testing.T) {
 		t.Fatalf("votedFor = %d, want 2", votedFor)
 	}
 
-	var restoredLog []LogEntry
+	var restoredLog []raft.LogEntry
 	gobDecode(t, mustGet(t, fs2, "log"), &restoredLog)
 	if len(restoredLog) != len(log) {
 		t.Fatalf("log length = %d, want %d", len(restoredLog), len(log))
@@ -251,7 +166,7 @@ func TestFileStorage_CrashSafety_OrphanTmpIgnored(t *testing.T) {
 
 // TestFileStorage_ConcurrentSet проверяет конкурентную запись разных ключей.
 func TestFileStorage_ConcurrentSet(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	fs := NewFileStorage(t.TempDir())
 
@@ -318,9 +233,9 @@ func TestFileStorage_GobCompatibility(t *testing.T) {
 	fs.Set("votedFor", gobEncode(t, -1))
 	fs.Set("lastSnapshotIndex", gobEncode(t, 4))
 	fs.Set("lastSnapshotTerm", gobEncode(t, 3))
-	log := []LogEntry{
-		{Index: 1, Term: 1, Type: LogCommand, Data: 100},
-		{Index: 2, Term: 1, Type: LogNoop, Data: nil},
+	log := []raft.LogEntry{
+		{Index: 1, Term: 1, Type: raft.LogCommand, Data: 100},
+		{Index: 2, Term: 1, Type: raft.LogNoop, Data: nil},
 	}
 	fs.Set("log", gobEncode(t, log))
 
@@ -333,7 +248,7 @@ func TestFileStorage_GobCompatibility(t *testing.T) {
 		t.Fatalf("scalars mismatch: term=%d votedFor=%d snapIdx=%d snapTerm=%d", term, votedFor, snapIdx, snapTerm)
 	}
 
-	var restoredLog []LogEntry
+	var restoredLog []raft.LogEntry
 	gobDecode(t, mustGet(t, fs, "log"), &restoredLog)
 	if len(restoredLog) != len(log) {
 		t.Fatalf("log length = %d, want %d", len(restoredLog), len(log))
@@ -358,15 +273,15 @@ func mustGet(t *testing.T, fs *FileStorage, key string) []byte {
 // TestFileStorage_SetSkipsUnchangedValue проверяет, что повторная запись того
 // же значения не выполняет ввода-вывода, а смена значения — выполняет.
 func TestFileStorage_SetSkipsUnchangedValue(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	fs := NewFileStorage(t.TempDir())
 	value := gobEncode(t, 42)
 	for i := 0; i < 10; i++ {
 		fs.Set("currentTerm", value)
 	}
-	if got := fs.writeCount(); got != 1 {
-		t.Fatalf("writeCount = %d after 10 identical Set, want 1", got)
+	if got := fs.WriteCount(); got != 1 {
+		t.Fatalf("WriteCount = %d after 10 identical Set, want 1", got)
 	}
 
 	fs2 := NewFileStorage(t.TempDir())
@@ -375,8 +290,8 @@ func TestFileStorage_SetSkipsUnchangedValue(t *testing.T) {
 	for _, value := range [][]byte{v1, v1, v2, v2, v1} {
 		fs2.Set("currentTerm", value)
 	}
-	if got := fs2.writeCount(); got != 3 {
-		t.Fatalf("writeCount = %d for sequence v1,v1,v2,v2,v1, want 3", got)
+	if got := fs2.WriteCount(); got != 3 {
+		t.Fatalf("WriteCount = %d for sequence v1,v1,v2,v2,v1, want 3", got)
 	}
 }
 
@@ -384,7 +299,7 @@ func TestFileStorage_SetSkipsUnchangedValue(t *testing.T) {
 // пяти ключей по отдельности выполняет запись именно этого ключа и что после
 // открытия каталога новым экземпляром значения прочитаны верно.
 func TestFileStorage_SetWritesChangedValue(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	dir := t.TempDir()
 	fs := NewFileStorage(dir)
@@ -394,14 +309,14 @@ func TestFileStorage_SetWritesChangedValue(t *testing.T) {
 		"votedFor":          gobEncode(t, -1),
 		"lastSnapshotIndex": gobEncode(t, 0),
 		"lastSnapshotTerm":  gobEncode(t, 0),
-		"log":               gobEncode(t, []LogEntry{{Index: 0, Term: 1}}),
+		"log":               gobEncode(t, []raft.LogEntry{{Index: 0, Term: 1}}),
 	}
 	keys := []string{"currentTerm", "votedFor", "lastSnapshotIndex", "lastSnapshotTerm", "log"}
 	for _, key := range keys {
 		fs.Set(key, initial[key])
 	}
-	if got := fs.writeCount(); got != len(keys) {
-		t.Fatalf("writeCount = %d after initial fill, want %d", got, len(keys))
+	if got := fs.WriteCount(); got != len(keys) {
+		t.Fatalf("WriteCount = %d after initial fill, want %d", got, len(keys))
 	}
 
 	changed := map[string][]byte{
@@ -409,7 +324,7 @@ func TestFileStorage_SetWritesChangedValue(t *testing.T) {
 		"votedFor":          gobEncode(t, 2),
 		"lastSnapshotIndex": gobEncode(t, 5),
 		"lastSnapshotTerm":  gobEncode(t, 3),
-		"log":               gobEncode(t, []LogEntry{{Index: 6, Term: 3}}),
+		"log":               gobEncode(t, []raft.LogEntry{{Index: 6, Term: 3}}),
 	}
 	expected := make(map[string][]byte, len(keys))
 	for key, value := range initial {
@@ -417,9 +332,9 @@ func TestFileStorage_SetWritesChangedValue(t *testing.T) {
 	}
 
 	for i, key := range keys {
-		before := fs.writeCount()
+		before := fs.WriteCount()
 		fs.Set(key, changed[key])
-		if got := fs.writeCount() - before; got != 1 {
+		if got := fs.WriteCount() - before; got != 1 {
 			t.Fatalf("key %q: %d writes on change, want 1", key, got)
 		}
 		expected[key] = changed[key]
@@ -434,9 +349,9 @@ func TestFileStorage_SetWritesChangedValue(t *testing.T) {
 		}
 
 		// Повторная запись того же значения ввода-вывода не выполняет.
-		before = fs.writeCount()
+		before = fs.WriteCount()
 		fs.Set(key, changed[key])
-		if got := fs.writeCount() - before; got != 0 {
+		if got := fs.WriteCount() - before; got != 0 {
 			t.Fatalf("key %q: %d writes on repeated identical Set, want 0", key, got)
 		}
 	}
@@ -446,15 +361,15 @@ func TestFileStorage_SetWritesChangedValue(t *testing.T) {
 // значения: мутация буфера вызывающего после Set не влияет ни на диск, ни на
 // решение о пропуске следующей записи.
 func TestFileStorage_CloneOnSet(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	dir := t.TempDir()
 	fs := NewFileStorage(dir)
 
 	original := []byte{1, 2, 3}
 	fs.Set("log", original)
-	if got := fs.writeCount(); got != 1 {
-		t.Fatalf("writeCount = %d after first Set, want 1", got)
+	if got := fs.WriteCount(); got != 1 {
+		t.Fatalf("WriteCount = %d after first Set, want 1", got)
 	}
 
 	// Вызывающий мутирует свой буфер на месте.
@@ -468,8 +383,8 @@ func TestFileStorage_CloneOnSet(t *testing.T) {
 	// Значение, совпадающее с мутированным буфером, отличается от лежащего на
 	// диске, поэтому запись обязана быть выполнена.
 	fs.Set("log", mutated)
-	if got := fs.writeCount(); got != 2 {
-		t.Fatalf("writeCount = %d after Set of mutated value, want 2 (cache aliased caller buffer)", got)
+	if got := fs.WriteCount(); got != 2 {
+		t.Fatalf("WriteCount = %d after Set of mutated value, want 2 (cache aliased caller buffer)", got)
 	}
 	if got := mustGet(t, NewFileStorage(dir), "log"); !bytes.Equal(got, mutated) {
 		t.Fatalf("disk value = %v, want %v", got, mutated)
@@ -479,7 +394,7 @@ func TestFileStorage_CloneOnSet(t *testing.T) {
 // TestFileStorage_CloneOnGet проверяет, что Get возвращает защитную копию:
 // мутация полученного среза не портит ни кэш, ни диск.
 func TestFileStorage_CloneOnGet(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	dir := t.TempDir()
 	fs := NewFileStorage(dir)
@@ -500,9 +415,9 @@ func TestFileStorage_CloneOnGet(t *testing.T) {
 		t.Fatalf("disk value = %v after reader mutation, want [1 2 3]", onDisk)
 	}
 
-	before := fs.writeCount()
+	before := fs.WriteCount()
 	fs.Set("log", []byte{9, 2, 3})
-	if got := fs.writeCount() - before; got != 1 {
+	if got := fs.WriteCount() - before; got != 1 {
 		t.Fatalf("%d writes for value differing from cached, want 1 (cache spoiled by reader)", got)
 	}
 }
@@ -510,7 +425,7 @@ func TestFileStorage_CloneOnGet(t *testing.T) {
 // TestFileStorage_HasDataAfterSkippedSet проверяет, что пропуск записи не
 // меняет семантику HasData.
 func TestFileStorage_HasDataAfterSkippedSet(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	dir := t.TempDir()
 	fs := NewFileStorage(dir)
@@ -521,8 +436,8 @@ func TestFileStorage_HasDataAfterSkippedSet(t *testing.T) {
 		t.Fatal("HasData() = false after first Set, want true")
 	}
 	fs.Set("currentTerm", value)
-	if got := fs.writeCount(); got != 1 {
-		t.Fatalf("writeCount = %d after repeated identical Set, want 1", got)
+	if got := fs.WriteCount(); got != 1 {
+		t.Fatalf("WriteCount = %d after repeated identical Set, want 1", got)
 	}
 	if !fs.HasData() {
 		t.Fatal("HasData() = false after skipped Set, want true")
@@ -535,8 +450,8 @@ func TestFileStorage_HasDataAfterSkippedSet(t *testing.T) {
 		t.Fatal("HasData() = false after load from disk, want true")
 	}
 	restarted.Set("currentTerm", value)
-	if got := restarted.writeCount(); got != 0 {
-		t.Fatalf("writeCount = %d after Set of value already on disk, want 0", got)
+	if got := restarted.WriteCount(); got != 0 {
+		t.Fatalf("WriteCount = %d after Set of value already on disk, want 0", got)
 	}
 	if !restarted.HasData() {
 		t.Fatal("HasData() = false after skipped Set on restarted storage, want true")

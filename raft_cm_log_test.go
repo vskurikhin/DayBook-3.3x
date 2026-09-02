@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // -- Тесты rebuildLastLogLocked. ---
@@ -86,7 +87,7 @@ func TestRebuildLastLog_AppendEntriesCallSite(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{}
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.cmState.state = Follower
 	cm.cmState.currentTerm = 1
 	cm.cmState.votedFor = -1
@@ -131,7 +132,7 @@ func TestRebuildLastLog_AppendEntriesCallSite(t *testing.T) {
 func TestRebuildLastLog_RestoreFromStorageCallSite(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	storage.Set("currentTerm", gobEncode(t, 1))
 	storage.Set("votedFor", gobEncode(t, -1))
 	storage.Set("log", gobEncode(t, []LogEntry{}))
@@ -158,7 +159,7 @@ func TestRebuildLastLog_RestoreFromStorageCallSite(t *testing.T) {
 func TestRebuildLastLog_RestoreFromStorageNonEmptyLog(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	storage.Set("currentTerm", gobEncode(t, 1))
 	storage.Set("votedFor", gobEncode(t, -1))
 	storage.Set("log", gobEncode(t, []LogEntry{

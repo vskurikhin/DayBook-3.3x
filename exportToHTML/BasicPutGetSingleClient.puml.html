@@ -1,0 +1,209 @@
+<html>
+<head>
+<title>BasicPutGetSingleClient.puml</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #080808;}
+</style>
+</head>
+<body bgcolor="#ffffff">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#c0c0c0" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+BasicPutGetSingleClient.puml</font>
+</center></td></tr></table>
+<pre><span class="s0">' ---------------------------------------------------------------------------- 
+' Диаграмма последовательностей: сценарий теста TestBasicPutGetSingleClient 
+' (pkg/system_test.go:35-46). Кластер из трёх узлов; один клиент выполняет 
+' один PUT (llave → cosa), затем один GET (ожидание &quot;cosa&quot;). 
+' 
+' Диаграмма изображает ФАКТИЧЕСКИЙ путь текущего кода (ветка 
+' v2-SNAPSHOT-CLEAN-CODE-0-STAGE-1, корневой пакет raft), без учебных 
+' каталогов part*. GET обслуживается по ReadIndex (Raft §8): без записи 
+' в журнал, после кворумного подтверждения лидерства через раунд 
+' AppendEntries; PUT — полный путь фиксации записи журнала. 
+' 
+' Evidence (сообщение → файл:строка) приведено в подписях стрелок; 
+' сводка — в комментарии к каждой фазе ниже. 
+' 
+'   Настройка: 
+'     - pkg/system_test.go:37-39          (NewHarness(3), CheckSingleLeader) 
+'     - pkg/testharness.go:103-161        (NewHarness: сервисы, ready, HTTP &quot;:0&quot;) 
+'     - pkg/kvservice/kvservice.go:149-171 (New: Fsm = KVService, raft.New + Serve) 
+'     - raft.go:287-293                   (&lt;-ready → runElectionTimer) 
+'     - raft_cm_election.go:152-158       (кворум голосов → startLeaderLocked) 
+'     - raft_cm_leader.go:686-765         (startLeaderLocked: noop, трекер, leaderLoop) 
+'     - pkg/testharness.go:557-588        (WaitForSingleLeader: опрос IsLeader) 
+' 
+'   PUT: 
+'     - pkg/system_test.go:42             (CheckPut(c1, &quot;llave&quot;, &quot;cosa&quot;)) 
+'     - pkg/testharness.go:593-600        (CheckPut → TryPut) 
+'     - pkg/kvclient/kvclient.go:118-126, 156-187 (Put → send, ротация адресов) 
+'     - pkg/kvservice/kvservice.go:386-432 (handlePut → rs.Apply → PutResponse) 
+'     - raft_cm_leader.go:49-90           (cm.Apply → applyCh) 
+'     - raft_cm_leader.go:490-511         (leaderLoop: dispatchLogs + leaderSendAEs) 
+'     - raft_cm_log.go:132-206            (dispatchLogs[Unsafe]: индекс/терм, журнал, персист) 
+'     - raft_cm_replication.go:461-496, 159-205 (leaderSendAEs → AE соседу) 
+'     - raft_cm_rpc.go:76-230             (ведомый: AppendEntries, персист, Success) 
+'     - raft_cm_replication.go:305-360    (handleAEReply → applyAESuccessLocked) 
+'     - commitment.go:104-173             (setMatch → медиана → commitCh) 
+'     - raft_cm_leader.go:516-547         (commitCh: LeaderCommit наружу, processLogs) 
+'     - raft_cm_apply.go:84-227           (processLogs → sendBatch → fsmMutateCh) 
+'     - raft_cm_apply.go:117-139, 14-58   (runFSM → applyBatch → f.respond(nil)) 
+'     - pkg/kvservice/kvservice.go:177-197, 237-244 (Apply/ApplyBatch → ds.Put) 
+' 
+'   GET: 
+'     - pkg/system_test.go:44             (CheckGet(c1, &quot;llave&quot;, &quot;cosa&quot;)) 
+'     - pkg/testharness.go:509-523, 605-610 (TryGet/CheckGet, сверка &quot;cosa&quot;) 
+'     - pkg/kvclient/kvclient.go:131-138  (Get → send POST /get/) 
+'     - pkg/kvservice/kvservice.go:434-468 (handleGet → VerifyLeader → ds.Get) 
+'     - raft_cm_leader.go:179-196         (cm.VerifyLeader → verifyCh) 
+'     - raft_cm_leader.go:583-622         (leaderLoop: эпоха, self-голос, pendingVerify) 
+'     - raft_cm_replication.go:305-332, 367-395 (handleAEReply → голоса → respond(nil)) 
+'     - pkg/kvservice/datastore.go:44-50  (ds.Get → &quot;cosa&quot;, true) 
+' 
+'   Завершение: 
+'     - pkg/system_test.go:38             (defer h.Shutdown()) 
+'     - pkg/testharness.go:409-434        (отключения, ctxCancel, Shutdown каждого) 
+'     - pkg/kvservice/kvservice.go:342-360 (rs.Shutdown, HTTP Shutdown) 
+'     - server.go:175-183, raft_cm.go:331-342 (cm.Stop: join горутин, transport.Close) 
+' ---------------------------------------------------------------------------- 
+@startuml BasicPutGetSingleClient 
+title TestBasicPutGetSingleClient: один клиент, PUT + GET в кластере из трёх узлов\n(фактический путь кода; GET — по ReadIndex, Raft §8, без записи в журнал) 
+ 
+autonumber 
+ 
+participant &quot;Тест / Harness\n(system_test.go, testharness.go)&quot; as TH 
+participant &quot;Клиент\nkvclient.KVClient&quot; as C 
+participant &quot;KVService (лидер)\nHTTP-обработчики + FSM/DataStore&quot; as KS 
+participant &quot;ConsensusModule (лидер)\nrunLeaderLoop, журнал&quot; as L 
+participant &quot;commitmentTracker&quot; as T 
+participant &quot;Ведомый 1\nKVService + CM&quot; as F1 
+participant &quot;Ведомый 2\nKVService + CM&quot; as F2 
+ 
+== Фаза 0. Настройка: подъём кластера и выборы лидера == 
+ 
+TH -&gt; TH : NewHarness(t, 3):\n3×NewKVService(&quot;:0&quot;, MapStorage, ready),\nConnectToRaftPeer, close(ready),\nServeHTTP(&quot;:0&quot;)\n(testharness.go:103-161) 
+TH -&gt; L : close(ready) →\nrunElectionTimer\n(raft.go:287-293) 
+L -&gt; F1 : Pre-Vote → выборы:\nRequestVote (терм t)\n(raft_cm_election.go:73-169) 
+L -&gt; F2 : RequestVote (параллельно) 
+F1 --&gt; L : VoteGranted 
+F2 --&gt; L : VoteGranted 
+L -&gt; L : кворум 2/3 → startLeaderLocked:\nnoop-запись терма (§5.4.2),\nновый commitmentTracker,\nзапуск runLeaderLoop\n(raft_cm_election.go:152-158;\nraft_cm_leader.go:686-765) 
+TH -&gt; TH : CheckSingleLeader:\nопрос IsLeader() подключённых\nсервисов до единственного лидера\n(testharness.go:485-488, 557-588) 
+note over TH, F2 
+  Предыстория сценария: лидер уже избран и зафиксировал noop-запись 
+  своего терма. Клиент (h.NewClient()) получает список адресов всех 
+  трёх сервисов (testharness.go:438-440); assumedLeader = 0 — лидера 
+  клиент не знает и находит обходом сервисов. 
+end note 
+ 
+TH -&gt; C : h.NewClient()\n(testharness.go:41, 438-440) 
+ 
+== Фаза 1. PUT «llave» = «cosa» (CheckPut) == 
+ 
+TH -&gt; C : CheckPut(c1, &quot;llave&quot;, &quot;cosa&quot;)\n→ TryPut: ctx 600×Quantum мс\n(system_test.go:42;\ntestharness.go:593-600, 500-504) 
+ 
+opt assumedLeader — не лидер (обход сервисов) 
+  C -&gt; F1 : POST /put/ {&quot;llave&quot;,&quot;cosa&quot;}\n(kvclient.go:156-162) 
+  F1 -&gt; F1 : rs.Apply → cm.Apply:\nstate != Leader →\nerrorFuture{ErrNotLeader}\n(raft_cm_leader.go:64-68) 
+  F1 --&gt; C : PutResponse{StatusNotLeader}\n(kvservice.go:408-414) 
+  C -&gt; C : nextLeader():\nпереход к следующему адресу\n(kvclient.go:174-178) 
+end 
+ 
+C -&gt; KS : POST /put/ {&quot;llave&quot;,&quot;cosa&quot;}\n(лидер; kvclient.go:156-162) 
+activate KS 
+KS -&gt; L : rs.Apply(cmd, 10 c):\nCommand{CommandPut},\nlogFuture → applyCh\n(kvservice.go:399-406;\nserver.go:102-104;\nraft_cm_leader.go:49-90) 
+activate L 
+L -&gt; L : leaderLoop case applyCh:\ndispatchLogs — журналу присвоены\nIndex=i, Term=t, персист (MapStorage),\ninflight[i] = future;\ntracker.commit(i): только self\n(raft_cm_leader.go:490-509;\nraft_cm_log.go:132-206) 
+L -&gt; T : setMatch(лидер, i)\n(raft_cm_log.go:169) 
+T -&gt; T : медиана {-1, -1, i} не продвигает\ncommitIndex: кворум 2/3 не собран\n(commitment.go:149-173) 
+L -&gt; F1 : leaderSendAEs →\nAppendEntries: Entries=[Put],\nLeaderCommit = прежний\n(raft_cm_leader.go:511;\nraft_cm_replication.go:461-496, 37-75) 
+L -&gt; F2 : AppendEntries (параллельно) 
+activate F1 
+F1 -&gt; F1 : проверка PrevLogIndex/Term,\nдозапись журнала, персист,\ncommitIndex не меняется\n(raft_cm_rpc.go:113-168, 177-185, 221) 
+F1 --&gt; L : reply.Success = true 
+deactivate F1 
+note over L, F1 
+  Граница долговечности: Success:true отправляется 
+  только после персиста принятых записей 
+  (raft_cm_rpc.go:64-74, 217-228). 
+end note 
+F2 --&gt; L : reply.Success = true 
+L -&gt; T : handleAEReply →\napplyAESuccessLocked:\nmatchIndex[ведомый] = i, setMatch\n(raft_cm_replication.go:305-360) 
+activate T 
+T -&gt; T : медиана {i, i, -1} = i;\ntерм i равен t, i ≥ startIndex\n→ commitIndex := i\n(§5.4.2; commitment.go:149-165) 
+T --&gt; L : commitCh &lt;- i\n(non-blocking, ёмкость 1)\n(commitment.go:166-172) 
+deactivate T 
+L -&gt; L : leaderLoop case commitCh:\ncommitIndex := i\n(raft_cm_leader.go:516-520) 
+L -&gt; F1 : leaderSendAEs:\nAppendEntries LeaderCommit = i\n(raft_cm_leader.go:540) 
+L -&gt; F2 : AppendEntries LeaderCommit = i 
+note over L 
+  Индекс фиксации рассылается ведомым ДО применения 
+  записи к машине состояний лидера: leaderSendAEs() 
+  (строка 540) выполняется раньше processLogs(i) 
+  (строка 544) — применение не задерживает рассылку. 
+end note 
+F1 -&gt; F1 : commitIndex = min(LeaderCommit, lastLogIndex)\n→ processLogs → sendBatch →\nrunFSM → FSM.ApplyBatch → ds.Put\n(raft_cm_rpc.go:177-185;\nraft_cm_apply.go:84-227, 117-139;\nkvservice.go:237-244, 177-197) 
+F2 -&gt; F2 : то же: журнал применён\nк DataStore ведомого 
+L -&gt; L : processLogs(i):\nlastApplied := i (до применения),\nsendBatch → fsmMutateCh\n(raft_cm_apply.go:84-106, 174-227) 
+L -&gt; KS : runFSM → FSM.ApplyBatch →\nFSM.Apply: ds.Put(&quot;llave&quot;,&quot;cosa&quot;)\n→ (&quot;&quot;, false)\n(raft_cm_apply.go:117-139, 35;\nkvservice.go:177-197;\ndatastore.go:55-62) 
+KS -&gt; KS : future.response = Command;\nfuture.respond(nil)\n(raft_cm_apply.go:52-57) 
+L --&gt; KS : future.ErrorCh &lt;- nil\n(future.go:142-153) 
+deactivate L 
+KS --&gt; C : PutResponse{StatusOK,\nKeyFound=false, PrevValue=&quot;&quot;}\n(ключ новый; kvservice.go:408-427) 
+deactivate KS 
+C --&gt; TH : (&quot;&quot;, false, nil) — ошибок нет,\nCheckPut пройден\n(testharness.go:593-600) 
+note over TH 
+  Предмет проверки CheckPut — отсутствие ошибки; 
+  prev/found утверждаются отдельным тестом 
+  TestPutPrevValue (system_test.go:48-70). 
+end note 
+ 
+== Фаза 2. GET «llave» (CheckGet, ожидание «cosa») == 
+ 
+TH -&gt; C : CheckGet(c1, &quot;llave&quot;, &quot;cosa&quot;)\n→ TryGet: сверка found и значения\n(system_test.go:44;\ntestharness.go:605-610, 509-523) 
+note over C 
+  Обход сервисов тот же, что у PUT: 
+  StatusNotLeader → nextLeader() 
+  (kvclient.go:174-178). 
+end note 
+C -&gt; KS : POST /get/ {&quot;llave&quot;}\n(kvclient.go:131-138, 156-162) 
+activate KS 
+KS -&gt; L : rs.VerifyLeader()\n(ReadIndex, без записи в журнал;\nkvservice.go:447-448; server.go:165-167) 
+activate L 
+L -&gt; L : cm.VerifyLeader → verifyCh;\nleaderLoop case verifyCh:\nquorumSize = 2, verifyEpoch++,\nself-голос (1/2),\nзапрос → pendingVerify;\nfirstPending → leaderSendAEs\n(raft_cm_leader.go:179-196, 583-622) 
+L -&gt; F1 : AppendEntries\n(Entries пуст — фактически пульс;\ndispatchEpoch = verifyEpoch)\n(raft_cm_replication.go:461-496) 
+L -&gt; F2 : AppendEntries (параллельно) 
+activate F1 
+F1 --&gt; L : reply.Success = true 
+deactivate F1 
+F2 --&gt; L : reply.Success = true 
+L -&gt; L : handleAEReply →\ncountVerifyVotesLocked:\nголос ведомого засчитан\n(epochs: vf.epoch ≤ dispatchEpoch)\n(raft_cm_replication.go:305-332, 367-395) 
+L --&gt; KS : verifyFuture.respond(nil):\n2/2 голоса — лидерство подтверждено\n(future.go:83-96) 
+deactivate L 
+KS -&gt; KS : ds.Get(&quot;llave&quot;)\n→ (&quot;cosa&quot;, true)\n(локальное чтение DataStore;\nkvservice.go:461-462; datastore.go:44-50) 
+KS --&gt; C : GetResponse{StatusOK,\nKeyFound=true, Value=&quot;cosa&quot;}\n(kvservice.go:463-467) 
+deactivate KS 
+C --&gt; TH : (&quot;cosa&quot;, true, nil):\nTryGet сверяет value == &quot;cosa&quot;\nи found == true — тест пройден\n(testharness.go:509-523) 
+ 
+== Фаза 3. Завершение (defer h.Shutdown) == 
+ 
+TH -&gt; TH : h.Shutdown(): отключение всех\nот соседей, ctxCancel,\nShutdown каждого сервиса\n(system_test.go:38;\ntestharness.go:409-434) 
+TH -&gt; L : rs.Shutdown(): cm.Stop() —\njoin всех горутин CM,\ntransport.Close()\n(server.go:175-183; raft_cm.go:331-342) 
+TH -&gt; KS : srv.Shutdown(ctx), ln.Close()\n(kvservice.go:342-360) 
+TH -&gt; F1 : Shutdown (то же для ведомых) 
+TH -&gt; F2 : Shutdown 
+ 
+note over TH, F2 
+  Итог: PUT зафиксирован кворумом 2/3 (запись журнала 
+  реплицирована и персистена на лидере и ведомом), 
+  применён к машине состояний всех трёх узлов; GET 
+  обслужен лидером локально из DataStore после 
+  кворумного подтверждения лидерства (ReadIndex, 
+  Raft §8) — без записи в журнал. 
+end note 
+@enduml 
+</span></pre>
+</body>
+</html>

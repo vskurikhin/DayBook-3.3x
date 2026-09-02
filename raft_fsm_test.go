@@ -10,6 +10,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // snapshotTestFSM — тестовая FSM с поддержкой снимков.
@@ -98,8 +99,8 @@ func TestSnapshotTestFSM_Basic(t *testing.T) {
 	}
 	defer snap.Release()
 
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(10, 1, Configuration{}, 0)
+	stor := store.NewInmemSnapshot()
+	sink, err := stor.Create(10, 1, Configuration{}, 0)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -110,7 +111,7 @@ func TestSnapshotTestFSM_Basic(t *testing.T) {
 
 	// Создаём новую FSM и восстанавливаем.
 	fsm2 := newSnapshotTestFSM()
-	_, reader, err := store.Open(sink.ID())
+	_, reader, err := stor.Open(sink.ID())
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -141,8 +142,8 @@ func TestSnapshotTestFSM_Empty(t *testing.T) {
 	}
 	defer snap.Release()
 
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(1, 1, Configuration{}, 0)
+	stor := store.NewInmemSnapshot()
+	sink, err := stor.Create(1, 1, Configuration{}, 0)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -152,7 +153,7 @@ func TestSnapshotTestFSM_Empty(t *testing.T) {
 	_ = sink.Close()
 
 	fsm2 := newSnapshotTestFSM()
-	_, reader, err := store.Open(sink.ID())
+	_, reader, err := stor.Open(sink.ID())
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}

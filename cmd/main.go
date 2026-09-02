@@ -18,6 +18,7 @@ import (
 	"github.com/vskurikhin/raft/internal/_init"
 	"github.com/vskurikhin/raft/internal/config"
 	"github.com/vskurikhin/raft/pkg/kvservice"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 const (
@@ -68,7 +69,7 @@ func runWith(values *config.Values) (func(), error) {
 	// Постоянное хранилище снимков: сжатие усекает журнал на диске,
 	// поэтому снимок обязан переживать рестарт процесса. retain=2 —
 	// запас на случай повреждения последнего снимка.
-	snapshotStore, err := raft.NewFileSnapshotStore(dataDir, 2)
+	snapshotStore, err := store.NewFileSnapshot(dataDir, 2)
 	if err != nil {
 		stopPprof()
 		return nil, fmt.Errorf("failed to create file snapshot store in %s: %w", dataDir, err)
@@ -88,7 +89,7 @@ func runWith(values *config.Values) (func(), error) {
 			PeerIds:           nums,
 			ServerID:          values.Number,
 			SnapshotStore:     snapshotStore,
-			Storage:           raft.NewFileStorage(dataDir),
+			Storage:           store.NewFileStorage(dataDir),
 			SnapshotInterval:  values.SnapshotInterval,
 			SnapshotThreshold: values.SnapshotThreshold,
 		},

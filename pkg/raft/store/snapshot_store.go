@@ -1,43 +1,47 @@
-package raft
+package store
 
 import (
 	"bytes"
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
-// InmemSnapshotStore — in-memory реализация SnapshotStore. Test-only:
+// InmemSnapshot — in-memory реализация SnapshotStore. Test-only:
 // не переживает рестарт процесса; для production использовать
-// FileSnapshotStore.
+// FileSnapshot.
 //
 // Хранит только последний снимок: незавершённый sink живёт в pending
 // и становится видимым (latest) только после успешного Close; Cancel
 // очищает pending, не затрагивая latest. Поддерживает один одновременный
 // Create — второй Create затирает pending первого, и первый Close не
 // продвигает свои данные в latest (защита от гонки двух Create).
-type InmemSnapshotStore struct {
+type InmemSnapshot struct {
 	mu      sync.Mutex
 	pending *InmemSnapshotSink
 	latest  *InmemSnapshotSink
 }
 
-var _ SnapshotStore = (*InmemSnapshotStore)(nil)
+var _ contract.SnapshotStore = (*InmemSnapshot)(nil)
 
-// NewInmemSnapshotStore создаёт новый InmemSnapshotStore.
-func NewInmemSnapshotStore() *InmemSnapshotStore {
-	return &InmemSnapshotStore{}
+// NewInmemSnapshot создаёт новый InmemSnapshot.
+func NewInmemSnapshot() *InmemSnapshot {
+	return &InmemSnapshot{}
 }
 
 // Create создаёт новый снимок. Снимок не виден в List/Open до Close.
-func (s *InmemSnapshotStore) Create(index, term int, configuration Configuration, configIndex int) (SnapshotSink, error) {
+func (s *InmemSnapshot) Create(
+	index, term int, configuration contract.Configuration, configIndex int,
+) (contract.SnapshotSink, error) {
 	id := fmt.Sprintf("snapshot-%d-%d", term, index)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sink := &InmemSnapshotSink{
 		store: s,
-		meta: SnapshotMeta{
-			Version:       ProtocolVersion,
+		meta: contract.SnapshotMeta{
+			Version:       contract.ProtocolVersion,
 			ID:            id,
 			Index:         index,
 			Term:          term,
@@ -51,17 +55,17 @@ func (s *InmemSnapshotStore) Create(index, term int, configuration Configuration
 
 // List возвращает срез с одним *SnapshotMeta или пустой срез, если
 // завершённого снимка нет.
-func (s *InmemSnapshotStore) List() ([]*SnapshotMeta, error) {
+func (s *InmemSnapshot) List() ([]*contract.SnapshotMeta, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.latest == nil {
 		return nil, nil
 	}
-	return []*SnapshotMeta{cloneMeta(&s.latest.meta)}, nil
+	return []*contract.SnapshotMeta{cloneMeta(&s.latest.meta)}, nil
 }
 
 // Open ищет завершённый снимок по ID. Возвращает копию данных.
-func (s *InmemSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, error) {
+func (s *InmemSnapshot) Open(id string) (*contract.SnapshotMeta, io.ReadCloser, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.latest == nil || s.latest.meta.ID != id {
@@ -75,14 +79,14 @@ func (s *InmemSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, erro
 
 // InmemSnapshotSink — реализация SnapshotSink в памяти.
 type InmemSnapshotSink struct {
-	store  *InmemSnapshotStore
-	meta   SnapshotMeta
+	store  *InmemSnapshot
+	meta   contract.SnapshotMeta
 	buf    bytes.Buffer
 	mu     sync.Mutex
 	closed bool
 }
 
-var _ SnapshotSink = (*InmemSnapshotSink)(nil)
+var _ contract.SnapshotSink = (*InmemSnapshotSink)(nil)
 
 // Write пишет данные в буфер снимка, обновляя Size.
 func (s *InmemSnapshotSink) Write(p []byte) (int, error) {
@@ -136,16 +140,16 @@ func (s *InmemSnapshotSink) Cancel() error {
 }
 
 // cloneMeta создаёт копию SnapshotMeta.
-func cloneMeta(m *SnapshotMeta) *SnapshotMeta {
+func cloneMeta(m *contract.SnapshotMeta) *contract.SnapshotMeta {
 	cfg := m.Configuration
-	servers := make([]ConfigServer, len(cfg.ConfigServers))
+	servers := make([]contract.ConfigServer, len(cfg.ConfigServers))
 	copy(servers, cfg.ConfigServers)
-	return &SnapshotMeta{
+	return &contract.SnapshotMeta{
 		Version:       m.Version,
 		ID:            m.ID,
 		Index:         m.Index,
 		Term:          m.Term,
-		Configuration: Configuration{ConfigServers: servers},
+		Configuration: contract.Configuration{ConfigServers: servers},
 		ConfigIndex:   m.ConfigIndex,
 		Size:          m.Size,
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // --- Pre-Vote: защита от лишних выборов при сетевых сбоях (§4) ---
@@ -252,7 +253,7 @@ func TestPreVote_CandidateRetry(t *testing.T) {
 	cm := &ConsensusModule{
 		id:         0,
 		transport:  &mockPreVoteGrant{peerTerm: 2},
-		storage:    NewMapStorage(),
+		storage:    store.NewMapStorage(),
 		shutdownCh: make(chan struct{}),
 		cmState: cmState{
 			state:              Candidate,
@@ -303,7 +304,7 @@ func newPreVoteTestCM(transport Transport, term int) *ConsensusModule {
 	cm := &ConsensusModule{
 		id:         0,
 		transport:  transport,
-		storage:    NewMapStorage(),
+		storage:    store.NewMapStorage(),
 		shutdownCh: make(chan struct{}),
 		cmState: cmState{
 			state:              Follower,
