@@ -1,16 +1,27 @@
 package raft
 
 import (
-	"log"
 	"net"
 	"sync"
 	"time"
 )
 
-// Server — тонкая обёртка над TCPTransport и ConsensusModule для
+// TransportManager — транспорт с управлением соединениями и
+// завершением: расширяет Transport адресной книгой соседей и
+// закрытием. Требуется Server для подключения/отключения соседей
+// и остановки. Реализация — TCPTransport (pkg/raft/transp).
+type TransportManager interface {
+	Transport
+	Connect(peerID ServerID, addr string)
+	Disconnect(peerID ServerID)
+	DisconnectAll()
+	Close()
+}
+
+// Server — тонкая обёртка над транспортом и ConsensusModule для
 // обратной совместимости с cmd/main.go и pkg/kvservice.
 // В тестах (Harness) не используется — вместо него применяется
-// InmemTransport напрямую.
+// внутрипроцессный транспорт напрямую.
 type Server struct {
 	mu sync.Mutex
 
@@ -19,16 +30,14 @@ type Server struct {
 	storage       Storage
 
 	cm        *ConsensusModule
-	transport *TCPTransport
+	transport TransportManager
 
-	maxPool  int
 	peerIds  []int
 	serverID int
 
 	ready <-chan any
 	quit  chan any
 
-	tcpRPCTimeout     time.Duration
 	snapshotInterval  time.Duration
 	snapshotThreshold int
 }
@@ -37,14 +46,9 @@ type Server struct {
 type Config struct {
 	PeerAddresses map[int]net.Addr
 	PeerIds       []int
-	RPCAddress    string
 	ServerID      int
 
 	Fsm FSM
-
-	// MaxPool — максимальное количество соединений в пуле на один целевой
-	// адрес (0 = _defaultMaxPool).
-	MaxPool int
 
 	// SnapshotInterval — интервал проверки необходимости снимка
 	// (0 = дефолт конструктора).
@@ -59,15 +63,19 @@ type Config struct {
 
 	Storage Storage
 
-	TCPRPCTimeout time.Duration
+	// Transport — транспорт с адресной книгой соседей и закрытием,
+	// создаётся вызывающим и передаётся в Server.
+	Transport TransportManager
 }
 
 // New создаёт новый сервер Raft с заданной конфигурацией cfg, хранилищем storage,
 // каналом уведомления ready и FSM для применения зафиксированных записей журнала.
 func New(cfg *Config, ready <-chan any) *Server {
+	if isNilInterface(cfg.Transport) {
+		panic("raft: Config.Transport is nil or typed nil: the transport must be created and passed by the caller")
+	}
 	s := &Server{
 		fsm:               cfg.Fsm,
-		maxPool:           cfg.MaxPool,
 		peerIds:           cfg.PeerIds,
 		quit:              make(chan any),
 		ready:             ready,
@@ -76,35 +84,14 @@ func New(cfg *Config, ready <-chan any) *Server {
 		snapshotStore:     cfg.SnapshotStore,
 		snapshotThreshold: cfg.SnapshotThreshold,
 		storage:           cfg.Storage,
-		tcpRPCTimeout:     cfg.TCPRPCTimeout,
+		transport:         cfg.Transport,
 	}
 	return s
 }
 
-// NewServer создаёт новый сервер Raft с указанными идентификатором serverID,
-// списком идентификаторов узлов-соседей peerIds, хранилищем storage, каналом
-// уведомления ready и FSM для применения зафиксированных записей журнала.
-func NewServer(serverID int, peerIds []int, fsm FSM, ready <-chan any) *Server {
-	return New(&Config{
-		ServerID:      serverID,
-		Fsm:           fsm,
-		PeerIds:       peerIds,
-		Storage:       NewMapStorage(),
-		TCPRPCTimeout: _defaultTCPRPCTimeout,
-	}, ready)
-}
-
-// Serve запускает TCP-транспорт на указанном адресе и создаёт ConsensusModule.
-func (s *Server) Serve(address string) {
-	transport, err := NewTCPTransport(address, s.tcpRPCTimeout, s.maxPool)
-	if err != nil {
-		log.Fatalf("raft: failed to create TCPTransport: %v", err)
-	}
-	s.mu.Lock()
-	s.transport = transport
-	s.mu.Unlock()
-
-	s.cm = NewConsensusModule(s.serverID, s.peerIds, transport, s.storage, s.fsm, s.ready, s.snapshotStore)
+// Serve создаёт ConsensusModule поверх переданного транспорта.
+func (s *Server) Serve() {
+	s.cm = NewConsensusModule(s.serverID, s.peerIds, s.transport, s.storage, s.fsm, s.ready, s.snapshotStore)
 
 	// Применение параметров снимков из конфигурации сразу после создания
 	// CM и до закрытия ready — CM ещё не участвует в выборах. Выполняется
@@ -133,15 +120,13 @@ func (s *Server) Apply(cmd any, timeout time.Duration) ApplyFuture {
 	return s.cm.Apply(cmd, timeout)
 }
 
-// ConnectToPeerWithTimeout сохраняет адрес соседа в TCPTransport.
+// ConnectToPeerWithTimeout сохраняет адрес соседа в транспорте.
 // В новой архитектуре транспорт подключается лениво (при первом RPC).
 // Метод сохранён для обратной совместимости с kvservice.
 func (s *Server) ConnectToPeerWithTimeout(peerID int, addr net.Addr, _ time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.transport != nil {
-		s.transport.Connect(ServerID(peerID), addr.String())
-	}
+	s.transport.Connect(ServerID(peerID), addr.String())
 	return nil
 }
 
@@ -154,9 +139,7 @@ func (s *Server) ConnectToPeer(peerID int, addr net.Addr) error {
 func (s *Server) DisconnectPeer(peerID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.transport != nil {
-		s.transport.Disconnect(ServerID(peerID))
-	}
+	s.transport.Disconnect(ServerID(peerID))
 	return nil
 }
 
@@ -164,18 +147,13 @@ func (s *Server) DisconnectPeer(peerID int) error {
 func (s *Server) DisconnectAll() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.transport != nil {
-		s.transport.DisconnectAll()
-	}
+	s.transport.DisconnectAll()
 }
 
-// GetListenAddr возвращает адрес, на котором слушает TCPTransport.
+// GetListenAddr возвращает адрес, на котором слушает транспорт.
 func (s *Server) GetListenAddr() net.Addr {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.transport == nil {
-		return nil
-	}
 	addr, err := net.ResolveTCPAddr("tcp", string(s.transport.LocalAddr()))
 	if err != nil {
 		return nil
@@ -205,9 +183,7 @@ func (s *Server) VerifyLeader() Future {
 func (s *Server) Shutdown() {
 	s.cm.Stop()
 	s.mu.Lock()
-	if s.transport != nil {
-		s.transport.Close()
-	}
+	s.transport.Close()
 	s.mu.Unlock()
 	close(s.quit)
 }

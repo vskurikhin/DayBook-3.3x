@@ -96,6 +96,36 @@ func TestTCPNewTransport(t *testing.T) {
 	if trans.LocalAddr() == "" {
 		t.Fatal("LocalAddr() returned empty")
 	}
+	if trans.timeout != 500*time.Millisecond {
+		t.Fatalf("timeout = %v, want 500ms", trans.timeout)
+	}
+}
+
+// TestTCPNewTransportMaxPool проверяет, что явное значение maxPool
+// сохраняется, а ноль заменяется дефолтом транспорта _defaultMaxPool.
+func TestTCPNewTransportMaxPool(t *testing.T) {
+	tests := []struct {
+		name    string
+		maxPool int
+		want    int
+	}{
+		{name: "explicit", maxPool: 7, want: 7},
+		{name: "zero uses transport default", maxPool: 0, want: _defaultMaxPool},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer leaktest.CheckTimeout(t, LeaktestBudget)()
+			trans, err := NewTCPTransport("127.0.0.1:0", 500*time.Millisecond, test.maxPool)
+			if err != nil {
+				t.Fatalf("NewTCPTransport: %v", err)
+			}
+			defer trans.Close()
+			if trans.maxPool != test.want {
+				t.Fatalf("transport.maxPool = %d, want %d", trans.maxPool, test.want)
+			}
+		})
+	}
 }
 
 // TestTCPNewTransportZeroTimeout проверяет защитную проверку конструктора

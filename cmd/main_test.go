@@ -34,8 +34,10 @@ func TestRunWithEmptyPeers(t *testing.T) {
 // TestRunWithNonDefaultNodeFlags запускает узел с нестандартными значениями
 // всех четырёх параметров узла: тайм-аут TCP RPC, размер пула, интервал
 // и порог снимков. Проверка значений внутри узла — поведенческая
-// (старт/стоп без ошибок, leaktest чист); маршрут значений до
-// raft.Config/ConsensusModule доказан юнит-тестами server_test.go.
+// (старт/стоп без ошибок, leaktest чист); маршрут значений теперь прямой —
+// тайм-аут и пул передаются аргументами NewTCPTransport в runWith, а
+// подстановка дефолтов транспорта покрыта тестами transport_tcp_test.go;
+// параметры снимков доказываются юнит-тестами server_test.go.
 func TestRunWithNonDefaultNodeFlags(t *testing.T) {
 	t.Cleanup(leaktest.CheckTimeout(t, raft.LeaktestBudget))
 
@@ -65,8 +67,18 @@ func TestRunWithPeerConnect(t *testing.T) {
 		for range commitChannel {
 		}
 	}()
-	peer := raft.NewServer(1, []int{}, raft.NewCommitChannelFSM(commitChannel), peerReady)
-	peer.Serve(":0")
+	peerTransport, err := raft.NewTCPTransport(":0", 0, 0)
+	if err != nil {
+		t.Fatalf("raft.NewTCPTransport: %v", err)
+	}
+	peer := raft.New(&raft.Config{
+		Fsm:       raft.NewCommitChannelFSM(commitChannel),
+		PeerIds:   []int{},
+		ServerID:  1,
+		Storage:   raft.NewMapStorage(),
+		Transport: peerTransport,
+	}, peerReady)
+	peer.Serve()
 	close(peerReady)
 	t.Cleanup(func() {
 		peer.Shutdown()

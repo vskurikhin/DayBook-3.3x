@@ -172,7 +172,7 @@ func New(cfg *Config, readyChan <-chan any) *KVService {
 	// KVService передаётся как FSM, поэтому Apply будет вызываться Raft'ом
 	// для каждой зафиксированной записи.
 	rs := raft.New(&cfg.Config, readyChan)
-	rs.Serve(cfg.RPCAddress)
+	rs.Serve()
 	kvs.rs = rs
 
 	return kvs
@@ -180,7 +180,8 @@ func New(cfg *Config, readyChan <-chan any) *KVService {
 
 // NewKVService создаёт новый экземпляр KVService.
 //
-//   - address - адрес, который будет слушать Raft сервер.
+//   - address - адрес, который будет слушать Raft сервер; используется
+//     для создания TCP-транспорта.
 //   - id — идентификатор данного сервиса в кластере Raft.
 //   - peerIds — идентификаторы остальных узлов Raft в кластере.
 //   - storage — реализация интерфейса raft.Storage, используемая сервисом
@@ -189,12 +190,16 @@ func New(cfg *Config, readyChan <-chan any) *KVService {
 //     как кластер Raft будет готов к работе (все узлы запущены и соединены
 //     друг с другом).
 func NewKVService(address string, id int, peerIds []int, storage raft.Storage, readyChan <-chan any) *KVService {
+	transport, err := raft.NewTCPTransport(address, 0, 0)
+	if err != nil {
+		log.Fatalf("kvservice: failed to create TCP transport on %s: %v", address, err)
+	}
 	return New(&Config{
 		Config: raft.Config{
-			RPCAddress: address,
-			ServerID:   id,
-			PeerIds:    peerIds,
-			Storage:    storage,
+			ServerID:  id,
+			PeerIds:   peerIds,
+			Storage:   storage,
+			Transport: transport,
 		},
 	}, readyChan,
 	)

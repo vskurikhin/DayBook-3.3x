@@ -1,16 +1,18 @@
 package raft
 
 import (
+	"io"
 	"net"
 	"testing"
 	"time"
 )
 
+var _ TransportManager = (*TCPTransport)(nil)
+
 func TestConfig(t *testing.T) {
 	cfg := Config{
 		PeerAddresses: map[int]net.Addr{1: nil, 2: nil},
 		PeerIds:       []int{1, 2},
-		RPCAddress:    ":0",
 		ServerID:      0,
 	}
 	if cfg.ServerID != 0 {
@@ -21,17 +23,56 @@ func TestConfig(t *testing.T) {
 	}
 }
 
+// stubTransportManager — минимальная тестовая заглушка
+// TransportManager для TestNewServer: без слушателя и горутин.
+// Методы не вызываются — тест проверяет только присваивание полей
+// в New; нулевые возвращаемые значения достаточны.
+type stubTransportManager struct{}
+
+func (stubTransportManager) Consumer() <-chan RPC { return nil }
+
+func (stubTransportManager) AppendEntries(ServerID, AppendEntriesArgs) (AppendEntriesReply, error) {
+	return AppendEntriesReply{}, nil
+}
+
+func (stubTransportManager) RequestVote(ServerID, RequestVoteArgs) (RequestVoteReply, error) {
+	return RequestVoteReply{}, nil
+}
+
+func (stubTransportManager) RequestPreVote(ServerID, RequestPreVoteArgs) (RequestPreVoteReply, error) {
+	return RequestPreVoteReply{}, nil
+}
+
+func (stubTransportManager) TimeoutNow(ServerID, TimeoutNowRequest) (TimeoutNowResponse, error) {
+	return TimeoutNowResponse{}, nil
+}
+
+func (stubTransportManager) InstallSnapshot(ServerID, InstallSnapshotRequest, io.Reader) (InstallSnapshotResponse, error) {
+	return InstallSnapshotResponse{}, nil
+}
+
+func (stubTransportManager) AppendEntriesPipeline(ServerID) (AppendPipeline, error) {
+	return nil, nil
+}
+
+func (stubTransportManager) SetHeartbeatHandler(func(RPC)) {}
+func (stubTransportManager) LocalAddr() ServerAddress      { return "" }
+func (stubTransportManager) Connect(ServerID, string)      {}
+func (stubTransportManager) Disconnect(ServerID)           {}
+func (stubTransportManager) DisconnectAll()                {}
+func (stubTransportManager) Close()                        {}
+
 func TestNewServer(t *testing.T) {
 	storage := NewMapStorage()
 	commitChan := make(chan CommitEntry, 10)
 	ready := make(chan any)
 
 	s := New(&Config{
-		Fsm:        NewCommitChannelFSM(commitChan),
-		PeerIds:    []int{2, 3},
-		RPCAddress: ":0",
-		ServerID:   1,
-		Storage:    storage,
+		Fsm:       NewCommitChannelFSM(commitChan),
+		PeerIds:   []int{2, 3},
+		ServerID:  1,
+		Storage:   storage,
+		Transport: stubTransportManager{},
 	}, ready)
 
 	if s.serverID != 1 {
@@ -39,67 +80,6 @@ func TestNewServer(t *testing.T) {
 	}
 	if len(s.peerIds) != 2 {
 		t.Fatalf("expected 2 peers, got %d", len(s.peerIds))
-	}
-}
-
-func TestNewServerWrapper(t *testing.T) {
-	commitChan := make(chan CommitEntry, 10)
-	ready := make(chan any)
-
-	s := NewServer(2, []int{1, 3}, NewCommitChannelFSM(commitChan), ready)
-
-	if s.serverID != 2 {
-		t.Fatalf("expected serverID=2, got %d", s.serverID)
-	}
-	if len(s.peerIds) != 2 {
-		t.Fatalf("expected 2 peers, got %d", len(s.peerIds))
-	}
-}
-
-// TestServeMaxPool проверяет, что значение MaxPool из конфигурации доезжает
-// до TCP-транспорта, а ноль заменяется значением по умолчанию транспорта.
-func TestServeMaxPool(t *testing.T) {
-	tests := []struct {
-		name    string
-		maxPool int
-		want    int
-	}{
-		{name: "explicit", maxPool: 7, want: 7},
-		{name: "zero uses transport default", maxPool: 0, want: 2},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			commitChan := make(chan CommitEntry)
-			readerDone := make(chan any)
-			go func() {
-				defer close(readerDone)
-				for range commitChan {
-				}
-			}()
-
-			ready := make(chan any)
-			s := New(&Config{
-				Fsm:           NewCommitChannelFSM(commitChan),
-				MaxPool:       test.maxPool,
-				PeerIds:       []int{},
-				RPCAddress:    "127.0.0.1:0",
-				ServerID:      1,
-				Storage:       NewMapStorage(),
-				TCPRPCTimeout: TCPRPCTimeout,
-			}, ready)
-			s.Serve("127.0.0.1:0")
-			close(ready)
-			t.Cleanup(func() {
-				s.Shutdown()
-				close(commitChan)
-				<-readerDone
-			})
-
-			if s.transport.maxPool != test.want {
-				t.Fatalf("transport.maxPool = %d, want %d", s.transport.maxPool, test.want)
-			}
-		})
 	}
 }
 
@@ -121,54 +101,6 @@ func TestDefaultTCPRPCTimeoutBarrier(t *testing.T) {
 	if _defaultCheckQuorumTimeout != 2*_defaultTCPRPCTimeout {
 		t.Fatalf("_defaultCheckQuorumTimeout = %v, want 2*_defaultTCPRPCTimeout = %v",
 			_defaultCheckQuorumTimeout, 2*_defaultTCPRPCTimeout)
-	}
-}
-
-// TestServeTCPRPCTimeout проверяет, что значение TCPRPCTimeout из конфигурации
-// доезжает до TCP-транспорта (мёртвый маршрут оживает, AC-3), а нулевая
-// конфигурация получает дефолт транспорта — те же эффективные 191 мс,
-// что и до починки маршрута (RISK-021 закрыт).
-func TestServeTCPRPCTimeout(t *testing.T) {
-	tests := []struct {
-		name    string
-		timeout time.Duration
-		want    time.Duration
-	}{
-		{name: "explicit", timeout: 500 * time.Millisecond, want: 500 * time.Millisecond},
-		{name: "zero uses transport default", timeout: 0, want: TCPRPCTimeout},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			commitChan := make(chan CommitEntry)
-			readerDone := make(chan any)
-			go func() {
-				defer close(readerDone)
-				for range commitChan {
-				}
-			}()
-
-			ready := make(chan any)
-			s := New(&Config{
-				Fsm:           NewCommitChannelFSM(commitChan),
-				PeerIds:       []int{},
-				RPCAddress:    "127.0.0.1:0",
-				ServerID:      1,
-				Storage:       NewMapStorage(),
-				TCPRPCTimeout: test.timeout,
-			}, ready)
-			s.Serve("127.0.0.1:0")
-			close(ready)
-			t.Cleanup(func() {
-				s.Shutdown()
-				close(commitChan)
-				<-readerDone
-			})
-
-			if s.transport.timeout != test.want {
-				t.Fatalf("transport.timeout = %v, want %v", s.transport.timeout, test.want)
-			}
-		})
 	}
 }
 
@@ -199,18 +131,21 @@ func TestServeSnapshotConfig(t *testing.T) {
 	}()
 
 	ready := make(chan any)
+	transport, err := NewTCPTransport("127.0.0.1:0", 0, 0)
+	if err != nil {
+		t.Fatalf("NewTCPTransport: %v", err)
+	}
 	s := New(&Config{
 		Fsm:               NewCommitChannelFSM(commitChan),
 		PeerIds:           []int{},
-		RPCAddress:        "127.0.0.1:0",
 		ServerID:          1,
 		SnapshotInterval:  5 * time.Second,
 		SnapshotStore:     NewInmemSnapshotStore(),
 		SnapshotThreshold: 100,
 		Storage:           NewMapStorage(),
-		TCPRPCTimeout:     TCPRPCTimeout,
+		Transport:         transport,
 	}, ready)
-	s.Serve("127.0.0.1:0")
+	s.Serve()
 	close(ready)
 	t.Cleanup(func() {
 		s.Shutdown()
@@ -241,16 +176,19 @@ func TestServeSnapshotConfigZeros(t *testing.T) {
 	}()
 
 	ready := make(chan any)
+	transport, err := NewTCPTransport("127.0.0.1:0", 0, 0)
+	if err != nil {
+		t.Fatalf("NewTCPTransport: %v", err)
+	}
 	s := New(&Config{
 		Fsm:           NewCommitChannelFSM(commitChan),
 		PeerIds:       []int{},
-		RPCAddress:    "127.0.0.1:0",
 		ServerID:      1,
 		SnapshotStore: NewInmemSnapshotStore(),
 		Storage:       NewMapStorage(),
-		TCPRPCTimeout: TCPRPCTimeout,
+		Transport:     transport,
 	}, ready)
-	s.Serve("127.0.0.1:0")
+	s.Serve()
 	close(ready)
 	t.Cleanup(func() {
 		s.Shutdown()
@@ -279,17 +217,20 @@ func TestServeSnapshotConfigDisabled(t *testing.T) {
 	}()
 
 	ready := make(chan any)
+	transport, err := NewTCPTransport("127.0.0.1:0", 0, 0)
+	if err != nil {
+		t.Fatalf("NewTCPTransport: %v", err)
+	}
 	s := New(&Config{
 		Fsm:               NewCommitChannelFSM(commitChan),
 		PeerIds:           []int{},
-		RPCAddress:        "127.0.0.1:0",
 		ServerID:          1,
 		SnapshotInterval:  5 * time.Second,
 		SnapshotThreshold: 100,
 		Storage:           NewMapStorage(),
-		TCPRPCTimeout:     TCPRPCTimeout,
+		Transport:         transport,
 	}, ready)
-	s.Serve("127.0.0.1:0")
+	s.Serve()
 	close(ready)
 	t.Cleanup(func() {
 		s.Shutdown()

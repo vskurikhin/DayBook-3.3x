@@ -69,14 +69,17 @@ func TestTraceReset(t *testing.T) {
 func newTestService(t *testing.T) *kvservice.KVService {
 	t.Helper()
 	ready := make(chan any)
+	transport, err := raft.NewTCPTransport(":0", 0, 0)
+	if err != nil {
+		t.Fatalf("raft.NewTCPTransport: %v", err)
+	}
 	cfg := &kvservice.Config{
 		HTTPAddress: ":0",
 		Config: raft.Config{
-			PeerIds:       []int{},
-			RPCAddress:    ":0",
-			ServerID:      7,
-			Storage:       raft.NewMapStorage(),
-			TCPRPCTimeout: raft.TCPRPCTimeout,
+			PeerIds:   []int{},
+			ServerID:  7,
+			Storage:   raft.NewMapStorage(),
+			Transport: transport,
 		},
 	}
 	kvs := kvservice.New(cfg, ready)

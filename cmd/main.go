@@ -86,17 +86,34 @@ func runWith(values *config.Values) (func(), error) {
 		Config: raft.Config{
 			PeerAddresses:     values.Peers,
 			PeerIds:           nums,
-			RPCAddress:        values.RPCAddress.String(),
 			ServerID:          values.Number,
 			SnapshotStore:     snapshotStore,
 			Storage:           raft.NewFileStorage(dataDir),
-			TCPRPCTimeout:     values.TCPRPCTimeout,
-			MaxPool:           maxPool,
 			SnapshotInterval:  values.SnapshotInterval,
 			SnapshotThreshold: values.SnapshotThreshold,
 		},
 	}
+
+	// Транспорт создаётся как можно позже — после хранилищ и сборки cfg,
+	// непосредственно перед kvservice.New, чтобы окно «слушатель открыт —
+	// потребителя нет» осталось минимальным. Владение транспортом после
+	// успешного kvservice.New переходит к Server (ownTransport = false);
+	// на пути ошибки до этого его закрывает defer.
+	transport, err := raft.NewTCPTransport(values.RPCAddress.String(), values.TCPRPCTimeout, maxPool)
+	if err != nil {
+		stopPprof()
+		return nil, fmt.Errorf("failed to create TCP transport on %s: %w", values.RPCAddress, err)
+	}
+	ownTransport := true
+	defer func() {
+		if ownTransport {
+			transport.Close()
+		}
+	}()
+
+	cfg.Transport = transport
 	kvs := kvservice.New(&cfg, ready)
+	ownTransport = false
 	_wg.Add(len(nums) / 2)
 	for _, num := range nums {
 		go connect(num, kvs, values, nums)

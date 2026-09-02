@@ -12,7 +12,6 @@ func TestConfig(t *testing.T) {
 		Config: raft.Config{
 			PeerAddresses: map[int]net.Addr{1: nil, 2: nil},
 			PeerIds:       []int{1, 2},
-			RPCAddress:    ":0",
 			ServerID:      0,
 		},
 		HTTPAddress: ":8080",
@@ -28,13 +27,17 @@ func TestConfig(t *testing.T) {
 func TestNewKVService(t *testing.T) {
 	storage := raft.NewMapStorage()
 	ready := make(chan any)
+	transport, err := raft.NewTCPTransport(":0", 0, 0)
+	if err != nil {
+		t.Fatalf("raft.NewTCPTransport: %v", err)
+	}
 
 	kvs := New(&Config{
 		Config: raft.Config{
-			PeerIds:    []int{1, 2},
-			RPCAddress: ":0",
-			ServerID:   0,
-			Storage:    storage,
+			PeerIds:   []int{1, 2},
+			ServerID:  0,
+			Storage:   storage,
+			Transport: transport,
 		},
 		HTTPAddress: ":8080",
 	}, ready)
