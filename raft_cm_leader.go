@@ -233,7 +233,7 @@ func (cm *ConsensusModule) appendConfigurationEntry(future *configurationChangeF
 	cm.cmState.configurations.latest = nextCfg
 	cm.cmState.configurations.latestIndex = cm.cmState.lastLogIndex + 1
 
-	cm.dispatchLogsUnsafe([]*logFuture{entry})
+	cm.dispatchLogsLocked([]*logFuture{entry})
 	cm.cmState.configurations.latestIndex = entry.log.Index
 	future.index = entry.log.Index
 
@@ -809,10 +809,10 @@ func (cm *ConsensusModule) startLeaderLocked() {
 		},
 	}
 	noop.init(cm.shutdownCh)
-	cm.dispatchLogsUnsafe([]*logFuture{noop})
+	cm.dispatchLogsLocked([]*logFuture{noop})
 
 	// Синхронизировать self-match трекера с только что добавленной
-	// noop-записью: dispatchLogsUnsafe трекер
+	// noop-записью: dispatchLogsLocked трекер
 	// не обновляет (в отличие от dispatchLogs — raft_cm_log.go), а
 	// setMatch(self, …) выше был выполнен ДО noop. Без этого вызова
 	// медиана при чётном n попадает на запись прошлого терма и

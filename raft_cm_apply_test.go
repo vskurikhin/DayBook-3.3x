@@ -187,7 +187,7 @@ func TestFSMRetainedEntryImmutable(t *testing.T) {
 
 	//Сжимаем журнал. Заменяет backing array (make+copy).
 	cm.mu.Lock()
-	cm.compactLogs(2)
+	cm.compactLogsLocked(2)
 	cm.mu.Unlock()
 
 	// Удержанный объект и его payload неизменны.
@@ -226,7 +226,7 @@ func TestCompactLogs_PendingBatchUnchanged(t *testing.T) {
 
 	// Сжатие журнала во время удержания батча (замена массива make+copy).
 	cm.mu.Lock()
-	cm.compactLogs(2)
+	cm.compactLogsLocked(2)
 	cm.mu.Unlock()
 
 	fsm.releaseApply()

@@ -168,7 +168,7 @@ type cmState struct {
 	lastApplied int
 
 	// lastLogIndex — кэш индекса последней записи в журнале.
-	// Обновляется через setLastLog при любом изменении журнала.
+	// Обновляется через setLastLogLocked при любом изменении журнала.
 	lastLogIndex int
 
 	// lastLogTerm — кэш терма последней записи в журнале.
@@ -192,7 +192,7 @@ type cmState struct {
 
 	// termIndexMap — карта term → последний LogEntry.Index с этим term.
 	// O(1) lookup для ConflictTerm.
-	// Инкрементально обновляется в dispatchLogsUnsafe; перестраивается
+	// Инкрементально обновляется в dispatchLogsLocked; перестраивается
 	// целиком при обрезке/сжатии/замене журнала.
 	// Требует удержания cm.mu (Lock) при чтении и записи.
 	termIndexMap map[int]int

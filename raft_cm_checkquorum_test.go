@@ -241,12 +241,12 @@ func TestCheckQuorum_ServiceEntriesBypassLimit(t *testing.T) {
 	}
 
 	// Носитель того же свойства для noop вступления в лидерство: обе
-	// служебные записи идут одним путём — dispatchLogsUnsafe.
+	// служебные записи идут одним путём — dispatchLogsLocked.
 	noop := &logFuture{log: LogEntry{Type: LogNoop}}
 	noop.init(leader.shutdownCh)
 	leader.mu.Lock()
 	beforeIndex = leader.cmState.lastLogIndex
-	leader.dispatchLogsUnsafe([]*logFuture{noop})
+	leader.dispatchLogsLocked([]*logFuture{noop})
 	afterIndex := leader.cmState.lastLogIndex
 	leader.mu.Unlock()
 	if afterIndex != beforeIndex+1 {

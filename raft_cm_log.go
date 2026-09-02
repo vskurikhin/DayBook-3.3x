@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-// lastLogIndexAndTerm возвращает кэшированный индекс и терм
+// lastLogIndexAndTermLocked возвращает кэшированный индекс и терм
 // последней записи в журнале. Не вычисляет из len(cm.cmState.log).
 // Требует удержания cm.mu.
-func (cm *ConsensusModule) lastLogIndexAndTerm() (int, int) {
+func (cm *ConsensusModule) lastLogIndexAndTermLocked() (int, int) {
 	return cm.cmState.lastLogIndex, cm.cmState.lastLogTerm
 }
 
@@ -47,18 +47,18 @@ func (cm *ConsensusModule) lookupTermLocked(index int) int {
 	return -1
 }
 
-// rebuildLastLog восстанавливает кэш lastLogIndex/lastLogTerm
+// rebuildLastLogLocked восстанавливает кэш lastLogIndex/lastLogTerm
 // из текущего содержимого cm.cmState.log.
 // Вызывается из restoreFromStorage() и других мест, где журнал
-// мог измениться без вызова setLastLog.
+// мог измениться без вызова setLastLogLocked.
 //
 // Инвариант: при пустом срезе журнала последняя
 // запись логического журнала — граница снимка, поэтому
 // lastLogIndex/lastLogTerm берутся из lastSnapshotIndex/lastSnapshotTerm.
 // Для свежего узла без снимка (lastSnapshotIndex == -1) поведение
 // совпадает с прежним: (-1, -1).
-// Требует удержания cm.mu (Lock).
-func (cm *ConsensusModule) rebuildLastLog() {
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) rebuildLastLogLocked() {
 	if len(cm.cmState.log) > 0 {
 		last := cm.cmState.log[len(cm.cmState.log)-1]
 		cm.cmState.lastLogIndex = last.Index
@@ -69,32 +69,32 @@ func (cm *ConsensusModule) rebuildLastLog() {
 	cm.cmState.lastLogTerm = cm.cmState.lastSnapshotTerm
 }
 
-// rebuildTermIndexMap перестраивает карту term→lastIndex из текущего cm.cmState.log.
+// rebuildTermIndexMapLocked перестраивает карту term→lastIndex из текущего cm.cmState.log.
 // Вызывается после любого изменения журнала, которое не является простым
 // append в конец: обрезка (AppendEntries conflict), сжатие
-// (compactLogs), замена (installSnapshot), загрузка (restoreFromStorage).
+// (compactLogsLocked), замена (installSnapshot), загрузка (restoreFromStorage).
 // Сложность O(n) по длине журнала. Вызывается редко — только при
 // несовпадении термов на ведомом или сжатии.
-// Требует удержания cm.mu (Lock).
-func (cm *ConsensusModule) rebuildTermIndexMap() {
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) rebuildTermIndexMapLocked() {
 	cm.cmState.termIndexMap = make(map[int]int)
 	for _, entry := range cm.cmState.log {
 		cm.cmState.termIndexMap[entry.Term] = entry.Index
 	}
 }
 
-// setLastLog обновляет кэш lastLogIndex/lastLogTerm.
+// setLastLogLocked обновляет кэш lastLogIndex/lastLogTerm.
 // Вызывается после любого изменения журнала (добавление записей,
 // удаление при конфликте, восстановление из storage).
-// Требует удержания cm.mu (Lock).
-func (cm *ConsensusModule) setLastLog(index, term int) {
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) setLastLogLocked(index, term int) {
 	cm.cmState.lastLogIndex = index
 	cm.cmState.lastLogTerm = term
 }
 
-// compactLogs удаляет записи из cm.cmState.log с Index < compactIndex.
+// compactLogsLocked удаляет записи из cm.cmState.log с Index < compactIndex.
 // Оставляет как минимум trailingLogs записей.
-// Вызывается под cm.mu.Lock().
+// Требует удержания cm.mu.
 //
 // Инвариант сжатия (Compaction Safety): замена backing array
 // допустима ТОЛЬКО аллокацией нового среза (make+copy). In-place обрезка вида
@@ -102,7 +102,7 @@ func (cm *ConsensusModule) setLastLog(index, term int) {
 // в sendBatch батчи FSM хранят собственные копии записей, но будущий рефакторинг
 // на in-place обрезку молча сломал бы гарантию «применяемые записи не зависят
 // от мутаций старого массива».
-func (cm *ConsensusModule) compactLogs(compactIndex int) {
+func (cm *ConsensusModule) compactLogsLocked(compactIndex int) {
 	if compactIndex <= 0 {
 		return
 	}
@@ -115,7 +115,7 @@ func (cm *ConsensusModule) compactLogs(compactIndex int) {
 	cm.cmState.log = kept
 	cm.cmState.logNeedsPersist = true
 	if pos > 0 {
-		cm.rebuildTermIndexMap()
+		cm.rebuildTermIndexMapLocked()
 	}
 }
 
@@ -135,7 +135,7 @@ func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 	// Страховочный лимит незафиксированного хвоста журнала: лидер, потерявший
 	// кворум, не наращивает журнал неограниченно. Это ограничение ущерба, а не
 	// протокольная гарантия, и действует только на клиентском пути — служебные
-	// записи идут через dispatchLogsUnsafe и лимитом не проверяются.
+	// записи идут через dispatchLogsLocked и лимитом не проверяются.
 	if room := _maxUncommittedEntries - cm.uncommittedLogLenLocked(); room < len(applyLogs) {
 		if room < 0 {
 			room = 0
@@ -150,9 +150,9 @@ func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 		}
 	}
 
-	cm.dispatchLogsUnsafe(applyLogs)
+	cm.dispatchLogsLocked(applyLogs)
 
-	// Защита от nil cm.cmState.log после dispatchLogsUnsafe. В нормальном состоянии
+	// Защита от nil cm.cmState.log после dispatchLogsLocked. В нормальном состоянии
 	// append гарантирует non-nil срез, но defensive check предотвращает
 	// панику в commitmentTracker.commit при нарушении инварианта.
 	if cm.cmState.log == nil {
@@ -181,9 +181,9 @@ func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 	}
 }
 
-// dispatchLogsUnsafe — внутренняя версия dispatchLogs без захвата блокировки.
-// Вызывающий должен удерживать cm.mu.
-func (cm *ConsensusModule) dispatchLogsUnsafe(applyLogs []*logFuture) {
+// dispatchLogsLocked — внутренняя версия dispatchLogs без захвата блокировки.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) dispatchLogsLocked(applyLogs []*logFuture) {
 	term := cm.cmState.currentTerm
 	lastIndex := cm.cmState.lastLogIndex
 	now := time.Now()
@@ -195,7 +195,7 @@ func (cm *ConsensusModule) dispatchLogsUnsafe(applyLogs []*logFuture) {
 		cm.cmState.termIndexMap[term] = lastIndex
 		cm.cmState.log = append(cm.cmState.log, f.log)
 	}
-	cm.setLastLog(lastIndex, term)
+	cm.setLastLogLocked(lastIndex, term)
 	cm.cmState.logNeedsPersist = true
 	cm.persistToStorage()
 	cm.leaderState.matchIndex[cm.id] = lastIndex

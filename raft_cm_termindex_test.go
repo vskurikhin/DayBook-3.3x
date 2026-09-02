@@ -26,14 +26,14 @@ func (m *mockTransportConflict) AppendEntries(_ ServerID, _ AppendEntriesArgs) (
 }
 
 // TestTermIndexMap_AppendEntries проверяет инкрементальное обновление
-// termIndexMap в dispatchLogsUnsafe при добавлении записей в конец лога.
+// termIndexMap в dispatchLogsLocked при добавлении записей в конец лога.
 //
 // Сценарий:
 //  1. Создать CM с пустым логом, currentTerm=1.
-//  2. Вызвать dispatchLogsUnsafe с 3 записями — все получают Term=1.
+//  2. Вызвать dispatchLogsLocked с 3 записями — все получают Term=1.
 //  3. Проверить termIndexMap[1] == 3 (последний Index с Term=1).
 //  4. Сменить currentTerm на 2.
-//  5. Вызвать dispatchLogsUnsafe с 1 записью — получает Term=2.
+//  5. Вызвать dispatchLogsLocked с 1 записью — получает Term=2.
 //  6. Проверить termIndexMap[2] == 4 (обновлён).
 //  7. Проверить termIndexMap[1] == 3 (не изменился).
 //
@@ -73,7 +73,7 @@ func TestTermIndexMap_AppendEntries(t *testing.T) {
 			log:        LogEntry{Type: LogCommand, Data: []byte("x")},
 		}
 	}
-	cm.dispatchLogsUnsafe(futures1)
+	cm.dispatchLogsLocked(futures1)
 
 	// После 3 записей с Term=1: termIndexMap[1] = 3.
 	if idx := cm.cmState.termIndexMap[1]; idx != 3 {
@@ -85,7 +85,7 @@ func TestTermIndexMap_AppendEntries(t *testing.T) {
 	futures2 := []*logFuture{
 		{deferError: deferError{errCh: make(chan error, 1)}, log: LogEntry{Type: LogCommand, Data: []byte("y")}},
 	}
-	cm.dispatchLogsUnsafe(futures2)
+	cm.dispatchLogsLocked(futures2)
 
 	// Проверяем termIndexMap после второй группы.
 	if idx := cm.cmState.termIndexMap[2]; idx != 4 {
@@ -103,7 +103,7 @@ func TestTermIndexMap_AppendEntries(t *testing.T) {
 // Сценарий:
 //  1. Создать CM с логом: T1/I1, T1/I2, T2/I3, T3/I4, T4/I5.
 //  2. Проверить начальное состояние termIndexMap.
-//  3. compactLogs(3) — удалить записи с Index < 3.
+//  3. compactLogsLocked(3) — удалить записи с Index < 3.
 //  4. Проверить: T1 удалён из карты, T2/I3, T3/I4, T4/I5 сохранены.
 //
 // Ожидание: после сжатия карта содержит только оставшиеся термы.
@@ -120,7 +120,7 @@ func TestTermIndexMap_CompactLogs(t *testing.T) {
 		{Index: 4, Term: 3},
 		{Index: 5, Term: 4},
 	}
-	cm.rebuildTermIndexMap()
+	cm.rebuildTermIndexMapLocked()
 
 	// Проверяем начальное состояние.
 	if idx := cm.cmState.termIndexMap[1]; idx != 2 {
@@ -137,7 +137,7 @@ func TestTermIndexMap_CompactLogs(t *testing.T) {
 	}
 
 	// Очищаем старые записи с Index < 3.
-	cm.compactLogs(3)
+	cm.compactLogsLocked(3)
 
 	// Проверяем состояние после сжатия.
 	if _, ok := cm.cmState.termIndexMap[1]; ok {
@@ -191,7 +191,7 @@ func TestTermIndexMap_AppendEntriesConflict(t *testing.T) {
 		{Index: 2, Term: 1},
 		{Index: 3, Term: 2},
 	}
-	cm.rebuildTermIndexMap()
+	cm.rebuildTermIndexMapLocked()
 
 	// AppendEntries с конфликтом на Index=3.
 	args := AppendEntriesArgs{
@@ -265,7 +265,7 @@ func TestTermIndexMap_RestoreFromStorage(t *testing.T) {
 	}
 	cm.cmState.lastLogIndex = 4
 	cm.cmState.lastLogTerm = 3
-	cm.rebuildTermIndexMap()
+	cm.rebuildTermIndexMapLocked()
 	cm.cmState.state = Follower
 	cm.cmState.currentTerm = 1
 	cm.persistToStorage()
@@ -352,7 +352,7 @@ func TestTermIndexMap_LeaderSendAEsConflictLookup(t *testing.T) {
 		{Index: 2, Term: 2},
 		{Index: 3, Term: 2},
 	}
-	cm.rebuildTermIndexMap()
+	cm.rebuildTermIndexMapLocked()
 
 	// Проверяем pre-condition.
 	if idx := cm.cmState.termIndexMap[2]; idx != 3 {
@@ -377,7 +377,7 @@ func TestTermIndexMap_LeaderSendAEsConflictLookup(t *testing.T) {
 //
 // Старое поведение (slices.Backward):
 //   - cm.cmState.log = [{I100,T1}, {I200,T2}, {I300,T2}]
-//   - compactLogs(100) → log не меняется (pos=0)
+//   - compactLogsLocked(100) → log не меняется (pos=0)
 //   - slices.Backward даёт i=2 для последней записи T2
 //   - nextIndex = 2+1 = 3 — НЕВЕРНО (должно быть 301)
 //
@@ -429,7 +429,7 @@ func TestTermIndexMap_SlicePositionBug(t *testing.T) {
 		{Index: 200, Term: 2},
 		{Index: 300, Term: 2},
 	}
-	cm.rebuildTermIndexMap()
+	cm.rebuildTermIndexMapLocked()
 
 	// Проверяем, что termIndexMap хранит LogEntry.Index, а не slice position.
 	if idx := cm.cmState.termIndexMap[2]; idx != 300 {

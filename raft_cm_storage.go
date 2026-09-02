@@ -77,7 +77,9 @@ func (cm *ConsensusModule) persistToStorage() {
 
 // restoreFromStorage восстанавливает постоянное состояние данного CM
 // из хранилища. Должен вызываться в конструкторе до запуска какой-либо
-// конкурентной работы.
+// конкурентной работы. Вызывает rebuildLastLogLocked и
+// rebuildTermIndexMapLocked без удержания cm.mu: это допустимо только
+// в однопоточном конструкторе, до запуска первой горутины.
 func (cm *ConsensusModule) restoreFromStorage() {
 	termData, found := cm.storage.Get(_storageKeyCurrentTerm)
 	if !found {
@@ -106,8 +108,8 @@ func (cm *ConsensusModule) restoreFromStorage() {
 	if err := cm.checkSnapshotKeysConsistency(); err != nil {
 		log.Fatal(err)
 	}
-	cm.rebuildLastLog()
-	cm.rebuildTermIndexMap()
+	cm.rebuildLastLogLocked()
+	cm.rebuildTermIndexMapLocked()
 
 	cm.rebuildConfigurations()
 
@@ -218,7 +220,7 @@ func (cm *ConsensusModule) restoreFromSnapshotStore() error {
 		if cm.cmState.lastLogIndex < meta.Index {
 			// Пустой или короткий журнал (trailing=0): синхронизация
 			// lastLogIndex/lastLogTerm со снимком — симметрично
-			// handleInstallSnapshot. Иначе rebuildLastLog() оставил бы
+			// handleInstallSnapshot. Иначе rebuildLastLogLocked() оставил бы
 			// lastLogIndex = -1 при lastApplied > 0 (нарушение инварианта
 			// lastApplied <= lastLogIndex, новая запись получила бы
 			// индекс, уже покрытый снимком).

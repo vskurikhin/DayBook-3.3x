@@ -48,7 +48,7 @@ func (cm *ConsensusModule) handleFsmSnapshot(req *reqSnapshotFuture) {
 		return
 	}
 	// Снимок с индексом, не превышающим lastSnapshotIndex, не добавляет
-	// информации: compactLogs с тем же аргументом ничего не сжимает,
+	// информации: compactLogsLocked с тем же аргументом ничего не сжимает,
 	// а повторение цикла «создать снимок → сжатие вхолостую» только
 	// нагружает хранилище. Защищает и монотонность lastSnapshotIndex.
 	if cm.cmState.fsmAppliedIndex <= cm.cmState.lastSnapshotIndex {
@@ -218,8 +218,8 @@ func (cm *ConsensusModule) installSnapshotStateLocked(meta *SnapshotMeta) {
 	} else {
 		cm.cmState.log = nil
 	}
-	cm.rebuildLastLog()
-	cm.rebuildTermIndexMap()
+	cm.rebuildLastLogLocked()
+	cm.rebuildTermIndexMapLocked()
 	// Проверка непрерывности границы снимка и журнала (защита от регрессий).
 	// При нарушении — только счётчик и трассировка, без паники и изменения Success.
 	if err := cm.checkSnapshotLogContinuity(); err != nil {
@@ -371,7 +371,7 @@ func (cm *ConsensusModule) takeSnapshot() error {
 	cm.mu.Lock()
 	cm.cmState.lastSnapshotIndex = snapReq.index
 	cm.cmState.lastSnapshotTerm = snapReq.term
-	cm.compactLogs(snapReq.index - cm.trailingLogs)
+	cm.compactLogsLocked(snapReq.index - cm.trailingLogs)
 	cm.persistToStorage()
 	cm.mu.Unlock()
 

@@ -6,7 +6,7 @@ import (
 	"github.com/fortytw2/leaktest"
 )
 
-// -- Тесты rebuildLastLog. ---
+// -- Тесты rebuildLastLogLocked. ---
 //
 // Инвариант: при пустом суффиксе журнала lastLogIndex/lastLogTerm
 // берутся из lastSnapshotIndex/lastSnapshotTerm. Для свежего узла без
@@ -24,7 +24,7 @@ func TestRebuildLastLog_EmptyLogWithoutSnapshot(t *testing.T) {
 	cm.cmState.lastSnapshotIndex = -1
 	cm.cmState.lastSnapshotTerm = -1
 
-	cm.rebuildLastLog()
+	cm.rebuildLastLogLocked()
 
 	if cm.cmState.lastLogIndex != -1 || cm.cmState.lastLogTerm != -1 {
 		t.Fatalf("lastLog = (%d, %d), want (-1, -1) — fresh node behavior must not change",
@@ -34,7 +34,7 @@ func TestRebuildLastLog_EmptyLogWithoutSnapshot(t *testing.T) {
 
 // TestRebuildLastLog_EmptyLogWithSnapshot — ядро:
 // пустой журнал при установленном снимке даёт (N, T) от снимка.
-// Именно эта ветка ломала догон в инциденте: rebuildLastLog затирал
+// Именно эта ветка ломала догон в инциденте: rebuildLastLogLocked затирал
 // корректные lastLogIndex/lastLogTerm в -1/-1.
 func TestRebuildLastLog_EmptyLogWithSnapshot(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
@@ -44,7 +44,7 @@ func TestRebuildLastLog_EmptyLogWithSnapshot(t *testing.T) {
 	cm.cmState.lastSnapshotIndex = 10
 	cm.cmState.lastSnapshotTerm = 2
 
-	cm.rebuildLastLog()
+	cm.rebuildLastLogLocked()
 
 	if cm.cmState.lastLogIndex != 10 || cm.cmState.lastLogTerm != 2 {
 		t.Fatalf("lastLog = (%d, %d), want (10, 2) — INV-S2 violated",
@@ -66,7 +66,7 @@ func TestRebuildLastLog_NonEmptyLog(t *testing.T) {
 	cm.cmState.lastSnapshotIndex = 5
 	cm.cmState.lastSnapshotTerm = 1
 
-	cm.rebuildLastLog()
+	cm.rebuildLastLogLocked()
 
 	if cm.cmState.lastLogIndex != 7 || cm.cmState.lastLogTerm != 3 {
 		t.Fatalf("lastLog = (%d, %d), want (7, 3)", cm.cmState.lastLogIndex, cm.cmState.lastLogTerm)
@@ -124,7 +124,7 @@ func TestRebuildLastLog_AppendEntriesCallSite(t *testing.T) {
 // точки вызова (call site) в raft_cm_storage.go (метод restoreFromStorage)
 // остаётся неизменным.
 //
-// Ключевой момент: rebuildLastLog вызывается до того, как из хранилища
+// Ключевой момент: rebuildLastLogLocked вызывается до того, как из хранилища
 // загружается lastSnapshotIndex (поле ещё имеет начальное значение -1,
 // как в конструкторе). Поэтому при пустом журнале результат равен (-1, -1).
 // Тест фиксирует этот сценарий и защищает от регрессий в порядке инициализации.

@@ -133,7 +133,7 @@ func (cm *ConsensusModule) startElectionLocked() {
 // голос засчитывается, пока узел остаётся кандидатом того же терма.
 //
 // Самостоятельно захватывает и освобождает cm.mu: две короткие критические
-// секции — снимок lastLogIndexAndTerm() и разбор ответа; вызов транспорта
+// секции — снимок lastLogIndexAndTermLocked() и разбор ответа; вызов транспорта
 // происходит между ними, без блокировки. votesReceived передаётся указателем,
 // чтобы общий счётчик голосов выборов разделялся между горутинами соседей.
 func (cm *ConsensusModule) requestVoteFromPeer(
@@ -142,7 +142,7 @@ func (cm *ConsensusModule) requestVoteFromPeer(
 	votesReceived *atomic.Int32,
 ) {
 	cm.mu.Lock()
-	savedLastLogIndex, savedLastLogTerm := cm.lastLogIndexAndTerm()
+	savedLastLogIndex, savedLastLogTerm := cm.lastLogIndexAndTermLocked()
 	cm.mu.Unlock()
 
 	args := RequestVoteArgs{
@@ -352,7 +352,7 @@ func (cm *ConsensusModule) sendPreVoteToPeer(
 	respCh chan<- *RequestPreVoteReply,
 ) {
 	cm.mu.Lock()
-	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTerm()
+	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTermLocked()
 	savedTerm := cm.cmState.currentTerm
 	cm.mu.Unlock()
 

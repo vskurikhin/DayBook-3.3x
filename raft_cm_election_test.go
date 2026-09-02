@@ -201,10 +201,10 @@ func TestRequestVoteFromPeer_OutgoingArgs(t *testing.T) {
 			transport := &recordingVoteTransport{}
 			cm := newRequestVoteFromPeerTestCM(transport, savedCurrentTerm, lastLogIndex, lastLogTerm)
 
-			// Ожидаемые значения журнала читаем под cm.mu: lastLogIndexAndTerm
+			// Ожидаемые значения журнала читаем под cm.mu: lastLogIndexAndTermLocked
 			// требует удержания блокировки (raft_cm_log.go:12).
 			cm.mu.Lock()
-			wantLastLogIndex, wantLastLogTerm := cm.lastLogIndexAndTerm()
+			wantLastLogIndex, wantLastLogTerm := cm.lastLogIndexAndTermLocked()
 			cm.mu.Unlock()
 
 			var votesReceived atomic.Int32

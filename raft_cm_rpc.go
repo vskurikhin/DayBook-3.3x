@@ -219,8 +219,8 @@ func (cm *ConsensusModule) appendMatchingEntriesLocked(
 		)
 		cm.cmState.log = append(cm.cmState.log[:logInsertPos], args.Entries[newEntriesIndex:]...)
 		cm.traceLockedLogf(_traceLevelLogDump, "... log is now: %v", cm.cmState.log)
-		cm.rebuildLastLog()
-		cm.rebuildTermIndexMap()
+		cm.rebuildLastLogLocked()
+		cm.rebuildTermIndexMapLocked()
 		cm.cmState.logNeedsPersist = true
 		// Если перезапись затронула конфигурацию, откатываем latest.
 		cm.processLogConflict(logInsertIndex)
@@ -307,7 +307,7 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 		return nil
 	}
 
-	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTerm()
+	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTermLocked()
 	cm.traceLockedLogf(
 		_traceLevelPreVote,
 		"RequestVote: %+v [currentTerm=%d, votedFor=%d, log index/term=(%d, %d)]",
@@ -387,7 +387,7 @@ func (cm *ConsensusModule) RequestPreVote(args RequestPreVoteArgs, reply *Reques
 		return err
 	}
 
-	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTerm()
+	lastLogIndex, lastLogTerm := cm.lastLogIndexAndTermLocked()
 	cm.traceLockedLogf(
 		_traceLevelPreVote,
 		"RequestPreVote: %+v [currentTerm=%d, log index/term=(%d, %d)]",

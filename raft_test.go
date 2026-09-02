@@ -3369,12 +3369,12 @@ func TestIntegration_TermIndexAfterLogTruncation(t *testing.T) {
 }
 
 // TestRace_TermIndexMapDispatchAndConflict проверяет, что конкурентное
-// инкрементальное обновление termIndexMap (dispatchLogsUnsafe) и
+// инкрементальное обновление termIndexMap (dispatchLogsLocked) и
 // чтение (leaderSendAEsToPeer с ConflictTerm) не вызывают data race.
 //
 // Сценарий:
 //  1. Создать CM-лидер.
-//  2. Запустить горутину dispatch, вызывающую dispatchLogsUnsafe.
+//  2. Запустить горутину dispatch, вызывающую dispatchLogsLocked.
 //  3. Запустить горутину conflict, вызывающую leaderSendAEsToPeer.
 //  4. Остановить через shutdownCh.
 //
@@ -3441,7 +3441,7 @@ func TestRace_TermIndexMapDispatchAndConflict(t *testing.T) {
 					log:        LogEntry{Type: LogCommand, Data: []byte("x")},
 				}
 				cm.mu.Lock()
-				cm.dispatchLogsUnsafe([]*logFuture{f})
+				cm.dispatchLogsLocked([]*logFuture{f})
 				cm.mu.Unlock()
 				dispatchIters.Add(1)
 			}
@@ -3477,12 +3477,12 @@ func TestRace_TermIndexMapDispatchAndConflict(t *testing.T) {
 }
 
 // TestRace_TermIndexMapCompactAndRead проверяет, что конкурентное
-// сжатие (compactLogs, перестраивает termIndexMap) и
+// сжатие (compactLogsLocked, перестраивает termIndexMap) и
 // чтение termIndexMap не вызывают data race.
 //
 // Сценарий:
 //  1. Создать CM с логом из 10 записей.
-//  2. Запустить горутину compact, вызывающую compactLogs.
+//  2. Запустить горутину compact, вызывающую compactLogsLocked.
 //  3. Запустить горутину reader, читающую termIndexMap.
 //  4. Остановить через shutdownCh.
 //
@@ -3512,7 +3512,7 @@ func TestRace_TermIndexMapCompactAndRead(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		cm.cmState.log = append(cm.cmState.log, LogEntry{Index: i + 1, Term: 1})
 	}
-	cm.rebuildTermIndexMap()
+	cm.rebuildTermIndexMapLocked()
 	cm.mu.Unlock()
 	defer cm.Stop()
 
@@ -3532,7 +3532,7 @@ func TestRace_TermIndexMapCompactAndRead(t *testing.T) {
 				return
 			default:
 				cm.mu.Lock()
-				cm.compactLogs(5)
+				cm.compactLogsLocked(5)
 				cm.mu.Unlock()
 				compactIters.Add(1)
 			}

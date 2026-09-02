@@ -620,7 +620,7 @@ func TestCompactLog_Basic(t *testing.T) {
 	cm.cmState.lastLogTerm = 1
 
 	// очищаем старые записи с Index < 3.
-	cm.compactLogs(3)
+	cm.compactLogsLocked(3)
 	cm.mu.Unlock()
 
 	// Проверяем, что остались записи с Index: 3, 4, 5.
@@ -649,7 +649,7 @@ func TestCompactLog_All(t *testing.T) {
 		{Index: 1, Term: 1},
 		{Index: 2, Term: 1},
 	}
-	cm.compactLogs(10)
+	cm.compactLogsLocked(10)
 	if len(cm.cmState.log) != 0 {
 		t.Fatalf("log length = %d, want 0", len(cm.cmState.log))
 	}
@@ -667,7 +667,7 @@ func TestCompactLog_Nothing(t *testing.T) {
 		{Index: 6, Term: 1},
 		{Index: 7, Term: 1},
 	}
-	cm.compactLogs(3)
+	cm.compactLogsLocked(3)
 	if len(cm.cmState.log) != 3 {
 		t.Fatalf("log length = %d, want 3", len(cm.cmState.log))
 	}
@@ -682,7 +682,7 @@ func TestCompactLog_Empty(t *testing.T) {
 
 	cm := &ConsensusModule{}
 	cm.shutdownCh = make(chan struct{})
-	cm.compactLogs(5)
+	cm.compactLogsLocked(5)
 	if len(cm.cmState.log) != 0 {
 		t.Fatalf("log length = %d, want 0", len(cm.cmState.log))
 	}
@@ -751,7 +751,7 @@ func TestLogPosition_AfterCompact(t *testing.T) {
 	}
 	// Оба метода требуют удержания cm.mu — вызываем под блокировкой.
 	cm.mu.Lock()
-	cm.compactLogs(3)
+	cm.compactLogsLocked(3)
 	if pos := cm.logPositionLocked(3); pos != 0 {
 		cm.mu.Unlock()
 		t.Fatalf("logPositionLocked(3) = %d, want 0", pos)
@@ -912,8 +912,8 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 		t.Fatalf("store holds snapshot with index %d, want the latest S2=%d", list[0].Index, s2)
 	}
 
-	// Сжатие журнала: takeSnapshot вызывает compactLogs(index - trailing),
-	// а compactLogs сохраняет записи с индексом >= compactIndex; после
+	// Сжатие журнала: takeSnapshot вызывает compactLogsLocked(index - trailing),
+	// а compactLogsLocked сохраняет записи с индексом >= compactIndex; после
 	// схождения (lastSnapshotIndex == lastLogIndex == S) журнал содержит
 	// ровно индексы S-trailing..S, то есть trailing + 1 = 2 + 1 = 3 записи.
 	if logLen != 3 {
@@ -1269,7 +1269,7 @@ func TestSnapshot_CatchUpBehindSnapshot(t *testing.T) {
 
 // TestSnapshot_InstallPostConditions — Case C (/004): после
 // установки снимка, покрывающего весь лог follower'а, выполнены
-// lastLogIndexAndTerm() согласован с метаданными
+// lastLogIndexAndTermLocked() согласован с метаданными
 // снимка (защита Leader Completeness: logOk в RequestVote/PreVote
 // считается против корректной пары, а не (-1,-1)).
 func TestSnapshot_InstallPostConditions(t *testing.T) {
@@ -1293,7 +1293,7 @@ func TestSnapshot_InstallPostConditions(t *testing.T) {
 	lastApplied := cm.cmState.lastApplied
 	commitIndex := cm.cmState.commitIndex
 	logLen := len(cm.cmState.log)
-	lli, llt := cm.lastLogIndexAndTerm()
+	lli, llt := cm.lastLogIndexAndTermLocked()
 	cm.mu.Unlock()
 
 	if lastLogIndex < lastSnapshotIndex {
@@ -1308,7 +1308,7 @@ func TestSnapshot_InstallPostConditions(t *testing.T) {
 			lastApplied, commitIndex, lastLogIndex)
 	}
 	if lli != lastLogIndex || llt != lastLogTerm {
-		t.Fatalf("lastLogIndexAndTerm() = (%d,%d), want (%d,%d) — vote-safety pair corrupted",
+		t.Fatalf("lastLogIndexAndTermLocked() = (%d,%d), want (%d,%d) — vote-safety pair corrupted",
 			lli, llt, lastLogIndex, lastLogTerm)
 	}
 }
