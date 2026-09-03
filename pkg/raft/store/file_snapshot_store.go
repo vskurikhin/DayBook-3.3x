@@ -46,8 +46,9 @@ type fileSnapshotMeta struct {
 
 // FileSnapshot — файловая реализация SnapshotStore с сохранением на диск.
 // Снимки хранятся в <base>/snapshots/<term>-<index>-<msec>/;
-// запись атомарна (временная директория + rename + fsync), целостность
-// данных проверяется CRC32. Переживает рестарт процесса.
+// запись атомарна (временная директория + rename + fsync),
+// целостность данных проверяется CRC32.
+// Переживает рестарт процесса.
 type FileSnapshot struct {
 	path   string
 	retain int
@@ -89,7 +90,7 @@ func snapshotName(term, index int, msec int64) string {
 // (в пределах миллисекунды), один из вызовов получит os.IsExist.
 // Проигравший вызывающий обрабатывает эту ошибку как обычную ошибку создания снимка.
 func (f *FileSnapshot) Create(
-	index, term int, configuration contract.Configuration, configIndex int,
+	index, term, configIndex int, configuration contract.Configuration,
 ) (contract.SnapshotSink, error) {
 	return f.createAt(index, term, configIndex, configuration, time.Now())
 }
@@ -335,7 +336,7 @@ func (s *FileSnapshotSink) Close() error {
 	if err := os.Rename(s.dir, finalPath); err != nil {
 		return fmt.Errorf("raft: failed to move snapshot into place: %v", err)
 	}
-	// fsync родительской директории, чтобы rename пережил крэш ОС.
+	// fsync родительской директории, чтобы rename пережил аварийный сбой ОС.
 	if err := syncDir(s.parentDir); err != nil {
 		return fmt.Errorf("raft: failed to sync snapshot directory: %v", err)
 	}
@@ -385,7 +386,7 @@ func (s *FileSnapshotSink) writeMeta() error {
 }
 
 // syncDir открывает каталог и синхронизирует его с диском, чтобы
-// переименования/удаления внутри пережили крэш ОС.
+// переименования/удаления внутри пережили аварийный сбой ОС.
 func syncDir(path string) error {
 	dh, err := os.Open(path)
 	if err != nil {

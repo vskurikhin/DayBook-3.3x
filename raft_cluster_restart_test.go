@@ -8,6 +8,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // clusterNode — файловый стенд одного узла для теста полного рестарта
@@ -19,7 +20,7 @@ type clusterNode struct {
 	fsm       *snapshotTestFSM
 	storage   *store.FileStorage
 	store     *store.FileSnapshot
-	transport *InmemTransport
+	transport *transp.InmemTransport
 	peerIds   []int
 }
 
@@ -51,7 +52,7 @@ func (n *clusterNode) start(t *testing.T) {
 	}
 	n.store = stor
 	n.fsm = newSnapshotTestFSM()
-	n.transport = NewInmemTransport(ServerAddress(fmt.Sprintf("raft-cluster-%d", n.id)))
+	n.transport = transp.NewInmemTransport(ServerAddress(fmt.Sprintf("raft-cluster-%d", n.id)))
 	ready := make(chan any)
 	n.cm = NewConsensusModule(n.id, n.peerIds, n.transport, n.storage, n.fsm, ready, stor)
 	close(ready)
@@ -139,7 +140,7 @@ func TestSnapshot_ClusterFullRestart(t *testing.T) {
 
 	waitForClusterLeader(t, nodes)
 	for i := 0; i < numNodes; i++ {
-		nodes[i].cm.SetSnapshotConfig(snapThreshold, 50*time.Millisecond, 2)
+		nodes[i].cm.SetSnapshotConfig(snapThreshold, 2, 50*time.Millisecond)
 	}
 
 	for i := 0; i < numCommands; i++ {

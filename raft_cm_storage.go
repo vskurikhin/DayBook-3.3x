@@ -26,7 +26,7 @@ const (
 // (т.е. когда лог действительно изменился), что позволяет избежать
 // дорогого gob.Encode(cm.cmState.log) на каждом heartbeat или RPC.
 //
-// Порядок записи ключей важен для крэш-безопасности:
+// Порядок записи ключей важен для отказоустойчивости:
 // currentTerm, votedFor, lastSnapshotIndex, lastSnapshotTerm, затем log.
 // Снимок-ключи пишутся ДО усечённого лога: окно «лог усечён, а
 // lastSnapshotIndex старый/отсутствует» устраняется; обратное окно
@@ -161,7 +161,7 @@ func (cm *ConsensusModule) checkSnapshotKeysConsistency() error {
 // как у restoreFromStorage). Все ошибки и нарушения инвариантов
 // возвращаются вызывающему; решение о фатальности принимает вызывающий код.
 func (cm *ConsensusModule) restoreFromSnapshotStore() error {
-	if isNilInterface(cm.snapshotStore) {
+	if IsNilInterface(cm.snapshotStore) {
 		return nil
 	}
 	snapshots, err := cm.snapshotStore.List()
@@ -202,7 +202,7 @@ func (cm *ConsensusModule) restoreFromSnapshotStore() error {
 			cm.cmState.configurations.latestIndex = meta.ConfigIndex
 		}
 		if meta.Index != cm.cmState.lastSnapshotIndex {
-			// Окно крэша между Close снимка и persistToStorage
+			// Окно сбоя между Close снимка и persistToStorage
 			// снимок в постоянном хранилище новее диска —
 			// самовосстановление метаданных из стора с повторным персистом.
 			cm.cmState.lastSnapshotIndex = meta.Index

@@ -1,4 +1,4 @@
-package raft
+package transp
 
 import (
 	"bufio"
@@ -38,32 +38,28 @@ const (
 //nolint:gochecknoinits
 func init() {
 	// Метки закреплены полным путём импорта корневого пакета
-	// github.com/vskurikhin/raft. Исторически RPC-типы были
-	// объявлены в корневом пакете, и gob строит имя конкретного
-	// типа из полного пути импорта пакета объявления. После
-	// переноса типов в pkg/raft/contract смена метки разорвала
-	// бы декодирование RPC между узлами разных версий
-	// (обновление кластера по одному узлу), поэтому метки
-	// осознанно сохраняют путь корневого пакета; заменять их
-	// на contract.<ИмяТипа> нельзя.
-	gob.RegisterName("github.com/vskurikhin/raft.AppendEntriesArgs", AppendEntriesArgs{})
-	gob.RegisterName("github.com/vskurikhin/raft.AppendEntriesReply", AppendEntriesReply{})
-	gob.RegisterName("github.com/vskurikhin/raft.RequestVoteArgs", RequestVoteArgs{})
-	gob.RegisterName("github.com/vskurikhin/raft.RequestVoteReply", RequestVoteReply{})
-	gob.RegisterName("github.com/vskurikhin/raft.TimeoutNowRequest", TimeoutNowRequest{})
-	gob.RegisterName("github.com/vskurikhin/raft.TimeoutNowResponse", TimeoutNowResponse{})
-	gob.RegisterName("github.com/vskurikhin/raft.RequestPreVoteArgs", RequestPreVoteArgs{})
-	gob.RegisterName("github.com/vskurikhin/raft.RequestPreVoteReply", RequestPreVoteReply{})
-	gob.RegisterName("github.com/vskurikhin/raft.InstallSnapshotRequest", InstallSnapshotRequest{})
-	gob.RegisterName("github.com/vskurikhin/raft.InstallSnapshotResponse", InstallSnapshotResponse{})
+	// github.com/vskurikhin/raft.
+	// Метки осознанно сохраняют путь корневого пакета;
+	// заменять их на contract.<ИмяТипа> нельзя.
+	gob.RegisterName("github.com/vskurikhin/raft.AppendEntriesArgs", contract.AppendEntriesArgs{})
+	gob.RegisterName("github.com/vskurikhin/raft.AppendEntriesReply", contract.AppendEntriesReply{})
+	gob.RegisterName("github.com/vskurikhin/raft.RequestVoteArgs", contract.RequestVoteArgs{})
+	gob.RegisterName("github.com/vskurikhin/raft.RequestVoteReply", contract.RequestVoteReply{})
+	gob.RegisterName("github.com/vskurikhin/raft.TimeoutNowRequest", contract.TimeoutNowRequest{})
+	gob.RegisterName("github.com/vskurikhin/raft.TimeoutNowResponse", contract.TimeoutNowResponse{})
+	gob.RegisterName("github.com/vskurikhin/raft.RequestPreVoteArgs", contract.RequestPreVoteArgs{})
+	gob.RegisterName("github.com/vskurikhin/raft.RequestPreVoteReply", contract.RequestPreVoteReply{})
+	gob.RegisterName("github.com/vskurikhin/raft.InstallSnapshotRequest", contract.InstallSnapshotRequest{})
+	gob.RegisterName("github.com/vskurikhin/raft.InstallSnapshotResponse", contract.InstallSnapshotResponse{})
 }
 
 // tcpConn — обёртка над net.Conn с буферизированным writer и gob-кодеками.
 // Используется как для исходящих соединений (пул), так и для входящих
-// (handleConn). В исходящем случае буфер чтения не используется — декодирование
-// идёт напрямую из conn.
+// (handleConn).
+// В исходящем случае буфер чтения не используется
+// — декодирование идёт напрямую из conn.
 type tcpConn struct {
-	target ServerAddress
+	target contract.ServerAddress
 	conn   net.Conn
 	w      *bufio.Writer
 	dec    *gob.Decoder
@@ -82,19 +78,19 @@ func (t *tcpConn) Release() error {
 // Потокобезопасность: все методы потокобезопасны.
 // После Close() все методы возвращают транспортную ошибку.
 type TCPTransport struct {
-	consumerCh chan RPC
-	localAddr  ServerAddress
+	consumerCh chan contract.RPC
+	localAddr  contract.ServerAddress
 	listener   net.Listener
 	timeout    time.Duration
 
 	mu    sync.Mutex
-	peers map[ServerID]string
+	peers map[contract.ServerID]string
 
-	connPool     map[ServerAddress][]*tcpConn
+	connPool     map[contract.ServerAddress][]*tcpConn
 	connPoolLock sync.Mutex
 	maxPool      int
 
-	heartbeatFn     func(RPC)
+	heartbeatFn     func(contract.RPC)
 	heartbeatFnLock sync.Mutex
 
 	activeConns     map[net.Conn]struct{}
@@ -104,7 +100,7 @@ type TCPTransport struct {
 	wg         sync.WaitGroup
 }
 
-var _ Transport = (*TCPTransport)(nil)
+var _ contract.Transport = (*TCPTransport)(nil)
 
 // NewTCPTransport создаёт новый TCPTransport, слушающий на указанном адресе.
 // Принимает адрес для прослушивания, таймаут и максимальный размер пула
@@ -123,15 +119,15 @@ func NewTCPTransport(addr string, timeout time.Duration, maxPool int) (*TCPTrans
 	// проверка, а не молчаливое исправление: недокументированная возможность
 	// «0 = без дедлайнов» изымается из контракта конструктора.
 	if timeout <= 0 {
-		timeout = _defaultTCPRPCTimeout
+		timeout = contract.TCPRPCTimeout
 	}
 	t := &TCPTransport{
-		consumerCh:  make(chan RPC),
-		localAddr:   ServerAddress(listener.Addr().String()),
+		consumerCh:  make(chan contract.RPC),
+		localAddr:   contract.ServerAddress(listener.Addr().String()),
 		listener:    listener,
 		timeout:     timeout,
-		peers:       make(map[ServerID]string),
-		connPool:    make(map[ServerAddress][]*tcpConn),
+		peers:       make(map[contract.ServerID]string),
+		connPool:    make(map[contract.ServerAddress][]*tcpConn),
 		maxPool:     maxPool,
 		activeConns: make(map[net.Conn]struct{}),
 		shutdownCh:  make(chan struct{}),
@@ -148,17 +144,17 @@ type tcpRPCRequest struct {
 }
 
 // Consumer возвращает небуферизированный канал входящих RPC.
-func (t *TCPTransport) Consumer() <-chan RPC {
+func (t *TCPTransport) Consumer() <-chan contract.RPC {
 	return t.consumerCh
 }
 
 // LocalAddr возвращает адрес, на котором слушает транспорт.
-func (t *TCPTransport) LocalAddr() ServerAddress {
+func (t *TCPTransport) LocalAddr() contract.ServerAddress {
 	return t.localAddr
 }
 
 // SetHeartbeatHandler устанавливает обработчик heartbeat fast-path.
-func (t *TCPTransport) SetHeartbeatHandler(fn func(RPC)) {
+func (t *TCPTransport) SetHeartbeatHandler(fn func(contract.RPC)) {
 	t.heartbeatFnLock.Lock()
 	defer t.heartbeatFnLock.Unlock()
 	t.heartbeatFn = fn
@@ -167,29 +163,37 @@ func (t *TCPTransport) SetHeartbeatHandler(fn func(RPC)) {
 // AppendEntries отправляет AppendEntries указанному узлу через пул соединений.
 //
 //nolint:gocritic
-func (t *TCPTransport) AppendEntries(peerID ServerID, args AppendEntriesArgs) (AppendEntriesReply, error) {
-	var reply AppendEntriesReply
+func (t *TCPTransport) AppendEntries(
+	peerID contract.ServerID, args contract.AppendEntriesArgs,
+) (contract.AppendEntriesReply, error) {
+	var reply contract.AppendEntriesReply
 	err := t.genericRPC(peerID, _rpcAppendEntries, &args, &reply)
 	return reply, err
 }
 
 // RequestVote отправляет RequestVote указанному узлу через пул соединений.
-func (t *TCPTransport) RequestVote(peerID ServerID, args RequestVoteArgs) (RequestVoteReply, error) {
-	var reply RequestVoteReply
+func (t *TCPTransport) RequestVote(
+	peerID contract.ServerID, args contract.RequestVoteArgs,
+) (contract.RequestVoteReply, error) {
+	var reply contract.RequestVoteReply
 	err := t.genericRPC(peerID, _rpcRequestVote, &args, &reply)
 	return reply, err
 }
 
 // RequestPreVote отправляет PreVote RPC узлу peerID через пул соединений.
-func (t *TCPTransport) RequestPreVote(peerID ServerID, args RequestPreVoteArgs) (RequestPreVoteReply, error) {
-	var reply RequestPreVoteReply
+func (t *TCPTransport) RequestPreVote(
+	peerID contract.ServerID, args contract.RequestPreVoteArgs,
+) (contract.RequestPreVoteReply, error) {
+	var reply contract.RequestPreVoteReply
 	err := t.genericRPC(peerID, _rpcRequestPreVote, &args, &reply)
 	return reply, err
 }
 
 // TimeoutNow отправляет TimeoutNowRequest указанному узлу через пул соединений.
-func (t *TCPTransport) TimeoutNow(peerID ServerID, args TimeoutNowRequest) (TimeoutNowResponse, error) {
-	var reply TimeoutNowResponse
+func (t *TCPTransport) TimeoutNow(
+	peerID contract.ServerID, args contract.TimeoutNowRequest,
+) (contract.TimeoutNowResponse, error) {
+	var reply contract.TimeoutNowResponse
 	err := t.genericRPC(peerID, _rpcTimeoutNow, &args, &reply)
 	return reply, err
 }
@@ -198,9 +202,9 @@ func (t *TCPTransport) TimeoutNow(peerID ServerID, args TimeoutNowRequest) (Time
 //
 //nolint:gocritic
 func (t *TCPTransport) InstallSnapshot(
-	peerID ServerID, args InstallSnapshotRequest, data io.Reader,
-) (InstallSnapshotResponse, error) {
-	var reply InstallSnapshotResponse
+	peerID contract.ServerID, args contract.InstallSnapshotRequest, data io.Reader,
+) (contract.InstallSnapshotResponse, error) {
+	var reply contract.InstallSnapshotResponse
 	target, err := t.lookupPeer(peerID)
 	if err != nil {
 		return reply, err
@@ -236,25 +240,25 @@ func (t *TCPTransport) InstallSnapshot(
 }
 
 // AppendEntriesPipeline не реализован.
-func (t *TCPTransport) AppendEntriesPipeline(_ ServerID) (AppendPipeline, error) {
+func (t *TCPTransport) AppendEntriesPipeline(_ contract.ServerID) (contract.AppendPipeline, error) {
 	return nil, contract.ErrNotImplemented
 }
 
 // Connect сохраняет адрес для указанного соседа. Если адрес изменился —
 // сбрасывает пул соединений для старого адреса.
-func (t *TCPTransport) Connect(peerID ServerID, addr string) {
+func (t *TCPTransport) Connect(peerID contract.ServerID, addr string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	if oldAddr, ok := t.peers[peerID]; ok && oldAddr != addr {
-		t.removeConnPoolForTarget(ServerAddress(oldAddr))
+		t.removeConnPoolForTarget(contract.ServerAddress(oldAddr))
 	}
 
 	t.peers[peerID] = addr
 }
 
 // Disconnect удаляет адрес указанного соседа.
-func (t *TCPTransport) Disconnect(peerID ServerID) {
+func (t *TCPTransport) Disconnect(peerID contract.ServerID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.peers, peerID)
@@ -264,7 +268,7 @@ func (t *TCPTransport) Disconnect(peerID ServerID) {
 func (t *TCPTransport) DisconnectAll() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.peers = make(map[ServerID]string)
+	t.peers = make(map[contract.ServerID]string)
 }
 
 // Close завершает работу транспорта: закрывает shutdownCh, слушатель,
@@ -318,7 +322,7 @@ func (t *TCPTransport) closeActiveConns() {
 }
 
 // genericRPC отправляет RPC любого типа, используя пул соединений.
-func (t *TCPTransport) genericRPC(peerID ServerID, rpcType byte, args, reply any) error {
+func (t *TCPTransport) genericRPC(peerID contract.ServerID, rpcType byte, args, reply any) error {
 	target, err := t.lookupPeer(peerID)
 	if err != nil {
 		return err
@@ -341,18 +345,18 @@ func (t *TCPTransport) genericRPC(peerID ServerID, rpcType byte, args, reply any
 }
 
 // lookupPeer возвращает адрес соседа по его ID.
-func (t *TCPTransport) lookupPeer(peerID ServerID) (ServerAddress, error) {
+func (t *TCPTransport) lookupPeer(peerID contract.ServerID) (contract.ServerAddress, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	addr, ok := t.peers[peerID]
 	if !ok {
 		return "", fmt.Errorf("raft: unknown peer %d", peerID)
 	}
-	return ServerAddress(addr), nil
+	return contract.ServerAddress(addr), nil
 }
 
 // getConn возвращает соединение к указанному адресу из пула или создаёт новое.
-func (t *TCPTransport) getConn(target ServerAddress) (*tcpConn, error) {
+func (t *TCPTransport) getConn(target contract.ServerAddress) (*tcpConn, error) {
 	if conn := t.getPooledConn(target); conn != nil {
 		return conn, nil
 	}
@@ -371,7 +375,7 @@ func (t *TCPTransport) getConn(target ServerAddress) (*tcpConn, error) {
 }
 
 // getPooledConn извлекает соединение из пула (LIFO).
-func (t *TCPTransport) getPooledConn(target ServerAddress) *tcpConn {
+func (t *TCPTransport) getPooledConn(target contract.ServerAddress) *tcpConn {
 	t.connPoolLock.Lock()
 	defer t.connPoolLock.Unlock()
 
@@ -444,7 +448,7 @@ func (t *TCPTransport) decodeResponse(conn *tcpConn, reply any) (bool, error) {
 }
 
 // removeConnPoolForTarget удаляет и закрывает все соединения к указанному адресу.
-func (t *TCPTransport) removeConnPoolForTarget(target ServerAddress) {
+func (t *TCPTransport) removeConnPoolForTarget(target contract.ServerAddress) {
 	t.connPoolLock.Lock()
 	defer t.connPoolLock.Unlock()
 	if conns, ok := t.connPool[target]; ok {
@@ -534,26 +538,26 @@ func (t *TCPTransport) handleCommand(r *bufio.Reader, _ net.Conn, dec *gob.Decod
 		return err
 	}
 
-	respCh := make(chan RPCResponse, 1)
+	respCh := make(chan contract.RPCResponse, 1)
 
 	cmd := req.Args
 	switch v := cmd.(type) {
-	case AppendEntriesArgs:
+	case contract.AppendEntriesArgs:
 		cmd = &v
-	case RequestVoteArgs:
+	case contract.RequestVoteArgs:
 		cmd = &v
-	case TimeoutNowRequest:
+	case contract.TimeoutNowRequest:
 		cmd = &v
-	case RequestPreVoteArgs:
+	case contract.RequestPreVoteArgs:
 		cmd = &v
-	case InstallSnapshotRequest:
+	case contract.InstallSnapshotRequest:
 		cmd = &v
 	}
 
 	// Данные снимка не входят в gob-команду — они идут следом в том же потоке.
 	// Поэтому для InstallSnapshot потребитель получает отдельный io.Reader
 	// поверх r, ограниченный DataSize.
-	snapReq, isSnapReq := cmd.(*InstallSnapshotRequest)
+	snapReq, isSnapReq := cmd.(*contract.InstallSnapshotRequest)
 	hasSnapshotData := isSnapReq && snapReq.DataSize > 0
 	var snapReader io.ReadCloser
 	if hasSnapshotData {
@@ -563,13 +567,13 @@ func (t *TCPTransport) handleCommand(r *bufio.Reader, _ net.Conn, dec *gob.Decod
 	// Heartbeat fast-path: если это heartbeat и установлен обработчик,
 	// вызываем его напрямую, минуя consumerCh.
 	if req.Type == _rpcAppendEntries {
-		if args, ok := cmd.(*AppendEntriesArgs); ok {
+		if args, ok := cmd.(*contract.AppendEntriesArgs); ok {
 			if args.Term != 0 && args.LeaderCommit == 0 && len(args.Entries) == 0 {
 				t.heartbeatFnLock.Lock()
 				fn := t.heartbeatFn
 				t.heartbeatFnLock.Unlock()
 				if fn != nil {
-					fn(RPC{Command: cmd, RespChan: respCh})
+					fn(contract.RPC{Command: cmd, RespChan: respCh})
 					goto RESP
 				}
 			}
@@ -577,7 +581,7 @@ func (t *TCPTransport) handleCommand(r *bufio.Reader, _ net.Conn, dec *gob.Decod
 	}
 
 	select {
-	case t.consumerCh <- RPC{Command: cmd, Reader: snapReader, RespChan: respCh}:
+	case t.consumerCh <- contract.RPC{Command: cmd, Reader: snapReader, RespChan: respCh}:
 	case <-t.shutdownCh:
 		return contract.ErrRaftShutdown
 	}
@@ -608,7 +612,7 @@ RESP:
 		return err
 	}
 	if respReply == nil {
-		respReply = &AppendEntriesReply{}
+		respReply = &contract.AppendEntriesReply{}
 	}
 	if err := enc.Encode(respReply); err != nil {
 		return err

@@ -33,7 +33,7 @@ func NewInmemSnapshot() *InmemSnapshot {
 
 // Create создаёт новый снимок. Снимок не виден в List/Open до Close.
 func (s *InmemSnapshot) Create(
-	index, term int, configuration contract.Configuration, configIndex int,
+	index, term, configIndex int, configuration contract.Configuration,
 ) (contract.SnapshotSink, error) {
 	id := fmt.Sprintf("snapshot-%d-%d", term, index)
 	s.mu.Lock()

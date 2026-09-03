@@ -7,6 +7,7 @@ import (
 
 	"github.com/vskurikhin/raft/pkg/raft/contract"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // NoOpFSM — пустая реализация FSM для тестов.
@@ -29,7 +30,7 @@ func (f NoOpFSM) Restore(_ io.ReadCloser) error {
 type tcpHarness struct {
 	t          *testing.T
 	cluster    []*ConsensusModule
-	transports []*TCPTransport
+	transports []*transp.TCPTransport
 	storage    []*store.MapStorage
 	alive      []bool
 	ready      chan any
@@ -40,7 +41,7 @@ type tcpHarness struct {
 func newTCPHarness(t *testing.T, n int) *tcpHarness {
 	t.Helper()
 
-	transports := make([]*TCPTransport, n)
+	transports := make([]*transp.TCPTransport, n)
 	storage := make([]*store.MapStorage, n)
 	cluster := make([]*ConsensusModule, n)
 	alive := make([]bool, n)
@@ -48,7 +49,7 @@ func newTCPHarness(t *testing.T, n int) *tcpHarness {
 
 	// Создаём транспорты (каждый на своём порту).
 	for i := 0; i < n; i++ {
-		trans, err := NewTCPTransport("127.0.0.1:0", 500*time.Millisecond, 2)
+		trans, err := transp.NewTCPTransport("127.0.0.1:0", 500*time.Millisecond, 2)
 		if err != nil {
 			t.Fatalf("NewTCPTransport(%d): %v", i, err)
 		}

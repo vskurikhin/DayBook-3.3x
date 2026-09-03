@@ -100,7 +100,7 @@ func TestSnapshotTestFSM_Basic(t *testing.T) {
 	defer snap.Release()
 
 	stor := store.NewInmemSnapshot()
-	sink, err := stor.Create(10, 1, Configuration{}, 0)
+	sink, err := stor.Create(10, 1, 0, Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestSnapshotTestFSM_Empty(t *testing.T) {
 	defer snap.Release()
 
 	stor := store.NewInmemSnapshot()
-	sink, err := stor.Create(1, 1, Configuration{}, 0)
+	sink, err := stor.Create(1, 1, 0, Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}

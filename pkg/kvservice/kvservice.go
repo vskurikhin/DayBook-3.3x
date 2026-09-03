@@ -17,6 +17,7 @@ import (
 
 	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/pkg/api"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // _traceKV — порог детализации отладочных сообщений KV-сервиса (traceLogf).
@@ -190,7 +191,7 @@ func New(cfg *Config, readyChan <-chan any) *KVService {
 //     как кластер Raft будет готов к работе (все узлы запущены и соединены
 //     друг с другом).
 func NewKVService(address string, id int, peerIds []int, storage raft.Storage, readyChan <-chan any) *KVService {
-	transport, err := raft.NewTCPTransport(address, 0, 0)
+	transport, err := transp.NewTCPTransport(address, 0, 0)
 	if err != nil {
 		log.Fatalf("kvservice: failed to create TCP transport on %s: %v", address, err)
 	}

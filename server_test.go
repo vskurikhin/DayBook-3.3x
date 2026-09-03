@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
-var _ TransportManager = (*TCPTransport)(nil)
+var _ TransportManager = (*transp.TCPTransport)(nil)
 
 func TestConfig(t *testing.T) {
 	cfg := Config{
@@ -133,7 +134,7 @@ func TestServeSnapshotConfig(t *testing.T) {
 	}()
 
 	ready := make(chan any)
-	transport, err := NewTCPTransport("127.0.0.1:0", 0, 0)
+	transport, err := transp.NewTCPTransport("127.0.0.1:0", 0, 0)
 	if err != nil {
 		t.Fatalf("NewTCPTransport: %v", err)
 	}
@@ -178,7 +179,7 @@ func TestServeSnapshotConfigZeros(t *testing.T) {
 	}()
 
 	ready := make(chan any)
-	transport, err := NewTCPTransport("127.0.0.1:0", 0, 0)
+	transport, err := transp.NewTCPTransport("127.0.0.1:0", 0, 0)
 	if err != nil {
 		t.Fatalf("NewTCPTransport: %v", err)
 	}
@@ -219,7 +220,7 @@ func TestServeSnapshotConfigDisabled(t *testing.T) {
 	}()
 
 	ready := make(chan any)
-	transport, err := NewTCPTransport("127.0.0.1:0", 0, 0)
+	transport, err := transp.NewTCPTransport("127.0.0.1:0", 0, 0)
 	if err != nil {
 		t.Fatalf("NewTCPTransport: %v", err)
 	}

@@ -71,7 +71,7 @@ type Config struct {
 // New создаёт новый сервер Raft с заданной конфигурацией cfg, хранилищем storage,
 // каналом уведомления ready и FSM для применения зафиксированных записей журнала.
 func New(cfg *Config, ready <-chan any) *Server {
-	if isNilInterface(cfg.Transport) {
+	if IsNilInterface(cfg.Transport) {
 		panic("raft: Config.Transport is nil or typed nil: the transport must be created and passed by the caller")
 	}
 	s := &Server{
@@ -94,11 +94,12 @@ func (s *Server) Serve() {
 	s.cm = NewConsensusModule(s.serverID, s.peerIds, s.transport, s.storage, s.fsm, s.ready, s.snapshotStore)
 
 	// Применение параметров снимков из конфигурации сразу после создания
-	// CM и до закрытия ready — CM ещё не участвует в выборах. Выполняется
-	// только при включённых снимках (snapshotStore != nil); нулевые и
-	// отрицательные значения заменяются дефолтами конструктора. Сеттер —
-	// единая точка записи параметров снимков; сигнал snapshotCh безопасен
-	// (shouldSnapshot — фильтр) и лишь ускоряет применение нового интервала.
+	// CM и до закрытия ready — CM ещё не участвует в выборах.
+	// Выполняется только при включённых снимках (snapshotStore != nil);
+	// нулевые и отрицательные значения заменяются дефолтами конструктора.
+	// Сеттер — единая точка записи параметров снимков; сигнал snapshotCh
+	// безопасен (shouldSnapshot — фильтр) и лишь ускоряет применение нового
+	// интервала.
 	if s.snapshotStore != nil {
 		interval := s.snapshotInterval
 		if interval <= 0 {
@@ -108,7 +109,7 @@ func (s *Server) Serve() {
 		if threshold <= 0 {
 			threshold = DefaultSnapshotThreshold
 		}
-		s.cm.SetSnapshotConfig(threshold, interval, _defaultTrailingLogs)
+		s.cm.SetSnapshotConfig(threshold, _defaultTrailingLogs, interval)
 	}
 }
 

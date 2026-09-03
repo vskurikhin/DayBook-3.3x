@@ -1,8 +1,10 @@
-package raft
+package transp
 
 import (
 	"testing"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // setupInmemBenchmark создаёт пару InmemTransport с обработчиком для бенчмарков.
@@ -19,13 +21,13 @@ func setupInmemBenchmark(b *testing.B) (*InmemTransport, func()) {
 			select {
 			case rpc := <-t2.Consumer():
 				switch cmd := rpc.Command.(type) {
-				case *AppendEntriesArgs:
-					rpc.RespChan <- RPCResponse{
-						Reply: &AppendEntriesReply{Success: true, Term: cmd.Term},
+				case *contract.AppendEntriesArgs:
+					rpc.RespChan <- contract.RPCResponse{
+						Reply: &contract.AppendEntriesReply{Success: true, Term: cmd.Term},
 					}
-				case *RequestVoteArgs:
-					rpc.RespChan <- RPCResponse{
-						Reply: &RequestVoteReply{VoteGranted: true, Term: cmd.Term},
+				case *contract.RequestVoteArgs:
+					rpc.RespChan <- contract.RPCResponse{
+						Reply: &contract.RequestVoteReply{VoteGranted: true, Term: cmd.Term},
 					}
 				}
 			case <-done:
@@ -63,13 +65,13 @@ func setupTCPBenchmark(b *testing.B) (*TCPTransport, func()) {
 			select {
 			case rpc := <-server.Consumer():
 				switch cmd := rpc.Command.(type) {
-				case *AppendEntriesArgs:
-					rpc.RespChan <- RPCResponse{
-						Reply: &AppendEntriesReply{Success: true, Term: cmd.Term},
+				case *contract.AppendEntriesArgs:
+					rpc.RespChan <- contract.RPCResponse{
+						Reply: &contract.AppendEntriesReply{Success: true, Term: cmd.Term},
 					}
-				case *RequestVoteArgs:
-					rpc.RespChan <- RPCResponse{
-						Reply: &RequestVoteReply{VoteGranted: true, Term: cmd.Term},
+				case *contract.RequestVoteArgs:
+					rpc.RespChan <- contract.RPCResponse{
+						Reply: &contract.RequestVoteReply{VoteGranted: true, Term: cmd.Term},
 					}
 				}
 			case <-done:
@@ -89,7 +91,7 @@ func BenchmarkInmemAppendEntries(b *testing.B) {
 	trans, cleanup := setupInmemBenchmark(b)
 	defer cleanup()
 
-	args := AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
+	args := contract.AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -104,7 +106,7 @@ func BenchmarkInmemAppendEntriesParallel(b *testing.B) {
 	trans, cleanup := setupInmemBenchmark(b)
 	defer cleanup()
 
-	args := AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
+	args := contract.AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
 	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
@@ -121,7 +123,7 @@ func BenchmarkTCPAppendEntries(b *testing.B) {
 	trans, cleanup := setupTCPBenchmark(b)
 	defer cleanup()
 
-	args := AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
+	args := contract.AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -136,7 +138,7 @@ func BenchmarkTCPAppendEntriesParallel(b *testing.B) {
 	trans, cleanup := setupTCPBenchmark(b)
 	defer cleanup()
 
-	args := AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
+	args := contract.AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
 	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {

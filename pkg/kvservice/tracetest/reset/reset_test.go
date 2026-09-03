@@ -15,6 +15,7 @@ import (
 	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/pkg/kvservice"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // buf — синхронизированный приёмник стандартного логгера: запись
@@ -70,9 +71,9 @@ func TestTraceReset(t *testing.T) {
 func newTestService(t *testing.T) *kvservice.KVService {
 	t.Helper()
 	ready := make(chan any)
-	transport, err := raft.NewTCPTransport(":0", 0, 0)
+	transport, err := transp.NewTCPTransport(":0", 0, 0)
 	if err != nil {
-		t.Fatalf("raft.NewTCPTransport: %v", err)
+		t.Fatalf("transp.NewTCPTransport: %v", err)
 	}
 	cfg := &kvservice.Config{
 		HTTPAddress: ":0",

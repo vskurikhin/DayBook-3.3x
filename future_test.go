@@ -12,6 +12,7 @@ import (
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/contract"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // --- deferError ---
@@ -237,7 +238,7 @@ func testServerWithFSM(t testing.TB, fsm FSM) *ConsensusModule {
 	ready := make(chan any)
 	close(ready)
 
-	transport := NewInmemTransport("single")
+	transport := transp.NewInmemTransport("single")
 	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready)
 	return cm
 }
@@ -248,7 +249,7 @@ func testFSMHarness(t *testing.T) (*Harness, *CaptureFSM) {
 	t.Helper()
 	n := 1
 	cluster := make([]*ConsensusModule, n)
-	transports := make([]*InmemTransport, n)
+	transports := make([]*transp.InmemTransport, n)
 	storage := make([]*store.MapStorage, n)
 	commitChans := make([]chan CommitEntry, n)
 	commits := make([][]CommitEntry, n)
@@ -258,7 +259,7 @@ func testFSMHarness(t *testing.T) (*Harness, *CaptureFSM) {
 
 	capture := &CaptureFSM{}
 
-	transports[0] = NewInmemTransport("single-0")
+	transports[0] = transp.NewInmemTransport("single-0")
 	storage[0] = store.NewMapStorage()
 	commitChans[0] = make(chan CommitEntry)
 	fsm := &captureCommitFSM{

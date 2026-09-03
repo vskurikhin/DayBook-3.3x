@@ -19,6 +19,7 @@ import (
 	"github.com/vskurikhin/raft/internal/config"
 	"github.com/vskurikhin/raft/pkg/kvservice"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 const (
@@ -100,7 +101,7 @@ func runWith(values *config.Values) (func(), error) {
 	// потребителя нет» осталось минимальным. Владение транспортом после
 	// успешного kvservice.New переходит к Server (ownTransport = false);
 	// на пути ошибки до этого его закрывает defer.
-	transport, err := raft.NewTCPTransport(values.RPCAddress.String(), values.TCPRPCTimeout, maxPool)
+	transport, err := transp.NewTCPTransport(values.RPCAddress.String(), values.TCPRPCTimeout, maxPool)
 	if err != nil {
 		stopPprof()
 		return nil, fmt.Errorf("failed to create TCP transport on %s: %w", values.RPCAddress, err)

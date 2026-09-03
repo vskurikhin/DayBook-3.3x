@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // failingSnapshotStore — тестовый двойник SnapshotStore, чей Create
@@ -23,7 +25,7 @@ type failingSnapshotStore struct {
 	creates int
 }
 
-func (f *failingSnapshotStore) Create(_, _ int, _ Configuration, _ int) (SnapshotSink, error) {
+func (f *failingSnapshotStore) Create(_, _, _ int, _ contract.Configuration) (contract.SnapshotSink, error) {
 	f.mu.Lock()
 	f.creates++
 	f.mu.Unlock()
@@ -56,7 +58,7 @@ func TestRunSnapshots_TakeSnapshotErrorDoesNotCrash(t *testing.T) {
 	ready := make(chan any)
 	close(ready)
 	storage := store.NewMapStorage()
-	transport := NewInmemTransport("single")
+	transport := transp.NewInmemTransport("single")
 	stor := &failingSnapshotStore{}
 	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, stor)
 	defer cm.Stop()
@@ -73,7 +75,7 @@ func TestRunSnapshots_TakeSnapshotErrorDoesNotCrash(t *testing.T) {
 	cm.cmState.fsmAppliedIndex = 0
 	cm.cmState.log = []LogEntry{{Index: 10, Term: 1, Type: LogCommand, Data: "k=v"}}
 	cm.mu.Unlock()
-	cm.SetSnapshotConfig(2, 20*time.Millisecond, 1)
+	cm.SetSnapshotConfig(2, 1, 20*time.Millisecond)
 
 	// Первая попытка должна произойти быстро (сигнал из SetSnapshotConfig);
 	// ждём и убеждаемся, что CM жив и попытки повторяются циклом.
@@ -122,9 +124,9 @@ type countingSnapshotStore struct {
 	creates atomic.Int64
 }
 
-func (s *countingSnapshotStore) Create(index, term int, configuration Configuration, configIndex int) (SnapshotSink, error) {
+func (s *countingSnapshotStore) Create(index, term, configIndex int, configuration contract.Configuration) (contract.SnapshotSink, error) {
 	s.creates.Add(1)
-	return s.InmemSnapshot.Create(index, term, configuration, configIndex)
+	return s.InmemSnapshot.Create(index, term, configIndex, configuration)
 }
 
 // newInstallSnapshotCM собирает литеральный CM с уже установленным
@@ -459,12 +461,12 @@ func TestSnapshotContent_MatchesMetaIndex(t *testing.T) {
 	fsm := newSnapshotTestFSM()
 	ready := make(chan any)
 	close(ready)
-	transport := NewInmemTransport("snapshot-content")
+	transport := transp.NewInmemTransport("snapshot-content")
 
 	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, stor)
 	defer cm.Stop()
 	waitForLeader(t, cm, 5*time.Second)
-	cm.SetSnapshotConfig(4, 50*time.Millisecond, 2)
+	cm.SetSnapshotConfig(4, 2, 50*time.Millisecond)
 
 	const numCommands = 10
 	byIndex := make(commandIndexMap, numCommands)
@@ -501,7 +503,7 @@ func TestSnapshotIndexProperty_BothSelectBranches(t *testing.T) {
 	close(ready)
 
 	cm := NewConsensusModule(
-		0, []int{}, NewInmemTransport("snapshot-property"),
+		0, []int{}, transp.NewInmemTransport("snapshot-property"),
 		store.NewMapStorage(), fsm, ready, snapStore,
 	)
 	defer cm.Stop()
@@ -509,7 +511,7 @@ func TestSnapshotIndexProperty_BothSelectBranches(t *testing.T) {
 
 	waitForLeader(t, cm, 5*time.Second)
 	// Порог отключает самостоятельные снимки: снимки инициирует только тест.
-	cm.SetSnapshotConfig(1<<20, time.Hour, 2)
+	cm.SetSnapshotConfig(1<<20, 2, time.Hour)
 
 	const iterations = 30
 	firstBatchWins, secondBatchWins := 0, 0
@@ -617,10 +619,10 @@ func TestSnapshot_RestartFromSnapshotProducesNewSnapshot(t *testing.T) {
 	}
 	ready := make(chan any)
 	close(ready)
-	transport := NewInmemTransport("restart-snapshot")
+	transport := transp.NewInmemTransport("restart-snapshot")
 	cm := NewConsensusModule(0, []int{}, transport, storage, newSnapshotTestFSM(), ready, snapStore)
 	waitForLeader(t, cm, 5*time.Second)
-	cm.SetSnapshotConfig(4, 50*time.Millisecond, 2)
+	cm.SetSnapshotConfig(4, 2, 50*time.Millisecond)
 
 	const numCommands = 10
 	for i := 0; i < numCommands; i++ {
@@ -641,7 +643,7 @@ func TestSnapshot_RestartFromSnapshotProducesNewSnapshot(t *testing.T) {
 	}
 	ready2 := make(chan any)
 	close(ready2)
-	transport2 := NewInmemTransport("restart-snapshot-2")
+	transport2 := transp.NewInmemTransport("restart-snapshot-2")
 	cm2 := NewConsensusModule(0, []int{}, transport2, storage2, newSnapshotTestFSM(), ready2, store2)
 	defer cm2.Stop()
 
@@ -658,7 +660,7 @@ func TestSnapshot_RestartFromSnapshotProducesNewSnapshot(t *testing.T) {
 	}
 
 	waitForLeader(t, cm2, 5*time.Second)
-	cm2.SetSnapshotConfig(4, 50*time.Millisecond, 2)
+	cm2.SetSnapshotConfig(4, 2, 50*time.Millisecond)
 	for i := numCommands; i < numCommands+10; i++ {
 		if err := cm2.Apply(fmt.Sprintf("k%d=v%d", i, i), 0).Error(); err != nil {
 			t.Fatalf("Apply k%d after restart: %v", i, err)
@@ -726,10 +728,10 @@ func TestSnapshot_UnappliedBatchesReplayedAfterRestart(t *testing.T) {
 	fsm := newGatedTestFSM(16)
 	ready := make(chan any)
 	close(ready)
-	transport := NewInmemTransport("stop-with-pending")
+	transport := transp.NewInmemTransport("stop-with-pending")
 	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, snapStore)
 	waitForLeader(t, cm, 5*time.Second)
-	cm.SetSnapshotConfig(2, 50*time.Millisecond, 2)
+	cm.SetSnapshotConfig(2, 2, 50*time.Millisecond)
 
 	// Фаза 1: команды применяются штатно и подтверждаются клиенту.
 	const appliedCommands = 5
@@ -743,7 +745,7 @@ func TestSnapshot_UnappliedBatchesReplayedAfterRestart(t *testing.T) {
 
 	// Дальнейшие снимки отключаем: содержимое машины состояний с этого
 	// момента заморожено шлюзом, и сценарий не должен от них зависеть.
-	cm.SetSnapshotConfig(1<<20, time.Hour, 2)
+	cm.SetSnapshotConfig(1<<20, 2, time.Hour)
 	waitForSnapshotQuiescence(t, cm, storage, 10*time.Second)
 
 	// Фаза 2: шлюз закрыт — записи попадают в журнал и в очередь машины
@@ -800,7 +802,7 @@ func TestSnapshot_UnappliedBatchesReplayedAfterRestart(t *testing.T) {
 	fsm2.release(64)
 	ready2 := make(chan any)
 	close(ready2)
-	transport2 := NewInmemTransport("stop-with-pending-2")
+	transport2 := transp.NewInmemTransport("stop-with-pending-2")
 	cm2 := NewConsensusModule(0, []int{}, transport2, storage2, fsm2, ready2, store2)
 	defer cm2.Stop()
 	waitForLeader(t, cm2, 5*time.Second)
@@ -965,7 +967,7 @@ func TestSnapshotIndexNotAheadOfFSM_Deterministic(t *testing.T) {
 			ready := make(chan any)
 			close(ready)
 			cm := NewConsensusModule(
-				0, []int{}, NewInmemTransport(ServerAddress("watermark-"+tc.name)),
+				0, []int{}, transp.NewInmemTransport(ServerAddress("watermark-"+tc.name)),
 				store.NewMapStorage(), tc.fsm, ready, store.NewInmemSnapshot(),
 			)
 			defer cm.Stop()
@@ -1070,7 +1072,7 @@ func TestFsmAppliedIndex_FreshStartAdvancesOnFirstBatch(t *testing.T) {
 	// поэтому проверка «отметка равна -1» детерминирована.
 	ready := make(chan any)
 	cm := NewConsensusModule(
-		0, []int{}, NewInmemTransport("fresh-start"),
+		0, []int{}, transp.NewInmemTransport("fresh-start"),
 		store.NewMapStorage(), fsm, ready, store.NewInmemSnapshot(),
 	)
 	defer cm.Stop()

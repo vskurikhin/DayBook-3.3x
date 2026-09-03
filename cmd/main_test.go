@@ -13,6 +13,7 @@ import (
 	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/internal/config"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // TestRunWithEmptyPeers запускает узел без соседей через runWith и
@@ -68,9 +69,9 @@ func TestRunWithPeerConnect(t *testing.T) {
 		for range commitChannel {
 		}
 	}()
-	peerTransport, err := raft.NewTCPTransport(":0", 0, 0)
+	peerTransport, err := transp.NewTCPTransport(":0", 0, 0)
 	if err != nil {
-		t.Fatalf("raft.NewTCPTransport: %v", err)
+		t.Fatalf("transp.NewTCPTransport: %v", err)
 	}
 	peer := raft.New(&raft.Config{
 		Fsm:       raft.NewCommitChannelFSM(commitChannel),

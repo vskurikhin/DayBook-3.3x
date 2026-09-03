@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
-
 	"github.com/vskurikhin/raft"
 )
 
@@ -27,7 +26,7 @@ func testConfig() raft.Configuration {
 // writeSnapshot создаёт и закрывает снимок с данными data, возвращая sink.ID.
 func writeSnapshot(t *testing.T, store *FileSnapshot, index, term int, data []byte) string {
 	t.Helper()
-	sink, err := store.Create(index, term, testConfig(), index)
+	sink, err := store.Create(index, term, index, testConfig())
 	if err != nil {
 		t.Fatalf("Create(%d, %d) failed: %v", index, term, err)
 	}
@@ -143,7 +142,7 @@ func TestFileSnapshot_Cancel(t *testing.T) {
 	}
 	writeSnapshot(t, store, 5, 1, []byte("keep"))
 
-	sink, err := store.Create(6, 1, testConfig(), 6)
+	sink, err := store.Create(6, 1, 6, testConfig())
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -179,7 +178,7 @@ func TestFileSnapshot_InvisibleBeforeClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
-	sink, err := store.Create(11, 2, testConfig(), 11)
+	sink, err := store.Create(11, 2, 11, testConfig())
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}

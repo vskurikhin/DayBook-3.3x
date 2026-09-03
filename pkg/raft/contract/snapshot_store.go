@@ -18,7 +18,7 @@ type SnapshotStore interface {
 	// Create создаёт новый снимок с указанными индексом, термом,
 	// конфигурацией и индексом конфигурации. Возвращает SnapshotSink
 	// для записи данных снимка.
-	Create(index, term int, configuration Configuration, configIndex int) (SnapshotSink, error)
+	Create(index, term, configIndex int, configuration Configuration) (SnapshotSink, error)
 
 	// List возвращает список доступных снимков.
 	List() ([]*SnapshotMeta, error)

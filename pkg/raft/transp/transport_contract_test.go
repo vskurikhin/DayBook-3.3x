@@ -1,26 +1,27 @@
-package raft
+package transp
 
 import (
 	"testing"
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // transportPairFactory создаёт пару соединённых транспортов (client, server, cleanup)
 // для параметризованных contract-тестов.
-type transportPairFactory func(t *testing.T) (Transport, Transport, func())
+type transportPairFactory func(t *testing.T) (contract.Transport, contract.Transport, func())
 
 // newInmemTransportPair — фабрика для InmemTransport.
-func newInmemTransportPair(t *testing.T) (Transport, Transport, func()) {
+func newInmemTransportPair(t *testing.T) (contract.Transport, contract.Transport, func()) {
 	t.Helper()
 	t1, t2, cleanup := newInmemPair(t)
 	return t1, t2, cleanup
 }
 
 // newTCPTransportPair — фабрика для TCPTransport.
-func newTCPTransportPair(t *testing.T) (Transport, Transport, func()) {
+func newTCPTransportPair(t *testing.T) (contract.Transport, contract.Transport, func()) {
 	t.Helper()
 	timeout := time.Second
 	server, err := NewTCPTransport("127.0.0.1:0", timeout, 2)
@@ -42,7 +43,7 @@ func newTCPTransportPair(t *testing.T) (Transport, Transport, func()) {
 
 // runTransportHandler запускает обработчик RPC на переданном транспорте.
 // Возвращает функцию остановки.
-func runTransportHandler(t *testing.T, trans Transport, consume bool) func() {
+func runTransportHandler(t *testing.T, trans contract.Transport, consume bool) func() {
 	t.Helper()
 	if !consume {
 		return func() {}
@@ -56,13 +57,13 @@ func runTransportHandler(t *testing.T, trans Transport, consume bool) func() {
 					return
 				}
 				switch cmd := rpc.Command.(type) {
-				case *AppendEntriesArgs:
-					rpc.RespChan <- RPCResponse{
-						Reply: &AppendEntriesReply{Success: true, Term: cmd.Term},
+				case *contract.AppendEntriesArgs:
+					rpc.RespChan <- contract.RPCResponse{
+						Reply: &contract.AppendEntriesReply{Success: true, Term: cmd.Term},
 					}
-				case *RequestVoteArgs:
-					rpc.RespChan <- RPCResponse{
-						Reply: &RequestVoteReply{VoteGranted: true, Term: cmd.Term},
+				case *contract.RequestVoteArgs:
+					rpc.RespChan <- contract.RPCResponse{
+						Reply: &contract.RequestVoteReply{VoteGranted: true, Term: cmd.Term},
 					}
 				}
 			case <-done:
@@ -74,7 +75,7 @@ func runTransportHandler(t *testing.T, trans Transport, consume bool) func() {
 }
 
 func TestTransportConsumerIsUnbuffered(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	tests := []struct {
 		name string
@@ -100,7 +101,7 @@ func TestTransportConsumerIsUnbuffered(t *testing.T) {
 }
 
 func TestTransportAppendEntriesIdempotent(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	tests := []struct {
 		name string
@@ -115,7 +116,7 @@ func TestTransportAppendEntriesIdempotent(t *testing.T) {
 			defer cleanup()
 			defer runTransportHandler(t, server, true)()
 
-			args := AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
+			args := contract.AppendEntriesArgs{Term: 1, LeaderID: 0, PrevLogIndex: -1, PrevLogTerm: -1, LeaderCommit: -1}
 
 			for i := 0; i < 5; i++ {
 				reply, err := client.AppendEntries(1, args)
@@ -131,7 +132,7 @@ func TestTransportAppendEntriesIdempotent(t *testing.T) {
 }
 
 func TestTransportRequestVoteIdempotent(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	tests := []struct {
 		name string
@@ -146,7 +147,7 @@ func TestTransportRequestVoteIdempotent(t *testing.T) {
 			defer cleanup()
 			defer runTransportHandler(t, server, true)()
 
-			args := RequestVoteArgs{Term: 2, CandidateID: 0, LastLogIndex: -1, LastLogTerm: -1}
+			args := contract.RequestVoteArgs{Term: 2, CandidateID: 0, LastLogIndex: -1, LastLogTerm: -1}
 
 			for i := 0; i < 5; i++ {
 				reply, err := client.RequestVote(1, args)
@@ -162,7 +163,7 @@ func TestTransportRequestVoteIdempotent(t *testing.T) {
 }
 
 func TestTransportDisconnectReturnsError(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	tests := []struct {
 		name string
@@ -177,7 +178,7 @@ func TestTransportDisconnectReturnsError(t *testing.T) {
 			defer cleanup()
 			defer runTransportHandler(t, server, true)()
 
-			args := AppendEntriesArgs{Term: 1, LeaderID: 0}
+			args := contract.AppendEntriesArgs{Term: 1, LeaderID: 0}
 
 			// Успешная отправка
 			_, err := client.AppendEntries(1, args)
@@ -186,7 +187,7 @@ func TestTransportDisconnectReturnsError(t *testing.T) {
 			}
 
 			// Disconnect
-			if d, ok := client.(interface{ Disconnect(ServerID) }); ok {
+			if d, ok := client.(interface{ Disconnect(contract.ServerID) }); ok {
 				d.Disconnect(1)
 			}
 
@@ -200,7 +201,7 @@ func TestTransportDisconnectReturnsError(t *testing.T) {
 }
 
 func TestTransportCloseReturnsError(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	tests := []struct {
 		name string
@@ -219,13 +220,13 @@ func TestTransportCloseReturnsError(t *testing.T) {
 				c.Close()
 			}
 
-			args := AppendEntriesArgs{Term: 1}
+			args := contract.AppendEntriesArgs{Term: 1}
 			_, err := client.AppendEntries(1, args)
 			if err == nil {
 				t.Fatal("expected error after Close")
 			}
 
-			_, err = client.RequestVote(1, RequestVoteArgs{Term: 1})
+			_, err = client.RequestVote(1, contract.RequestVoteArgs{Term: 1})
 			if err == nil {
 				t.Fatal("expected error after Close")
 			}
@@ -234,18 +235,18 @@ func TestTransportCloseReturnsError(t *testing.T) {
 }
 
 func TestTransportStubsReturnNotImplemented(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	tests := []struct {
 		name string
 		fn   transportPairFactory
 	}{
-		{"InmemTransport", func(t *testing.T) (Transport, Transport, func()) {
+		{"InmemTransport", func(t *testing.T) (contract.Transport, contract.Transport, func()) {
 			t1 := NewInmemTransport("test-0")
 			t2 := NewInmemTransport("test-1")
 			return t1, t2, func() { t1.Close(); t2.Close() }
 		}},
-		{"TCPTransport", func(t *testing.T) (Transport, Transport, func()) {
+		{"TCPTransport", func(t *testing.T) (contract.Transport, contract.Transport, func()) {
 			t1, err := NewTCPTransport("127.0.0.1:0", 100*time.Millisecond, 2)
 			if err != nil {
 				t.Fatalf("NewTCPTransport: %v", err)
@@ -263,15 +264,15 @@ func TestTransportStubsReturnNotImplemented(t *testing.T) {
 			client, _, cleanup := tt.fn(t)
 			defer cleanup()
 
-			if _, err := client.RequestPreVote(1, RequestPreVoteArgs{}); err == nil || err == contract.ErrNotImplemented {
+			if _, err := client.RequestPreVote(1, contract.RequestPreVoteArgs{}); err == nil || err == contract.ErrNotImplemented {
 				t.Fatalf("RequestPreVote: want transport error, got %v", err)
 			}
-			if _, err := client.TimeoutNow(1, TimeoutNowRequest{}); err == nil || err == contract.ErrNotImplemented {
+			if _, err := client.TimeoutNow(1, contract.TimeoutNowRequest{}); err == nil || err == contract.ErrNotImplemented {
 				t.Fatalf("TimeoutNow: want transport error, got %v", err)
 			}
 			// InmemTransport реализует InstallSnapshot и возвращает contract.ErrNotReachable
 			// (или другую транспортную ошибку), а TCPTransport — contract.ErrNotImplemented.
-			if _, err := client.InstallSnapshot(1, InstallSnapshotRequest{}, nil); err == nil {
+			if _, err := client.InstallSnapshot(1, contract.InstallSnapshotRequest{}, nil); err == nil {
 				t.Fatalf("InstallSnapshot: want error, got nil")
 			}
 			if _, err := client.AppendEntriesPipeline(1); err != contract.ErrNotImplemented {
@@ -282,7 +283,7 @@ func TestTransportStubsReturnNotImplemented(t *testing.T) {
 }
 
 func TestTransportAppendEntriesWithEntries(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	tests := []struct {
 		name string
@@ -297,13 +298,13 @@ func TestTransportAppendEntriesWithEntries(t *testing.T) {
 			defer cleanup()
 			defer runTransportHandler(t, server, true)()
 
-			args := AppendEntriesArgs{
+			args := contract.AppendEntriesArgs{
 				Term:         1,
 				LeaderID:     0,
 				PrevLogIndex: -1,
 				PrevLogTerm:  -1,
-				Entries: []LogEntry{
-					{Index: 0, Term: 1, Type: LogCommand, Data: []byte("test")},
+				Entries: []raft.LogEntry{
+					{Index: 0, Term: 1, Type: raft.LogCommand, Data: []byte("test")},
 				},
 				LeaderCommit: -1,
 			}
@@ -320,16 +321,16 @@ func TestTransportAppendEntriesWithEntries(t *testing.T) {
 }
 
 func TestTransportLocalAddr(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	tests := []struct {
 		name string
-		fn   func(t *testing.T) Transport
+		fn   func(t *testing.T) contract.Transport
 	}{
-		{"InmemTransport", func(t *testing.T) Transport {
+		{"InmemTransport", func(t *testing.T) contract.Transport {
 			return NewInmemTransport("test-addr")
 		}},
-		{"TCPTransport", func(t *testing.T) Transport {
+		{"TCPTransport", func(t *testing.T) contract.Transport {
 			trans, err := NewTCPTransport("127.0.0.1:0", 500*time.Millisecond, 2)
 			if err != nil {
 				t.Fatalf("NewTCPTransport: %v", err)

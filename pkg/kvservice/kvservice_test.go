@@ -6,6 +6,7 @@ import (
 
 	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 func TestConfig(t *testing.T) {
@@ -28,9 +29,9 @@ func TestConfig(t *testing.T) {
 func TestNewKVService(t *testing.T) {
 	storage := store.NewMapStorage()
 	ready := make(chan any)
-	transport, err := raft.NewTCPTransport(":0", 0, 0)
+	transport, err := transp.NewTCPTransport(":0", 0, 0)
 	if err != nil {
-		t.Fatalf("raft.NewTCPTransport: %v", err)
+		t.Fatalf("transp.NewTCPTransport: %v", err)
 	}
 
 	kvs := New(&Config{

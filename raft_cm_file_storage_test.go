@@ -9,6 +9,7 @@ import (
 	"github.com/fortytw2/leaktest"
 
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // TestFileStorage_RestartRestoresState проверяет, что после рестарта
@@ -24,7 +25,7 @@ func TestFileStorage_RestartRestoresState(t *testing.T) {
 	fsm1 := newSnapshotTestFSM()
 	ready1 := make(chan any)
 	close(ready1)
-	transport1 := NewInmemTransport("single")
+	transport1 := transp.NewInmemTransport("single")
 
 	cm1 := NewConsensusModule(0, []int{}, transport1, storage, fsm1, ready1)
 	defer cm1.Stop()
@@ -61,7 +62,7 @@ func TestFileStorage_RestartRestoresState(t *testing.T) {
 	fsm2 := newSnapshotTestFSM()
 	ready2 := make(chan any)
 	close(ready2)
-	transport2 := NewInmemTransport("single-2")
+	transport2 := transp.NewInmemTransport("single-2")
 	storage2 := store.NewFileStorage(dir)
 
 	cm2 := NewConsensusModule(0, []int{}, transport2, storage2, fsm2, ready2)

@@ -127,7 +127,7 @@ func (cm *ConsensusModule) planReplication(peerID, savedCurrentTerm int) replica
 		first = cm.cmState.log[0].Index
 	}
 	prev := cm.leaderState.nextIndex[peerID] - 1
-	if !isNilInterface(cm.snapshotStore) && cm.prevInSnapshotHoleLocked(prev, first) {
+	if !IsNilInterface(cm.snapshotStore) && cm.prevInSnapshotHoleLocked(prev, first) {
 		return _replicationSnapshot
 	}
 	return _replicationAppend
@@ -220,7 +220,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 	// Если терм для PrevLogIndex неизвестен, отправить снимок: AppendEntries
 	// будет гарантированно отвергнут ведомым. Проверка повторная: состояние
 	// могло измениться после освобождения блокировки предотправочной фазы.
-	if snapshotNeeded && !isNilInterface(cm.snapshotStore) {
+	if snapshotNeeded && !IsNilInterface(cm.snapshotStore) {
 		cm.leaderSendSnapshot(peerID, savedCurrentTerm)
 		return
 	}
@@ -602,7 +602,7 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 	// Защита от nil-хранилища. Инвариант проверяется и в вызывающем коде
 	// (leaderSendAEsToPeer), но при рефакторинге он может нарушиться,
 	// а паника здесь упала бы в отдельной горутине без recover().
-	if isNilInterface(cm.snapshotStore) {
+	if IsNilInterface(cm.snapshotStore) {
 		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot: snapshotStore is nil, cannot send to %d", peerID)
 		return
 	}

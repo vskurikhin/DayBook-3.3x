@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 const _submitTimeout = 5 * time.Second
@@ -25,9 +26,9 @@ const (
 	_preVoteRound = _maxElectionTimeout
 
 	// _inmemRPCTimeout — тайм-аут одного RPC внутрипроцессного
-	// транспорта; ссылается на _inmemTransportTimeout, рассинхрон
+	// транспорта; ссылается на transp.InmemTransportTimeout, рассинхрон
 	// с транспортом исключён компилятором.
-	_inmemRPCTimeout = _inmemTransportTimeout
+	_inmemRPCTimeout = transp.InmemTransportTimeout
 
 	// _commitBudgetSteady — бюджет ожидания фиксации при устоявшемся лидере:
 	// 4*(_applyBatchInterval + _inmemRPCTimeout) = 4*(50ms+500ms) = 2.2s.
@@ -99,7 +100,7 @@ type Harness struct {
 	cluster []*ConsensusModule
 
 	// transports — in-memory транспорты для каждого узла.
-	transports []*InmemTransport
+	transports []*transp.InmemTransport
 
 	storage []*store.MapStorage
 
@@ -161,7 +162,7 @@ func NewHarness(t *testing.T, n int) *Harness {
 // к каждому узлу до close(ready) (до старта фоновых горутин).
 func NewHarnessWithOptions(t *testing.T, n int, opts ...HarnessOption) *Harness {
 	cluster := make([]*ConsensusModule, n)
-	transports := make([]*InmemTransport, n)
+	transports := make([]*transp.InmemTransport, n)
 	connected := make([]bool, n)
 	alive := make([]bool, n)
 	commitChans := make([]chan CommitEntry, n)
@@ -172,7 +173,7 @@ func NewHarnessWithOptions(t *testing.T, n int, opts ...HarnessOption) *Harness 
 	// Создаём транспорты и соединяем их все друг с другом.
 	for i := 0; i < n; i++ {
 		addr := ServerAddress("raft-" + itoa(i))
-		transports[i] = NewInmemTransport(addr)
+		transports[i] = transp.NewInmemTransport(addr)
 	}
 
 	// Соединяем все транспорты друг с другом.
@@ -394,7 +395,7 @@ func (h *Harness) RestartPeer(id int) {
 
 	ready := make(chan any)
 	addr := ServerAddress("raft-" + itoa(h.n) + "-" + itoa(id))
-	h.transports[id] = NewInmemTransport(addr)
+	h.transports[id] = transp.NewInmemTransport(addr)
 
 	// Подключаем новый транспорт только к живым и связным соседям:
 	// молчаливое восстановление разорванной связи запрещено инвариантом

@@ -5,6 +5,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // mockTransportConflict — минимальная реализация Transport для тестов
@@ -254,7 +255,7 @@ func TestTermIndexMap_RestoreFromStorage(t *testing.T) {
 	storage := store.NewMapStorage()
 	ready := make(chan any)
 	close(ready)
-	cm := NewConsensusModule(0, []int{}, NewInmemTransport("test"), storage, newSnapshotTestFSM(), ready)
+	cm := NewConsensusModule(0, []int{}, transp.NewInmemTransport("test"), storage, newSnapshotTestFSM(), ready)
 
 	// Заполняем лог.
 	cm.mu.Lock()
@@ -279,7 +280,7 @@ func TestTermIndexMap_RestoreFromStorage(t *testing.T) {
 	close(ready2)
 
 	// Восстанавливаем через прямой вызов (NewConsensusModule вызывает restoreFromStorage).
-	cm2 := NewConsensusModule(0, []int{}, NewInmemTransport("test"), storage2, newSnapshotTestFSM(), ready2)
+	cm2 := NewConsensusModule(0, []int{}, transp.NewInmemTransport("test"), storage2, newSnapshotTestFSM(), ready2)
 	defer cm2.Stop()
 
 	cm2.mu.Lock()

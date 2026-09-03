@@ -1,6 +1,10 @@
 package raft
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/vskurikhin/raft/pkg/raft/transp"
+)
 
 // TestIsNilInterface проверяет функцию isNilInterface, используемую в
 // предусловии конструктора NewConsensusModule.
@@ -37,13 +41,13 @@ func TestIsNilInterface(t *testing.T) {
 			// Конструктор обязан его обнаружить, иначе горутина репликации
 			// упадёт с nil-dereference при первом вызове AppendEntries.
 			name: "typed nil pointer in interface",
-			v:    Transport((*InmemTransport)(nil)),
+			v:    Transport((*transp.InmemTransport)(nil)),
 			want: true,
 		},
 		{
 			// Реальный ненулевой объект транспорта — предусловие выполняется.
 			name: "non-nil pointer",
-			v:    Transport(NewInmemTransport("test")),
+			v:    Transport(transp.NewInmemTransport("test")),
 			want: false,
 		},
 		{
@@ -74,7 +78,7 @@ func TestIsNilInterface(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isNilInterface(tt.v); got != tt.want {
+			if got := IsNilInterface(tt.v); got != tt.want {
 				t.Errorf("isNilInterface(%#v) = %v, want %v", tt.v, got, tt.want)
 			}
 		})

@@ -7,6 +7,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // Матричные (table-driven) версии тестов из commitment_test.go.
@@ -1019,8 +1020,8 @@ func TestCommitmentE2E_NoopCommitsAfterFailover(t *testing.T) {
 func TestConfiguration_AddVoterFromSingleVoter(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	transportA := NewInmemTransport(ServerAddress("raft-A"))
-	transportB := NewInmemTransport(ServerAddress("raft-B"))
+	transportA := transp.NewInmemTransport(ServerAddress("raft-A"))
+	transportB := transp.NewInmemTransport(ServerAddress("raft-B"))
 	transportA.Connect(ServerID(1), transportB)
 	transportB.Connect(ServerID(0), transportA)
 

@@ -188,7 +188,7 @@ func NewConsensusModule(
 	ready <-chan any,
 	snapshots ...SnapshotStore,
 ) *ConsensusModule {
-	if isNilInterface(transport) {
+	if IsNilInterface(transport) {
 		log.Fatalln("raft: NewConsensusModule: transport is nil")
 	}
 	// Отмечаем факт создания CM для трассировки (set-once).
@@ -251,8 +251,9 @@ func NewConsensusModule(
 		cm.restoreFromStorage()
 		cm.cmState.logNeedsPersist = false
 		// Однопоточное восстановление FSM из снимка до запуска горутин.
-		// Fail‑fast: узел должен громко упасть при невосстановимом состоянии,
-		// чтобы избежать молчаливой потери подтверждённых данных.
+		// Стратегия немедленного отказа: при невосстановимом состоянии узел
+		// аварийно завершается с явной ошибкой, чтобы избежать молчаливой
+		// потери подтверждённых данных.
 		if err := cm.restoreFromSnapshotStore(); err != nil {
 			log.Fatalf("raft: startup snapshot restore failed: %v", err)
 		}

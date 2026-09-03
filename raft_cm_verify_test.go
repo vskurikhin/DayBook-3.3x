@@ -1652,7 +1652,7 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 		// отсутствие голоса.
 		mock := &mockTransportAE{replyTerm: 1, installReplyTermSet: true, installReplyTerm: 0}
 		stor := store.NewInmemSnapshot()
-		sink, err := stor.Create(3, 1, Configuration{}, 0)
+		sink, err := stor.Create(3, 1, 0, Configuration{})
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
