@@ -546,6 +546,25 @@ func (h *Harness) TryGet(c *kvclient.KVClient, key string, wantValue string) err
 	return nil
 }
 
+// TryWeakGet отправляет через клиента c запрос слабого чтения WeakGet и
+// проверяет, что ключ найден и его значение совпадает с ожидаемым.
+// Возвращает ошибку без обращения к *testing.T.
+func (h *Harness) TryWeakGet(c *kvclient.KVClient, key string, wantValue string) error {
+	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeout)
+	defer cancel()
+	wv, f, err := c.WeakGet(ctx, key)
+	if err != nil {
+		return err
+	}
+	if !f {
+		return fmt.Errorf("got found=false, want true for key=%s", key)
+	}
+	if wv != wantValue {
+		return fmt.Errorf("got value=%v, want %v for key=%s", wv, wantValue, key)
+	}
+	return nil
+}
+
 // TryCAS отправляет через клиента c запрос CAS. Возвращает
 // (prevValue, keyFound, error) без обращения к *testing.T.
 func (h *Harness) TryCAS(c *kvclient.KVClient, key, compare, value string) (string, bool, error) {
@@ -560,6 +579,22 @@ func (h *Harness) TryGetNotFound(c *kvclient.KVClient, key string) error {
 	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeoutProbe)
 	defer cancel()
 	_, f, err := c.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	if f {
+		return fmt.Errorf("got found=true, want false for key=%s", key)
+	}
+	return nil
+}
+
+// TryWeakGetNotFound отправляет через клиента c запрос слабого чтения
+// WeakGet и проверяет, что ключ отсутствует. Возвращает ошибку без
+// обращения к *testing.T.
+func (h *Harness) TryWeakGetNotFound(c *kvclient.KVClient, key string) error {
+	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeoutProbe)
+	defer cancel()
+	_, f, err := c.WeakGet(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -633,6 +668,17 @@ func (h *Harness) CheckGet(c *kvclient.KVClient, key string, wantValue string) {
 	}
 }
 
+// CheckWeakGet отправляет через клиента c запрос слабого чтения WeakGet
+// и проверяет отсутствие ошибок. Также проверяет, что ключ найден и его
+// значение совпадает с ожидаемым. Вызывается только из тестовой горутины
+// (см. TryWeakGet).
+func (h *Harness) CheckWeakGet(c *kvclient.KVClient, key string, wantValue string) {
+	h.t.Helper()
+	if err := h.TryWeakGet(c, key, wantValue); err != nil {
+		h.t.Error(err)
+	}
+}
+
 // CheckCAS отправляет через клиента c запрос CAS и проверяет, что он
 // завершился без ошибок. Возвращает (prevValue, keyFound).
 // Вызывается только из тестовой горутины (см. TryCAS).
@@ -651,6 +697,17 @@ func (h *Harness) CheckCAS(c *kvclient.KVClient, key, compare, value string) (st
 func (h *Harness) CheckGetNotFound(c *kvclient.KVClient, key string) {
 	h.t.Helper()
 	if err := h.TryGetNotFound(c, key); err != nil {
+		h.t.Error(err)
+	}
+}
+
+// CheckWeakGetNotFound отправляет через клиента c запрос слабого чтения
+// WeakGet и проверяет отсутствие ошибок, а также то, что указанный ключ
+// отсутствует в сервисе. Вызывается только из тестовой горутины
+// (см. TryWeakGetNotFound).
+func (h *Harness) CheckWeakGetNotFound(c *kvclient.KVClient, key string) {
+	h.t.Helper()
+	if err := h.TryWeakGetNotFound(c, key); err != nil {
 		h.t.Error(err)
 	}
 }
@@ -674,6 +731,28 @@ func (h *Harness) CheckGetTimesOut(c *kvclient.KVClient, key string) {
 	// ctx.Err() != nil. Ветка «commit failed; please retry»
 	// (kvclient StatusFailedCommit) контекст НЕ оборачивает — если
 	// сценарий уйдёт в неё, тест обязан упасть, а не молча пройти.
+	if !errors.Is(err, context.DeadlineExceeded) {
+		h.t.Errorf("got err %v (%T); want an error wrapping context.DeadlineExceeded", err, err)
+	}
+}
+
+// CheckWeakGetTimesOut проверяет, что запрос слабого чтения WeakGet,
+// отправленный через данного клиента, завершится по тайм-ауту при
+// использовании контекста с дедлайном, поскольку клиент не сможет
+// добиться подтверждения лидерства сервисом.
+func (h *Harness) CheckWeakGetTimesOut(c *kvclient.KVClient, key string) {
+	h.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), _clientOpTimeoutShort)
+	defer cancel()
+	_, _, err := c.WeakGet(ctx, key)
+	if err == nil {
+		h.t.Error("got err nil; want an error wrapping context.DeadlineExceeded")
+		return
+	}
+	// Проверка по фактической цепочке ошибок, а не по подстроке:
+	// kvclient.WeakGet → send → sendJSONRequest → http.Client.Do
+	// возвращает *url.Error, оборачивающий context.DeadlineExceeded,
+	// и send возвращает его как есть при ctx.Err() != nil.
 	if !errors.Is(err, context.DeadlineExceeded) {
 		h.t.Errorf("got err %v (%T); want an error wrapping context.DeadlineExceeded", err, err)
 	}

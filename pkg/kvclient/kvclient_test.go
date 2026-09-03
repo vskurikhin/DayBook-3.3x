@@ -60,6 +60,8 @@ func writeResponse(t *testing.T, w http.ResponseWriter, r *http.Request, status 
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/get/"):
 		resp = api.GetResponse{RespStatus: status, KeyFound: true, Value: "value"}
+	case strings.HasPrefix(r.URL.Path, "/weak-get/"):
+		resp = api.GetResponse{RespStatus: status, KeyFound: true, Value: "value"}
 	case strings.HasPrefix(r.URL.Path, "/put/"):
 		resp = api.PutResponse{RespStatus: status}
 	default:
@@ -105,6 +107,10 @@ func TestClientConcurrentUse(t *testing.T) {
 					t.Errorf("goroutine %d: Get: %v", id, err)
 					return
 				}
+				if _, _, err := client.WeakGet(ctx, "key"); err != nil {
+					t.Errorf("goroutine %d: WeakGet: %v", id, err)
+					return
+				}
 				if _, _, err := client.Put(ctx, "key", "value"); err != nil {
 					t.Errorf("goroutine %d: Put: %v", id, err)
 					return
@@ -113,6 +119,26 @@ func TestClientConcurrentUse(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// TestWeakGetReturnsValueAndFound проверяет, что WeakGet возвращает
+// из ответа сервера ожидаемые value и found (семантика ветки
+// /weak-get/ тестового сервера).
+func TestWeakGetReturnsValueAndFound(t *testing.T) {
+	okSrv := httptest.NewServer(okHandler(t))
+	defer okSrv.Close()
+
+	client := New([]string{serverAddr(t, okSrv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	value, found, err := client.WeakGet(ctx, "key")
+	if err != nil {
+		t.Fatalf("WeakGet: %v", err)
+	}
+	if value != "value" || !found {
+		t.Errorf("WeakGet = (%q, %v); want (%q, %v)", value, found, "value", true)
+	}
 }
 
 // TestNewUsesDefaultTimeout проверяет, что New даёт таймаут запроса

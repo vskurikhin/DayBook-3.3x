@@ -126,6 +126,19 @@ func (c *KVClient) Get(ctx context.Context, key string) (string, bool, error) {
 	return getResp.Value, getResp.KeyFound, err
 }
 
+// WeakGet получает значение по ключу слабым чтением: без записи в
+// raft-журнал, после подтверждения лидерства (ReadIndex, Raft §8).
+// Возвращает ошибку либо (value, found, nil), где found показывает,
+// существует ли указанный ключ в хранилище.
+func (c *KVClient) WeakGet(ctx context.Context, key string) (string, bool, error) {
+	getReq := api.GetRequest{
+		Key: key,
+	}
+	var getResp api.GetResponse
+	err := c.send(ctx, "weak-get", getReq, &getResp)
+	return getResp.Value, getResp.KeyFound, err
+}
+
 // CAS операция: если текущее значение ключа совпадает с compare,
 // записывается новое значение value.
 // Возвращает ошибку либо (prevValue, keyFound, nil), где keyFound показывает,
