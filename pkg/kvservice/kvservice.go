@@ -301,6 +301,7 @@ func (kvs *KVService) ServeHTTP(address string) error {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /get/", kvs.handleGet)
+	mux.HandleFunc("POST /weak-get/", kvs.handleWeakGet)
 	mux.HandleFunc("POST /put/", kvs.handlePut)
 	mux.HandleFunc("POST /cas/", kvs.handleCAS)
 	mux.HandleFunc("POST /verifyleader/", kvs.handleVerifyLeader)
@@ -469,6 +470,42 @@ func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
 	defer func() {
 		elapsed := time.Since(start)
 		kvs.traceLogf("HTTP GET %v took %v", gr, elapsed)
+	}()
+
+	if err := readRequestJSON(req, gr); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// ReadIndex: подтверждение лидерства без записи в raft-журнал (Raft §8).
+	future := kvs.rs.VerifyLeader()
+	select {
+	case err := <-future.ErrorCh():
+		if err != nil {
+			kvs.sendHTTPResponse(w, api.GetResponse{
+				RespStatus: api.StatusNotLeader,
+			})
+			return
+		}
+	case <-req.Context().Done():
+		return
+	}
+
+	// Локальное чтение из DataStore (без raft-журнала, только после ReadIndex).
+	value, found := kvs.ds.Get(gr.Key)
+	kvs.sendHTTPResponse(w, api.GetResponse{
+		RespStatus: api.StatusOK,
+		KeyFound:   found,
+		Value:      value,
+	})
+}
+
+func (kvs *KVService) handleWeakGet(w http.ResponseWriter, req *http.Request) {
+	start := time.Now()
+	gr := &api.GetRequest{}
+	defer func() {
+		elapsed := time.Since(start)
+		kvs.traceLogf("HTTP WEAK-GET %v took %v", gr, elapsed)
 	}()
 
 	if err := readRequestJSON(req, gr); err != nil {

@@ -60,7 +60,7 @@ func TestWriteHandlersDoNotVerifyLeader(t *testing.T) {
 // проверки: подтверждение лидерства для чтений и отдельной ручки
 // сохраняется в прежнем виде.
 func TestReadHandlersStillVerifyLeader(t *testing.T) {
-	for _, name := range []string{"handleGet", "handleVerifyLeader"} {
+	for _, name := range []string{"handleGet", "handleVerifyLeader", "handleWeakGet"} {
 		if got := verifyLeaderCallsIn(t, name); got == 0 {
 			t.Errorf("%s does not call VerifyLeader, want it preserved", name)
 		}
