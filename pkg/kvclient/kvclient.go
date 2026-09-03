@@ -155,6 +155,18 @@ func (c *KVClient) CAS(ctx context.Context, key, compare, value string) (string,
 	return casResp.PrevValue, casResp.KeyFound, err
 }
 
+// Delete удаляет ключ, пропуская команду CommandDelete через
+// консенсус (как Put). Возвращает прежнее значение ключа и признак
+// его существования до удаления.
+func (c *KVClient) Delete(ctx context.Context, key string) (string, bool, error) {
+	delReq := api.DeleteRequest{
+		Key: key,
+	}
+	var delResp api.DeleteResponse
+	err := c.send(ctx, "delete", delReq, &delResp)
+	return delResp.PrevValue, delResp.KeyFound, err
+}
+
 func (c *KVClient) send(ctx context.Context, route string, req any, resp api.Response) error {
 	for {
 		reqCtx, reqCtxCancel := context.WithTimeout(ctx, c.requestTimeout)

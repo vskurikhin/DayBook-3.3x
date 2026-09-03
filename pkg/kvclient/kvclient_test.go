@@ -64,6 +64,8 @@ func writeResponse(t *testing.T, w http.ResponseWriter, r *http.Request, status 
 		resp = api.GetResponse{RespStatus: status, KeyFound: true, Value: "value"}
 	case strings.HasPrefix(r.URL.Path, "/put/"):
 		resp = api.PutResponse{RespStatus: status}
+	case strings.HasPrefix(r.URL.Path, "/delete/"):
+		resp = api.DeleteResponse{RespStatus: status, KeyFound: true, PrevValue: "prev"}
 	default:
 		resp = api.StatusResponse{RespStatus: status}
 	}
@@ -115,6 +117,10 @@ func TestClientConcurrentUse(t *testing.T) {
 					t.Errorf("goroutine %d: Put: %v", id, err)
 					return
 				}
+				if _, _, err := client.Delete(ctx, "key"); err != nil {
+					t.Errorf("goroutine %d: Delete: %v", id, err)
+					return
+				}
 			}
 		}(i)
 	}
@@ -138,6 +144,27 @@ func TestWeakGetReturnsValueAndFound(t *testing.T) {
 	}
 	if value != "value" || !found {
 		t.Errorf("WeakGet = (%q, %v); want (%q, %v)", value, found, "value", true)
+	}
+}
+
+// TestDeleteReturnsPrevAndFound проверяет, что Delete возвращает из
+// ответа сервера ожидаемые prev и found (семантика ветки /delete/
+// тестового сервера), а не только отсутствие ошибки: значение и признак
+// существования берутся из тела ответа DeleteResponse.
+func TestDeleteReturnsPrevAndFound(t *testing.T) {
+	okSrv := httptest.NewServer(okHandler(t))
+	defer okSrv.Close()
+
+	client := New([]string{serverAddr(t, okSrv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	prev, found, err := client.Delete(ctx, "key")
+	if err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if prev != "prev" || !found {
+		t.Errorf("Delete = (%q, %v); want (%q, %v)", prev, found, "prev", true)
 	}
 }
 

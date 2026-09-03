@@ -223,6 +223,8 @@ func (kvs *KVService) Apply(log *raft.LogEntry) any {
 		cmd.ResultValue, cmd.ResultFound = kvs.ds.Put(cmd.Key, cmd.Value)
 	case CommandCAS:
 		cmd.ResultValue, cmd.ResultFound = kvs.ds.CAS(cmd.Key, cmd.CompareValue, cmd.Value)
+	case CommandDelete:
+		cmd.ResultValue, cmd.ResultFound = kvs.ds.Delete(cmd.Key)
 	default:
 		kvs.traceLogf("unknown command kind %v", cmd.Kind)
 		return nil
@@ -305,6 +307,7 @@ func (kvs *KVService) ServeHTTP(address string) error {
 	mux.HandleFunc("POST /put/", kvs.handlePut)
 	mux.HandleFunc("POST /cas/", kvs.handleCAS)
 	mux.HandleFunc("POST /verifyleader/", kvs.handleVerifyLeader)
+	mux.HandleFunc("POST /delete/", kvs.handleDelete)
 
 	ln, err := net.Listen("tcp", address)
 	if err != nil {
@@ -454,6 +457,53 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		kvs.sendHTTPResponse(w, api.PutResponse{
+			RespStatus: api.StatusOK,
+			KeyFound:   cmdResp.ResultFound,
+			PrevValue:  cmdResp.ResultValue,
+		})
+
+	case <-req.Context().Done():
+		return
+	}
+}
+
+func (kvs *KVService) handleDelete(w http.ResponseWriter, req *http.Request) {
+	start := time.Now()
+	dr := &api.DeleteRequest{}
+	defer func() {
+		elapsed := time.Since(start)
+		kvs.traceLogf("HTTP DELETE %v took %v", dr, elapsed)
+	}()
+
+	if err := readRequestJSON(req, dr); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	cmd := Command{
+		Kind: CommandDelete,
+		Key:  dr.Key,
+		ID:   kvs.id,
+	}
+
+	future := kvs.rs.Apply(cmd, _requestTimeout)
+
+	select {
+	case err := <-future.ErrorCh():
+		if err != nil {
+			kvs.sendHTTPResponse(w, api.DeleteResponse{
+				RespStatus: api.StatusNotLeader,
+			})
+			return
+		}
+		cmdResp, ok := future.Response().(Command)
+		if !ok {
+			kvs.sendHTTPResponse(w, api.DeleteResponse{
+				RespStatus: api.StatusInvalid,
+			})
+			return
+		}
+		kvs.sendHTTPResponse(w, api.DeleteResponse{
 			RespStatus: api.StatusOK,
 			KeyFound:   cmdResp.ResultFound,
 			PrevValue:  cmdResp.ResultValue,

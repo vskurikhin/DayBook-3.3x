@@ -49,7 +49,7 @@ func verifyLeaderCallsIn(t *testing.T, name string) int {
 // счётчик вызовов в тесте пакета нельзя, а изменять корневой пакет raft
 // в этой задаче запрещено.
 func TestWriteHandlersDoNotVerifyLeader(t *testing.T) {
-	for _, name := range []string{"handlePut", "handleCAS"} {
+	for _, name := range []string{"handlePut", "handleCAS", "handleDelete"} {
 		if got := verifyLeaderCallsIn(t, name); got != 0 {
 			t.Errorf("%s calls VerifyLeader %d time(s), want 0", name, got)
 		}

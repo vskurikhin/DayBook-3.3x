@@ -573,6 +573,15 @@ func (h *Harness) TryCAS(c *kvclient.KVClient, key, compare, value string) (stri
 	return c.CAS(ctx, key, compare, value)
 }
 
+// TryDelete отправляет через клиента c запрос Delete и проверяет, что
+// он завершился без ошибок. Возвращает ошибку без обращения к *testing.T.
+func (h *Harness) TryDelete(c *kvclient.KVClient, key string) error {
+	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeout)
+	defer cancel()
+	_, _, err := c.Delete(ctx, key)
+	return err
+}
+
 // TryGetNotFound отправляет через клиента c запрос Get и проверяет,
 // что ключ отсутствует. Возвращает ошибку без обращения к *testing.T.
 func (h *Harness) TryGetNotFound(c *kvclient.KVClient, key string) error {
@@ -691,6 +700,28 @@ func (h *Harness) CheckCAS(c *kvclient.KVClient, key, compare, value string) (st
 	return pv, f
 }
 
+// CheckDelete отправляет через клиента c запрос Delete и проверяет, что
+// он завершился без ошибок. Вызывается только из тестовой горутины
+// (см. TryDelete).
+func (h *Harness) CheckDelete(c *kvclient.KVClient, key string) {
+	h.t.Helper()
+	if err := h.TryDelete(c, key); err != nil {
+		h.t.Error(err)
+	}
+}
+
+// CheckDeleteGone отправляет через клиента c запрос Delete, а затем
+// слабым чтением WeakGet проверяет, что ключ отсутствует (found=false).
+// Вызывается только из тестовой горутины (см. TryDelete и
+// TryWeakGetNotFound).
+func (h *Harness) CheckDeleteGone(c *kvclient.KVClient, key string) {
+	h.t.Helper()
+	h.CheckDelete(c, key)
+	if err := h.TryWeakGetNotFound(c, key); err != nil {
+		h.t.Error(err)
+	}
+}
+
 // CheckGetNotFound отправляет через клиента c запрос Get и проверяет
 // отсутствие ошибок, а также то, что указанный ключ отсутствует в сервисе.
 // Вызывается только из тестовой горутины (см. TryGetNotFound).
@@ -753,6 +784,31 @@ func (h *Harness) CheckWeakGetTimesOut(c *kvclient.KVClient, key string) {
 	// kvclient.WeakGet → send → sendJSONRequest → http.Client.Do
 	// возвращает *url.Error, оборачивающий context.DeadlineExceeded,
 	// и send возвращает его как есть при ctx.Err() != nil.
+	if !errors.Is(err, context.DeadlineExceeded) {
+		h.t.Errorf("got err %v (%T); want an error wrapping context.DeadlineExceeded", err, err)
+	}
+}
+
+// CheckDeleteTimesOut проверяет, что запрос Delete, отправленный через
+// данного клиента, завершится по тайм-ауту при использовании контекста
+// с дедлайном, поскольку клиент не сможет добиться фиксации своей команды
+// сервисом.
+func (h *Harness) CheckDeleteTimesOut(c *kvclient.KVClient, key string) {
+	h.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), _clientOpTimeoutShort)
+	defer cancel()
+	_, _, err := c.Delete(ctx, key)
+	if err == nil {
+		h.t.Error("got err nil; want an error wrapping context.DeadlineExceeded")
+		return
+	}
+	// Проверка по фактической цепочке ошибок, а не по подстроке:
+	// kvclient.Delete → send → sendJSONRequest → http.Client.Do
+	// возвращает *url.Error, оборачивающий context.DeadlineExceeded,
+	// и send возвращает его как есть при ctx.Err() != nil. Ветка
+	// «commit failed; please retry» (kvclient StatusFailedCommit) контекст
+	// НЕ оборачивает — если сценарий уйдёт в неё, тест обязан упасть,
+	// а не молча пройти.
 	if !errors.Is(err, context.DeadlineExceeded) {
 		h.t.Errorf("got err %v (%T); want an error wrapping context.DeadlineExceeded", err, err)
 	}
