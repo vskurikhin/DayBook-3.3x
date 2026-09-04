@@ -39,6 +39,16 @@ const (
 // errRequestRate — темп меньше одного тика в секунду не поддерживается.
 var errRequestRate = errors.New("invalid -request-rate: must be >= 1")
 
+// opKind — вид операции сценария нагрузки, выбираемый лестницей долей.
+type opKind int
+
+const (
+	opDelete opKind = iota
+	opWeakGet
+	opGet
+	opPut
+)
+
 var (
 	_keys []string
 
@@ -49,12 +59,22 @@ var (
 	_verifyOK  atomic.Uint64
 	_verifyBad atomic.Uint64
 
-	// _getDone, _putDone, _verifyDone — завершённые операции. Каждая выполненная
-	// операция увеличивает ровно один счётчик ровно один раз, включая пути
-	// ошибок.
-	_getDone    atomic.Uint64
-	_putDone    atomic.Uint64
-	_verifyDone atomic.Uint64
+	_weakGetOK       atomic.Uint64
+	_weakGetFail     atomic.Uint64
+	_deleteOK        atomic.Uint64
+	_deleteFail      atomic.Uint64
+	_deleteVerifyOK  atomic.Uint64
+	_deleteVerifyBad atomic.Uint64
+
+	// _getDone, _putDone, _verifyDone, _weakGetDone, _deleteDone,
+	// _deleteVerifyDone — завершённые операции. Каждая выполненная операция
+	// увеличивает ровно один счётчик ровно один раз, включая пути ошибок.
+	_getDone          atomic.Uint64
+	_putDone          atomic.Uint64
+	_verifyDone       atomic.Uint64
+	_weakGetDone      atomic.Uint64
+	_deleteDone       atomic.Uint64
+	_deleteVerifyDone atomic.Uint64
 
 	// _dropped — тики, пришедшие при исчерпанной одновременности: заданный
 	// темп не достигнут.
@@ -64,8 +84,10 @@ var (
 	// значение делает прогон непригодным как базовая линия.
 	_latencyDropped atomic.Uint64
 
-	_getLatency = newLatencyRecorder(_latencyPrealloc, 0)
-	_putLatency = newLatencyRecorder(_latencyPrealloc, 0)
+	_getLatency     = newLatencyRecorder(_latencyPrealloc, 0)
+	_putLatency     = newLatencyRecorder(_latencyPrealloc, 0)
+	_weakGetLatency = newLatencyRecorder(_latencyPrealloc, 0)
+	_deleteLatency  = newLatencyRecorder(_latencyPrealloc, 0)
 
 	_values config.Values
 )
@@ -171,23 +193,35 @@ func generate(ctx context.Context, client *kvclient.KVClient, interval time.Dura
 // run выполняет одну операцию сценария нагрузки и учитывает её результат.
 func run(ctx context.Context, client *kvclient.KVClient) {
 	key := _keys[rand.Intn(len(_keys))]
-	if rand.Intn(100) < _values.GetPercent {
+	switch chooseOp(rand.Intn(100), _values.DeletePercent, _values.WeakGetPercent, _values.GetPercent) {
+	case opDelete:
+		del(ctx, client, key)
+	case opWeakGet:
+		weakGet(ctx, client, key)
+	case opGet:
 		get(ctx, client, key)
-		return
+	default:
+		put(ctx, client, key)
 	}
-	value := makeValue(key, _values.ValueSize)
-	start := time.Now()
-	_, _, err := client.Put(ctx, key, value)
-	observe(_putLatency, time.Since(start))
-	_putDone.Add(1)
-	if err != nil {
-		_putFail.Add(1)
-		fmt.Printf("PUT: %v\n", err)
-		return
-	}
-	_putOK.Add(1)
-	if rand.Intn(100) < _values.VerifyPercent {
-		verify(ctx, client, key, value)
+}
+
+// chooseOp — лестница распределения операций. Полосы:
+// [0,d) DELETE; [d,d+w) WEAK-GET; [d+w,d+w+g) GET; остаток PUT.
+// При d+w+g > 100 усекается последняя достигнутая полоса
+// (при d>100 — DELETE, при d+w>100 — WEAK-GET, иначе GET),
+// последующие полосы и PUT пусты. Значения долей вне [0,100]
+// не поддерживаются: отрицательная доля сдвигает все
+// последующие границы вниз.
+func chooseOp(r, d, w, g int) opKind {
+	switch {
+	case r < d:
+		return opDelete
+	case r < d+w:
+		return opWeakGet
+	case r < d+w+g:
+		return opGet
+	default:
+		return opPut
 	}
 }
 
@@ -205,13 +239,82 @@ func get(ctx context.Context, client *kvclient.KVClient, key string) {
 	_getOK.Add(1)
 }
 
-// verify перечитывает записанное значение; время чтения учитывается как GET,
-// а сама операция — отдельным счётчиком. Расхождение значения не является
-// признаком ошибки сервиса: повторы клиента не идемпотентны.
+// weakGet выполняет слабое чтение (без записи в журнал) и учитывает его
+// результат.
+func weakGet(ctx context.Context, client *kvclient.KVClient, key string) {
+	start := time.Now()
+	_, _, err := client.WeakGet(ctx, key)
+	observe(_weakGetLatency, time.Since(start))
+	_weakGetDone.Add(1)
+	if err != nil {
+		_weakGetFail.Add(1)
+		fmt.Printf("WEAK GET: %v\n", err)
+		return
+	}
+	_weakGetOK.Add(1)
+}
+
+// put выполняет запись и учитывает её результат; после успешной записи с
+// вероятностью VerifyPercent перечитывает записанное значение.
+func put(ctx context.Context, client *kvclient.KVClient, key string) {
+	value := makeValue(key, _values.ValueSize)
+	start := time.Now()
+	_, _, err := client.Put(ctx, key, value)
+	observe(_putLatency, time.Since(start))
+	_putDone.Add(1)
+	if err != nil {
+		_putFail.Add(1)
+		fmt.Printf("PUT: %v\n", err)
+		return
+	}
+	_putOK.Add(1)
+	if rand.Intn(100) < _values.VerifyPercent {
+		verify(ctx, client, key, value)
+	}
+}
+
+// del выполняет удаление ключа и учитывает его результат; после успешного
+// удаления с вероятностью VerifyPercent перечитывает ключ.
+func del(ctx context.Context, client *kvclient.KVClient, key string) {
+	start := time.Now()
+	_, _, err := client.Delete(ctx, key)
+	observe(_deleteLatency, time.Since(start))
+	_deleteDone.Add(1)
+	if err != nil {
+		_deleteFail.Add(1)
+		fmt.Printf("DELETE: %v\n", err)
+		return
+	}
+	_deleteOK.Add(1)
+	if rand.Intn(100) < _values.VerifyPercent {
+		verifyDelete(ctx, client, key)
+	}
+}
+
+// verifyDelete перечитывает удалённый ключ слабым чтением; время чтения
+// учитывается как WEAK GET, а сама проверка — отдельным счётчиком.
+// Успех — ключ не найден без ошибки; наличие ключа после удаления требует
+// разбора и само по себе не означает отказа сервиса.
+func verifyDelete(ctx context.Context, client *kvclient.KVClient, key string) {
+	start := time.Now()
+	_, found, err := client.WeakGet(ctx, key)
+	observe(_weakGetLatency, time.Since(start))
+	_deleteVerifyDone.Add(1)
+	if !found && err == nil {
+		_deleteVerifyOK.Add(1)
+		return
+	}
+	_deleteVerifyBad.Add(1)
+}
+
+// verify перечитывает записанное значение слабым чтением; время
+// чтения учитывается как WEAK GET, а сама операция — отдельным
+// счётчиком. Расхождение значения не является признаком ошибки
+// сервиса: повторы клиента не идемпотентны.
 func verify(ctx context.Context, client *kvclient.KVClient, key, value string) {
 	start := time.Now()
-	got, found, err := client.Get(ctx, key)
-	observe(_getLatency, time.Since(start))
+	got, found, err := client.WeakGet(ctx, key)
+	observe(_weakGetLatency, time.Since(start))
 	_verifyDone.Add(1)
 	if err != nil || !found || got != value {
 		_verifyBad.Add(1)
@@ -247,9 +350,11 @@ func observe(recorder *latencyRecorder, elapsed time.Duration) {
 	}
 }
 
-// doneTotal — число завершённых операций всех видов.
+// doneTotal — число завершённых операций всех видов. Суммируются все шесть
+// счётчиков *Done: по одному на каждую выполненную операцию.
 func doneTotal() uint64 {
-	return _getDone.Load() + _putDone.Load() + _verifyDone.Load()
+	return _getDone.Load() + _putDone.Load() + _verifyDone.Load() +
+		_weakGetDone.Load() + _deleteDone.Load() + _deleteVerifyDone.Load()
 }
 
 // stats раз в секунду печатает достигнутую скорость и время ответа операций,
@@ -258,7 +363,7 @@ func stats(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	var prevDone uint64
-	var getOffset, putOffset int
+	var getOffset, putOffset, weakGetOffset, deleteOffset int
 	for {
 		select {
 		case <-ctx.Done():
@@ -269,20 +374,29 @@ func stats(ctx context.Context) {
 			prevDone = done
 			getSamples, getTotal := _getLatency.from(getOffset)
 			putSamples, putTotal := _putLatency.from(putOffset)
+			weakGetSamples, weakGetTotal := _weakGetLatency.from(weakGetOffset)
+			deleteSamples, deleteTotal := _deleteLatency.from(deleteOffset)
 			getOffset, putOffset = getTotal, putTotal
-			recent := make([]time.Duration, 0, len(getSamples)+len(putSamples))
+			weakGetOffset, deleteOffset = weakGetTotal, deleteTotal
+			recent := make([]time.Duration, 0,
+				len(getSamples)+len(putSamples)+len(weakGetSamples)+len(deleteSamples))
 			recent = append(recent, getSamples...)
 			recent = append(recent, putSamples...)
+			recent = append(recent, weakGetSamples...)
+			recent = append(recent, deleteSamples...)
 			slices.Sort(recent)
 			slog.Info(fmt.Sprintf(
 				"RPS=%5d  p50=%7.2fms p80=%7.2fms p95=%7.2fms p99=%7.2fms"+
-					"  GET ok=%8d fail=%4d  PUT ok=%8d fail=%4d  VERIFY ok=%6d bad=%4d  _dropped=%6d",
+					"  GET ok=%8d fail=%4d  PUT ok=%8d fail=%4d  VERIFY ok=%6d bad=%4d"+
+					"  WEAK GET ok=%8d fail=%4d  DELETE ok=%8d fail=%4d  _dropped=%6d",
 				rps,
 				percentile(recent, 50), percentile(recent, 80),
 				percentile(recent, 95), percentile(recent, 99),
 				_getOK.Load(), _getFail.Load(),
 				_putOK.Load(), _putFail.Load(),
 				_verifyOK.Load(), _verifyBad.Load(),
+				_weakGetOK.Load(), _weakGetFail.Load(),
+				_deleteOK.Load(), _deleteFail.Load(),
 				_dropped.Load(),
 			))
 		}
@@ -294,22 +408,44 @@ func stats(ctx context.Context) {
 func summary() {
 	getSamples, _ := _getLatency.from(0)
 	putSamples, _ := _putLatency.from(0)
+	weakGetSamples, _ := _weakGetLatency.from(0)
+	deleteSamples, _ := _deleteLatency.from(0)
 	traceLevel := os.Getenv(_traceLogLevelEnv)
 	if traceLevel == "" {
 		traceLevel = "не задан"
 	}
+	d := _values.DeletePercent
+	w := _values.WeakGetPercent
+	g := _values.GetPercent
+	// Эффективные доли по формулам: каждая полоса не выходит за границы
+	// [0,100] с учётом уже занятых предыдущими полосами.
+	effectiveD := min(d, 100)
+	effectiveW := min(w, 100-effectiveD)
+	effectiveG := min(g, 100-effectiveD-effectiveW)
+	effectiveP := 100 - effectiveD - effectiveW - effectiveG
 	slog.Info(fmt.Sprintf(
-		"run: concurrency=%d request-rate=%d value-size=%d duration=%v %s=%s",
+		"run: concurrency=%d request-rate=%d value-size=%d duration=%v %s=%s"+
+			"  mix: delete=%d weak-get=%d get=%d put=%d (эффективные)",
 		_values.Concurrency, _values.RequestRate, _values.ValueSize,
 		_values.Duration, _traceLogLevelEnv, traceLevel,
+		effectiveD, effectiveW, effectiveG, effectiveP,
 	))
+	if d+w+g > 100 {
+		slog.Info("WARNING: сумма долей > 100 — последняя полоса усечена, PUT пуст")
+	}
 	slog.Info(fmt.Sprintf(
-		"done: get=%d put=%d verify=%d  GET ok=%d fail=%d  PUT ok=%d fail=%d"+
-			"  VERIFY ok=%d bad=%d  _dropped=%d _latencyDropped=%d",
+		"done: get=%d put=%d verify=%d weak-get=%d delete=%d delete-verify=%d"+
+			"  GET ok=%d fail=%d  PUT ok=%d fail=%d  VERIFY ok=%d bad=%d"+
+			"  WEAK GET ok=%d fail=%d  DELETE ok=%d fail=%d  DELETE-VERIFY ok=%d bad=%d"+
+			"  _dropped=%d _latencyDropped=%d",
 		_getDone.Load(), _putDone.Load(), _verifyDone.Load(),
+		_weakGetDone.Load(), _deleteDone.Load(), _deleteVerifyDone.Load(),
 		_getOK.Load(), _getFail.Load(),
 		_putOK.Load(), _putFail.Load(),
 		_verifyOK.Load(), _verifyBad.Load(),
+		_weakGetOK.Load(), _weakGetFail.Load(),
+		_deleteOK.Load(), _deleteFail.Load(),
+		_deleteVerifyOK.Load(), _deleteVerifyBad.Load(),
 		_dropped.Load(), _latencyDropped.Load(),
 	))
 	if bad := _verifyBad.Load(); bad > 0 {
@@ -321,8 +457,19 @@ func summary() {
 			bad,
 		))
 	}
+	if bad := _deleteVerifyBad.Load(); bad > 0 {
+		// Хеджированная формулировка: ключ прочитан после удаления — требует
+		// разбора; при DELETE_PERCENT>0 возможна гонка с параллельной записью
+		// того же ключа, поэтому расхождение не однозначно означает отказ.
+		slog.Info(fmt.Sprintf(
+			"_deleteVerifyBad=%d: key read after delete, needs review (parallel write may race at DELETE_PERCENT>0)",
+			bad,
+		))
+	}
 	slog.Info(latencyLine("GET", getSamples))
 	slog.Info(latencyLine("PUT", putSamples))
+	slog.Info(latencyLine("WEAK GET", weakGetSamples))
+	slog.Info(latencyLine("DELETE", deleteSamples))
 }
 
 // latencyLine форматирует распределение времени ответа одного вида операций.

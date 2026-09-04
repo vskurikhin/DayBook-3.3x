@@ -11,11 +11,13 @@ GOCMD=$(GOBASE)/cmd
 TRACE=trace
 TRACE_LOG_LEVEL=0
 CONCURRENCY=8
+DELETE_PERCENT=0
 DURATION=5m
 GET_PERCENT=75
 REQUEST_RATE=200
 VALUE_SIZE=128
 VERIFY_PERCENT=33
+WEAK_GET_PERCENT=0
 
 STAND=
 STAND_PREFIX := $(if $(STAND),$(STAND)_,"")
@@ -97,12 +99,14 @@ start-raft: stop-raft
 	peers=$$(for p in $(NODES); do printf ':888%s,' $$p; done | sed 's/,$$//'); \
 	echo "peers=$$peers" ; $(GOBIN)/loadkv \
 		-concurrency $(CONCURRENCY) \
+		-delete-percent $(DELETE_PERCENT) \
 		-duration $(DURATION) \
 		-get-percent $(GET_PERCENT) \
 		-peers "$$peers" \
 		-request-rate $(REQUEST_RATE) \
 		-value-size $(VALUE_SIZE) \
 		-verify-percent $(VERIFY_PERCENT) \
+		-weak-get-percent $(WEAK_GET_PERCENT) \
 		> $(OUT_LOAD_KV_FILE) 2>&1 & echo $$! > $(PID_LOADKV)
 	@sed "/^/s/^/  \>  PID4: /" $(PID_LOADKV)
 

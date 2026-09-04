@@ -18,6 +18,8 @@ const (
 type Values struct {
 	// Concurrency — предельное число одновременно выполняющихся запросов.
 	Concurrency int
+	// DeletePercent — доля удалений (delete через консенсус), %.
+	DeletePercent int
 	// Duration — длительность прогона; ноль означает работу до сигнала.
 	Duration   time.Duration
 	GetPercent int
@@ -28,11 +30,14 @@ type Values struct {
 	// ValueSize — размер значения в байтах для операций записи.
 	ValueSize     int
 	VerifyPercent int
+	// WeakGetPercent — доля слабых чтений (weak-get, без журнала), %.
+	WeakGetPercent int
 }
 
 func ParseFlags() Values {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
 	concurrencyFlag := fs.Int("concurrency", 4, "Maximum number of requests in flight")
+	deletePercentFlag := fs.Int("delete-percent", 0, "")
 	durationFlag := fs.Duration("duration", 0, "Load run duration (0 = until signal)")
 	getPercentFlag := fs.Int("get-percent", 66, "")
 	keyCountFlag := fs.Int("key-count", 2000, "")
@@ -40,6 +45,7 @@ func ParseFlags() Values {
 	peersFlag := fs.String("peers", "", "Comma-separated list of peers servers (host:port)")
 	valueSizeFlag := fs.Int("value-size", 128, "Value size in bytes")
 	verifyPercentFlag := fs.Int("verify-percent", 33, "")
+	weakGetPercentFlag := fs.Int("weak-get-percent", 0, "")
 
 	args := make([]string, 0, len(os.Args)-1)
 	for _, arg := range os.Args[1:] {
@@ -59,14 +65,16 @@ func ParseFlags() Values {
 	}
 
 	return Values{
-		Concurrency:   *concurrencyFlag,
-		Duration:      *durationFlag,
-		GetPercent:    *getPercentFlag,
-		KeyCount:      *keyCountFlag,
-		RequestRate:   *requestRateFlag,
-		Peers:         peers,
-		ValueSize:     *valueSizeFlag,
-		VerifyPercent: *verifyPercentFlag,
+		Concurrency:    *concurrencyFlag,
+		DeletePercent:  *deletePercentFlag,
+		Duration:       *durationFlag,
+		GetPercent:     *getPercentFlag,
+		KeyCount:       *keyCountFlag,
+		RequestRate:    *requestRateFlag,
+		Peers:          peers,
+		ValueSize:      *valueSizeFlag,
+		VerifyPercent:  *verifyPercentFlag,
+		WeakGetPercent: *weakGetPercentFlag,
 	}
 }
 
