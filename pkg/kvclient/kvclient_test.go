@@ -105,8 +105,8 @@ func TestClientConcurrentUse(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			for range perGoroutine {
-				if _, _, err := client.Get(ctx, "key"); err != nil {
-					t.Errorf("goroutine %d: Get: %v", id, err)
+				if _, _, err := client.ConsensusGet(ctx, "key"); err != nil {
+					t.Errorf("goroutine %d: ConsensusGet: %v", id, err)
 					return
 				}
 				if _, _, err := client.WeakGet(ctx, "key"); err != nil {
@@ -184,8 +184,8 @@ func TestNewUsesDefaultTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	start := time.Now()
-	if _, _, err := client.Get(ctx, "key"); err != nil {
-		t.Fatalf("Get: %v", err)
+	if _, _, err := client.ConsensusGet(ctx, "key"); err != nil {
+		t.Fatalf("ConsensusGet: %v", err)
 	}
 	elapsed := time.Since(start)
 
@@ -214,8 +214,8 @@ func TestNewWithTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	start := time.Now()
-	if _, _, err := client.Get(ctx, "key"); err != nil {
-		t.Fatalf("Get with 5s timeout: %v", err)
+	if _, _, err := client.ConsensusGet(ctx, "key"); err != nil {
+		t.Fatalf("ConsensusGet with 5s timeout: %v", err)
 	}
 	if elapsed := time.Since(start); elapsed < responseDelay {
 		t.Errorf("elapsed = %v, want at least %v", elapsed, responseDelay)
@@ -226,7 +226,7 @@ func TestNewWithTimeout(t *testing.T) {
 	defaultClient := New(addrs)
 	shortCtx, shortCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer shortCancel()
-	if _, _, err := defaultClient.Get(shortCtx, "key"); err == nil {
-		t.Error("Get with default timeout: want error, got nil")
+	if _, _, err := defaultClient.ConsensusGet(shortCtx, "key"); err == nil {
+		t.Error("ConsensusGet with default timeout: want error, got nil")
 	}
 }

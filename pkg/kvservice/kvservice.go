@@ -88,7 +88,7 @@ func SetTrace(cfg TraceConfig) error {
 	return nil
 }
 
-// _requestTimeout — таймаут для Apply-операций (PUT, CAS).
+// _requestTimeout — таймаут для Apply-операций (PUT, CAS, DELETE, GET).
 // Если за это время не удалось отправить команду в applyCh лидера,
 // возвращается contract.ErrEnqueueTimeout.
 const _requestTimeout = 10 * time.Second
@@ -527,8 +527,14 @@ func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// ReadIndex: подтверждение лидерства без записи в raft-журнал (Raft §8).
-	future := kvs.rs.VerifyLeader()
+	cmd := Command{
+		Kind: CommandGet,
+		Key:  gr.Key,
+		ID:   kvs.id,
+	}
+
+	future := kvs.rs.Apply(cmd, _requestTimeout)
+
 	select {
 	case err := <-future.ErrorCh():
 		if err != nil {
@@ -537,17 +543,22 @@ func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
 			})
 			return
 		}
+		cmdResp, ok := future.Response().(Command)
+		if !ok {
+			kvs.sendHTTPResponse(w, api.GetResponse{
+				RespStatus: api.StatusInvalid,
+			})
+			return
+		}
+		kvs.sendHTTPResponse(w, api.GetResponse{
+			RespStatus: api.StatusOK,
+			KeyFound:   cmdResp.ResultFound,
+			Value:      cmdResp.ResultValue,
+		})
+
 	case <-req.Context().Done():
 		return
 	}
-
-	// Локальное чтение из DataStore (без raft-журнала, только после ReadIndex).
-	value, found := kvs.ds.Get(gr.Key)
-	kvs.sendHTTPResponse(w, api.GetResponse{
-		RespStatus: api.StatusOK,
-		KeyFound:   found,
-		Value:      value,
-	})
 }
 
 func (kvs *KVService) handleWeakGet(w http.ResponseWriter, req *http.Request) {

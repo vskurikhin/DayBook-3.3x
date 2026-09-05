@@ -527,13 +527,13 @@ func (h *Harness) TryPut(c *kvclient.KVClient, key, value string) (string, bool,
 	return c.Put(ctx, key, value)
 }
 
-// TryGet отправляет через клиента c запрос Get и проверяет, что ключ
-// найден и его значение совпадает с ожидаемым. Возвращает ошибку
-// без обращения к *testing.T.
+// TryGet отправляет через клиента c запрос консенсусного чтения ConsensusGet
+// и проверяет, что ключ найден и его значение совпадает с ожидаемым.
+// Возвращает ошибку без обращения к *testing.T.
 func (h *Harness) TryGet(c *kvclient.KVClient, key string, wantValue string) error {
 	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeout)
 	defer cancel()
-	gv, f, err := c.Get(ctx, key)
+	gv, f, err := c.ConsensusGet(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -582,12 +582,13 @@ func (h *Harness) TryDelete(c *kvclient.KVClient, key string) error {
 	return err
 }
 
-// TryGetNotFound отправляет через клиента c запрос Get и проверяет,
-// что ключ отсутствует. Возвращает ошибку без обращения к *testing.T.
+// TryGetNotFound отправляет через клиента c запрос консенсусного чтения
+// ConsensusGet и проверяет, что ключ отсутствует. Возвращает ошибку без
+// обращения к *testing.T.
 func (h *Harness) TryGetNotFound(c *kvclient.KVClient, key string) error {
 	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeoutProbe)
 	defer cancel()
-	_, f, err := c.Get(ctx, key)
+	_, f, err := c.ConsensusGet(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -667,9 +668,10 @@ func (h *Harness) CheckPut(c *kvclient.KVClient, key, value string) (string, boo
 	return pv, f
 }
 
-// CheckGet отправляет через клиента c запрос Get и проверяет отсутствие
-// ошибок. Также проверяет, что ключ найден и его значение совпадает с
-// ожидаемым. Вызывается только из тестовой горутины (см. TryGet).
+// CheckGet отправляет через клиента c запрос консенсусного чтения
+// ConsensusGet и проверяет отсутствие ошибок. Также проверяет, что ключ
+// найден и его значение совпадает с ожидаемым. Вызывается только из
+// тестовой горутины (см. TryGet).
 func (h *Harness) CheckGet(c *kvclient.KVClient, key string, wantValue string) {
 	h.t.Helper()
 	if err := h.TryGet(c, key, wantValue); err != nil {
@@ -722,9 +724,10 @@ func (h *Harness) CheckDeleteGone(c *kvclient.KVClient, key string) {
 	}
 }
 
-// CheckGetNotFound отправляет через клиента c запрос Get и проверяет
-// отсутствие ошибок, а также то, что указанный ключ отсутствует в сервисе.
-// Вызывается только из тестовой горутины (см. TryGetNotFound).
+// CheckGetNotFound отправляет через клиента c запрос консенсусного чтения
+// ConsensusGet и проверяет отсутствие ошибок, а также то, что указанный
+// ключ отсутствует в сервисе. Вызывается только из тестовой горутины
+// (см. TryGetNotFound).
 func (h *Harness) CheckGetNotFound(c *kvclient.KVClient, key string) {
 	h.t.Helper()
 	if err := h.TryGetNotFound(c, key); err != nil {
@@ -743,14 +746,15 @@ func (h *Harness) CheckWeakGetNotFound(c *kvclient.KVClient, key string) {
 	}
 }
 
-// CheckGetTimesOut проверяет, что запрос Get, отправленный через данного
-// клиента, завершится по тайм-ауту при использовании контекста с дедлайном,
-// поскольку клиент не сможет добиться фиксации своей команды сервисом.
+// CheckGetTimesOut проверяет, что запрос консенсусного чтения ConsensusGet,
+// отправленный через данного клиента, завершится по тайм-ауту при
+// использовании контекста с дедлайном, поскольку клиент не сможет добиться
+// фиксации своей команды сервисом.
 func (h *Harness) CheckGetTimesOut(c *kvclient.KVClient, key string) {
 	h.t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), _clientOpTimeoutShort)
 	defer cancel()
-	_, _, err := c.Get(ctx, key)
+	_, _, err := c.ConsensusGet(ctx, key)
 	if err == nil {
 		h.t.Error("got err nil; want an error wrapping context.DeadlineExceeded")
 		return
@@ -814,15 +818,15 @@ func (h *Harness) CheckDeleteTimesOut(c *kvclient.KVClient, key string) {
 	}
 }
 
-// WaitForKeyValue ждёт, пока Get(key) не вернется с ожидаемым значением
-// expectedValue или до истечения таймаута 2s. При таймауте вызывает
-// h.CheckGet, который завершит тест с Fatal.
+// WaitForKeyValue ждёт, пока ConsensusGet(key) не вернётся с ожидаемым
+// значением expectedValue или до истечения таймаута 2s. При таймауте
+// вызывает h.CheckGet, который завершит тест с Fatal.
 func (h *Harness) WaitForKeyValue(c *kvclient.KVClient, key, expectedValue string) {
 	h.t.Helper()
 	deadline := time.Now().Add(_waitKeyValueBudget)
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeoutProbe)
-		val, _, err := c.Get(ctx, key)
+		val, _, err := c.ConsensusGet(ctx, key)
 		cancel()
 		if err == nil && val == expectedValue {
 			return

@@ -49,7 +49,7 @@ func verifyLeaderCallsIn(t *testing.T, name string) int {
 // счётчик вызовов в тесте пакета нельзя, а изменять корневой пакет raft
 // в этой задаче запрещено.
 func TestWriteHandlersDoNotVerifyLeader(t *testing.T) {
-	for _, name := range []string{"handlePut", "handleCAS", "handleDelete"} {
+	for _, name := range []string{"handlePut", "handleCAS", "handleDelete", "handleGet"} {
 		if got := verifyLeaderCallsIn(t, name); got != 0 {
 			t.Errorf("%s calls VerifyLeader %d time(s), want 0", name, got)
 		}
@@ -57,10 +57,11 @@ func TestWriteHandlersDoNotVerifyLeader(t *testing.T) {
 }
 
 // TestReadHandlersStillVerifyLeader — контроль от вырождения предыдущей
-// проверки: подтверждение лидерства для чтений и отдельной ручки
-// сохраняется в прежнем виде.
+// проверки: консенсусный handleGet переведён в список записи (Э4);
+// слабое чтение — handleWeakGet. Подтверждение лидерства сохраняется
+// только для ручки слабого чтения и отдельной ручки VerifyLeader.
 func TestReadHandlersStillVerifyLeader(t *testing.T) {
-	for _, name := range []string{"handleGet", "handleVerifyLeader", "handleWeakGet"} {
+	for _, name := range []string{"handleVerifyLeader", "handleWeakGet"} {
 		if got := verifyLeaderCallsIn(t, name); got == 0 {
 			t.Errorf("%s does not call VerifyLeader, want it preserved", name)
 		}

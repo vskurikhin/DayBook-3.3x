@@ -103,7 +103,7 @@ func init() {
 
 func main() {
 	if err := runLoad(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -225,10 +225,11 @@ func chooseOp(r, d, w, g int) opKind {
 	}
 }
 
-// get выполняет чтение и учитывает его результат.
+// get выполняет сильное чтение через консенсус (как Put) и учитывает
+// его результат.
 func get(ctx context.Context, client *kvclient.KVClient, key string) {
 	start := time.Now()
-	_, _, err := client.Get(ctx, key)
+	_, _, err := client.ConsensusGet(ctx, key)
 	observe(_getLatency, time.Since(start))
 	_getDone.Add(1)
 	if err != nil {

@@ -77,8 +77,8 @@ func TestWeakGetOnLeaderValueAndMissingKey(t *testing.T) {
 }
 
 // TestBasicPutWeakGetSingleClient — паритет TestBasicPutGetSingleClient:
-// put → слабое чтение одним клиентом; для явной фиксации паритета
-// дополнительно выполняется обычное чтение Get, оба дают то же значение.
+// put → слабое чтение одним клиентом; /get с Э4 консенсусный — оба
+// дают то же значение.
 func TestBasicPutWeakGetSingleClient(t *testing.T) {
 	h := NewHarness(t, 3)
 	defer h.Shutdown()
@@ -109,7 +109,7 @@ func TestBasicPutWeakGetDifferentClients(t *testing.T) {
 }
 
 // TestWeakGetMissingKeyStatusOK — слабое чтение отсутствующего ключа:
-// без ошибки, found=false (семантика 1:1 с /get/).
+// без ошибки, found=false (/get с Э4 консенсусный).
 func TestWeakGetMissingKeyStatusOK(t *testing.T) {
 	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 

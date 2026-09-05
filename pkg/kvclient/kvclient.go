@@ -114,10 +114,11 @@ func (c *KVClient) Put(ctx context.Context, key, value string) (string, bool, er
 	return putResp.PrevValue, putResp.KeyFound, err
 }
 
-// Get получает значение по ключу.
-// Возвращает ошибку либо (value, found, nil), где found показывает,
-// существует ли указанный ключ в хранилище.
-func (c *KVClient) Get(ctx context.Context, key string) (string, bool, error) {
+// ConsensusGet выполняет сильное чтение по ключу через консенсус: команда
+// CommandGet проходит через журнал (как Put), результат возвращается
+// future'ом по применению. Возвращает ошибку либо (value, found, nil),
+// где found показывает, существует ли указанный ключ в хранилище.
+func (c *KVClient) ConsensusGet(ctx context.Context, key string) (string, bool, error) {
 	getReq := api.GetRequest{
 		Key: key,
 	}
