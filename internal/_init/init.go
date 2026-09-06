@@ -12,8 +12,8 @@ var Values config.Values
 
 // configureTraceLogging применяет параметры трассировки командной строки:
 // --trace-log-level задаёт пороги обоих пакетов (raft и kvservice),
-// --trace-cm-log-file — файл трассировки консенсус-модуля,
-// --trace-kv-log-file — файл трассировки KV-сервиса (пустая строка — стандартный логгер).
+// -trace-cm-log-file — файл трассировки консенсус-модуля,
+// -trace-kv-log-file — файл трассировки KV-сервиса (пустая строка — стандартный логгер).
 // Это единственное место, где значения флагов отображаются в публичные типы raft.TraceConfig
 // и kvservice.TraceConfig: публичные пакеты не зависят от internal/config.
 func configureTraceLogging(values config.Values) error {

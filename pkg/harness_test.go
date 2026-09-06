@@ -785,9 +785,9 @@ func (h *Harness) CheckWeakGetTimesOut(c *kvclient.KVClient, key string) {
 		return
 	}
 	// Проверка по фактической цепочке ошибок, а не по подстроке:
-	// kvclient.WeakGet → send → sendJSONRequest → http.Client.Do
+	// kvclient.WeakGet → sendGet → sendJSONGetRequest → http.Client.Do
 	// возвращает *url.Error, оборачивающий context.DeadlineExceeded,
-	// и send возвращает его как есть при ctx.Err() != nil.
+	// и sendGet возвращает его как есть при ctx.Err() != nil.
 	if !errors.Is(err, context.DeadlineExceeded) {
 		h.t.Errorf("got err %v (%T); want an error wrapping context.DeadlineExceeded", err, err)
 	}

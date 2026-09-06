@@ -302,12 +302,12 @@ func (kvs *KVService) ServeHTTP(address string) error {
 		return fmt.Errorf("kvservice %d: ServeHTTP called with existing server", kvs.id)
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /get/", kvs.handleGet)
-	mux.HandleFunc("POST /weak-get/", kvs.handleWeakGet)
-	mux.HandleFunc("POST /put/", kvs.handlePut)
+	mux.HandleFunc("GET /weak-get/{key...}", kvs.handleWeakGet)
 	mux.HandleFunc("POST /cas/", kvs.handleCAS)
-	mux.HandleFunc("POST /verifyleader/", kvs.handleVerifyLeader)
 	mux.HandleFunc("POST /delete/", kvs.handleDelete)
+	mux.HandleFunc("POST /get/", kvs.handleGet)
+	mux.HandleFunc("POST /put/", kvs.handlePut)
+	mux.HandleFunc("POST /verifyleader/", kvs.handleVerifyLeader)
 
 	ln, err := net.Listen("tcp", address)
 	if err != nil {
@@ -419,24 +419,61 @@ func (kvs *KVService) handleVerifyLeader(w http.ResponseWriter, _ *http.Request)
 	kvs.sendHTTPResponse(w, api.StatusResponse{RespStatus: api.StatusOK})
 }
 
-func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
+func (kvs *KVService) handleWeakGet(w http.ResponseWriter, req *http.Request) {
 	start := time.Now()
-	pr := &api.PutRequest{}
+	gr := &api.GetRequest{Key: req.PathValue("key")}
 	defer func() {
 		elapsed := time.Since(start)
-		kvs.traceLogf("HTTP PUT %v took %v", pr, elapsed)
+		kvs.traceLogf("HTTP WEAK-GET %v took %v", gr, elapsed)
 	}()
 
-	if err := readRequestJSON(req, pr); err != nil {
+	// GET семантически кешируем: значение слабого чтения актуально
+	// только на момент подтверждения лидерства — запрещаем хранение
+	// ответа промежуточными кешами.
+	w.Header().Set("Cache-Control", "no-store")
+
+	// ReadIndex: подтверждение лидерства без записи в raft-журнал (Raft §8).
+	future := kvs.rs.VerifyLeader()
+	select {
+	case err := <-future.ErrorCh():
+		if err != nil {
+			kvs.sendHTTPResponse(w, api.GetResponse{
+				RespStatus: api.StatusNotLeader,
+			})
+			return
+		}
+	case <-req.Context().Done():
+		return
+	}
+
+	// Локальное чтение из DataStore (без raft-журнала, только после ReadIndex).
+	value, found := kvs.ds.Get(gr.Key)
+	kvs.sendHTTPResponse(w, api.GetResponse{
+		RespStatus: api.StatusOK,
+		KeyFound:   found,
+		Value:      value,
+	})
+}
+
+func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
+	start := time.Now()
+	cr := &api.CASRequest{}
+	defer func() {
+		elapsed := time.Since(start)
+		kvs.traceLogf("HTTP CAS %v took %v", cr, elapsed)
+	}()
+
+	if err := readRequestJSON(req, cr); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	cmd := Command{
-		Kind:  CommandPut,
-		Key:   pr.Key,
-		Value: pr.Value,
-		ID:    kvs.id,
+		Kind:         CommandCAS,
+		Key:          cr.Key,
+		CompareValue: cr.CompareValue,
+		Value:        cr.Value,
+		ID:           kvs.id,
 	}
 
 	future := kvs.rs.Apply(cmd, _requestTimeout)
@@ -444,19 +481,19 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 	select {
 	case err := <-future.ErrorCh():
 		if err != nil {
-			kvs.sendHTTPResponse(w, api.PutResponse{
+			kvs.sendHTTPResponse(w, api.CASResponse{
 				RespStatus: api.StatusNotLeader,
 			})
 			return
 		}
 		cmdResp, ok := future.Response().(Command)
 		if !ok {
-			kvs.sendHTTPResponse(w, api.PutResponse{
+			kvs.sendHTTPResponse(w, api.CASResponse{
 				RespStatus: api.StatusInvalid,
 			})
 			return
 		}
-		kvs.sendHTTPResponse(w, api.PutResponse{
+		kvs.sendHTTPResponse(w, api.CASResponse{
 			RespStatus: api.StatusOK,
 			KeyFound:   cmdResp.ResultFound,
 			PrevValue:  cmdResp.ResultValue,
@@ -561,61 +598,24 @@ func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (kvs *KVService) handleWeakGet(w http.ResponseWriter, req *http.Request) {
+func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 	start := time.Now()
-	gr := &api.GetRequest{}
+	pr := &api.PutRequest{}
 	defer func() {
 		elapsed := time.Since(start)
-		kvs.traceLogf("HTTP WEAK-GET %v took %v", gr, elapsed)
+		kvs.traceLogf("HTTP PUT %v took %v", pr, elapsed)
 	}()
 
-	if err := readRequestJSON(req, gr); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// ReadIndex: подтверждение лидерства без записи в raft-журнал (Raft §8).
-	future := kvs.rs.VerifyLeader()
-	select {
-	case err := <-future.ErrorCh():
-		if err != nil {
-			kvs.sendHTTPResponse(w, api.GetResponse{
-				RespStatus: api.StatusNotLeader,
-			})
-			return
-		}
-	case <-req.Context().Done():
-		return
-	}
-
-	// Локальное чтение из DataStore (без raft-журнала, только после ReadIndex).
-	value, found := kvs.ds.Get(gr.Key)
-	kvs.sendHTTPResponse(w, api.GetResponse{
-		RespStatus: api.StatusOK,
-		KeyFound:   found,
-		Value:      value,
-	})
-}
-
-func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
-	start := time.Now()
-	cr := &api.CASRequest{}
-	defer func() {
-		elapsed := time.Since(start)
-		kvs.traceLogf("HTTP CAS %v took %v", cr, elapsed)
-	}()
-
-	if err := readRequestJSON(req, cr); err != nil {
+	if err := readRequestJSON(req, pr); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	cmd := Command{
-		Kind:         CommandCAS,
-		Key:          cr.Key,
-		CompareValue: cr.CompareValue,
-		Value:        cr.Value,
-		ID:           kvs.id,
+		Kind:  CommandPut,
+		Key:   pr.Key,
+		Value: pr.Value,
+		ID:    kvs.id,
 	}
 
 	future := kvs.rs.Apply(cmd, _requestTimeout)
@@ -623,19 +623,19 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 	select {
 	case err := <-future.ErrorCh():
 		if err != nil {
-			kvs.sendHTTPResponse(w, api.CASResponse{
+			kvs.sendHTTPResponse(w, api.PutResponse{
 				RespStatus: api.StatusNotLeader,
 			})
 			return
 		}
 		cmdResp, ok := future.Response().(Command)
 		if !ok {
-			kvs.sendHTTPResponse(w, api.CASResponse{
+			kvs.sendHTTPResponse(w, api.PutResponse{
 				RespStatus: api.StatusInvalid,
 			})
 			return
 		}
-		kvs.sendHTTPResponse(w, api.CASResponse{
+		kvs.sendHTTPResponse(w, api.PutResponse{
 			RespStatus: api.StatusOK,
 			KeyFound:   cmdResp.ResultFound,
 			PrevValue:  cmdResp.ResultValue,

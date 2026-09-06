@@ -1,6 +1,3 @@
-// Package kvclient — библиотека клиента KV.
-// Go-приложениям, взаимодействующим с KV-сервисом, следует использовать
-// этот клиент вместо непосредственной отправки REST-запросов.
 package kvclient
 
 import (
@@ -11,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"sync/atomic"
 	"time"
 
@@ -42,6 +40,16 @@ type KVClient struct {
 	// файла путём увеличения глобального счётчика _clientCount.
 	clientID int32
 }
+
+var (
+	// errMethodNotAllowed — сервер ответил 405 на GET-запрос слабого
+	// чтения: метод маршрута не совпадает с версией клиента и сервера.
+	errMethodNotAllowed = errors.New("server returned 405 Method Not Allowed")
+
+	// errRouteMismatch — сервер ответил 404: маршрут не совпал.
+	// Детерминирован для всех узлов — ротация бессмысленна.
+	errRouteMismatch = errors.New("server returned 404 Not Found")
+)
 
 // New создаёт новый экземпляр KVClient. serviceAddrs — список адресов
 // (каждый в формате "host:port") сервисов кластера KVService, с которыми
@@ -127,16 +135,17 @@ func (c *KVClient) ConsensusGet(ctx context.Context, key string) (string, bool, 
 	return getResp.Value, getResp.KeyFound, err
 }
 
-// WeakGet получает значение по ключу слабым чтением: без записи в
-// raft-журнал, после подтверждения лидерства (ReadIndex, Raft §8).
-// Возвращает ошибку либо (value, found, nil), где found показывает,
-// существует ли указанный ключ в хранилище.
+// WeakGet метод реализует операцию слабого чтения значения по заданному ключу.
+// Операция не приводит к записи в журнал консенсуса Raft и выполняется только
+// после подтверждения лидерства с использованием механизма ReadIndex (Raft §8).
+// Возвращаемое значение представляет собой либо ошибку, либо тройку (value, found, nil),
+// где флаг found отражает факт наличия ключа в хранилище.
+// Ключ извлекается из суффикса пути HTTP-запроса GET /weak-get/.
+// Для безопасного использования ключа в URL применяется кодирование через url.PathEscape
+// с дополнительным экранированием ключей, содержащих точку.
 func (c *KVClient) WeakGet(ctx context.Context, key string) (string, bool, error) {
-	getReq := api.GetRequest{
-		Key: key,
-	}
 	var getResp api.GetResponse
-	err := c.send(ctx, "weak-get", getReq, &getResp)
+	err := c.sendGet(ctx, "weak-get", key, &getResp)
 	return getResp.Value, getResp.KeyFound, err
 }
 
@@ -199,6 +208,96 @@ func (c *KVClient) send(ctx context.Context, route string, req any, resp api.Res
 			panic("unreachable")
 		}
 	}
+}
+
+// sendGet выполняет GET-запрос слабого чтения с ротацией адресов —
+// аналогично send. Отличия: ключ в path-сегменте (URL-кодирование),
+// запрос без тела и досрочный возврат при 405 — метод маршрута
+// одинаков для всех узлов, повтор по другому адресу бессмыслен.
+func (c *KVClient) sendGet(ctx context.Context, route, key string, resp api.Response) error {
+	for {
+		reqCtx, reqCtxCancel := context.WithTimeout(ctx, c.requestTimeout)
+		path := fmt.Sprintf("http://%s/%s/%s", c.addrs[c.leader()], route, pathKey(key))
+
+		c.clientLogf("sending GET key=%v to %v", key, path)
+		if err := sendJSONGetRequest(reqCtx, path, resp); err != nil {
+			reqCtxCancel()
+			if ctx.Err() != nil {
+				return err
+			}
+			if errors.Is(err, errMethodNotAllowed) || errors.Is(err, errRouteMismatch) {
+				return err
+			}
+			c.clientLogf("request failed: %v; switching to next address", err)
+			c.nextLeader()
+			continue
+		}
+		reqCtxCancel()
+		c.clientLogf("received response %#v", resp)
+
+		switch resp.Status() {
+		case api.StatusNotLeader:
+			c.clientLogf("not leader: will try next address")
+			c.nextLeader()
+			continue
+		case api.StatusOK:
+			return nil
+		case api.StatusFailedCommit:
+			return errors.New("commit failed; please retry")
+		default:
+			panic("unreachable")
+		}
+	}
+}
+
+// pathKey кодирует ключ для path /weak-get/: PathEscape
+// не кодирует точку, а сырой dot-сегмент ("."/"..") переписывается
+// маршрутизатором (307) — полные dot-ключи экранируются вручную.
+func pathKey(key string) string {
+	switch key {
+	case ".":
+		return "%2E"
+	case "..":
+		return "%2E%2E"
+	default:
+		return url.PathEscape(key)
+	}
+}
+
+// sendJSONGetRequest выполняет GET-запрос без тела и декодирует
+// JSON-ответ. Ответ с состоянием, отличным от 200, — ошибка; 405 —
+// errMethodNotAllowed; 404 — errRouteMismatch.
+func sendJSONGetRequest(ctx context.Context, path string, respData any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, http.NoBody)
+	if err != nil {
+		return fmt.Errorf("creating HTTP request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusMethodNotAllowed {
+			return errMethodNotAllowed
+		}
+		if resp.StatusCode == http.StatusNotFound {
+			return errRouteMismatch
+		}
+		return fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
+	}
+
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(respData); err != nil {
+		return fmt.Errorf("JSON-decoding response data: %w", err)
+	}
+	return nil
 }
 
 // clientLogf выводит отладочное сообщение, если DebugClient > 0.

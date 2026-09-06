@@ -88,8 +88,8 @@ start-raft: stop-raft
 		$(GOBIN)/$(PROJECTNAME)kv -number $$n \
 			-http-addr=":$$http" -rpc-addr=":$$rpc" -peers="$$peers" \
 			-trace-log-level $(TRACE_LOG_LEVEL) \
-			--trace-cm-log-file "$(call trace_cm,$$n)" \
-			--trace-kv-log-file "$(call trace_kv,$$n)" \
+			-trace-cm-log-file "$(call trace_cm,$$n)" \
+			-trace-kv-log-file "$(call trace_kv,$$n)" \
 			1>"$(call stdout,$$n)" 2>"$(call stderr,$$n)" & \
 		echo $$! > $(call pid_file,$$n); \
 		sed "/^/s/^/  \>  PID$$n: /" $(call pid_file,$$n); \

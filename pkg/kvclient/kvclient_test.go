@@ -3,6 +3,7 @@ package kvclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -38,6 +39,22 @@ func hangingHandler(done <-chan struct{}) http.Handler {
 		case <-r.Context().Done():
 		case <-done:
 		}
+	})
+}
+
+// methodNotAllowedHandler отвечает 405 Method Not Allowed на любой
+// запрос — имитация рассинхрона версий: сервер отвергает метод.
+func methodNotAllowedHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+}
+
+// notFoundHandler отвечает 404 Not Found на любой запрос — имитация
+// несовпадения маршрута (например, прокси без маршрута /weak-get/).
+func notFoundHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "not found", http.StatusNotFound)
 	})
 }
 
@@ -228,5 +245,59 @@ func TestNewWithTimeout(t *testing.T) {
 	defer shortCancel()
 	if _, _, err := defaultClient.ConsensusGet(shortCtx, "key"); err == nil {
 		t.Error("ConsensusGet with default timeout: want error, got nil")
+	}
+}
+
+// TestWeakGetMethodNotAllowedFailsFast — 405 на GET-запрос слабого
+// чтения возвращает явную ошибку без ротации адресов: метод
+// одинаков для всех узлов кластера, повтор бессмыслен.
+func TestWeakGetMethodNotAllowedFailsFast(t *testing.T) {
+	srv := httptest.NewServer(methodNotAllowedHandler())
+	defer srv.Close()
+
+	client := New([]string{serverAddr(t, srv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	_, _, err := client.WeakGet(ctx, "key")
+	if err == nil {
+		t.Fatal("WeakGet: want error, got nil")
+	}
+	if !errors.Is(err, errMethodNotAllowed) {
+		t.Errorf("WeakGet error = %v; want errors.Is(err, errMethodNotAllowed)", err)
+	}
+	if elapsed := time.Since(start); elapsed >= 2*time.Second {
+		t.Errorf("WeakGet took %v; want < 2s (fails fast, not deadline)", elapsed)
+	}
+	if got := client.leader(); got != 0 {
+		t.Errorf("leader = %d, want 0 (no rotation)", got)
+	}
+}
+
+// TestWeakGetRouteMismatchFailsFast — 404 на GET-запрос слабого чтения
+// возвращает явную ошибку errRouteMismatch без ротации адресов: класс
+// «маршрут не совпал» детерминирован для всех узлов, повтор бессмыслен.
+func TestWeakGetRouteMismatchFailsFast(t *testing.T) {
+	srv := httptest.NewServer(notFoundHandler())
+	defer srv.Close()
+
+	client := New([]string{serverAddr(t, srv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	_, _, err := client.WeakGet(ctx, "key")
+	if err == nil {
+		t.Fatal("WeakGet: want error, got nil")
+	}
+	if !errors.Is(err, errRouteMismatch) {
+		t.Errorf("WeakGet error = %v; want errors.Is(err, errRouteMismatch)", err)
+	}
+	if elapsed := time.Since(start); elapsed >= 2*time.Second {
+		t.Errorf("WeakGet took %v; want < 2s (fails fast, not deadline)", elapsed)
+	}
+	if got := client.leader(); got != 0 {
+		t.Errorf("leader = %d, want 0 (no rotation)", got)
 	}
 }

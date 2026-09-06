@@ -77,11 +77,11 @@ func (s *kvStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		encode(w, getResponse{RespStatus: statusOK, KeyFound: found, Value: value})
 	case strings.HasPrefix(r.URL.Path, "/weak-get/"):
 		// Слабое чтение в стабе ведёт себя как обычное чтение: возвращает
-		// значение ключа без изменения состояния хранилища.
-		var req getRequest
-		decode(w, r, &req)
+		// значение ключа без изменения состояния хранилища. Ключ передаётся
+		// path-сегментом GET-запроса (r.URL.Path уже декодирован).
+		key := strings.TrimPrefix(r.URL.Path, "/weak-get/")
 		s.mu.Lock()
-		value, found := s.data[req.Key]
+		value, found := s.data[key]
 		s.mu.Unlock()
 		encode(w, getResponse{RespStatus: statusOK, KeyFound: found, Value: value})
 	case strings.HasPrefix(r.URL.Path, "/delete/"):
