@@ -181,7 +181,7 @@ func TestPreVote_Disabled(t *testing.T) {
 
 	// Pre-Vote отключается на всех узлах кластера через опцию Harness
 	// ДО close(ready) — до старта фоновых горутин (никакой
-	// post-start мутации конфигурации). DefaultTickerTimeout = 21ms —
+	// post-start мутации конфигурации). DefaultTickerTimeout = 20ms —
 	// первый tick election timer не успевает сработать раньше.
 	h := NewHarnessWithOptions(t, 3, DisablePreVote())
 	defer h.Shutdown()

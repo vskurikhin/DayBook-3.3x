@@ -346,7 +346,7 @@ func TestParseFlagsMaxPool(t *testing.T) {
 }
 
 // TestParseFlagsTCPRPCTimeoutDefaults проверяет дефолт флага -tcp-rpc-timeout:
-// без флага поле Values.TCPRPCTimeout равно raft.TCPRPCTimeout (191 мс).
+// без флага поле Values.TCPRPCTimeout равно raft.TCPRPCTimeout (165 мс).
 // Одновременно это защита от рассинхрона дефолта между internal/config
 // и пакетом raft (RISK-023): единый источник — алиас raft.TCPRPCTimeout.
 func TestParseFlagsTCPRPCTimeoutDefaults(t *testing.T) {
@@ -359,8 +359,8 @@ func TestParseFlagsTCPRPCTimeoutDefaults(t *testing.T) {
 	if v.TCPRPCTimeout != raft.TCPRPCTimeout {
 		t.Errorf("TCPRPCTimeout = %v, want default %v", v.TCPRPCTimeout, raft.TCPRPCTimeout)
 	}
-	if raft.TCPRPCTimeout != 191*time.Millisecond {
-		t.Errorf("raft.TCPRPCTimeout = %v, want 191ms", raft.TCPRPCTimeout)
+	if raft.TCPRPCTimeout != 165*time.Millisecond {
+		t.Errorf("raft.TCPRPCTimeout = %v, want 165ms", raft.TCPRPCTimeout)
 	}
 }
 
@@ -488,15 +488,15 @@ func TestParseFlagsTiming(t *testing.T) {
 // даёт ошибку с именем параметра.
 func TestValidateTimingFlags_Delegation(t *testing.T) {
 	if err := validateTimingFlags(33*time.Millisecond, 21*time.Millisecond, 381*time.Millisecond, 50*time.Millisecond); err != nil {
-		t.Errorf("validateTimingFlags(defaults) = %v, want nil", err)
+		t.Errorf("validateTimingFlags(pre-change defaults) = %v, want nil", err)
 	}
 
 	err := validateTimingFlags(200*time.Millisecond, 21*time.Millisecond, 381*time.Millisecond, 50*time.Millisecond)
 	if err == nil {
 		t.Fatal("validateTimingFlags = nil, want error for heartbeat 200ms")
 	}
-	if !strings.Contains(err.Error(), "heartbeat-timeout") || !strings.Contains(err.Error(), "95") {
-		t.Errorf("error %q must mention heartbeat-timeout and 95", err)
+	if !strings.Contains(err.Error(), "heartbeat-timeout") || !strings.Contains(err.Error(), "82") {
+		t.Errorf("error %q must mention heartbeat-timeout and 82", err)
 	}
 }
 
@@ -525,16 +525,18 @@ func TestParseFlagsTimingHelp(t *testing.T) {
 	fs.SetOutput(&buf)
 	fs.Duration("heartbeat-timeout", raft.DefaultHeartbeatTimeout,
 		"Leader heartbeat interval (default 33ms). Upper bound derives from the "+
-			"fixed 382ms check-quorum timeout: beyond 95ms a leader steps down "+
-			"on a single lost packet")
+			"fixed 330ms check-quorum timeout: beyond 82ms a leader steps down "+
+			"on a single lost packet; the 82ms bound is reachable only with "+
+			"reelection-timeout >= 10x heartbeat-timeout (with the default "+
+			"340ms the effective ceiling is 34ms)")
 	fs.Duration("ticker-timeout", raft.DefaultTickerTimeout,
-		"Election timer polling tick (default 21ms); must be at most "+
+		"Election timer polling tick (default 20ms); must be at most "+
 			"reelection-timeout/10")
 	fs.Duration("reelection-timeout", raft.DefaultReelectionTimeout,
 		"Base of the randomized election timeout, actual timeout is in "+
-			"[reelection, 2*reelection) (default 381ms); must be at least 10x "+
+			"[reelection, 2*reelection) (default 340ms); must be at least 10x "+
 			"heartbeat-timeout; also gates the pre-vote suppression window "+
-			"[reelection, 2*reelection); check-quorum stays fixed at 382ms and "+
+			"[reelection, 2*reelection); check-quorum stays fixed at 330ms and "+
 			"does not scale with this flag")
 	fs.Duration("apply-batch-interval", raft.DefaultApplyBatchInterval,
 		"Leader-side safety-net apply batching interval (default 50ms); must "+
@@ -543,7 +545,7 @@ func TestParseFlagsTimingHelp(t *testing.T) {
 
 	help := buf.String()
 	for _, want := range []string{
-		"382", "95ms", "check-quorum", "reelection-timeout/10", "10x heartbeat-timeout", "reelection-timeout",
+		"330", "82ms", "33ms", "check-quorum", "reelection-timeout/10", "10x heartbeat-timeout", "reelection-timeout",
 	} {
 		if !strings.Contains(help, want) {
 			t.Errorf("help output does not contain %q", want)

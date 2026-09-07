@@ -340,7 +340,7 @@ func TestNoCommitWithNoQuorum(t *testing.T) {
 	// Изолируем обоих follower'ов: у лидера остаётся 1/3 — кворума нет.
 	// Прежняя схема опиралась на инвариант «время изоляции < min election
 	// timeout» (комментарий «246ms < 254ms»); фактические константы
-	// (DefaultReelectionTimeout=381ms) его нарушали — изоляция 300+93ms
+	// (DefaultReelectionTimeout=340ms) его нарушали — изоляция 300+93ms
 	// превышала минимальный election timeout, и тест был flaky.
 	// Инвариант снят: тест больше не зависит от того, начнут ли изолированные
 	// follower'ы выборы.
@@ -419,7 +419,7 @@ func TestDisconnectLeaderBriefly(t *testing.T) {
 
 	// Отключаем лидера на короткое время (меньше тайм-аута выборов у соседей).
 	// keep: timing — предмет теста. Длительность разрыва (90 мс) заведомо
-	// меньше минимального election timeout (DefaultReelectionTimeout = 381 мс),
+	// меньше минимального election timeout (DefaultReelectionTimeout = 340 мс),
 	// поэтому соседи не начинают выборы.
 	h.DisconnectPeer(origLeaderId)
 	sleepMs(90)
@@ -2995,7 +2995,7 @@ func TestDedup_ConcurrentHeartbeatAndDispatch(t *testing.T) {
 		}
 		// keep: timing — интервал подачи нагрузки является предметом
 		// стресс-теста (пересечение с heartbeat/apply-тикерами).
-		// ⌊21/4⌋ — целочисленное деление прежнего выражения
+		// ⌊20/4⌋ — целочисленное деление прежнего выражения
 		// DefaultTickerTimeout/4, сохранено дословно (5 мс).
 		time.Sleep(5 * time.Millisecond)
 	}

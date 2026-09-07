@@ -21,10 +21,10 @@ const (
 
 	// DefaultReelectionTimeout — база тайм-аута выборов по умолчанию:
 	// фактический тайм-аут выводится из неё случайной величиной.
-	DefaultReelectionTimeout = 381 * time.Millisecond
+	DefaultReelectionTimeout = 340 * time.Millisecond
 
 	// DefaultTickerTimeout — такт тикера выборов по умолчанию.
-	DefaultTickerTimeout = 21 * time.Millisecond
+	DefaultTickerTimeout = 20 * time.Millisecond
 
 	// LeaktestBudget — единый бюджет leaktest:
 	// max(_inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
@@ -44,7 +44,7 @@ const (
 	// Соотношение с базой перевыборов: обнаружение потери кворума
 	// приходится на [CQ; CQ+HB) (проверка выполняется по тику пульса),
 	// а ведомый начинает выборы на [RE; 2·RE). На умолчаниях величины
-	// почти совпадают: 382 мс против [381; 762) мс.
+	// почти совпадают: 330 мс против [340; 680) мс.
 	_defaultCheckQuorumTimeout = 2 * _defaultTCPRPCTimeout
 
 	// DefaultSnapshotInterval — интервал проверки необходимости снимка.
@@ -115,10 +115,10 @@ const (
 	MinHeartbeatTimeout = 5 * time.Millisecond
 	// MaxHeartbeatTimeout — максимальный период пульса лидера. Верхняя
 	// граница выводится из фиксированного check-quorum тайм-аута
-	// (382 мс): в окне проверки кворума лидер должен успеть не менее
+	// (330 мс): в окне проверки кворума лидер должен успеть не менее
 	// четырёх раз связаться с соседями. Целочисленное выражение
-	// ⌊382/4⌋ = 95 мс сохраняет требование целого числа миллисекунд.
-	//nolint:durationcheck // целочисленное округление вниз до целых мс (⌊382/4⌋ = 95)
+	// ⌊330/4⌋ = 82 мс сохраняет требование целого числа миллисекунд.
+	//nolint:durationcheck // целочисленное округление вниз до целых мс (⌊330/4⌋ = 82)
 	MaxHeartbeatTimeout = _defaultCheckQuorumTimeout / 4 / time.Millisecond * time.Millisecond
 
 	// MinTickerTimeout — минимальный такт тикера выборов.

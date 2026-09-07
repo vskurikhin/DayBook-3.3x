@@ -53,7 +53,7 @@ type Values struct {
 	// Ноль — защитное значение: применяется дефолт конструктора.
 	SnapshotThreshold int
 	// TCPRPCTimeout — тайм-аут TCP RPC к соседям. Ноль — защитное значение:
-	// применяется дефолт транспорта (raft.TCPRPCTimeout, 191 мс). Связь
+	// применяется дефолт транспорта (raft.TCPRPCTimeout, 165 мс). Связь
 	// значения с проверкой кворума лидера — в подсказке флага.
 	TCPRPCTimeout time.Duration
 	// TickerTimeout — такт тикера выборов. Ноль — защитное значение:
@@ -94,7 +94,7 @@ func ParseFlags() Values {
 	tcpRPCTimeoutFlag := fs.Duration(
 		"tcp-rpc-timeout", raft.TCPRPCTimeout,
 		"Timeout for TCP RPC calls to peers; the leader check-quorum timeout "+
-			"stays fixed at 382ms and does NOT scale with this flag (default 191ms)",
+			"stays fixed at 330ms and does NOT scale with this flag (default 165ms)",
 	)
 	traceCMLogFileFlag, traceKVLogFileFlag, traceLogLevelFlag := addTraceFlags(fs)
 
@@ -203,18 +203,20 @@ func addTimingFlags(fs *flag.FlagSet) (applyBatch, heartbeat, reelection, ticker
 		), fs.Duration(
 			"heartbeat-timeout", raft.DefaultHeartbeatTimeout,
 			"Leader heartbeat interval (default 33ms). Upper bound derives from the "+
-				"fixed 382ms check-quorum timeout: beyond 95ms a leader steps down "+
-				"on a single lost packet",
+				"fixed 330ms check-quorum timeout: beyond 82ms a leader steps down "+
+				"on a single lost packet; the 82ms bound is reachable only with "+
+				"reelection-timeout >= 10x heartbeat-timeout (with the default "+
+				"340ms the effective ceiling is 34ms)",
 		), fs.Duration(
 			"reelection-timeout", raft.DefaultReelectionTimeout,
 			"Base of the randomized election timeout, actual timeout is in "+
-				"[reelection, 2*reelection) (default 381ms); must be at least 10x "+
+				"[reelection, 2*reelection) (default 340ms); must be at least 10x "+
 				"heartbeat-timeout; also gates the pre-vote suppression window "+
-				"[reelection, 2*reelection); check-quorum stays fixed at 382ms and "+
+				"[reelection, 2*reelection); check-quorum stays fixed at 330ms and "+
 				"does not scale with this flag",
 		), fs.Duration(
 			"ticker-timeout", raft.DefaultTickerTimeout,
-			"Election timer polling tick (default 21ms); must be at most "+
+			"Election timer polling tick (default 20ms); must be at most "+
 				"reelection-timeout/10",
 		)
 }
