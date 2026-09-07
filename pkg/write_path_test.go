@@ -14,7 +14,7 @@ import (
 
 // checkQuorumBudget — запас времени на обнаружение потери кворума лидером:
 // два срока проверки кворума плюс период пульса и накладные HTTP.
-const checkQuorumBudget = 2*2*raft.TCPRPCTimeout + 4*raft.HeartbeatTimeoutMs*time.Millisecond
+const checkQuorumBudget = 2*2*raft.TCPRPCTimeout + 4*raft.DefaultHeartbeatTimeout
 
 // postJSON отправляет запрос напрямую сервису id и разбирает ответ.
 // Прямой HTTP нужен там, где предмет проверки — статус ответа конкретного

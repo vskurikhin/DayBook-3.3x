@@ -179,7 +179,7 @@ verify-imports:
 		exit 1; \
 	fi
 
-go-test: verify-imports go-test-root go-test-pkg-raft go-test-pkg go-test-kvservice
+go-test: verify-imports go-test-root go-test-pkg-raft go-test-pkg go-test-internal go-test-kvservice
 
 verify-race-scope:
 	@ROOT_PKG=$$(go list -m); \
@@ -187,6 +187,10 @@ verify-race-scope:
 		echo "race scope lost root raft package: $$ROOT_PKG not in $(RACE_PKGS)" >&2; \
 		exit 1; \
 	}
+
+go-test-internal:
+	@echo "  >  Running tests: pinternal/... $(TESTFLAGS)"
+	@go test $(TESTFLAGS) ./internal/...
 
 go-test-kvservice:
 	@echo "  >  Running tests: pkg/kvservice/... $(TESTFLAGS)"

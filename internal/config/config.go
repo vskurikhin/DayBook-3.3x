@@ -90,22 +90,13 @@ func ParseFlags() Values {
 	peersFlag := fs.String("peers", "", "Comma-separated list of peers servers (id=host:port)")
 	pprofAddressFlag := fs.String("pprof-addr", "", "Profiling HTTP server listen address (empty = disabled)")
 	rpcAddressFlag := fs.String("rpc-addr", ":9990", "RPC server listen address")
-	snapshotIntervalFlag := fs.Duration(
-		"snapshot-interval", raft.DefaultSnapshotInterval,
-		"Interval between snapshot checks (default 3s)",
-	)
-	snapshotThresholdFlag := fs.Int(
-		"snapshot-threshold", raft.DefaultSnapshotThreshold,
-		"Log entries since last snapshot to trigger a new one (default 1024)",
-	)
+	snapshotIntervalFlag, snapshotThresholdFlag := addSnapshotFlags(fs)
 	tcpRPCTimeoutFlag := fs.Duration(
 		"tcp-rpc-timeout", raft.TCPRPCTimeout,
 		"Timeout for TCP RPC calls to peers; the leader check-quorum timeout "+
 			"stays fixed at 382ms and does NOT scale with this flag (default 191ms)",
 	)
-	traceCMLogFileFlag := fs.String("trace-cm-log-file", "", "Trace consensus module log file path (empty = stderr)")
-	traceKVLogFileFlag := fs.String("trace-kv-log-file", "", "Trace key-value database log file path (empty = stderr)")
-	traceLogLevelFlag := fs.Int("trace-log-level", 1, "Trace log level for the raft and kvservice packages")
+	traceCMLogFileFlag, traceKVLogFileFlag, traceLogLevelFlag := addTraceFlags(fs)
 
 	args := make([]string, 0, len(os.Args)-1)
 	for _, arg := range os.Args[1:] {
@@ -192,18 +183,28 @@ func checkTimingFlags(heartbeat, ticker, reelection, applyBatch *time.Duration) 
 	}
 }
 
+func addSnapshotFlags(fs *flag.FlagSet) (snapshotIntervalFlag *time.Duration, snapshotThresholdFlag *int) {
+	return fs.Duration(
+			"snapshot-interval", raft.DefaultSnapshotInterval,
+			"Interval between snapshot checks (default 3s)",
+		), fs.Int(
+			"snapshot-threshold", raft.DefaultSnapshotThreshold,
+			"Log entries since last snapshot to trigger a new one (default 1024)",
+		)
+}
+
 // addTimingFlags регистрирует четыре временных флага узла и возвращает
 // их указатели. Вынесено из ParseFlags для сокращения функции.
 func addTimingFlags(fs *flag.FlagSet) (applyBatch, heartbeat, reelection, ticker *time.Duration) {
 	return fs.Duration(
+			"apply-batch-interval", raft.DefaultApplyBatchInterval,
+			"Leader-side safety-net apply batching interval (default 50ms); must "+
+				"not exceed reelection-timeout",
+		), fs.Duration(
 			"heartbeat-timeout", raft.DefaultHeartbeatTimeout,
 			"Leader heartbeat interval (default 33ms). Upper bound derives from the "+
 				"fixed 382ms check-quorum timeout: beyond 95ms a leader steps down "+
 				"on a single lost packet",
-		), fs.Duration(
-			"ticker-timeout", raft.DefaultTickerTimeout,
-			"Election timer polling tick (default 21ms); must be at most "+
-				"reelection-timeout/10",
 		), fs.Duration(
 			"reelection-timeout", raft.DefaultReelectionTimeout,
 			"Base of the randomized election timeout, actual timeout is in "+
@@ -212,10 +213,16 @@ func addTimingFlags(fs *flag.FlagSet) (applyBatch, heartbeat, reelection, ticker
 				"[reelection, 2*reelection); check-quorum stays fixed at 382ms and "+
 				"does not scale with this flag",
 		), fs.Duration(
-			"apply-batch-interval", raft.DefaultApplyBatchInterval,
-			"Leader-side safety-net apply batching interval (default 50ms); must "+
-				"not exceed reelection-timeout",
+			"ticker-timeout", raft.DefaultTickerTimeout,
+			"Election timer polling tick (default 21ms); must be at most "+
+				"reelection-timeout/10",
 		)
+}
+
+func addTraceFlags(fs *flag.FlagSet) (traceCMLogFileFlag, traceKVLogFileFlag *string, traceLogLevelFlag *int) {
+	return fs.String("trace-cm-log-file", "", "Trace consensus module log file path (empty = stderr)"),
+		fs.String("trace-kv-log-file", "", "Trace key-value database log file path (empty = stderr)"),
+		fs.Int("trace-log-level", 1, "Trace log level for the raft and kvservice packages")
 }
 
 func parsePeers(peers map[int]net.Addr, raw string) map[int]net.Addr {

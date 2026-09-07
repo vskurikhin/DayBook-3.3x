@@ -43,7 +43,7 @@ func TestPreVote_DisconnectedFollower_NoElection(t *testing.T) {
 	h.DisconnectPeer(otherID)
 
 	// keep: budgeted negative window — проверяется, что за целый
-	// worst-case election timeout (_maxElectionTimeout = 2*ReelectionTimeoutMs)
+	// worst-case election timeout (_maxElectionTimeout = 2*DefaultReelectionTimeout)
 	// отключённый узел НЕ увеличил term и не сменил лидера. Опрос
 	// не доказывает отсутствия события — окно осознанно временное;
 	// его уменьшение ослабило бы assert.
@@ -181,8 +181,8 @@ func TestPreVote_Disabled(t *testing.T) {
 
 	// Pre-Vote отключается на всех узлах кластера через опцию Harness
 	// ДО close(ready) — до старта фоновых горутин (никакой
-	// post-start мутации конфигурации). TickerTimeoutMs = 7*Quantum =
-	// 21ms — первый tick election timer не успевает сработать раньше.
+	// post-start мутации конфигурации). DefaultTickerTimeout = 21ms —
+	// первый tick election timer не успевает сработать раньше.
 	h := NewHarnessWithOptions(t, 3, DisablePreVote())
 	defer h.Shutdown()
 
@@ -399,7 +399,7 @@ func (m *notImplementedPreVoteTransport) RequestVote(_ ServerID, _ RequestVoteAr
 // pre-vote: транспорт блокирует RequestPreVote, ответы не приходят, и select
 // выходит по кейсу таймаута. Узел завершает в Follower с неизменённым
 // currentTerm (pre-vote терм не инкрементирует), а переход занимает не менее
-// ReelectionTimeoutMs — это отличает ветку таймаута от ветки потери.
+// DefaultReelectionTimeout — это отличает ветку таймаута от ветки потери.
 func TestPreVote_CollectTimeout_StepsDownToFollower(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
@@ -418,15 +418,15 @@ func TestPreVote_CollectTimeout_StepsDownToFollower(t *testing.T) {
 	if cm.cmState.currentTerm != 2 {
 		t.Fatalf("currentTerm = %d after pre-vote timeout, want 2 (pre-vote must not increment term)", cm.cmState.currentTerm)
 	}
-	if elapsed < time.Duration(ReelectionTimeoutMs)*time.Millisecond {
-		t.Fatalf("step-down via pre-vote timeout took %v, want >= %v", elapsed, time.Duration(ReelectionTimeoutMs)*time.Millisecond)
+	if elapsed < time.Duration(DefaultReelectionTimeout) {
+		t.Fatalf("step-down via pre-vote timeout took %v, want >= %v", elapsed, time.Duration(DefaultReelectionTimeout))
 	}
 }
 
 // TestPreVote_QuorumLost_StepsDownToFollower пинирует пост-select проверку
 // потери: транспорт отвечает отказом всем соседям, все ответы приходят,
 // votersResponded достигает totalVoters, и шаг вниз выполняет проверка потери,
-// а не кейс таймаута. Переход происходит строго быстрее ReelectionTimeoutMs —
+// а не кейс таймаута. Переход происходит строго быстрее DefaultReelectionTimeout —
 // без этой границы тест не отличает ветку потери от ветки таймаута.
 func TestPreVote_QuorumLost_StepsDownToFollower(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
@@ -444,8 +444,8 @@ func TestPreVote_QuorumLost_StepsDownToFollower(t *testing.T) {
 	if cm.cmState.currentTerm != 2 {
 		t.Fatalf("currentTerm = %d after pre-vote loss, want 2 (pre-vote must not increment term)", cm.cmState.currentTerm)
 	}
-	if elapsed >= time.Duration(ReelectionTimeoutMs)*time.Millisecond {
-		t.Fatalf("step-down via quorum loss took %v, want strictly faster than %v", elapsed, time.Duration(ReelectionTimeoutMs)*time.Millisecond)
+	if elapsed >= time.Duration(DefaultReelectionTimeout) {
+		t.Fatalf("step-down via quorum loss took %v, want strictly faster than %v", elapsed, time.Duration(DefaultReelectionTimeout))
 	}
 }
 

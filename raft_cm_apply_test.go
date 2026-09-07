@@ -496,7 +496,7 @@ const (
 
 	// applyLatencyBudget — предел медианы промежутка «фиксация →
 	// применение». Заметно меньше интервала страховочного тика
-	// (_applyBatchInterval): при применении по тику ожидание составляло бы
+	// (DefaultApplyBatchInterval): при применении по тику ожидание составляло бы
 	// в среднем около половины интервала.
 	applyLatencyBudget = 20 * time.Millisecond
 
@@ -679,7 +679,7 @@ func TestApplyOnCommit_SafetyTickApplies(t *testing.T) {
 
 	if err := waitCond(
 		"entry is re-applied by the safety tick",
-		2*_applyBatchInterval+_leaderElectionBudget,
+		2*DefaultApplyBatchInterval+_leaderElectionBudget,
 		func() bool { return countApplied() == 2 },
 		func() string { return "applied count = " + itoa(countApplied()) },
 	); err != nil {

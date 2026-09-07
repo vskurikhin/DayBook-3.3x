@@ -33,8 +33,8 @@ const (
 	_pollInterval = 10 * time.Millisecond
 
 	// _maxElectionTimeout — максимальный тайм-аут выборов:
-	// 2*ReelectionTimeoutMs = 762 мс.
-	_maxElectionTimeout = 2 * raft.ReelectionTimeoutMs * time.Millisecond
+	// 2*DefaultReelectionTimeout = 762 мс.
+	_maxElectionTimeout = 2 * raft.DefaultReelectionTimeout
 
 	// _maxReplicationBackoff — потолок задержки повторов репликации
 	// (1000 мс). Дублирует не экспортированное значение пакета raft;
@@ -54,28 +54,27 @@ const (
 	_serviceReadyBudget = _singleLeaderBudget
 
 	// _serviceProbeTimeout — тайм-аут одного HTTP-пробника готовности
-	// (тот же порядок, что у клиентских запросов харнесса:
-	// 600*Quantum = 1.8 с).
-	_serviceProbeTimeout = 600 * raft.Quantum * time.Millisecond
+	// (тот же порядок, что у клиентских запросов харнесса: 1.8 с).
+	_serviceProbeTimeout = 1800 * time.Millisecond
 
 	// _clientOpTimeout — тайм-аут контекста клиентских операций Put/Get
-	// (600*Quantum = 1.8 с); тот же порядок величины, что у пробника
+	// (1.8 с); тот же порядок величины, что у пробника
 	// готовности сервиса (_serviceProbeTimeout).
-	_clientOpTimeout = 600 * raft.Quantum * time.Millisecond
+	_clientOpTimeout = 1800 * time.Millisecond
 
-	// _clientOpTimeoutCAS — тайм-аут контекста CAS (800*Quantum =
-	// 2.4 с); увеличенный относительно Put/Get запас.
-	_clientOpTimeoutCAS = 800 * raft.Quantum * time.Millisecond
+	// _clientOpTimeoutCAS — тайм-аут контекста CAS (2.4 с);
+	// увеличенный относительно Put/Get запас.
+	_clientOpTimeoutCAS = 2400 * time.Millisecond
 
 	// _clientOpTimeoutProbe — тайм-аут контекста Get-пробников:
 	// проверка отсутствия ключа и одиночный запрос в ожидании
-	// значения (500*Quantum = 1.5 с).
-	_clientOpTimeoutProbe = 500 * raft.Quantum * time.Millisecond
+	// значения (1.5 с).
+	_clientOpTimeoutProbe = 1500 * time.Millisecond
 
 	// _clientOpTimeoutShort — короткий дедлайн Get в контроле истечения
-	// тайм-аута клиентом (300*Quantum = 0.9 с): сервис с отключёнными
+	// тайм-аута клиентом (0.9 с): сервис с отключёнными
 	// ответами не успевает зафиксировать команду за это время.
-	_clientOpTimeoutShort = 300 * raft.Quantum * time.Millisecond
+	_clientOpTimeoutShort = 900 * time.Millisecond
 
 	// _waitKeyValueBudget — бюджет схождения значения ключа
 	// в ожидании WaitForKeyValue (2 с).

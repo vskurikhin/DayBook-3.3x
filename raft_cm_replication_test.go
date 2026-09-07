@@ -191,7 +191,7 @@ func TestLeaderSendAEs_Deduplication(t *testing.T) {
 	cm.leaderSendAEs()
 
 	// Негативный assert — budgeted negative window (классификация).
-	// Бюджет выведен из протокольной константы HeartbeatTimeoutMs:
+	// Бюджет выведен из протокольной константы DefaultHeartbeatTimeout:
 	// за интервал heartbeat сломанная дедупликация успела бы выполнить
 	// как минимум один AppendEntries.
 	//
@@ -201,7 +201,7 @@ func TestLeaderSendAEs_Deduplication(t *testing.T) {
 	// assert, уменьшение — ослабляет его.
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
-	sleepMs(HeartbeatTimeoutMs)
+	sleepMs(int(DefaultHeartbeatTimeout.Milliseconds()))
 
 	if calls := mock.callCount.Load(); calls > 0 {
 		t.Errorf("expected 0 AppendEntries calls (dedup active), got %d", calls)
@@ -1183,7 +1183,7 @@ func TestReplicationBackoff_SkipsTransportAndDoesNotRecordAttempt(t *testing.T) 
 			matchIndex:             map[int]int{1: 0},
 			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
 			nextVerifyRedispatchAt: map[int]time.Time{},
-			// Одна транспортная ошибка при HeartbeatTimeoutMs = 33 даёт
+			// Одна транспортная ошибка при DefaultHeartbeatTimeout = 33 даёт
 			// задержку 66 мс, поэтому только что зафиксированная попытка
 			// гарантирует активную задержку.
 			replFailures: map[int]int{1: 1},

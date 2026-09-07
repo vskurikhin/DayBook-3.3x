@@ -19,8 +19,8 @@ const _submitTimeout = 5 * time.Second
 
 const (
 	// _maxElectionTimeout — максимальный election timeout:
-	// 2*ReelectionTimeoutMs = 762ms.
-	_maxElectionTimeout = 2 * ReelectionTimeoutMs * time.Millisecond
+	// 2*DefaultReelectionTimeout = 762ms.
+	_maxElectionTimeout = 2 * DefaultReelectionTimeout
 
 	// _preVoteRound — worst-case раунда Pre-Vote (≈ _maxElectionTimeout).
 	_preVoteRound = _maxElectionTimeout
@@ -31,8 +31,8 @@ const (
 	_inmemRPCTimeout = transp.InmemTransportTimeout
 
 	// _commitBudgetSteady — бюджет ожидания фиксации при устоявшемся лидере:
-	// 4*(_applyBatchInterval + _inmemRPCTimeout) = 4*(50ms+500ms) = 2.2s.
-	_commitBudgetSteady = 4 * (_applyBatchInterval + _inmemRPCTimeout)
+	// 4*(DefaultApplyBatchInterval + _inmemRPCTimeout) = 4*(50ms+500ms) = 2.2s.
+	_commitBudgetSteady = 4 * (DefaultApplyBatchInterval + _inmemRPCTimeout)
 
 	// _failoverBudgetMargin — запас бюджета after-failover для поглощения
 	// межфазных задержек (worst-case 2*762 + 762 + 50 + 200 ≈ 2.5s).
@@ -40,8 +40,8 @@ const (
 
 	// _commitBudgetAfterFailover — бюджет ожидания фиксации для сценариев
 	// с возможными перевыборами (disconnect/restart/leadership transfer):
-	// 2*_maxElectionTimeout + _preVoteRound + _applyBatchInterval + запас ≈ 2.5–3s.
-	_commitBudgetAfterFailover = 2*_maxElectionTimeout + _preVoteRound + _applyBatchInterval + _failoverBudgetMargin
+	// 2*_maxElectionTimeout + _preVoteRound + DefaultApplyBatchInterval + запас ≈ 2.5–3s.
+	_commitBudgetAfterFailover = 2*_maxElectionTimeout + _preVoteRound + DefaultApplyBatchInterval + _failoverBudgetMargin
 
 	// _leaderElectionBudget — бюджет ожидания выборов лидера
 	// (§9 architecture.md): 2*_maxElectionTimeout + _preVoteRound ≈ 2.3s.
@@ -59,9 +59,9 @@ const (
 	// _snapshotConvergenceBudget — бюджет схождения снимка к вершине журнала.
 	// Вывод при интервале снимков, заданном тестом (например, 50 мс):
 	// после возврата последнего Apply машина состояний догоняет журнал
-	// не позднее чем за _applyBatchInterval (50 мс), а ближайший тик цикла
+	// не позднее чем за DefaultApplyBatchInterval (50 мс), а ближайший тик цикла
 	// снимков создаёт снимок с индексом машины состояний; худший случай —
-	// _applyBatchInterval + 2*snapshotInterval = 150 мс при интервале 50 мс.
+	// DefaultApplyBatchInterval + 2*snapshotInterval = 150 мс при интервале 50 мс.
 	// Значение берётся равным _commitBudgetSteady = 2.2 с: тот же способ
 	// вывода из констант, запас более чем 14-кратный, отдельная константа
 	// с литералом не вводится.
@@ -159,7 +159,8 @@ func NewHarness(t *testing.T, n int) *Harness {
 }
 
 // NewHarnessWithOptions создаёт Harness с опциями opts, применяемыми
-// к каждому узлу до close(ready) (до старта фоновых горутин).
+// к каждому узлу после конструктора, запустившего фоновые горутины,
+// и до close(ready).
 func NewHarnessWithOptions(t *testing.T, n int, opts ...HarnessOption) *Harness {
 	cluster := make([]*ConsensusModule, n)
 	transports := make([]*transp.InmemTransport, n)
@@ -200,8 +201,8 @@ func NewHarnessWithOptions(t *testing.T, n int, opts ...HarnessOption) *Harness 
 			i, peerIds, transports[i],
 			storage[i], NewCommitChannelFSM(commitChans[i]), ready,
 		)
-		// Опции применяются до close(ready) — до старта фоновых
-		// горутин узла; никакой post-start мутации.
+		// Опции применяются после конструктора (фоновые горутины узла уже
+		// запущены) и до close(ready); никакой post-start мутации.
 		for _, opt := range opts {
 			opt(cluster[i])
 		}

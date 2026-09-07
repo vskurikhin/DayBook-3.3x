@@ -12,7 +12,7 @@ import (
 // Стресс‑режим для тестирования выборов: если задана переменная окружения
 // (имя — forcedReelectionEnv из производственного файла), функция
 // electionTimeout() в трети случаев возвращает фиксированное значение
-// ReelectionTimeoutMs. Это отключает рандомизацию таймаута, чтобы провоцировать
+// DefaultReelectionTimeout. Это отключает рандомизацию таймаута, чтобы провоцировать
 // одновременные попытки запуска выборов и проверять устойчивость алгоритма.
 // Переменная читается один раз при создании CM и кэшируется в переменную
 // пакета _forcedReelectionHook (ADR-CONF-011); тесты выставляют её помощником
@@ -25,14 +25,14 @@ const (
 	hookSamples = 1000
 
 	// wantHookedShare — нижняя граница доли значений, равных ровно
-	// ReelectionTimeoutMs, при ВКЛЮЧЁННОМ хуке. Матожидание доли — 1/3
+	// DefaultReelectionTimeout, при ВКЛЮЧЁННОМ хуке. Матожидание доли — 1/3
 	// (rand.Intn(3) == 0); при M = 1000 σ = sqrt(p(1-p)/M) ≈ 0.0149,
 	// поэтому порог 0.20 отстоит от матожидания примерно на 9σ.
 	wantHookedShare = 0.20
 
 	// maxUnhookedShare — верхняя граница той же доли при ВЫКЛЮЧЕННОМ
-	// хуке. Там значение ReelectionTimeoutMs выпадает только при
-	// rand.Intn(ReelectionTimeoutMs) == 0, то есть с вероятностью
+	// хуке. Там значение DefaultReelectionTimeout выпадает только при
+	// rand.Intn(DefaultReelectionTimeout) == 0, то есть с вероятностью
 	// 1/381 ≈ 0.26 %; при M = 1000 σ ≈ 0.0016, и порог 0.05 отстоит
 	// от матожидания примерно на 30σ.
 	maxUnhookedShare = 0.05
@@ -56,7 +56,7 @@ const (
 func TestElectionTimeout_ForcedReelectionHook(t *testing.T) {
 	// Переменная пакета _forcedReelectionHook — общее состояние, поэтому
 	// тест остаётся serial (t.Parallel не используется).
-	hooked := time.Duration(ReelectionTimeoutMs) * time.Millisecond
+	hooked := time.Duration(DefaultReelectionTimeout)
 
 	// Порядок ветвей: сначала контрольная (хук выключен), затем с хуком.
 	t.Run("hook disabled", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestElectionTimeout_ForcedReelectionHook(t *testing.T) {
 		if share > maxUnhookedShare {
 			t.Errorf(
 				"без хука доля значений ровно %v = %.4f, want <= %.2f (матожидание 1/%d)",
-				hooked, share, maxUnhookedShare, ReelectionTimeoutMs,
+				hooked, share, maxUnhookedShare, int(DefaultReelectionTimeout.Milliseconds()),
 			)
 		}
 	})
@@ -104,8 +104,8 @@ func setForcedReelectionHook(t *testing.T, enabled bool) {
 func hookedShare(t *testing.T, hooked time.Duration) float64 {
 	t.Helper()
 
-	minTimeout := time.Duration(ReelectionTimeoutMs) * time.Millisecond
-	maxTimeout := time.Duration(2*ReelectionTimeoutMs) * time.Millisecond
+	minTimeout := time.Duration(DefaultReelectionTimeout)
+	maxTimeout := 2 * DefaultReelectionTimeout
 
 	cm := &ConsensusModule{}
 	exact := 0

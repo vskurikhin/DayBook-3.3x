@@ -403,7 +403,7 @@ func TestSnapshot_NoSnapshotStore(t *testing.T) {
 	}
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
-	sleepMs(ReelectionTimeoutMs)
+	sleepMs(int(DefaultReelectionTimeout.Milliseconds()))
 
 	// Проверяем, что lastSnapshotIndex == -1 на всех узлах.
 	for i := 0; i < h.n; i++ {
@@ -782,7 +782,7 @@ func (h *snapshotHarness) waitForSingleLeader() int {
 			}
 		}
 		// poll-интервал condition-wait (не фиксированная пауза).
-		time.Sleep(HeartbeatTimeoutMs * time.Millisecond * 2)
+		time.Sleep(2 * DefaultHeartbeatTimeout)
 	}
 	return -1
 }
@@ -797,7 +797,7 @@ func (h *snapshotHarness) waitForSingleLeader() int {
 // зона S ∈ {26..29}, из которой система по своим правилам не выходит.
 //
 // Бюджет каждого ожидания — _snapshotConvergenceBudget: худший случай
-// схождения при интервале снимков 50 мс — _applyBatchInterval + 2 интервала
+// схождения при интервале снимков 50 мс — DefaultApplyBatchInterval + 2 интервала
 // снимков = 150 мс, запас более чем 14-кратный.
 func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
@@ -1459,7 +1459,7 @@ func TestSnapshot_InstallIdempotency(t *testing.T) {
 	before := h.installSnapshotCount(followerID)
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
-	sleepMs(ReelectionTimeoutMs * 2)
+	sleepMs(2 * int(DefaultReelectionTimeout.Milliseconds()))
 	if n := h.installSnapshotCount(followerID); n != before {
 		t.Fatalf("InstallSnapshot storm: count %d -> %d", before, n)
 	}

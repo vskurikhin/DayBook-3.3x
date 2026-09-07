@@ -309,7 +309,7 @@ func TestDisconnectLeaderAndFollower(t *testing.T) {
 
 	c := h.NewClient()
 	for r := 0; r < 10; r++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 300*raft.Quantum*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 900*time.Millisecond)
 		_, _, err := c.ConsensusGet(ctx, "key0")
 		cancel()
 		if err != nil {
@@ -477,7 +477,7 @@ func TestRestartServiceGetsNewPort(t *testing.T) {
 // и отвечает как на лидере, так и на follower'е).
 func checkServiceReachable(t *testing.T, addr string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 600*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Millisecond)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(

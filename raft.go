@@ -10,14 +10,6 @@ import (
 )
 
 const (
-	// Quantum — множитель для всех Raft-таймеров.
-	// Для тестового ускорения Quantum не меняется — используются
-	// test-only хуки (RAFT_FORCE_MORE_REELECTION и аналоги).
-	Quantum             = 3
-	HeartbeatTimeoutMs  = 11 * Quantum
-	ReelectionTimeoutMs = 127 * Quantum
-	TickerTimeoutMs     = 7 * Quantum
-
 	// DefaultApplyBatchInterval — интервал, с которым цикл лидера проверяет
 	// необходимость применения записей к FSM. Накопление уведомлений канала
 	// фиксации за этот интервал позволяет объединять несколько мелких
@@ -37,12 +29,6 @@ const (
 	// LeaktestBudget — единый бюджет leaktest:
 	// max(_inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
 	LeaktestBudget = 600 * time.Millisecond
-
-	// _applyBatchInterval — интервал, с которым цикл лидера проверяет
-	// необходимость применения записей к FSM. Накопление уведомлений канала
-	// фиксации за этот интервал позволяет объединять несколько мелких
-	// фиксаций в один батч.
-	_applyBatchInterval = 50 * time.Millisecond
 
 	// _batchApplyBuffer — ёмкость fsmMutateCh для burst-устойчивости.
 	// Выбрана как 1024: при массовой фиксации processLogs не блокируется.
