@@ -187,7 +187,7 @@ func TestDisconnectLeaderWeakGetTimesOut(t *testing.T) {
 // заголовком Allow (содержит GET) — при wildcard-паттерне ЛЮБОЙ
 // POST (с остатком и без) даёт 405 (проверено прогонами). Кейс
 // HEAD: неявное обслуживание GET-паттерном (Q6) — StatusOK,
-// тело подавлено, Cache-Control: no-store (SA-759).
+// тело подавлено, Cache-Control: no-store.
 func TestWeakGetPostMethodNotAllowed(t *testing.T) {
 	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
@@ -244,9 +244,9 @@ func TestWeakGetPostMethodNotAllowed(t *testing.T) {
 // ("", ".", "..") проходят сквозь pathKey (клиент) и PathValue
 // (сервер) без потерь; прямой GET с кодированным остатком даёт тот
 // же ответ, что и WeakGet. Пустой ключ законно возвращает
-// ("", false, nil) — как до Этапа 5 (SA-753: регресс недопустим).
+// ("", false, nil).
 // Временной ассерт: каждый WeakGet укладывается в 2 c — шторм
-// повторов (5628 запросов за 1,2 с в прогоне SA) исключён.
+// повторов (5628 запросов за 1,2 с в прогоне) исключён.
 func TestWeakGetKeyEncoding(t *testing.T) {
 	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 

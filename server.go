@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -51,7 +52,6 @@ type Server struct {
 
 // Config — конфигурация для создания нового сервера Raft.
 type Config struct {
-
 	// ApplyBatchInterval — интервал батча применения записей к FSM
 	// (0 = умолчание).
 	ApplyBatchInterval time.Duration
@@ -138,6 +138,19 @@ func (s *Server) Serve() {
 	if applyBatch <= 0 {
 		applyBatch = DefaultApplyBatchInterval
 	}
+
+	// Защитная проверка программного входа: эффективные значения после
+	// нормализации обязаны проходить валидацию. При нарушении — стратегия
+	// немедленного отказа (log.Fatalf) по прецеденту конструктора CM.
+	if err := ValidateTiming(TimerConfig{
+		ApplyBatch: applyBatch,
+		Heartbeat:  heartbeat,
+		Reelection: reelection,
+		Ticker:     ticker,
+	}); err != nil {
+		log.Fatalf("raft: Serve: invalid timing configuration: %v", err)
+	}
+
 	s.cm.setTimerConfig(TimerConfig{
 		ApplyBatch: applyBatch,
 		Heartbeat:  heartbeat,

@@ -536,7 +536,7 @@ func TestChooseOp(t *testing.T) {
 // TestDeletePercentSaturating проверяет интеграционное поведение при
 // DeletePercent=100 и VerifyPercent=100: каждая операция — удаление, после
 // каждого успешного удаления выполняется verify-after-delete слабым чтением,
-// а сумма всех шести *Done равна числу выполненных HTTP-запросов (SA-602).
+// а сумма всех шести *Done равна числу выполненных HTTP-запросов.
 func TestDeletePercentSaturating(t *testing.T) {
 	resetMetrics()
 	setValues(t, config.Values{
@@ -592,7 +592,7 @@ func TestDeletePercentSaturating(t *testing.T) {
 	}
 	// Сумма всех шести *Done равна числу выполненных HTTP-запросов: каждая
 	// операция (удаление или перечитывание) даёт ровно один запрос и один
-	// счётчик *Done (SA-602).
+	// счётчик *Done.
 	if done := doneTotal(); done != requests {
 		t.Errorf("done total = %d, HTTP requests = %d, want equal", done, requests)
 	}

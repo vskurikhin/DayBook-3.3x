@@ -30,12 +30,21 @@ type Values struct {
 	Number      int
 	Peers       map[int]net.Addr
 
+	// ApplyBatchInterval — интервал батча применения записей к FSM.
+	// Ноль — защитное значение: применяется raft.DefaultApplyBatchInterval.
+	ApplyBatchInterval time.Duration
 	// DataDir — директория для persistent-хранилища узла;
 	// пустая строка — вычисляется путь по умолчанию в cmd/main.go.
 	DataDir string
+	// HeartbeatTimeout — период пульса лидера. Ноль — защитное значение:
+	// применяется raft.DefaultHeartbeatTimeout.
+	HeartbeatTimeout time.Duration
 	// MaxPool — максимальное количество соединений в пуле на один адрес
 	// соседа; ноль заменяется на DefaultMaxPool при сборке конфигурации узла.
 	MaxPool int
+	// ReelectionTimeout — база тайм-аута выборов. Ноль — защитное значение:
+	// применяется raft.DefaultReelectionTimeout.
+	ReelectionTimeout time.Duration
 	// SnapshotInterval — интервал проверки необходимости снимка.
 	// Ноль — защитное значение: применяется дефолт конструктора.
 	SnapshotInterval time.Duration
@@ -47,6 +56,9 @@ type Values struct {
 	// применяется дефолт транспорта (raft.TCPRPCTimeout, 191 мс). Связь
 	// значения с проверкой кворума лидера — в подсказке флага.
 	TCPRPCTimeout time.Duration
+	// TickerTimeout — такт тикера выборов. Ноль — защитное значение:
+	// применяется raft.DefaultTickerTimeout.
+	TickerTimeout time.Duration
 	// TraceCMLogFile — путь к файлу трассировки ConsensusModule; пустая строка — stderr.
 	TraceCMLogFile string
 	// TraceKVLogFile — путь к файлу трассировки Key-Value; пустая строка — stderr.
@@ -68,6 +80,7 @@ type Values struct {
 
 func ParseFlags() Values {
 	fs := flag.NewFlagSet("raft", flag.ContinueOnError)
+	applyBatchIntervalFlag, heartbeatTimeoutFlag, reelectionTimeoutFlag, tickerTimeoutFlag := addTimingFlags(fs)
 	blockProfileRateFlag := fs.Int("block-profile-rate", 0, "Block profile rate (0 = disabled)")
 	dataDirFlag := fs.String("data-dir", "", "Directory for persistent storage")
 	httpAddressFlag := fs.String("http-addr", ":8880", "HTTP server listen address")
@@ -130,24 +143,79 @@ func ParseFlags() Values {
 		log.Fatalf("-snapshot-threshold must be at least 1, got %d", *snapshotThresholdFlag)
 	}
 
+	checkTimingFlags(heartbeatTimeoutFlag, tickerTimeoutFlag, reelectionTimeoutFlag, applyBatchIntervalFlag)
+
 	return Values{
-		HTTPAddress:       httpAddress,
-		RPCAddress:        rpcAddress,
-		Number:            *numberFlag,
-		Peers:             peers,
-		TraceLogLevel:     *traceLogLevelFlag,
-		TraceCMLogFile:    *traceCMLogFileFlag,
-		TraceKVLogFile:    *traceKVLogFileFlag,
-		DataDir:           *dataDirFlag,
-		MaxPool:           *maxPoolFlag,
-		TCPRPCTimeout:     *tcpRPCTimeoutFlag,
-		SnapshotInterval:  *snapshotIntervalFlag,
-		SnapshotThreshold: *snapshotThresholdFlag,
+		ApplyBatchInterval: *applyBatchIntervalFlag,
+		DataDir:            *dataDirFlag,
+		HTTPAddress:        httpAddress,
+		HeartbeatTimeout:   *heartbeatTimeoutFlag,
+		MaxPool:            *maxPoolFlag,
+		Number:             *numberFlag,
+		Peers:              peers,
+		RPCAddress:         rpcAddress,
+		ReelectionTimeout:  *reelectionTimeoutFlag,
+		SnapshotInterval:   *snapshotIntervalFlag,
+		SnapshotThreshold:  *snapshotThresholdFlag,
+		TCPRPCTimeout:      *tcpRPCTimeoutFlag,
+		TickerTimeout:      *tickerTimeoutFlag,
+		TraceCMLogFile:     *traceCMLogFileFlag,
+		TraceKVLogFile:     *traceKVLogFileFlag,
+		TraceLogLevel:      *traceLogLevelFlag,
 
 		PprofAddress:         *pprofAddressFlag,
 		BlockProfileRate:     *blockProfileRateFlag,
 		MutexProfileFraction: *mutexProfileFractionFlag,
 	}
+}
+
+// validateTimingFlags — тонкая тестируемая обёртка над
+// raft.ValidateTiming: собирает временные параметры в TimerConfig и
+// делегирует проверку пакету raft (владельцу инвариантов). Возвращает
+// ошибку со всеми нарушениями сразу.
+func validateTimingFlags(heartbeat, ticker, reelection, applyBatch time.Duration) error {
+	return raft.ValidateTiming(raft.TimerConfig{
+		ApplyBatch: applyBatch,
+		Heartbeat:  heartbeat,
+		Reelection: reelection,
+		Ticker:     ticker,
+	})
+}
+
+// checkTimingFlags выполняет раннюю отказку для недопустимых значений
+// временных флагов узла: индивидуальные границы и межпараметрические
+// соотношения проверяются выделенной тестируемой функцией, сообщение
+// содержит имя параметра, фактическое значение и требование.
+func checkTimingFlags(heartbeat, ticker, reelection, applyBatch *time.Duration) {
+	if err := validateTimingFlags(*heartbeat, *ticker, *reelection, *applyBatch); err != nil {
+		log.Fatalf("invalid Raft timing flags: %v", err)
+	}
+}
+
+// addTimingFlags регистрирует четыре временных флага узла и возвращает
+// их указатели. Вынесено из ParseFlags для сокращения функции.
+func addTimingFlags(fs *flag.FlagSet) (applyBatch, heartbeat, reelection, ticker *time.Duration) {
+	return fs.Duration(
+			"heartbeat-timeout", raft.DefaultHeartbeatTimeout,
+			"Leader heartbeat interval (default 33ms). Upper bound derives from the "+
+				"fixed 382ms check-quorum timeout: beyond 95ms a leader steps down "+
+				"on a single lost packet",
+		), fs.Duration(
+			"ticker-timeout", raft.DefaultTickerTimeout,
+			"Election timer polling tick (default 21ms); must be at most "+
+				"reelection-timeout/10",
+		), fs.Duration(
+			"reelection-timeout", raft.DefaultReelectionTimeout,
+			"Base of the randomized election timeout, actual timeout is in "+
+				"[reelection, 2*reelection) (default 381ms); must be at least 10x "+
+				"heartbeat-timeout; also gates the pre-vote suppression window "+
+				"[reelection, 2*reelection); check-quorum stays fixed at 382ms and "+
+				"does not scale with this flag",
+		), fs.Duration(
+			"apply-batch-interval", raft.DefaultApplyBatchInterval,
+			"Leader-side safety-net apply batching interval (default 50ms); must "+
+				"not exceed reelection-timeout",
+		)
 }
 
 func parsePeers(peers map[int]net.Addr, raw string) map[int]net.Addr {

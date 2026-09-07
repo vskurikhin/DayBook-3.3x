@@ -1,6 +1,8 @@
 package raft
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"sync/atomic"
@@ -52,9 +54,11 @@ const (
 	// чем завершается один RPC (AppendEntries к одному соседу
 	// сериализованы флагом inflightAE), а дедлайн одного RPC равен
 	// TCPRPCTimeout и масштабируется объёмом передаваемых записей;
-	// двукратный запас покрывает один полный тайм-аут RPC. Итоговая
-	// величина близка к ReelectionTimeoutMs: лидер обнаруживает потерю
-	// кворума не позже, чем ведомый начинает выборы.
+	// двукратный запас покрывает один полный тайм-аут RPC.
+	// Соотношение с базой перевыборов: обнаружение потери кворума
+	// приходится на [CQ; CQ+HB) (проверка выполняется по тику пульса),
+	// а ведомый начинает выборы на [RE; 2·RE). На умолчаниях величины
+	// почти совпадают: 382 мс против [381; 762) мс.
 	_defaultCheckQuorumTimeout = 2 * _defaultTCPRPCTimeout
 
 	// DefaultSnapshotInterval — интервал проверки необходимости снимка.
@@ -118,6 +122,41 @@ const (
 	_verifyChBuffer = 64
 )
 
+// Границы допустимых значений временных параметров узла. Все границы
+// выражены целым числом миллисекунд и используются функцией ValidateTiming.
+const (
+	// MinHeartbeatTimeout — минимальный период пульса лидера.
+	MinHeartbeatTimeout = 5 * time.Millisecond
+	// MaxHeartbeatTimeout — максимальный период пульса лидера. Верхняя
+	// граница выводится из фиксированного check-quorum тайм-аута
+	// (382 мс): в окне проверки кворума лидер должен успеть не менее
+	// четырёх раз связаться с соседями. Целочисленное выражение
+	// ⌊382/4⌋ = 95 мс сохраняет требование целого числа миллисекунд.
+	//nolint:durationcheck // целочисленное округление вниз до целых мс (⌊382/4⌋ = 95)
+	MaxHeartbeatTimeout = _defaultCheckQuorumTimeout / 4 / time.Millisecond * time.Millisecond
+
+	// MinTickerTimeout — минимальный такт тикера выборов.
+	MinTickerTimeout = 1 * time.Millisecond
+	// MaxTickerTimeout — максимальный такт тикера выборов. Санитарный
+	// предел: такт задаёт ошибку квантования тайм-аута выборов.
+	MaxTickerTimeout = 1000 * time.Millisecond
+
+	// MinReelectionTimeout — минимальная база тайм-аута выборов. Нижняя
+	// граница связана с джиттером pre-vote (50 мс): джиттер не должен быть
+	// сопоставим с тайм-аутом, 4 × 50 = 200 мс.
+	MinReelectionTimeout = 4 * _preVoteJitterMs * time.Millisecond
+	// MaxReelectionTimeout — максимальная база тайм-аута выборов.
+	// Санитарный предел: цикл перевыборов до 2 × 30 с, и окно подавления
+	// pre-vote на получателе также до 2 × 30 с.
+	MaxReelectionTimeout = 30000 * time.Millisecond
+
+	// MinApplyBatchInterval — минимальный интервал батча применения.
+	MinApplyBatchInterval = 1 * time.Millisecond
+	// MaxApplyBatchInterval — максимальный интервал батча применения.
+	// Санитарный предел страховочного тика лидера.
+	MaxApplyBatchInterval = 5000 * time.Millisecond
+)
+
 // TimerConfig — набор временных параметров узла Raft. Все значения —
 // time.Duration; нулевое или отрицательное значение означает умолчание
 // соответствующей константы Default*.
@@ -130,6 +169,54 @@ type TimerConfig struct {
 	Reelection time.Duration
 	// Ticker — такт тикера выборов.
 	Ticker time.Duration
+}
+
+// ValidateTiming проверяет временные параметры узла: индивидуальные
+// границы каждого параметра (диапазон и целое число миллисекунд).
+// Функция чистая, без побочных эффектов; все нарушения собираются
+// в одну ошибку (errors.Join).
+func ValidateTiming(tc TimerConfig) error {
+	var errs []error
+	check := func(ok bool, format string, args ...any) {
+		if !ok {
+			errs = append(errs, fmt.Errorf(format, args...))
+		}
+	}
+	check(
+		tc.Heartbeat >= MinHeartbeatTimeout && tc.Heartbeat <= MaxHeartbeatTimeout && tc.Heartbeat%time.Millisecond == 0,
+		"heartbeat-timeout must be between %v and %v, got %v", MinHeartbeatTimeout, MaxHeartbeatTimeout, tc.Heartbeat,
+	)
+	check(
+		tc.Ticker >= MinTickerTimeout && tc.Ticker <= MaxTickerTimeout && tc.Ticker%time.Millisecond == 0,
+		"ticker-timeout must be between %v and %v, got %v", MinTickerTimeout, MaxTickerTimeout, tc.Ticker,
+	)
+	check(
+		tc.Reelection >= MinReelectionTimeout && tc.Reelection <= MaxReelectionTimeout && tc.Reelection%time.Millisecond == 0,
+		"reelection-timeout must be between %v and %v, got %v", MinReelectionTimeout, MaxReelectionTimeout, tc.Reelection,
+	)
+	check(
+		tc.ApplyBatch >= MinApplyBatchInterval && tc.ApplyBatch <= MaxApplyBatchInterval && tc.ApplyBatch%time.Millisecond == 0,
+		"apply-batch-interval must be between %v and %v, got %v", MinApplyBatchInterval, MaxApplyBatchInterval, tc.ApplyBatch,
+	)
+	check(
+		tc.Reelection >= 10*tc.Heartbeat,
+		"reelection-timeout must be at least 10x heartbeat-timeout: got %v vs heartbeat-timeout %v",
+		tc.Reelection, tc.Heartbeat,
+	)
+	check(
+		tc.Ticker <= tc.Reelection/10,
+		"ticker-timeout must be at most reelection-timeout/10: got %v vs reelection-timeout %v",
+		tc.Ticker, tc.Reelection,
+	)
+	check(
+		tc.ApplyBatch <= tc.Reelection,
+		"apply-batch-interval must not exceed reelection-timeout: got %v vs reelection-timeout %v",
+		tc.ApplyBatch, tc.Reelection,
+	)
+	if len(errs) == 0 {
+		return nil
+	}
+	return errors.Join(errs...)
 }
 
 // CommitEntry — это данные, которые Raft отправляет в канал фиксации.
@@ -216,7 +303,7 @@ func NewConsensusModule(
 	_traceCMCreated.Store(true)
 	// Единственное чтение переменной окружения хука форсирования выборов
 	// выполняется при старте: значение кэшируется в переменную пакета на
-	// весь процесс (см. ADR-CONF-011).
+	// весь процесс.
 	_forcedReelectionHook.Store(os.Getenv(forcedReelectionEnv) != "")
 	cm := new(ConsensusModule)
 	cm.id = id

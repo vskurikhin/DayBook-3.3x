@@ -86,13 +86,17 @@ func runWith(values *config.Values) (func(), error) {
 	cfg := kvservice.Config{
 		HTTPAddress: values.HTTPAddress.String(),
 		Config: raft.Config{
-			PeerAddresses:     values.Peers,
-			PeerIds:           nums,
-			ServerID:          values.Number,
-			SnapshotStore:     snapshotStore,
-			Storage:           store.NewFileStorage(dataDir),
-			SnapshotInterval:  values.SnapshotInterval,
-			SnapshotThreshold: values.SnapshotThreshold,
+			ApplyBatchInterval: values.ApplyBatchInterval,
+			HeartbeatTimeout:   values.HeartbeatTimeout,
+			PeerAddresses:      values.Peers,
+			PeerIds:            nums,
+			ReelectionTimeout:  values.ReelectionTimeout,
+			ServerID:           values.Number,
+			SnapshotInterval:   values.SnapshotInterval,
+			SnapshotStore:      snapshotStore,
+			SnapshotThreshold:  values.SnapshotThreshold,
+			Storage:            store.NewFileStorage(dataDir),
+			TickerTimeout:      values.TickerTimeout,
 		},
 	}
 
