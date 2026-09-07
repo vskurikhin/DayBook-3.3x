@@ -30,8 +30,12 @@ type KVClient struct {
 
 	// assumedLeader — индекс (в addrs) сервиса, который в данный момент
 	// предполагается лидером кластера. По умолчанию инициализируется нулём,
-	// что не влияет на общность алгоритма.
-	assumedLeader int
+	// что не влияет на общность алгоритма. Один экземпляр клиента разделяется
+	// несколькими горутинами, поэтому индекс читается и меняется атомарно.
+	assumedLeader atomic.Int64
+
+	// requestTimeout — таймаут одного HTTP-запроса этого экземпляра клиента.
+	requestTimeout time.Duration
 
 	// clientID — уникальный идентификатор клиента. Управляется внутри этого
 	// файла путём увеличения глобального счётчика clientCount.
@@ -40,13 +44,33 @@ type KVClient struct {
 
 // New создаёт новый экземпляр KVClient. serviceAddrs — список адресов
 // (каждый в формате "host:port") сервисов кластера KVService, с которыми
-// будет взаимодействовать клиент.
+// будет взаимодействовать клиент. Таймаут одного запроса —
+// defaultRequestTimeout.
 func New(serviceAddrs []string) *KVClient {
+	return NewWithTimeout(serviceAddrs, defaultRequestTimeout)
+}
+
+// NewWithTimeout создаёт экземпляр KVClient с заданным таймаутом одного
+// HTTP-запроса. Нужен измерительным сценариям, где таймаут по умолчанию
+// обрезает хвост распределения времени ответа.
+func NewWithTimeout(serviceAddrs []string, timeout time.Duration) *KVClient {
 	return &KVClient{
-		addrs:         serviceAddrs,
-		assumedLeader: 0,
-		clientID:      clientCount.Add(1),
+		addrs:          serviceAddrs,
+		requestTimeout: timeout,
+		clientID:       clientCount.Add(1),
 	}
+}
+
+// leader возвращает индекс адреса, который клиент сейчас считает лидером.
+func (c *KVClient) leader() int {
+	return int(c.assumedLeader.Load())
+}
+
+// nextLeader переводит клиента на следующий адрес списка. При одновременном
+// вызове из нескольких горутин один адрес может быть пропущен — это свойство
+// исходного алгоритма ротации сохраняется.
+func (c *KVClient) nextLeader() {
+	c.assumedLeader.Store(int64((c.leader() + 1) % len(c.addrs)))
 }
 
 // clientCount используется для назначения уникальных идентификаторов
@@ -59,9 +83,10 @@ var clientCount atomic.Int32
 // Позволяет клиенту быстро обнаружить смену лидера без лишних KV-запросов.
 func (c *KVClient) VerifyLeader(ctx context.Context) (int, error) {
 	for {
-		path := fmt.Sprintf("http://%s/verifyleader/", c.addrs[c.assumedLeader])
+		leader := c.leader()
+		path := fmt.Sprintf("http://%s/verifyleader/", c.addrs[leader])
 
-		reqCtx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
+		reqCtx, cancel := context.WithTimeout(ctx, c.requestTimeout)
 		var resp api.Response
 		err := sendJSONRequest(reqCtx, path, nil, &resp)
 		cancel()
@@ -69,18 +94,18 @@ func (c *KVClient) VerifyLeader(ctx context.Context) (int, error) {
 			if ctx.Err() != nil {
 				return -1, err
 			}
-			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			c.nextLeader()
 			continue
 		}
 
 		switch resp.Status() {
 		case api.StatusOK:
-			return c.assumedLeader, nil
+			return leader, nil
 		case api.StatusNotLeader:
-			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			c.nextLeader()
 			continue
 		default:
-			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			c.nextLeader()
 			continue
 		}
 	}
@@ -130,8 +155,8 @@ func (c *KVClient) CAS(ctx context.Context, key, compare, value string) (string,
 
 func (c *KVClient) send(ctx context.Context, route string, req any, resp api.Response) error {
 	for {
-		reqCtx, reqCtxCancel := context.WithTimeout(ctx, defaultRequestTimeout)
-		path := fmt.Sprintf("http://%s/%s/", c.addrs[c.assumedLeader], route)
+		reqCtx, reqCtxCancel := context.WithTimeout(ctx, c.requestTimeout)
+		path := fmt.Sprintf("http://%s/%s/", c.addrs[c.leader()], route)
 
 		c.clientLogf("sending %#v to %v", req, path)
 		if err := sendJSONRequest(reqCtx, path, req, resp); err != nil {
@@ -140,7 +165,7 @@ func (c *KVClient) send(ctx context.Context, route string, req any, resp api.Res
 				return err
 			}
 			c.clientLogf("request failed: %v; switching to next address", err)
-			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			c.nextLeader()
 			continue
 		}
 		reqCtxCancel()
@@ -149,7 +174,7 @@ func (c *KVClient) send(ctx context.Context, route string, req any, resp api.Res
 		switch resp.Status() {
 		case api.StatusNotLeader:
 			c.clientLogf("not leader: will try next address")
-			c.assumedLeader = (c.assumedLeader + 1) % len(c.addrs)
+			c.nextLeader()
 			continue
 		case api.StatusOK:
 			return nil

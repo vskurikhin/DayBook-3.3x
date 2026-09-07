@@ -357,11 +357,11 @@ func TestNoCommitWithNoQuorum(t *testing.T) {
 	// любого election timeout и нескольких раундов репликации, т.е. если
 	// бы кворум был, команда 8 успела бы зафиксироваться.
 	//
-	// Инвариант окна: корректен, пока в реализации отсутствует CheckQuorum
-	// (изолированный лидер не выполняет step-down — raft_cm_leader.go,
-	// цикл runLeaderLoop). При добавлении CheckQuorum окно необходимо
-	// пересмотреть: лидер сложит полномочия сам, и команда 8 завершится
-	// ошибкой раньше окончания окна.
+	// Инвариант окна: лидер изолирован, кворума нет; CheckQuorum заставляет
+	// его сложить полномочия, поэтому команда 8 завершается ошибкой ещё до
+	// окончания окна. После реконнекта выборы выигрывает либо старый лидер
+	// (журнал длиннее — команда 8 фиксируется в новом терме), либо узел с
+	// коротким журналом (команда 8 перезаписывается) — оба исхода штатные.
 	time.Sleep(2 * maxElectionTimeout)
 	h.CheckNotCommitted(8)
 
@@ -389,7 +389,17 @@ func TestNoCommitWithNoQuorum(t *testing.T) {
 	h.SubmitToServer(leaderId, 11)
 
 	for _, v := range []int{9, 10, 11} {
-		h.WaitForCommit(v, 3)
+		if submitIdx >= 0 {
+			// Ветка «8 зафиксирована»: журналы всех узлов идентичны,
+			// строгая сходимость применима.
+			h.WaitForCommit(v, 3)
+		} else {
+			// Ветка «8 потеряна»: предыстории журналов расходятся
+			// (незафиксированная запись 8 перезаписана), поэтому
+			// восстановление проверяем по значению — без требования
+			// одинаковой позиции/Index записи.
+			h.WaitForCommitConvergedValues(v, 3)
+		}
 	}
 }
 
@@ -1054,11 +1064,12 @@ func TestSameTermDoubleVotePrevented(t *testing.T) {
 func TestBecomeFollowerDoubleClose(t *testing.T) {
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			leaderStartIndex: -1,
-			nextIndex:        make(map[int]int),
-			matchIndex:       make(map[int]int),
-			inflightAE:       make(map[int]*atomic.Bool),
-			inflight:         make(map[int]*logFuture),
+			leaderStartIndex:       -1,
+			nextIndex:              make(map[int]int),
+			matchIndex:             make(map[int]int),
+			inflightAE:             make(map[int]*atomic.Bool),
+			nextVerifyRedispatchAt: make(map[int]time.Time),
+			inflight:               make(map[int]*logFuture),
 		},
 
 		id:           1,
@@ -1675,9 +1686,16 @@ func TestLeader_Shutdown_NoInflight(t *testing.T) {
 	// Просто shutdown — leaktest проверит утечки
 }
 
-// TestLeader_Shutdown_DuringApply проверяет shutdown во время Apply.
-// Из-за гонки между Apply() (проверка cm.cmState.state) и Stop() (установка state=Dead)
-// допускается ErrNotLeader — Stop может успеть раньше.
+// TestLeader_Shutdown_DuringApply проверяет остановку кластера при
+// незавершённом Apply. Гарантия: остановка не оставляет клиентское
+// обещание неразрешённым — ответ обязан прийти по каналу ErrorCh в
+// пределах бюджета. Ожидание идёт через ErrorCh, а не через Error:
+// после остановки Error возвращает ErrRaftShutdown по запасному
+// исходу даже для неотвеченного обещания. Из-за гонки между Apply и
+// остановкой законны исходы: nil (запись успела зафиксироваться и
+// примениться), ErrLeadershipLost, ErrRaftShutdown, ErrNotLeader;
+// иная ошибка — отказ. При nil у записи обязан быть присвоенный
+// индекс журнала.
 func TestLeader_Shutdown_DuringApply(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 	h := NewHarness(t, 3)
@@ -1688,9 +1706,16 @@ func TestLeader_Shutdown_DuringApply(t *testing.T) {
 	future := h.cluster[lid].Apply(42, 0)
 	h.Shutdown()
 
-	err := future.Error()
-	if err != ErrLeadershipLost && err != ErrRaftShutdown && err != ErrNotLeader {
-		t.Fatalf("got %v, want ErrLeadershipLost or ErrRaftShutdown or ErrNotLeader", err)
+	err := waitFuture(t, future, commitBudgetSteady)
+	switch err {
+	case nil:
+		if future.Index() < 1 {
+			t.Fatalf("got success without a log index: Index() = %d", future.Index())
+		}
+	case ErrLeadershipLost, ErrRaftShutdown, ErrNotLeader:
+		// Штатные исходы гонки между Apply и остановкой.
+	default:
+		t.Fatalf("got %v, want nil or ErrLeadershipLost or ErrRaftShutdown or ErrNotLeader", err)
 	}
 }
 
@@ -1874,7 +1899,6 @@ func TestRace_ApplyAndStepDown(t *testing.T) {
 	lid, _ := h.CheckSingleLeader()
 
 	// Apply в одной горутине
-	inflightBefore := h.applyInflightCount(lid)
 	done := make(chan struct{})
 	go func() {
 		future := h.cluster[lid].Apply(42, 0)
@@ -1882,9 +1906,11 @@ func TestRace_ApplyAndStepDown(t *testing.T) {
 		close(done)
 	}()
 
-	// replace: ждём попадания Apply в inflight лидера вместо
-	// фиксированной паузы.
-	h.waitForApplyInflight(lid, inflightBefore+1, commitBudgetSteady)
+	// Барьер — попадание команды в журнал лидера. Прежний барьер ждал
+	// команду в очереди inflight, но после применения по факту фиксации
+	// запись покидает очередь быстрее интервала опроса, и барьер
+	// перестал наблюдаться.
+	h.waitForLastLogIndex(lid, h.lastLogIndex(lid)+1, commitBudgetSteady)
 
 	// stepDown в другой горутине
 	args := AppendEntriesArgs{
@@ -3408,7 +3434,7 @@ func TestRace_TermIndexMapDispatchAndConflict(t *testing.T) {
 			case <-done:
 				return
 			default:
-				cm.leaderSendAEsToPeer(1, 1, 0)
+				cm.leaderSendAEsToPeer(1, 1, 0, true)
 				conflictIters.Add(1)
 			}
 		}

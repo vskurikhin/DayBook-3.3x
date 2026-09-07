@@ -236,3 +236,44 @@ func mustParseAddr(s string) net.Addr {
 	}
 	return addr
 }
+
+func TestParseFlagsProfilingDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.PprofAddress != "" {
+		t.Errorf("PprofAddress = %q, want default empty", v.PprofAddress)
+	}
+	if v.BlockProfileRate != 0 {
+		t.Errorf("BlockProfileRate = %d, want default 0", v.BlockProfileRate)
+	}
+	if v.MutexProfileFraction != 0 {
+		t.Errorf("MutexProfileFraction = %d, want default 0", v.MutexProfileFraction)
+	}
+}
+
+func TestParseFlagsProfiling(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{
+		"raft", "-number", "1",
+		"--pprof-addr", ":6060",
+		"--block-profile-rate", "1",
+		"--mutex-profile-fraction", "5",
+	}
+
+	v := ParseFlags()
+	if v.PprofAddress != ":6060" {
+		t.Errorf("PprofAddress = %q, want :6060", v.PprofAddress)
+	}
+	if v.BlockProfileRate != 1 {
+		t.Errorf("BlockProfileRate = %d, want 1", v.BlockProfileRate)
+	}
+	if v.MutexProfileFraction != 5 {
+		t.Errorf("MutexProfileFraction = %d, want 5", v.MutexProfileFraction)
+	}
+}

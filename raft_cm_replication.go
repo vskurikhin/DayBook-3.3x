@@ -140,24 +140,41 @@ func (cm *ConsensusModule) incReplFailuresIfLeader(peerID, savedCurrentTerm int)
 // leaderSendAEsToPeer отправляет AppendEntries указанному соседу и
 // обрабатывает ответ. Выполняется в отдельной горутине.
 //
-// dispatchEpoch — эпоха верификации, снятая в leaderSendAEs под cm.mu
+// dispatchEpoch — эпоха верификации, снятая вызывающим под cm.mu
 // в момент запуска горутины: ответы этого AE являются голосами только
 // для verify-запросов с epoch <= dispatchEpoch (AE отправлен не раньше
 // постановки запроса, Raft §8).
 //
-// При любом завершении (успех, ошибка, step down) сбрасывает
-// inflightAE[peerID], разрешая последующий вызов leaderSendAEs
-// для этого соседа. Сброс гарантирован через defer.
-func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dispatchEpoch uint64) {
+// ownsInflight — признак владения флагом inflightAE[peerID]: истина, если
+// флаг захвачен вызывающим через CompareAndSwap(false, true). Все точки
+// запуска захватывают флаг только через CompareAndSwap и передают признак
+// владения; прямой вызов без захвата запрещён конструктивно. Единый протокол
+// захвата гарантирует инвариант «на одного соседа не более одной живой
+// горутины репликации при любом пути вызова».
+//
+// При любом завершении (успех, ошибка, step down) горутина, владеющая
+// флагом, сбрасывает inflightAE[peerID] через defer, разрешая последующий
+// вызов для этого соседа. Горутина без владения чужой флаг не снимает:
+// иначе она обнулила бы флаг параллельной горутины, запущенной другим путём.
+func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dispatchEpoch uint64, ownsInflight bool) {
+	// Решение предотправочной фазы снимается до объявления defer: defer
+	// должен знать, завершилась ли горутина веткой replicationSkip, чтобы не
+	// выполнять перерассылку при активной задержке повторов.
+	plan := cm.planReplication(peerID, savedCurrentTerm)
 	defer func() {
 		cm.mu.Lock()
-		if cm.leaderState.inflightAE != nil && cm.leaderState.inflightAE[peerID] != nil {
+		if ownsInflight && cm.leaderState.inflightAE != nil && cm.leaderState.inflightAE[peerID] != nil {
 			cm.leaderState.inflightAE[peerID].Store(false)
+			// Немедленная перерассылка при неудовлетворённом verify-запросе:
+			// только владелец флага и только вне ветки задержки повторов.
+			if plan != replicationSkip {
+				cm.redispatchVerifyIfPendingLocked(peerID, savedCurrentTerm, dispatchEpoch)
+			}
 		}
 		cm.mu.Unlock()
 	}()
 
-	switch cm.planReplication(peerID, savedCurrentTerm) {
+	switch plan {
 	case replicationSkip:
 		return
 	case replicationSnapshot:
@@ -177,6 +194,7 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 	}
 	cm.traceLogf(8, "sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
 	cm.recordAttemptIfLeader(peerID, savedCurrentTerm)
+	cm.countAEOutbound(peerID)
 
 	reply, err := cm.transport.AppendEntries(ServerID(peerID), args)
 	if err != nil {
@@ -184,6 +202,96 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 		return
 	}
 	cm.handleAEReply(peerID, savedCurrentTerm, ni, len(entries), reply, dispatchEpoch)
+}
+
+// redispatchVerifyIfPendingLocked выполняет немедленную перерассылку
+// AppendEntries соседу после завершения горутины репликации, если остался
+// verify-запрос, поставленный позже момента отправки завершившегося AE.
+//
+// Завершившаяся горутина только что сняла флаг inflightAE[peerID]
+// (Store(false)) в той же критической секции — флаг свободен. Если узел всё
+// ещё лидер того же терма и в pendingVerify есть запрос с epoch > dispatchEpoch,
+// ответ завершившегося AE такому запросу голосом не является (AE отправлен до
+// постановки запроса), и запрос ждал бы ближайшего пульса. Перерассылка
+// отправляет свежий AE с новой эпохой, покрывающей все текущие pendingVerify.
+//
+// Ограниченность (отсутствие бесконечной перерассылки) — две независимые
+// границы. Первая — по частоте клиентских запросов: verifyEpoch монотонно
+// возрастает и инкрементируется только в цикле лидера под cm.mu при постановке
+// нового verify. newDispatchEpoch снимается под той же блокировкой и потому не
+// меньше эпохи любого verify, находящегося в pendingVerify в этот момент:
+// ответ перерассланного AE засчитывается всем текущим запросам, и повторная
+// перерассылка для них не требуется — новая возможна только при поступлении
+// нового verify. Вторая — минимальный интервал на соседа: перерассылки
+// отстоят не менее чем на verifyRedispatchMinInterval, поэтому их частота
+// ≤ 1000/интервал независимо от темпа запросов. Запрос, заставший окно
+// занятым, дожидается либо следующей перерассылки, либо пульса — не дольше
+// пульса (интервал строго меньше HeartbeatTimeoutMs). Перерассылка выполняется
+// только владельцем флага (инвариант «на одного соседа не более одной живой
+// горутины репликации»), поэтому каскад горутин невозможен. Ветка
+// replicationSkip не перерассылает: AE всё равно не был бы отправлен, а смена
+// горутин без прогресса была бы бесполезной.
+//
+// Требует удержания cm.mu; блокировку не берёт и не снимает.
+func (cm *ConsensusModule) redispatchVerifyIfPendingLocked(peerID, savedCurrentTerm int, dispatchEpoch uint64) {
+	// nil-проверки защищают от изменения конфигурации: сосед мог быть
+	// исключён из состава кластера, пока выполнялась горутина репликации.
+	if cm.leaderState.inflightAE == nil || cm.leaderState.inflightAE[peerID] == nil {
+		return
+	}
+	// Условие перерассылки — все три одновременно: узел всё ещё лидер того же
+	// терма и есть verify, поставленный позже отправки завершившегося AE.
+	if cm.cmState.state != Leader || cm.cmState.currentTerm != savedCurrentTerm {
+		return
+	}
+	if !hasPendingVerifyAfterEpoch(cm.leaderState.pendingVerify, dispatchEpoch) {
+		return
+	}
+	// Окно троттлинга: не более одной перерассылки соседу за минимальный
+	// интервал. Метка ставится только при фактической перерассылке, поэтому
+	// неуспешный CAS (флаг занят другим путём) окно не закрывает — чужая
+	// отправка без фактической рассылки не должна подавлять перерассылку.
+	now := time.Now()
+	if !now.After(cm.leaderState.nextVerifyRedispatchAt[peerID]) {
+		cm.counters.verifyRedispatchSuppressed = incPeerCount(cm.counters.verifyRedispatchSuppressed, peerID)
+		return
+	}
+	// Свежая эпоха под той же блокировкой: не меньше эпохи любого текущего
+	// запроса, поэтому ответ перерассланного AE покрывает все pendingVerify.
+	newDispatchEpoch := cm.leaderState.verifyEpoch
+	if !cm.leaderState.inflightAE[peerID].CompareAndSwap(false, true) {
+		return
+	}
+	cm.goSpawnLocked(func() {
+		cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, newDispatchEpoch, true)
+	})
+	// Метка окна и счётчик перерассылок — только при фактическом запуске
+	// горутины: неуспешный CAS выше вернулся бы до этой точки.
+	cm.leaderState.nextVerifyRedispatchAt[peerID] = now.Add(cm.verifyRedispatchMinInterval)
+	cm.counters.verifyRedispatched = incPeerCount(cm.counters.verifyRedispatched, peerID)
+}
+
+// hasPendingVerifyAfterEpoch сообщает, есть ли в очереди verify-запрос с
+// эпохой позже dispatchEpoch — поставленный после отправки AppendEntries,
+// ответ которого такому запросу голосом не является.
+func hasPendingVerifyAfterEpoch(pending []*verifyFuture, dispatchEpoch uint64) bool {
+	for _, vf := range pending {
+		if vf.epoch > dispatchEpoch {
+			return true
+		}
+	}
+	return false
+}
+
+// countAEOutbound фиксирует факт отправки AppendEntries соседу: инкремент
+// счётчика исходящих AE по соседу. Счётчик контролирует частоту исходящих AE
+// (перерассылка не должна превращаться в пульсацию); чтение — из горутины
+// stats под cm.mu.
+// Самостоятельно захватывает и освобождает cm.mu.
+func (cm *ConsensusModule) countAEOutbound(peerID int) {
+	cm.mu.Lock()
+	cm.counters.aeSentPerPeer = incPeerCount(cm.counters.aeSentPerPeer, peerID)
+	cm.mu.Unlock()
 }
 
 // handleAEReply разбирает ответ AppendEntries от соседа: сбрасывает задержку
@@ -200,18 +308,19 @@ func (cm *ConsensusModule) handleAEReply(
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	// Сброс задержки повторов при любом RPC без транспортной ошибки,
-	// независимо от reply.Success.
-	if cm.cmState.state == Leader && cm.cmState.currentTerm == savedCurrentTerm {
-		cm.resetReplFailuresLocked(peerID)
-	}
+	cm.recordPeerReplyLocked(peerID, savedCurrentTerm)
 	if reply.Term > cm.cmState.currentTerm {
 		cm.traceLockedLogf(8, "term out of date in heartbeat reply")
 		cm.becomeFollowerLocked(reply.Term)
 		return
 	}
-	// Запоздавший ответ вытесненного лидерства состояние репликации не меняет.
-	if cm.cmState.state != Leader || savedCurrentTerm != reply.Term {
+	// Запоздавший ответ вытесненного лидерства состояние репликации не меняет:
+	// терм отправки сверяется и с термом ответа, и с текущим термом лидера.
+	// Без сверки с текущим термом успех прежнего лидерства применился бы к
+	// свежим картам репликации нового лидерства, не сбрасывая при этом
+	// счётчик транспортных ошибок (recordPeerReplyLocked сверяет текущий терм).
+	if cm.cmState.state != Leader || savedCurrentTerm != reply.Term ||
+		savedCurrentTerm != cm.cmState.currentTerm {
 		return
 	}
 	if !reply.Success {
@@ -227,9 +336,20 @@ func (cm *ConsensusModule) handleAEReply(
 // ni и sentEntries сняты до отправки RPC и передаются по значению: nextIndex
 // вычисляется от фактически отправленного диапазона, а не от текущего
 // значения карты.
+//
+// Продвижение matchIndex и nextIndex — только вперёд: поздний или
+// дублирующий ответ более старой отправки с меньшим ni+sentEntries не
+// уменьшает значения. Это устраняет расхождение leaderState с фактическим
+// состоянием соседа и лишние повторные отправки записей, которые сосед уже
+// имеет. Продвижение индекса фиксации от отката защищено независимо от этой
+// правки: commitmentTracker.setMatch игнорирует убывающие значения.
 // Требует удержания cm.mu; блокировку не берёт и не снимает.
 func (cm *ConsensusModule) applyAESuccessLocked(peerID, ni, sentEntries int) {
-	cm.leaderState.nextIndex[peerID] = ni + sentEntries
+	newNextIndex := ni + sentEntries
+	if newNextIndex <= cm.leaderState.nextIndex[peerID] {
+		return
+	}
+	cm.leaderState.nextIndex[peerID] = newNextIndex
 	cm.leaderState.matchIndex[peerID] = cm.leaderState.nextIndex[peerID] - 1
 
 	cm.leaderState.commitmentTracker.setMatch(peerID, cm.leaderState.matchIndex[peerID], cm.lookupTermLocked)
@@ -259,6 +379,14 @@ func (cm *ConsensusModule) countVerifyVotesLocked(peerID int, dispatchEpoch uint
 	for _, vf := range cm.leaderState.pendingVerify {
 		if vf.votes >= vf.quorumSize {
 			vf.respond(nil)
+			// Успешное завершение verify-запроса: знаменатель доли
+			// «дождавшихся пульса». Запрос считается дождавшимся, если между
+			// постановкой в очередь и завершением успел сработать тик пульса
+			// (счётчик тиков строго вырос относительно значения при постановке).
+			cm.counters.verifyCompleted++
+			if cm.leaderState.heartbeatTicks > vf.enqueuedAtHeartbeat {
+				cm.counters.verifyWaitedHeartbeat++
+			}
 		} else {
 			remaining = append(remaining, vf)
 		}
@@ -360,11 +488,40 @@ func (cm *ConsensusModule) leaderSendAEs() {
 		}
 		if cm.leaderState.inflightAE[peerID].CompareAndSwap(false, true) {
 			cm.goSpawnLocked(func() {
-				cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, dispatchEpoch)
+				cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, dispatchEpoch, true)
 			})
 		}
 	}
 	cm.mu.Unlock()
+}
+
+// leaderSendAEsToPeerIfIdle отправляет AppendEntries одному соседу, если для
+// него не выполняется горутина репликации. Дедупликация — тот же флаг
+// inflightAE и тот же CompareAndSwap, что и в leaderSendAEs: догоняющая
+// репликация передачи лидерства не должна порождать второго отправителя
+// одному соседу (конкурирующие попытки искажают счётчик транспортных ошибок
+// и периодизацию задержки повторов).
+//
+// Флаг захватывается только через CompareAndSwap(false, true), и признак
+// владения передаётся запущенной горутине по единому протоколу захвата —
+// сброс флага выполняется только владельцем. При занятом флаге попытка
+// пропускается: живая репликация догонит соседа сама.
+//
+// Эпоха верификации снимается в той же критической секции, что и захват
+// флага, — как в leaderSendAEs.
+// Самостоятельно захватывает и освобождает cm.mu.
+func (cm *ConsensusModule) leaderSendAEsToPeerIfIdle(peerID, savedCurrentTerm int) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if cm.leaderState.inflightAE[peerID] == nil {
+		return
+	}
+	dispatchEpoch := cm.leaderState.verifyEpoch
+	if cm.leaderState.inflightAE[peerID].CompareAndSwap(false, true) {
+		cm.goSpawnLocked(func() {
+			cm.leaderSendAEsToPeer(peerID, savedCurrentTerm, dispatchEpoch, true)
+		})
+	}
 }
 
 // leaderSendSnapshot отправляет последний снимок отстающему follower.
@@ -457,37 +614,34 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 		cm.mu.Unlock()
 		return
 	}
-	// Сброс задержка повторов при RPC без транспортной ошибки,
-	// независимо от reply.Success.
+	// Сосед, догоняемый снимком, отвечает дольше одного пульса, но остаётся
+	// живым: его ответ — такое же доказательство контакта, как ответ
+	// AppendEntries. Сброс задержки повторов и применение результата
+	// выполняются в одной критической секции: наблюдатель не может увидеть
+	// несогласованную пару «matchIndex вырос, счётчик ошибок не сброшен».
 	cm.mu.Lock()
-	if cm.cmState.state == Leader && cm.cmState.currentTerm == term {
-		cm.resetReplFailuresLocked(peerID)
-	}
-	cm.mu.Unlock()
-	if reply.Term > term {
-		// becomeFollowerLocked требует удержания cm.mu; здесь блокировка
-		// не удерживается (RPC выполнялся без блокировки).
-		cm.mu.Lock()
+	cm.recordPeerReplyLocked(peerID, term)
+	if reply.Term > cm.cmState.currentTerm {
 		cm.becomeFollowerLocked(reply.Term)
 		cm.mu.Unlock()
 		return
 	}
-	if reply.Success {
-		cm.mu.Lock()
-		// Симметрия с путём AppendEntries (raft_cm_replication.go, ветка
-		// успеха AE): запоздавший ответ из вытесненного term'а не должен
-		// менять состояние репликации нового лидера.
-		if cm.cmState.state == Leader && term == reply.Term {
-			cm.leaderState.nextIndex[peerID] = meta.Index + 1
-			cm.leaderState.matchIndex[peerID] = meta.Index
-			// matchIndex = meta.Index означает сохранённое на диске владение префиксом
-			// до meta.Index — ровно то, что гарантирует Success:true.
-			// Проверка term'а внутри setMatch работает через fallback
-			// lookupTermLocked на lastSnapshotTerm.
-			cm.leaderState.commitmentTracker.setMatch(peerID, meta.Index, cm.lookupTermLocked)
-		}
-		cm.mu.Unlock()
+	// Симметрия с путём AppendEntries (ветка успеха AE): запоздавший ответ
+	// вытесненного лидерства состояние репликации не меняет — результат
+	// применяется только в терме отправки, совпадающем с текущим.
+	// Сверка с термом ответа сохранена как защита от несогласованного ответа
+	// соседа: при Success:true протокол гарантирует reply.Term == term.
+	if reply.Success && cm.cmState.state == Leader &&
+		cm.cmState.currentTerm == term && reply.Term == term {
+		cm.leaderState.nextIndex[peerID] = meta.Index + 1
+		cm.leaderState.matchIndex[peerID] = meta.Index
+		// matchIndex = meta.Index означает сохранённое на диске владение префиксом
+		// до meta.Index — ровно то, что гарантирует Success:true.
+		// Проверка терма внутри setMatch работает через fallback
+		// lookupTermLocked на lastSnapshotTerm.
+		cm.leaderState.commitmentTracker.setMatch(peerID, meta.Index, cm.lookupTermLocked)
 	}
+	cm.mu.Unlock()
 }
 
 // failedAETrace формирует текст трассировки неудачного AppendEntries
@@ -535,6 +689,31 @@ func (cm *ConsensusModule) recordAttemptLocked(peerID int) {
 		cm.leaderState.lastAttempt = make(map[int]time.Time)
 	}
 	cm.leaderState.lastAttempt[peerID] = time.Now()
+}
+
+// recordPeerReplyLocked обрабатывает ответ соседа, полученный без
+// транспортной ошибки: сбрасывает задержку повторов и отмечает контакт.
+// Содержание ответа значения не имеет — доказательством живого соседа
+// служит сам факт ответа. Состояние меняется только для текущего
+// лидерства: term — терм, снятый до отправки RPC.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) recordPeerReplyLocked(peerID, term int) {
+	if cm.cmState.state != Leader || cm.cmState.currentTerm != term {
+		return
+	}
+	cm.resetReplFailuresLocked(peerID)
+	cm.recordContactLocked(peerID)
+}
+
+// recordContactLocked отмечает момент получения ответа RPC от соседа без
+// транспортной ошибки: такой ответ доказывает, что сосед жив, независимо
+// от содержания ответа.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) recordContactLocked(peerID int) {
+	if cm.leaderState.lastContact == nil {
+		cm.leaderState.lastContact = make(map[int]time.Time)
+	}
+	cm.leaderState.lastContact[peerID] = time.Now()
 }
 
 // incReplFailuresLocked инкрементирует число подряд идущих транспортных ошибок

@@ -21,6 +21,13 @@ type mockTransportAE struct {
 	installCallCount atomic.Int32
 	delay            time.Duration
 	blockCh          chan struct{}
+	// gateBlockAfter / gateCh — гейт отправок AppendEntries: если gateCh задан,
+	// вызовы с callCount >= gateBlockAfter блокируются до закрытия gateCh.
+	// Используется для детерминированной фазовой проверки перерассылки: первая
+	// (синхронная) отправка проходит, вторая и последующие придерживаются, пока
+	// тест не освободит гейт.
+	gateBlockAfter int32
+	gateCh         chan struct{}
 
 	// failReply — AppendEntries отвечает Success:false с заданным
 	// конфликтом (ConflictIndex/ConflictTerm), вместо Success:true.
@@ -55,6 +62,9 @@ func (m *mockTransportAE) AppendEntries(_ ServerID, args AppendEntriesArgs) (App
 	m.lastArgsSet = true
 	if m.blockCh != nil {
 		<-m.blockCh
+	}
+	if m.gateCh != nil && m.callCount.Load() >= m.gateBlockAfter {
+		<-m.gateCh
 	}
 	if m.delay > 0 {
 		// poll-интервал condition-wait (не фиксированная пауза).
@@ -140,9 +150,10 @@ func TestLeaderSendAEs_Deduplication(t *testing.T) {
 	mock := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 0},
-			matchIndex: map[int]int{1: -1},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 0},
+			matchIndex:             map[int]int{1: -1},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:        Leader,
@@ -222,9 +233,10 @@ func TestInflightAE_DeferReset(t *testing.T) {
 	mock := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 0},
-			matchIndex: map[int]int{1: -1},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 0},
+			matchIndex:             map[int]int{1: -1},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:        Leader,
@@ -255,7 +267,7 @@ func TestInflightAE_DeferReset(t *testing.T) {
 
 	// Установить флаг и вызвать leaderSendAEsToPeer.
 	cm.leaderState.inflightAE[1].Store(true)
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
 	time.Sleep(20 * time.Millisecond)
@@ -266,28 +278,37 @@ func TestInflightAE_DeferReset(t *testing.T) {
 	}
 }
 
-// TestInflightAE_DeferResetOnSnapshotPath проверяет, что defer
-// сбрасывает inflightAE при выходе через snapshot path.
+// TestInflightAE_DeferResetOnSnapshotPath проверяет, что defer сбрасывает
+// inflightAE при выходе через путь снимка.
 //
 // Сценарий:
-//  1. ConsensusModule в состоянии Leader, snapshotStore != nil,
-//     nextIndex[1] <= lastSnapshotIndex.
+//  1. ConsensusModule в состоянии Leader, lastSnapshotIndex = 3, журнал
+//     начинается после снимка (запись с индексом 4), nextIndex[1] = 3.
 //  2. Установить inflightAE[1] = true.
-//  3. Вызвать leaderSendAEsToPeer — она идёт по snapshot path.
-//  4. После завершения inflightAE[1] == false.
+//  3. Вызвать leaderSendAEsToPeer — предикат плана даёт replicationSnapshot
+//     (prev = 2: 0 <= 2, 2 != lastSnapshotIndex = 3, 2 < first = 4), поэтому
+//     исполняется путь снимка (leaderSendSnapshot).
+//  4. Проверить, что InstallSnapshot действительно вызван (installCallCount
+//     >= 1) — путь снимка исполнен; после завершения inflightAE[1] == false.
 func TestInflightAE_DeferResetOnSnapshotPath(t *testing.T) {
+	// Терм отправки AppendEntries в вызове теста — константа; сверяется с
+	// currentTerm приспособления ниже (терм отправки должен равняться currentTerm).
+	const sendTerm = 1
+
+	transport := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:        map[int]int{1: -1},
+			nextIndex:        map[int]int{1: 3},
 			matchIndex:       map[int]int{1: -1},
 			leaderStartIndex: -1,
 			inflightAE:       map[int]*atomic.Bool{1: new(atomic.Bool)},
 		},
 		cmState: cmState{
 			state:             Leader,
-			log:               make([]LogEntry, 0),
-			lastLogIndex:      -1,
-			lastSnapshotIndex: -1,
+			log:               []LogEntry{{Index: 4, Term: 1}},
+			lastLogIndex:      4,
+			lastLogTerm:       1,
+			lastSnapshotIndex: 3,
 			currentTerm:       1,
 			commitIndex:       -1,
 			votedFor:          -1,
@@ -307,19 +328,44 @@ func TestInflightAE_DeferResetOnSnapshotPath(t *testing.T) {
 			},
 		},
 
-		id:            0,
-		transport:     &mockTransportAE{},
-		storage:       NewMapStorage(),
-		snapshotStore: &mockSnapshotStore{},
+		id:        0,
+		transport: transport,
+		storage:   NewMapStorage(),
+		snapshotStore: &mockSnapshotStoreCfg{
+			listResult: []*SnapshotMeta{{ID: "snap-3", Index: 3, Term: 1, Size: 100}},
+			openMeta:   &SnapshotMeta{Index: 3, Term: 1, Size: 100},
+		},
 	}
 	cm.leaderState.inflightAE[1].Store(false)
 
+	// Защитная проверка согласованности приспособления: предикат плана должен
+	// выбирать путь снимка (prev = nextIndex[1] − 1 удовлетворяет
+	// prev >= 0 ∧ prev != lastSnapshotIndex ∧ prev < first = log[0].Index), а
+	// терм отправки равен currentTerm.
+	cm.mu.Lock()
+	first := cm.cmState.log[0].Index
+	prev := cm.leaderState.nextIndex[1] - 1
+	if cm.cmState.currentTerm != sendTerm {
+		cm.mu.Unlock()
+		t.Fatalf("sendTerm = %d, currentTerm = %d: приспособление несогласованно (терм отправки != currentTerm)",
+			sendTerm, cm.cmState.currentTerm)
+	}
+	if !(prev >= 0 && prev != cm.cmState.lastSnapshotIndex && prev < first) {
+		cm.mu.Unlock()
+		t.Fatalf("приспособление не выбирает путь снимка: prev = %d, first = %d, lastSnapshotIndex = %d",
+			prev, first, cm.cmState.lastSnapshotIndex)
+	}
+	cm.mu.Unlock()
+
 	cm.leaderState.inflightAE[1].Store(true)
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, sendTerm, 0, true)
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
 	time.Sleep(20 * time.Millisecond)
 
+	if n := transport.installCallCount.Load(); n < 1 {
+		t.Errorf("InstallSnapshot calls = %d, want >= 1 (snapshot path must be executed)", n)
+	}
 	if cm.leaderState.inflightAE[1].Load() {
 		t.Error("inflightAE[1] should be false after snapshot path exit")
 	}
@@ -336,7 +382,8 @@ func TestLeaderSendAEs_StateCheck(t *testing.T) {
 	mock := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state: Follower,
@@ -384,7 +431,7 @@ func TestInflightAE_NilSafe(t *testing.T) {
 
 	// Не должно быть panic.
 	cm.leaderSendAEs()
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 }
 
 // TestBecomeFollower_InflightAE_NilEntry проверяет, что becomeFollowerLocked
@@ -650,11 +697,20 @@ func TestLeaderSendSnapshot_Success(t *testing.T) {
 	}
 }
 
-// TestLeaderSendSnapshot_SuccessStaleTerm проверяет защиту от
-// запоздалого ответа из вытесненного term'а: при
-// reply.Term != term запроса (ответ из прошлого лидерства) состояние
-// репликации не изменяется.
-func TestLeaderSendSnapshot_SuccessStaleTerm(t *testing.T) {
+// TestLeaderSendSnapshot_InconsistentSuccessReplyGuard — защитная проверка
+// (страж) несогласованного ответа об успехе: сочетание Success:true, Term=1
+// при терме запроса 2 недостижимо от корректного соседа.
+//
+// Производственный инвариант: при Success:true протокол гарантирует
+// равенство терма ответа терму запроса (reply.Term == term). Приведённое
+// ниже сочетание исключается этим инвариантом, поэтому тестовый сценарий
+// явно византийский: он проверяет, что защитная проверка не позволяет
+// несогласованному ответу изменить состояние репликации.
+//
+// Реалистичный сценарий (ответ из прошлого лидерства, когда узел снова стал
+// лидером другого терма) покрыт тестом
+// TestLeaderSendSnapshot_StaleTermReplyDoesNotResetFailures.
+func TestLeaderSendSnapshot_InconsistentSuccessReplyGuard(t *testing.T) {
 	transport := &mockTransportAE{replyTerm: 1}
 	tracker := newCommitmentTracker(0, 2, -1, make(chan int, 1))
 	cm := &ConsensusModule{
@@ -679,7 +735,8 @@ func TestLeaderSendSnapshot_SuccessStaleTerm(t *testing.T) {
 	}
 	tracker.setConfiguration([]int{0, 1}, cm.lookupTermLocked)
 
-	// term запроса 2, reply.Term 1 — ответ устарел.
+	// Терм запроса 2, reply.Term 1 при Success:true — явно византийский
+	// ответ: от корректного соседа такое сочетание недостижимо.
 	cm.leaderSendSnapshot(1, 2)
 
 	if cm.leaderState.nextIndex[1] != 7 {
@@ -732,15 +789,73 @@ func TestLeaderSendSnapshot_SuccessNotLeader(t *testing.T) {
 	}
 }
 
+// TestLeaderSendSnapshot_StaleTermReplyDoesNotResetFailures проверяет, что
+// запоздавший успешный ответ InstallSnapshot чужого терма не применяется к
+// состоянию нового лидерства.
+//
+// Сценарий воспроизводит наблюдение стресс-прогона «matchIndex вырос, а
+// счётчик транспортных ошибок не сброшен»: узел был лидером терма 1, потерял
+// лидерство и снова стал лидером терма 3 со свежими картами репликации;
+// ответ на снимок, отправленный в терме 1, приходит после повторного
+// избрания.
+//
+//  1. Отправка выполняется в терме 1 (term=1), текущий терм узла — 3.
+//  2. Транспорт отвечает Success:true, Term:1.
+//  3. Проверить: nextIndex/matchIndex и индекс соседа в commitmentTracker не
+//     изменились, счётчик транспортных ошибок не сброшен.
+func TestLeaderSendSnapshot_StaleTermReplyDoesNotResetFailures(t *testing.T) {
+	transport := &mockTransportAE{replyTerm: 1}
+	tracker := newCommitmentTracker(0, 3, -1, make(chan int, 1))
+	cm := &ConsensusModule{
+		leaderState: leaderState{
+			nextIndex:         map[int]int{1: 0},
+			matchIndex:        map[int]int{1: -1},
+			replFailures:      map[int]int{1: 4},
+			commitmentTracker: tracker,
+		},
+		cmState: cmState{
+			state:             Leader,
+			currentTerm:       3,
+			lastSnapshotIndex: 5,
+			lastSnapshotTerm:  1,
+		},
+
+		id:        0,
+		transport: transport,
+		snapshotStore: &mockSnapshotStoreCfg{
+			listResult: []*SnapshotMeta{{ID: "snap-5", Index: 5, Term: 1, Size: 100}},
+			openMeta:   &SnapshotMeta{Index: 5, Term: 1, Size: 100},
+		},
+	}
+	tracker.setConfiguration([]int{0, 1}, cm.lookupTermLocked)
+
+	// Ответ на отправку терма 1 приходит, когда узел уже лидер терма 3.
+	cm.leaderSendSnapshot(1, 1)
+
+	if cm.leaderState.nextIndex[1] != 0 {
+		t.Errorf("nextIndex[1] = %d, want unchanged (0)", cm.leaderState.nextIndex[1])
+	}
+	if cm.leaderState.matchIndex[1] != -1 {
+		t.Errorf("matchIndex[1] = %d, want unchanged (-1)", cm.leaderState.matchIndex[1])
+	}
+	if got := tracker.matchIndex[1]; got != -1 {
+		t.Errorf("commitmentTracker.matchIndex[1] = %d, want -1 (not updated)", got)
+	}
+	if got := cm.leaderState.replFailures[1]; got != 4 {
+		t.Errorf("replFailures[1] = %d, want unchanged (4)", got)
+	}
+}
+
 // newRejectionTestCM собирает литеральный CM-лидер для тестов обработки
 // отказа AppendEntries: nextIndex[1]=10, matchIndex[1]=5, журнал с
 // записями 9..10. Транспорт — mock с настраиваемым отказом.
 func newRejectionTestCM(transport *mockTransportAE) *ConsensusModule {
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 10},
-			matchIndex: map[int]int{1: 5},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 10},
+			matchIndex:             map[int]int{1: 5},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:             Leader,
@@ -776,7 +891,7 @@ func TestLeaderSendAEsToPeer_RejectsImpossibleConflictIndex(t *testing.T) {
 	mock := &mockTransportAE{failReply: true, failConflictIndex: 0, failConflictTerm: -1, replyTerm: 1}
 	cm := newRejectionTestCM(mock)
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if cm.leaderState.nextIndex[1] != 10 {
 		t.Fatalf("nextIndex[1] = %d, want unchanged (10) — impossible rejection must be ignored",
@@ -801,7 +916,7 @@ func TestLeaderSendAEsToPeer_AcceptsPlausibleRejection(t *testing.T) {
 	mock := &mockTransportAE{failReply: true, failConflictIndex: 8, failConflictTerm: -1, replyTerm: 1}
 	cm := newRejectionTestCM(mock)
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if cm.leaderState.nextIndex[1] != 8 {
 		t.Fatalf("nextIndex[1] = %d, want 8 (plausible rejection applied)", cm.leaderState.nextIndex[1])
@@ -865,9 +980,10 @@ func TestLeaderSendAEsToPeer_SnapshotPredicateBoundaries(t *testing.T) {
 			}
 			cm := &ConsensusModule{
 				leaderState: leaderState{
-					nextIndex:  map[int]int{1: tt.nextIndex},
-					matchIndex: map[int]int{1: -1},
-					inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+					nextIndex:              map[int]int{1: tt.nextIndex},
+					matchIndex:             map[int]int{1: -1},
+					inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+					nextVerifyRedispatchAt: map[int]time.Time{},
 				},
 				cmState: cmState{
 					state:             Leader,
@@ -893,7 +1009,7 @@ func TestLeaderSendAEsToPeer_SnapshotPredicateBoundaries(t *testing.T) {
 			}
 			cm.leaderState.inflightAE[1].Store(false)
 
-			cm.leaderSendAEsToPeer(1, 1, 0)
+			cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 			installs := mock.installCallCount.Load()
 			calls := mock.callCount.Load()
@@ -940,9 +1056,10 @@ func TestReplicationBackoff_LogicalRejectionsDoNotBackoff(t *testing.T) {
 	mock := &mockTransportAE{failReply: true, failConflictIndex: 0, failConflictTerm: -1, replyTerm: 1}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 0},
-			matchIndex: map[int]int{1: -1},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 0},
+			matchIndex:             map[int]int{1: -1},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:             Leader,
@@ -966,7 +1083,7 @@ func TestReplicationBackoff_LogicalRejectionsDoNotBackoff(t *testing.T) {
 
 	const attempts = 5
 	for i := 0; i < attempts; i++ {
-		cm.leaderSendAEsToPeer(1, 1, 0)
+		cm.leaderSendAEsToPeer(1, 1, 0, true)
 	}
 
 	if got := mock.callCount.Load(); got != attempts {
@@ -1039,9 +1156,10 @@ func TestReplicationBackoff_SkipsTransportAndDoesNotRecordAttempt(t *testing.T) 
 	mock := &mockTransportAE{}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 1},
-			matchIndex: map[int]int{1: 0},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 1},
+			matchIndex:             map[int]int{1: 0},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 			// Одна транспортная ошибка при HeartbeatTimeoutMs = 33 даёт
 			// задержку 66 мс, поэтому только что зафиксированная попытка
 			// гарантирует активную задержку.
@@ -1069,7 +1187,7 @@ func TestReplicationBackoff_SkipsTransportAndDoesNotRecordAttempt(t *testing.T) 
 	cm.leaderState.inflightAE[1].Store(false)
 	lastAttemptBefore := cm.leaderState.lastAttempt[1]
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if got := mock.callCount.Load(); got != 0 {
 		t.Fatalf("AppendEntries calls = %d, want 0 (backoff must skip the attempt)", got)
@@ -1104,9 +1222,10 @@ func TestLeaderSendAEsToPeer_HigherTermStepsDown(t *testing.T) {
 	mock := &mockTransportAE{replyTerm: 5}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 1},
-			matchIndex: map[int]int{1: 0},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 1},
+			matchIndex:             map[int]int{1: 0},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:             Leader,
@@ -1136,7 +1255,7 @@ func TestLeaderSendAEsToPeer_HigherTermStepsDown(t *testing.T) {
 	cm.leaderState.inflightAE[1].Store(false)
 	defer cm.Stop()
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	// Чтение состояния под cm.mu: горутина таймера выборов уже запущена.
 	cm.mu.Lock()
@@ -1177,7 +1296,7 @@ func TestReplicationBackoff_TransportErrorIncrementsFailures(t *testing.T) {
 	mock := &mockTransportAE{aeErr: errors.New("transport unavailable")}
 	cm := newRejectionTestCM(mock)
 
-	cm.leaderSendAEsToPeer(1, 1, 0)
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 	if got := mock.callCount.Load(); got != 1 {
 		t.Fatalf("AppendEntries calls = %d, want 1", got)
@@ -1203,10 +1322,19 @@ func TestReplicationBackoff_TransportErrorIncrementsFailures(t *testing.T) {
 // TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState — запоздавший ответ не
 // изменяет состояние репликации.
 //
-// Ответ горутины вытесненного лидерства (терм ответа не совпадает с термом
-// отправки) и ответ, пришедший после утраты лидерства, обязаны быть
-// отброшены: иначе nextIndex и matchIndex нового лидера откатились бы к
-// значениям прошлого терма.
+// Первый подслучай — защитная проверка (страж) несогласованного ответа об
+// успехе: reply.Term = 0 < терма отправки 1 при Success:true недостижим от
+// корректного соседа. Производственный инвариант: при Success:true терм
+// ответа равен терму запроса (и не меньше терма отправки). Сочетание ниже
+// исключается этим инвариантом, поэтому тестовый сценарий явно византийский:
+// он проверяет, что защитная проверка не даёт несогласованному ответу
+// изменить состояние репликации. Реалистичный сценарий (успех ответа из
+// прежнего лидерства, когда узел снова стал лидером другого терма) покрыт
+// тестом TestLeaderSendAEsToPeer_StaleTermSuccessDoesNotApply.
+//
+// Второй подслучай — ответ, пришедший после утраты лидерства: узел больше не
+// лидер, состояние репликации не изменяется. Иначе nextIndex и matchIndex
+// нового лидера откатились бы к значениям прошлого терма.
 func TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1214,7 +1342,7 @@ func TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState(t *testing.T) {
 		replyTerm int
 	}{
 		{
-			name:      "терм ответа не совпадает с термом отправки",
+			name:      "терм ответа не совпадает с термом отправки (явно византийский ответ)",
 			state:     Leader,
 			replyTerm: 0,
 		},
@@ -1232,7 +1360,7 @@ func TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState(t *testing.T) {
 			cm.cmState.state = tt.state
 			cm.leaderState.replFailures = map[int]int{1: 2}
 
-			cm.leaderSendAEsToPeer(1, 1, 0)
+			cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 			if cm.leaderState.nextIndex[1] != 10 || cm.leaderState.matchIndex[1] != 5 {
 				t.Fatalf("stale reply mutated replication state: nextIndex=%d matchIndex=%d, want 10 and 5",
@@ -1246,5 +1374,35 @@ func TestLeaderSendAEsToPeer_StaleReplyDoesNotMutateState(t *testing.T) {
 				t.Fatal("inflightAE[1] = true, want false (flag must be cleared on every exit)")
 			}
 		})
+	}
+}
+
+// TestLeaderSendAEsToPeer_StaleTermSuccessDoesNotApply проверяет, что успешный
+// ответ AppendEntries, отправленный в прежнем терме, не применяется к
+// состоянию нового лидерства.
+//
+// Сценарий: узел отправил AppendEntries в терме 1, затем потерял лидерство и
+// снова стал лидером — текущий терм 3. Успешный ответ терма 1 приходит после
+// повторного избрания: и nextIndex/matchIndex, и счётчик транспортных ошибок
+// остаются нетронутыми (recordPeerReplyLocked сверяет текущий терм, ветка
+// применения обязана сверять его так же).
+func TestLeaderSendAEsToPeer_StaleTermSuccessDoesNotApply(t *testing.T) {
+	mock := &mockTransportAE{replyTerm: 1}
+	cm := newRejectionTestCM(mock)
+	cm.cmState.currentTerm = 3
+	cm.leaderState.replFailures = map[int]int{1: 4}
+
+	// Отправка выполнена в терме 1, узел уже лидер терма 3.
+	cm.leaderSendAEsToPeer(1, 1, 0, true)
+
+	if cm.leaderState.nextIndex[1] != 10 || cm.leaderState.matchIndex[1] != 5 {
+		t.Fatalf("успех чужого терма изменил состояние репликации: nextIndex=%d matchIndex=%d, want 10 и 5",
+			cm.leaderState.nextIndex[1], cm.leaderState.matchIndex[1])
+	}
+	if got := cm.leaderState.replFailures[1]; got != 4 {
+		t.Fatalf("replFailures[1] = %d, want unchanged (4) — ответ чужого терма не сбрасывает счётчик", got)
+	}
+	if cm.leaderState.inflightAE[1].Load() {
+		t.Fatal("inflightAE[1] = true, want false (флаг снимается на каждом выходе)")
 	}
 }

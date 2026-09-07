@@ -14,6 +14,12 @@ var (
 	ErrUnsupportedProtocol          = errors.New("raft: unsupported protocol version")
 	ErrLeadershipTransferInProgress = errors.New("raft: leadership transfer in progress")
 
+	// ErrTooManyUncommittedEntries возвращается клиенту, когда
+	// незафиксированный хвост журнала лидера достиг maxUncommittedEntries.
+	// Признак того, что фиксация не продвигается: кворум недоступен либо
+	// соседи не успевают за нагрузкой.
+	ErrTooManyUncommittedEntries = errors.New("raft: too many uncommitted log entries")
+
 	// ErrNothingNewToSnapshot возвращается, когда нет новых зафиксированных
 	// записей для создания снимка.
 	ErrNothingNewToSnapshot = errors.New("raft: nothing new to snapshot")
@@ -58,6 +64,13 @@ type verifyFuture struct {
 	// засчитывается только от AE, отправленного с dispatchEpoch >= epoch
 	// (AE отправлен не раньше запроса, Raft §8).
 	epoch uint64
+
+	// enqueuedAtHeartbeat — значение leaderState.heartbeatTicks в момент
+	// постановки запроса в pendingVerify. При успешном завершении сравнивается
+	// с текущим значением счётчика тиков пульса: если тик успел сработать
+	// (значение больше), запрос «дождался пульса». Поле заполняется и читается
+	// только под cm.mu.
+	enqueuedAtHeartbeat uint64
 }
 
 // vote регистрирует голос узла peerID при подтверждении лидерства.

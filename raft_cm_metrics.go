@@ -80,20 +80,45 @@ func (l *cmLatency) snapshotAndReset() latencyReport {
 }
 
 // format форматирует снимок агрегатов в одну строку отчёта. Чистая функция:
-// не читает глобалей и полей CM, не логирует. Набор, порядок
-// и имена колонок, а также формат %5.2fms сохраняются прежними; собственной
-// метки времени и префикса [state,N:id,T:term] нет — их добавляют логгер
+// не читает глобалей и полей CM, не логирует. Набор и порядок колонок,
+// а также формат %5.2fms сохраняются; имена колонок сокращены для
+// компактности (например TakeSnap вместо TakeSnapshot). Собственной метки
+// времени и префикса [state,N:id,T:term] нет — их добавляют логгер
 // трассировки и traceLogf. Приём только по указателю —
 // (88 B > порог gocritic:hugeParam).
 func (r *latencyReport) format() string {
 	return fmt.Sprintf(
 		"AE=%5.2fms, BatchingFSM=%5.2fms, Election=%5.2fms, FSMSnapSh=%5.2fms,"+
 			" InstSnapShot=%5.2fms, ProcessLog=%5.2fms, RqPVt=%5.2fms, RqVote=%5.2fms,"+
-			" SendBatch=%5.2fms, TakeSnapshot=%5.2fms, TmOutNowRq=%5.2fms",
+			" SendBatch=%5.2fms, TakeSnap=%5.2fms, TmOutNowRq=%5.2fms",
 		r.appendEntries, r.fsmApply, r.election, r.handleFsmSnapshot,
 		r.installSnapshot, r.processLogs, r.requestPreVote, r.requestVote,
 		r.sendBatch, r.takeSnapshot, r.timeoutNowRequest,
 	)
+}
+
+// countersReport формирует строку счётчиков узла: события репликации
+// и снимков, показатели по каждому соседу, шаги лидера вниз по причинам
+// и размер незафиксированного хвоста журнала.
+// Самостоятельно захватывает и освобождает cm.mu.
+func (cm *ConsensusModule) countersReport() string {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return fmt.Sprintf(
+		"%s %s Uncommitted=%d",
+		cm.counters.report(&cm.leaderState),
+		cm.counters.stepDowns.report(),
+		cm.uncommittedLogLenLocked(),
+	)
+}
+
+// uncommittedLogLenLocked возвращает размер незафиксированного хвоста
+// журнала — число записей, добавленных в журнал, но ещё не зафиксированных.
+// Величина считается по индексам (lastLogIndex - commitIndex), а не по длине
+// среза журнала: после сжатия журнала позиция в срезе не равна индексу записи.
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) uncommittedLogLenLocked() int {
+	return cm.cmState.lastLogIndex - cm.cmState.commitIndex
 }
 
 func (cm *ConsensusModule) stats(shutdownCh chan struct{}) {
@@ -112,6 +137,7 @@ func (cm *ConsensusModule) stats(shutdownCh chan struct{}) {
 			// Префикс [state,N:id,T:term] добавляет stdoutTracePrintln.
 			if traceEnabled(0) {
 				cm.stdoutTracePrintln(rep.format())
+				cm.stdoutTracePrintln(cm.countersReport())
 			}
 		}
 	}
@@ -156,11 +182,65 @@ type raftCounters struct {
 	// показывает, как часто это окно проходится.
 	snapshotIndexBehindDispatched atomic.Int64
 
+	// stepDowns — шаги лидера вниз, в ведомые, с разбивкой по причине.
+	stepDowns stepDownCounters
+
 	// sendBatchEntrySkipped — записи, пропущенные при сборке батча для
 	// машины состояний (запись выше конца журнала, позиция вне журнала,
 	// несовпадение индекса). Штатная причина — сжатие журнала: запись уже
 	// покрыта снимком.
 	sendBatchEntrySkipped atomic.Int64
+
+	// verifyCompleted — успешно завершённые verify-запросы (ReadIndex),
+	// получившие кворум голосов через очередь pendingVerify. Знаменатель доли
+	// «дождавшихся пульса». Защищён cm.mu: инкремент — под уже удерживаемым
+	// cm.mu в countVerifyVotesLocked, чтение — из горутины stats.
+	verifyCompleted int64
+
+	// verifyWaitedHeartbeat — успешно завершённые verify-запросы, между
+	// постановкой в pendingVerify и завершением которых успел сработать тик
+	// пульса (leaderState.heartbeatTicks вырос относительно значения при
+	// постановке). Числитель доли. Защищён cm.mu: инкремент — под уже
+	// удерживаемым cm.mu, чтение — из горутины stats.
+	verifyWaitedHeartbeat int64
+
+	// aeSentPerPeer — исходящие AppendEntries по соседу: фактическая отправка
+	// через транспорт. Контроль частоты исходящих AE (немедленная
+	// перерассылка не должна превращаться в пульсацию). Защищён cm.mu:
+	// инкремент — под уже удерживаемым cm.mu, чтение — из горутины stats.
+	aeSentPerPeer map[int]int64
+
+	// verifyRedispatched — фактические немедленные перерассылки AppendEntries
+	// по соседу при неудовлетворённом verify-запросе (после успешного захвата
+	// флага и запуска горутины). Числитель границы частоты перерассылок.
+	// Защищён cm.mu: инкремент — под уже удерживаемым cm.mu, чтение — из
+	// горутины stats.
+	verifyRedispatched map[int]int64
+
+	// verifyRedispatchSuppressed — перерассылки AppendEntries, подавленные
+	// окном троттлинга (окно ещё не истекло) по соседу. Наблюдаемость того,
+	// что троттлинг срабатывает при плотном потоке verify. Защищён cm.mu:
+	// инкремент — под уже удерживаемым cm.mu, чтение — из горутины stats.
+	verifyRedispatchSuppressed map[int]int64
+}
+
+// stepDownCounters — шаги лидера вниз, в ведомые, по причинам:
+// higherTerm — обнаружен больший терм; checkQuorum — кворум голосующих
+// не отвечал дольше checkQuorumTimeout; configExit — лидер не входит
+// в зафиксированную конфигурацию. Разбивка отвечает на вопрос
+// «шаги вниз вызваны потерей контакта или чем-то иным?», на который
+// суммарный счётчик ответить не способен. Поля — atomic.Int64,
+// инкремент без захвата cm.mu.
+type stepDownCounters struct {
+	higherTerm, checkQuorum, configExit atomic.Int64
+}
+
+// report форматирует счётчики шагов вниз в одну строку отчёта.
+func (c *stepDownCounters) report() string {
+	return fmt.Sprintf(
+		"SDterm=%d SDquorum=%d SDconfig=%d",
+		c.higherTerm.Load(), c.checkQuorum.Load(), c.configExit.Load(),
+	)
 }
 
 // incPeerCount инкрементирует счётчик по каждому соседу, лениво инициализируя
@@ -190,11 +270,16 @@ func peerSum(m map[int]int64) int64 {
 // ni/mi. Вызывается только из stats под cm.mu.
 func (c *raftCounters) report(ls *leaderState) string {
 	var b strings.Builder
-	_, _ = fmt.Fprintf(&b, "ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d BatchSkip=%d",
+	_, _ = fmt.Fprintf(&b,
+		"ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d "+
+			"BatchSkip=%d VrfDone=%d VrfWtd=%d AESent=%d "+
+			"VrfRedisp=%d VrfRedispSupp=%d",
 		peerSum(c.installSnapshotSent), c.installSnapshotReceived.Load(),
 		peerSum(c.installSnapshotSkippedStale), peerSum(c.appendEntriesRejected),
 		peerSum(c.nextIndexRejectionIgnored), c.snapshotLogBoundaryViolation.Load(),
-		c.snapshotIndexBehindDispatched.Load(), c.sendBatchEntrySkipped.Load())
+		c.snapshotIndexBehindDispatched.Load(), c.sendBatchEntrySkipped.Load(),
+		c.verifyCompleted, c.verifyWaitedHeartbeat, peerSum(c.aeSentPerPeer),
+		peerSum(c.verifyRedispatched), peerSum(c.verifyRedispatchSuppressed))
 	peers := make([]int, 0, len(ls.nextIndex))
 	for p := range ls.nextIndex {
 		peers = append(peers, p)

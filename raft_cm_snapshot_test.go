@@ -747,12 +747,26 @@ func TestSnapshot_UnappliedBatchesReplayedAfterRestart(t *testing.T) {
 	// Фаза 2: шлюз закрыт — записи попадают в журнал и в очередь машины
 	// состояний, но не применяются.
 	const pendingCommands = 3
+	// Базовая линия отметки применения, зафиксированная до
+	// диспетчеризации команд фазы 2: условие ниже опирается только на
+	// прирост отметки и не зависит от служебных записей, дошедших до
+	// машины состояний ранее (noop и пр.).
+	baseDispatched, _ := readWatermarks(cm)
 	for i := appliedCommands; i < appliedCommands+pendingCommands; i++ {
 		cm.Apply(fmt.Sprintf("k%d=v%d", i, i), 0)
 	}
-	waitForCondition(t, 5*time.Second, "pending commands dispatched to the FSM queue", func() bool {
-		dispatched, applied := readWatermarks(cm)
-		return dispatched > applied && fsm.enteredCount() > appliedCommands
+	// Инвариант: отметка применения растёт только при обработке
+	// фиксации, а фиксация возможна лишь после записи журнала на диск
+	// (персист выполняется при добавлении записей в журнал — до
+	// продвижения индекса фиксации; сама отметка присваивается в начале
+	// processLogs, до постановки батча в очередь машины состояний).
+	// Поэтому продвижение отметки до базовой линии + 3 гарантирует
+	// присутствие всех трёх команд фазы 2 в журнале на диске: остановка
+	// не может застать диспетчеризацию, и после перезапуска все три
+	// записи будут переиграны.
+	waitForCondition(t, 5*time.Second, "pending commands committed to the durable log", func() bool {
+		dispatched, _ := readWatermarks(cm)
+		return dispatched >= baseDispatched+pendingCommands
 	})
 
 	// Останавливаем узел: Apply обязан завершаться, поэтому переводим

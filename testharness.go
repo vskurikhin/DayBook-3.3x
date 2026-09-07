@@ -284,15 +284,20 @@ func (h *Harness) DisconnectPeer(id int) {
 	h.mu.Unlock()
 }
 
-// ReconnectPeer повторно подключает сервер ко всем остальным серверам кластера.
+// ReconnectPeer повторно подключает сервер к остальным живым серверам
+// кластера, логически подключённым в этот момент. Сервер, отключённый
+// отдельным вызовом DisconnectPeer, остаётся изолированным: восстановление
+// связи с ним нарушило бы учёт connected и делало бы «отключённый» узел
+// участником кворума.
 //
-// Значения alive снимаются под h.mu до работы с транспортами; мутация
-// connected — отдельной короткой секцией.
+// Значения alive и connected снимаются под h.mu до работы с транспортами;
+// мутация connected — отдельной короткой секцией.
 func (h *Harness) ReconnectPeer(id int) {
 	tlog("Reconnect %d", id)
 	alive := h.aliveSnapshot()
+	connected := h.connectedSnapshot()
 	for j := 0; j < h.n; j++ {
-		if j != id && alive[j] {
+		if j != id && alive[j] && connected[j] {
 			h.transports[id].Connect(ServerID(j), h.transports[j])
 			h.transports[j].Connect(ServerID(id), h.transports[id])
 		}
@@ -752,6 +757,76 @@ func (h *Harness) committedOn(cmd int) (nc int, converged bool) {
 	return nc, false
 }
 
+// commitValuesOn возвращает (nc, lengthsConverged):
+//   - nc — число подключённых узлов, у которых команда cmd присутствует
+//     в h.commits (в любой позиции);
+//   - lengthsConverged == true, когда у всех подключённых узлов равные
+//     длины списков фиксации.
+//
+// В отличие от committedOn, не требует одинаковой позиции/Index записи:
+// после перевыборов предыстории журналов могут расходиться (перезапись
+// незафиксированного хвоста), и для проверки восстановления достаточно
+// наличия команды по значению. Предикат non-fatal (не вызывает
+// t.Error*/t.Fatal*).
+//
+// Контракт: h.mu must be held.
+func (h *Harness) commitValuesOn(cmd int) (nc int, lengthsConverged bool) {
+	commitsLen := -1
+	lengthsEqual := true
+	for i := 0; i < h.n; i++ {
+		if !h.connected[i] {
+			continue
+		}
+		if commitsLen < 0 {
+			commitsLen = len(h.commits[i])
+		} else if len(h.commits[i]) != commitsLen {
+			lengthsEqual = false
+		}
+		for c := range h.commits[i] {
+			if v, ok := h.commits[i][c].Data.(int); ok && v == cmd {
+				nc++
+				break
+			}
+		}
+	}
+	if commitsLen < 0 {
+		return nc, false
+	}
+	return nc, lengthsEqual
+}
+
+// checkCommittedValues утверждает наличие команды cmd по значению на
+// каждом подключённом узле, не требуя одинаковой позиции/Index записи
+// (см. commitValuesOn). Чистый assert БЕЗ ожидания: вызывается после
+// wait по commitValuesOn, когда cmd уже присутствует на всех
+// подключённых узлах; наличие монотонно, поэтому assert не гоняется с
+// коллектором.
+func (h *Harness) checkCommittedValues(cmd int) {
+	h.t.Helper()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	nc := 0
+	for i := 0; i < h.n; i++ {
+		if !h.connected[i] {
+			continue
+		}
+		nc++
+		found := false
+		for c := range h.commits[i] {
+			if v, ok := h.commits[i][c].Data.(int); ok && v == cmd {
+				found = true
+				break
+			}
+		}
+		if !found {
+			h.t.Fatalf("cmd=%d not committed on connected peer %d: commits[%d] = %v", cmd, i, i, h.commits[i])
+		}
+	}
+	if nc == 0 {
+		h.t.Fatalf("cmd=%d: no connected peers", cmd)
+	}
+}
+
 // commitsDiag возвращает строку состояния h.commits для диагностики.
 // Контракт: h.mu must be held.
 func (h *Harness) commitsDiag() string {
@@ -906,6 +981,46 @@ func (h *Harness) WaitForCommitAll(cmd int, timeout time.Duration) {
 	h.CheckCommitted(cmd)
 }
 
+// WaitForCommitConvergedValues ждёт, пока списки фиксации подключённых
+// узлов не сойдутся по длине и команда cmd не появится минимум на n
+// подключённых узлах, затем утверждает наличие cmd по значению на всех
+// подключённых узлах.
+//
+// В отличие от WaitForCommit, не требует одинаковой позиции/Index записи:
+// после перевыборов предыстории журналов могут расходиться (перезапись
+// незафиксированного хвоста), и это требование невыполнимо; для проверки
+// восстановления достаточно наличия команды по значению.
+//
+// Бюджет по умолчанию — commitBudgetAfterFailover.
+func (h *Harness) WaitForCommitConvergedValues(cmd int, n int) {
+	h.t.Helper()
+	h.WaitForCommitConvergedValuesBudget(cmd, n, commitBudgetAfterFailover)
+}
+
+// WaitForCommitConvergedValuesBudget — WaitForCommitConvergedValues
+// с явным бюджетом ожидания.
+//
+// Схема: wait по предикату commitValuesOn (равные длины и наличие cmd
+// на >= n узлах) под h.mu → assert checkCommittedValues (без h.mu).
+// Наличие cmd монотонно, поэтому assert выполняется и при успешном
+// ожидании, и при исчерпании бюджета (ожидание не слабее assert'а).
+func (h *Harness) WaitForCommitConvergedValuesBudget(cmd int, n int, budget time.Duration) {
+	h.t.Helper()
+	desc := fmt.Sprintf("cmd=%d present on >=%d connected peers (converged lengths)", cmd, n)
+	err := h.waitFor(
+		desc, budget,
+		func() bool {
+			nc, lengthsConverged := h.commitValuesOn(cmd)
+			return nc >= n && lengthsConverged
+		},
+		h.commitsDiag,
+	)
+	if err != nil {
+		h.t.Errorf("WaitForCommitConvergedValues %v", err)
+	}
+	h.checkCommittedValues(cmd)
+}
+
 // waitForSuffrage ждёт, пока узел observerID не увидит в своей последней
 // конфигурации сервер target с правом голоса suffrage — наблюдаемый признак
 // того, что изменение членства дошло до этого узла и применено.
@@ -1014,6 +1129,31 @@ func (h *Harness) waitForApplyInflight(id int, want int, budget time.Duration) {
 			"  expected: server %d has >=%d inflight Apply futures (got %d)\n  %s",
 		budget, pollInterval, id, want, h.applyInflightCount(id), h.nodeStates(),
 	)
+}
+
+// lastLogIndex возвращает индекс последней записи журнала узла id.
+// Читается под cm.mu; h.mu не участвует.
+func (h *Harness) lastLogIndex(id int) int {
+	cm := h.cluster[id]
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return cm.cmState.lastLogIndex
+}
+
+// waitForLastLogIndex ждёт, пока журнал узла id не дорастёт до индекса want:
+// команда, отправленная клиентом, дошла до лидерского цикла и записана
+// в журнал. Барьер не зависит от скорости применения к машине состояний,
+// в отличие от ожидания непустой очереди inflight.
+func (h *Harness) waitForLastLogIndex(id, want int, budget time.Duration) {
+	h.t.Helper()
+	if err := waitCond(
+		"log of the node reaches the expected index",
+		budget,
+		func() bool { return h.lastLogIndex(id) >= want },
+		func() string { return "lastLogIndex = " + itoa(h.lastLogIndex(id)) },
+	); err != nil {
+		h.t.Fatalf("waitForLastLogIndex(server %d, want %d): %v\n  %s", id, want, err, h.nodeStates())
+	}
 }
 
 // CheckNotCommitted проверяет, что команда cmd ещё не зафиксирована.

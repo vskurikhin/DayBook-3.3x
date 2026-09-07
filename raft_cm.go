@@ -51,6 +51,26 @@ type ConsensusModule struct {
 	stepDown     chan struct{}
 	confChangeCh chan *configurationChangeFuture
 
+	// checkQuorumTimeout — предельный срок без ответов от кворума голосующих,
+	// после которого лидер шагает вниз, в ведомые. Значение по умолчанию —
+	// defaultCheckQuorumTimeout; поле, а не константа, чтобы тесты пакета
+	// могли задать заведомо больший или меньший срок. Читается только
+	// в цикле лидера под cm.mu.
+	checkQuorumTimeout time.Duration
+
+	// verifyRedispatchMinInterval — минимальный интервал между немедленными
+	// перерассылками AppendEntries одному соседу при неудовлетворённом
+	// verify-запросе. Значение по умолчанию — verifyRedispatchMinIntervalMs;
+	// поле, а не константа, чтобы тесты пакета могли задать заведомо малое
+	// значение (укороченное окно) для проверки границы частоты. Читается и
+	// записывается только под cm.mu в redispatchVerifyIfPendingLocked.
+	verifyRedispatchMinInterval time.Duration
+
+	// leaderLoopsAlive — число живых горутин цикла лидера на этом узле.
+	// Инвариант: значение не превышает 1. Увеличивается на входе в цикл
+	// и уменьшается при выходе, оба раза под cm.mu; читается тестами пакета.
+	leaderLoopsAlive int
+
 	// preVoteDisabled отключает механизм Pre-Vote.
 	// Если true, выборы начинаются сразу (как в классическом Raft).
 	// По умолчанию false — Pre-Vote включён.
@@ -121,7 +141,10 @@ type leaderState struct {
 	//		nil — сосед вне конфигурации;
 	//		false — нет активной горутины;
 	//		true — leaderSendAEsToPeer выполняется.
-	// Сброс: в defer leaderSendAEsToPeer, runLeaderLoop и becomeFollowerLocked.
+	// Захват — только через CompareAndSwap(false, true), единый для всех
+	// точек запуска; сброс флага — только горутиной, владеющей им (признак
+	// владения передаётся в leaderSendAEsToPeer). Сброс также выполняется в
+	// runLeaderLoop и becomeFollowerLocked.
 	inflightAE map[int]*atomic.Bool
 
 	// commitmentTracker — продвижение commitIndex на лидере.
@@ -141,6 +164,12 @@ type leaderState struct {
 	// Значение снимается в leaderSendAEs и передаётся как dispatchEpoch.
 	verifyEpoch uint64
 
+	// heartbeatTicks — монотонный счётчик тиков пульса текущего лидерства.
+	// Инкрементируется в leaderLoop по тику пульса под cm.mu. Значение,
+	// снятое при постановке verify в pendingVerify, служит нижней границей
+	// «дождался ли запрос тика пульса» при его успешном завершении.
+	heartbeatTicks uint64
+
 	// leaderStartIndex — первый индекс текущего терма лидера.
 	leaderStartIndex int
 
@@ -156,6 +185,21 @@ type leaderState struct {
 	// Устанавливается в handleLeadershipTransfer, отвечается в stepDown.
 	leadershipTransferFuture *leadershipTransferFuture
 
+	// lastContact — время последнего ответа RPC без транспортной ошибки
+	// по каждому соседу. Ответ соседа любого содержания (в том числе отказ
+	// AppendEntries и ответ InstallSnapshot) доказывает, что сосед жив,
+	// поэтому отметка обновляется в тех же критических секциях, где
+	// сбрасывается задержка повторов.
+	//
+	// Жизненный цикл привязан к роли лидера: карта создаётся заново
+	// в startLeaderLocked (отметка «сейчас» для соседей актуальной
+	// конфигурации), пополняется в ensureReplicationForLocked при
+	// добавлении сервера и очищается от удалённых серверов в
+	// startStopReplicationLocked. Отсутствующая отметка трактуется как
+	// «контакт только что был» — льгота, защищающая от ложного шага вниз
+	// сразу после изменения состава кластера. Все обращения — под cm.mu.
+	lastContact map[int]time.Time
+
 	// replFailures — число подряд идущих транспортных ошибок по соседу.
 	// Жизненный цикл привязан к роли лидера: создаётся в startLeaderLocked,
 	// очищается в becomeFollowerLocked.
@@ -165,6 +209,21 @@ type leaderState struct {
 	// Задержка повторов реализуется сравнением времени (без time.Sleep), чтобы
 	// не удерживать inflightAE[peer] и не задерживать восстановление узла.
 	lastAttempt map[int]time.Time
+
+	// nextVerifyRedispatchAt — момент, раньше которого немедленная
+	// перерассылка AppendEntries соседу не выполняется (окно троттлинга).
+	// Ограничивает частоту перерассылок доказуемой границей: не более одной
+	// перерассылки за verifyRedispatchMinInterval на каждого соседа, что
+	// исключает самоподдерживающуюся эстафету при плотном потоке verify.
+	//
+	// Жизненный цикл привязан к роли лидера: карта создаётся заново в
+	// startLeaderLocked (каждому лидерству — своя карта, по образцу
+	// lastContact), поэтому окно не переживает смену лидерства — первая
+	// перерассылка нового лидерства немедленна. Отсутствующий ключ — нулевое
+	// время, окно свободно (льгота, симметричная отсутствующей отметке
+	// контакта). Метка ставится только при фактической перерассылке под
+	// cm.mu; все обращения — под cm.mu.
+	nextVerifyRedispatchAt map[int]time.Time
 }
 
 // cmState — состояние узла Raft.

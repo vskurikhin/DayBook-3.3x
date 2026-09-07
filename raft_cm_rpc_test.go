@@ -26,6 +26,7 @@ func TestAppendEntries_ConflictIndexSnapshotBoundary(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{}
+	cm.storage = NewMapStorage()
 	cm.cmState.state = Follower
 	cm.cmState.currentTerm = 1
 	cm.cmState.votedFor = -1
@@ -62,6 +63,7 @@ func TestAppendEntries_ConflictIndexSnapshotBoundaryCorrupted(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{}
+	cm.storage = NewMapStorage()
 	cm.cmState.state = Follower
 	cm.cmState.currentTerm = 1
 	cm.cmState.votedFor = -1

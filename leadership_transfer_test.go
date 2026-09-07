@@ -742,3 +742,62 @@ func TestLeadershipTransfer_EnqueueConfigurationChangeBlocked(t *testing.T) {
 		t.Fatal("leadership transfer timed out after reconnecting target")
 	}
 }
+
+// TestLeadershipTransfer_CatchUpSendIsDeduplicated проверяет, что догоняющая
+// репликация передачи лидерства подчиняется дедупликации отправителей:
+// пока горутина репликации на соседа активна, повторный вызов не порождает
+// второго AppendEntries тому же соседу.
+//
+// Проверяется точка входа догоняющего цикла — leaderSendAEsToPeerIfIdle:
+// цикл вызывает её каждые 10 мс, а прямой вызов leaderSendAEsToPeer обходил
+// бы флаг inflightAE (два параллельных RPC одному соседу искажают счётчик
+// транспортных ошибок и периодизацию задержки повторов).
+//
+// Сценарий:
+//  1. Транспорт блокирует AppendEntries — первая отправка остаётся активной.
+//  2. Пять итераций догоняющего цикла во время активной отправки.
+//  3. Проверить: AppendEntries вызван ровно один раз.
+//  4. Разблокировать транспорт: после снятия флага отправка снова проходит.
+func TestLeadershipTransfer_CatchUpSendIsDeduplicated(t *testing.T) {
+	mock := &mockTransportAE{blockCh: make(chan struct{})}
+	cm := newRejectionTestCM(mock)
+
+	// Первая отправка захватывает флаг и блокируется в транспорте.
+	cm.leaderSendAEsToPeerIfIdle(1, 1)
+	deadline := time.Now().Add(inmemRPCTimeout)
+	for mock.callCount.Load() == 0 {
+		if !time.Now().Before(deadline) {
+			t.Fatalf("AppendEntries не вызван за %v", inmemRPCTimeout)
+		}
+		time.Sleep(pollInterval)
+	}
+
+	// Итерации догоняющего цикла, пока отправка активна.
+	for i := 0; i < 5; i++ {
+		cm.leaderSendAEsToPeerIfIdle(1, 1)
+		// keep: timing — воспроизводится интервал догоняющего цикла (10 мс);
+		// наблюдаемого признака состояния здесь нет.
+		time.Sleep(pollInterval)
+	}
+	if calls := mock.callCount.Load(); calls != 1 {
+		t.Fatalf("AppendEntries calls = %d, want 1 — догоняющий цикл породил параллельного отправителя", calls)
+	}
+
+	// Разблокировка: горутина завершается, флаг снимается через defer.
+	close(mock.blockCh)
+	cm.wg.Wait()
+	if cm.leaderState.inflightAE[1].Load() {
+		t.Fatal("inflightAE[1] = true, want false (флаг снимается на каждом выходе)")
+	}
+
+	// После снятия флага очередная итерация цикла снова отправляет RPC.
+	cm.leaderSendAEsToPeerIfIdle(1, 1)
+	deadline = time.Now().Add(inmemRPCTimeout)
+	for mock.callCount.Load() < 2 {
+		if !time.Now().Before(deadline) {
+			t.Fatalf("AppendEntries calls = %d, want 2 после снятия флага", mock.callCount.Load())
+		}
+		time.Sleep(pollInterval)
+	}
+	cm.wg.Wait()
+}

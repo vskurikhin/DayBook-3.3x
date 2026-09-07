@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -42,26 +43,27 @@ func TestCommitmentE2E_FourNodes_TwoDownNoCommit(t *testing.T) {
 	cmd := 1001
 	future := h.cluster[lid].Apply(cmd, 0)
 
-	// Контрольное окно ~ election timeout: команда не должна зафиксироваться при 2/4.
-	select {
-	case err := <-future.ErrorCh():
-		t.Fatalf("command committed without quorum (err=%v)", err)
-	case <-time.After(ReelectionTimeoutMs * time.Millisecond):
+	// Команда не фиксируется при 2/4: кворум 3/4 недостижим. Лидер,
+	// потерявший контакт с кворумом, шагает вниз и отклоняет ожидающую
+	// запись — ошибкой, а не фиксацией.
+	if err := waitFuture(t, future, checkQuorumBudget); !errors.Is(err, ErrLeadershipLost) {
+		t.Fatalf("pending Apply without quorum = %v, want %v", err, ErrLeadershipLost)
 	}
 	h.CheckNotCommitted(cmd)
 
-	// Восстановить связь — кворум 4/4 достижим, команда фиксируется.
+	// Восстановить связь — кворум 4/4 достижим, кластер снова фиксирует записи.
 	h.ReconnectPeer(f1)
 	h.ReconnectPeer(f2)
 
-	if err := waitFuture(t, future, 3*time.Second); err != nil {
+	newLid, _ := h.WaitForSingleLeader(leaderElectionBudget)
+	restored := 1011
+	if err := waitFuture(t, h.cluster[newLid].Apply(restored, 0), 3*time.Second); err != nil {
 		t.Fatalf("Apply failed after reconnect: %v", err)
 	}
 	// После реконнекта подключены все 4 узла: assert CheckCommittedN
 	// (выполняется WaitForCommit после ожидания сходимости) требует
-	// точного числа подключённых узлов. Прежнее значение 3 не
-	// проверялось — старый WaitForCommit возвращался по «nc >= n».
-	h.WaitForCommit(cmd, 4)
+	// точного числа подключённых узлов.
+	h.WaitForCommit(restored, 4)
 }
 
 // TestCommitmentE2E_FourNodes_OneDownStillCommits — n=4 позитивный сценарий:
@@ -98,19 +100,20 @@ func TestCommitmentE2E_TwoNodes_FollowerDownNoCommit(t *testing.T) {
 	cmd := 1003
 	future := h.cluster[lid].Apply(cmd, 0)
 
-	// Контрольное окно: при 1/2 фиксация невозможна (кворум 2/2).
-	select {
-	case err := <-future.ErrorCh():
-		t.Fatalf("command committed by isolated leader (err=%v)", err)
-	case <-time.After(ReelectionTimeoutMs * time.Millisecond):
+	// При 1/2 фиксация невозможна (кворум 2/2): лидер шагает вниз по потере
+	// контакта и отклоняет ожидающую запись.
+	if err := waitFuture(t, future, checkQuorumBudget); !errors.Is(err, ErrLeadershipLost) {
+		t.Fatalf("pending Apply without quorum = %v, want %v", err, ErrLeadershipLost)
 	}
 	h.CheckNotCommitted(cmd)
 
 	h.ReconnectPeer(follower)
-	if err := waitFuture(t, future, 3*time.Second); err != nil {
+	newLid, _ := h.WaitForSingleLeader(leaderElectionBudget)
+	restored := 1013
+	if err := waitFuture(t, h.cluster[newLid].Apply(restored, 0), 3*time.Second); err != nil {
 		t.Fatalf("Apply failed after reconnect: %v", err)
 	}
-	h.WaitForCommit(cmd, 2)
+	h.WaitForCommit(restored, 2)
 }
 
 // TestCommitmentE2E_NoopCommitsAfterFailover — проверка фиксации noop после failover:

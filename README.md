@@ -6,7 +6,7 @@
 * [Часть 1: Выборы](https://svn.su/2020/2020-02-24-implementing-raft-part-1-elections.html)
 * [Часть 2: Команды и репликация логов](https://svn.su/2020/2020-02-29-implementing-raft-part-2-commands-and-log-replication.html)
 * [Часть 3: Сохранение состояния и оптимизации](https://svn.su/2020/2020-05-05-implementing-raft-part-3-persistence-and-optimizations.html)
-* **Часть 4. База данных «ключ-значение»**
+* [Часть 4. База данных «ключ-значение»](https://svn.su/2024/2024-10-10-implementing-raft-part-4-key-value-database.html)
 * ~~Часть 5. Доставка сообщений «ровно один раз» (Exactly-Once Delivery)~~ _todo_
 
 Каждый каталог `partN` в этом репозитории содержит полный исходный код, соответствующий **части N** серии статей (за исключением части 0, которая является вводной и не содержит кода).
@@ -104,8 +104,8 @@ raft/
 │  │ (Serve)  │  │ обновления │  │ Raft     │  │           │  │
 │  └──────────┘  └────────────┘  └──────────┘  └───────────┘  │
 └─────────────────────────────────────────────────────────────┘
-                           │
-                           ▼
+                               │
+                               ▼
  ┌──────────────────────────────────────────────────────────┐
  │                    Server (server.go)                    │
  │                                                          │
@@ -115,8 +115,8 @@ raft/
  │  │ (net/rpc)│  │          │  │                        │  │
  │  └──────────┘  └──────────┘  └────────────────────────┘  │
  └──────────────────────────────────────────────────────────┘
-                           │
-                           ▼
+                              │
+                              ▼
 ┌────────────────────────────────────────────────────────────┐
 │            ConsensusModule (raft_cm_*.go)                  │
 │                                                            │
@@ -160,6 +160,4 @@ startElection()│     │                      │
 
 ---
 
-## Вывод
-
-Проект — **полноценная реализация Raft + реплицированный KV сервис**. Корневой пакет `github.com/vskurikhin/raft` (без изменений от v0.0.3) предоставляет: leader election, log replication, commitment, persistence, crash/recovery. `pkg/kvservice/` (новый в Part 5) добавляет: REST API, Go-клиент, реплицированное DataStore, exactly-once семантику через `(ClientID, RequestID)` dedup в `runUpdater()`. 62 теста, 24 .go файла, 5351 строка.
+Проект — **полноценная реализация Raft + реплицированный KV сервис**. Корневой пакет `github.com/vskurikhin/raft` (без изменений от v1.0.2) предоставляет: leader election, log replication, commitment, persistence, crash/recovery. `pkg/kvservice/` (новый в Part 5) добавляет: REST API, Go-клиент, реплицированное DataStore, exactly-once семантику через `(ClientID, RequestID)` dedup в `runUpdater()`. 62 теста, 24 .go файла, 5351 строка.

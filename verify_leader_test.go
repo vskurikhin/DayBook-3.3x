@@ -181,16 +181,37 @@ func TestVerifyFuture_VoteDeduplication(t *testing.T) {
 
 // TestVerifyLeader_EpochFilter: голос учитывается только если AE отправлен
 // не раньше постановки запроса (vf.epoch <= dispatchEpoch).
+//
+// Предмет обоих подслучаев — «AE, отправленный до постановки, не голосует» —
+// требует vf.epoch > dispatchEpoch, то есть ровно условия перерассылки:
+// завершившаяся горутина репликации видит в pendingVerify запрос с эпохой позже
+// отправки и немедленно отправляет свежий AE с новой эпохой. Поэтому подслучай
+// «до постановки» разбит на две фазы, разделённые гейтом транспорта: фаза 1
+// фиксирует, что ответ AE старой эпохи голосом не является (утверждение
+// детерминировано — перерассылка придержана гейтом); фаза 2 освобождает гейт и
+// проверяет, что перерассланный AE с новой эпохой голос засчитывает. Без гейта
+// утверждение фазы 1 было бы гоночным, а несогласованная фикстура (verifyEpoch,
+// не покрывающая эпоху запроса) дала бы бесконечную эстафету горутин.
 func TestVerifyLeader_EpochFilter(t *testing.T) {
-	newCM := func(epoch uint64) (*ConsensusModule, *verifyFuture) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	// Терм отправки AppendEntries в вызовах теста — константа; сверяется с
+	// currentTerm приспособления ниже (терм отправки должен равняться currentTerm).
+	const sendTerm = 1
+
+	newCM := func(transport Transport, epoch uint64) (*ConsensusModule, *verifyFuture) {
 		cm := &ConsensusModule{
-			id:        0,
-			transport: &mockTransportAE{},
+			id: 0,
+			// Терм ответа совпадает с термом лидера: отправка выполняется
+			// в текущем терме, иначе успешный ответ к состоянию репликации
+			// не применяется и фильтр по раунду верификации не проверялся бы.
+			transport: transport,
 			commitCh:  make(chan int, 1),
 			leaderState: leaderState{
-				nextIndex:  map[int]int{1: 0},
-				matchIndex: map[int]int{1: -1},
-				inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+				nextIndex:              map[int]int{1: 0},
+				matchIndex:             map[int]int{1: -1},
+				inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+				nextVerifyRedispatchAt: map[int]time.Time{},
 			},
 			cmState: cmState{
 				state:        Leader,
@@ -217,25 +238,71 @@ func TestVerifyLeader_EpochFilter(t *testing.T) {
 			quorumSize: 2,
 			epoch:      epoch,
 		}
+		// Согласование фикстуры с инвариантом «эпоха ожидающего запроса не
+		// больше verifyEpoch»: перерассылка отправляет AE с эпохой
+		// newDispatchEpoch = verifyEpoch, и при verifyEpoch = 0 ответ такого AE
+		// голосом запросу с эпохой > 0 не был бы, а эстафета горутин — бесконечной.
+		cm.mu.Lock()
+		cm.leaderState.verifyEpoch = epoch
 		cm.leaderState.pendingVerify = []*verifyFuture{vf}
+		// Защитная проверка согласованности приспособления: сочетание достижимо
+		// в работающей системе, только если терм отправки равен currentTerm и
+		// эпоха ожидающего запроса не превосходит verifyEpoch.
+		if cm.cmState.currentTerm != sendTerm {
+			t.Fatalf("sendTerm = %d, currentTerm = %d: приспособление несогласованно (терм отправки != currentTerm)",
+				sendTerm, cm.cmState.currentTerm)
+		}
+		if vf.epoch > cm.leaderState.verifyEpoch {
+			t.Fatalf("verifyEpoch = %d < vf.epoch = %d: приспособление несогласованно (эпоха ожидающего запроса больше verifyEpoch)",
+				cm.leaderState.verifyEpoch, vf.epoch)
+		}
+		cm.mu.Unlock()
 		return cm, vf
 	}
 
-	// Ответ AE, отправленного ДО запроса (dispatchEpoch=1 < epoch=2):
-	// голос не засчитывается.
-	cm, vf := newCM(2)
-	cm.leaderSendAEsToPeer(1, 0, 1)
-	if vf.votes != 0 {
-		t.Fatalf("votes = %d, want 0 (AE dispatched before request must not vote)", vf.votes)
-	}
+	t.Run("AE отправленный до постановки не голосует", func(t *testing.T) {
+		mock := &mockTransportAE{replyTerm: 1, gateBlockAfter: 2, gateCh: make(chan struct{})}
+		cm, vf := newCM(mock, 2)
 
-	// Ответ AE, отправленного ПОСЛЕ запроса (dispatchEpoch=2 == epoch=2):
-	// голос засчитывается.
-	cm, vf = newCM(2)
-	cm.leaderSendAEsToPeer(1, 0, 2)
-	if vf.votes != 1 {
-		t.Fatalf("votes = %d, want 1 (AE dispatched after request must vote)", vf.votes)
-	}
+		// Фаза 1: первый синхронный вызов с dispatchEpoch = 1 < epoch = 2.
+		// Ответ AE, отправленного до постановки запроса, голосом не является;
+		// гейт придерживает второй вызов (перерассылку), поэтому утверждение
+		// детерминировано.
+		cm.leaderSendAEsToPeer(1, sendTerm, 1, true)
+		if vf.votes != 0 {
+			t.Fatalf("votes = %d, want 0 (AE dispatched before request must not vote)", vf.votes)
+		}
+
+		// Фаза 2: освобождение гейта. Перерассланный AE с новой эпохой
+		// (newDispatchEpoch = verifyEpoch = 2) голос засчитывает; кворум 2 не
+		// достигнут, запрос остаётся в очереди, третьей отправки нет (эстафета
+		// конечна: 2 <= 2).
+		close(mock.gateCh)
+		waitFor(t, "перерассылка и голос перерассланного AE", inmemRPCTimeout, func() bool {
+			return mock.callCount.Load() >= 2 && !cm.inflightAELoaded(1)
+		})
+		if vf.votes != 1 {
+			t.Fatalf("votes = %d, want 1 (redispatched AE must vote)", vf.votes)
+		}
+		cm.mu.Lock()
+		remaining := cm.leaderState.pendingVerify
+		cm.mu.Unlock()
+		if len(remaining) != 1 || remaining[0] != vf {
+			t.Fatalf("pendingVerify = %v, want [vf] still queued", remaining)
+		}
+		if got := mock.callCount.Load(); got != 2 {
+			t.Fatalf("AppendEntries calls = %d, want 2 (no third dispatch)", got)
+		}
+	})
+
+	t.Run("AE отправленный после постановки голосует", func(t *testing.T) {
+		mock := &mockTransportAE{replyTerm: 1}
+		cm, vf := newCM(mock, 2)
+		cm.leaderSendAEsToPeer(1, sendTerm, 2, true)
+		if vf.votes != 1 {
+			t.Fatalf("votes = %d, want 1 (AE dispatched after request must vote)", vf.votes)
+		}
+	})
 }
 
 // TestVerifyLeader_MultiplePendingDifferentEpochs — фильтр по раунду
@@ -245,17 +312,38 @@ func TestVerifyLeader_EpochFilter(t *testing.T) {
 // засчитывается только тем запросам верификации, которые были поставлены не
 // позже отправки (epoch запроса не больше dispatchEpoch). Набравшие кворум
 // запросы покидают очередь, остальные сохраняются в исходном порядке.
+//
+// В очереди есть запрос с эпохой 7 при dispatchEpoch = 5 (поставленный позже
+// отправки) — ровно условие перерассылки: завершившаяся горутина отправляет
+// свежий AE с новой эпохой. Поэтому проверка разбита на две фазы, разделённые
+// гейтом транспорта: фаза 1 фиксирует голоса от AE старой эпохи (детерминировано
+// — перерассылка придержана гейтом); фаза 2 освобождает гейт и проверяет
+// сходимость после перерассланного AE. Согласованная фикстура
+// (verifyEpoch = максимум эпох) делает эстафету конечной: 7 <= 7.
+//
+// Запрос vfSame (эпоха 5, кворум 3) недобирает голос до кворума: в фикстуре
+// лишь два источника голоса — лидер (self-голос учтён при создании) и сосед 1
+// (единственный получатель AppendEntries). Повторный голос соседа от
+// перерассланного AE дедуплицируется (verifyFuture.vote), поэтому vfSame
+// остаётся в очереди с 2 голосами из 3 — это и есть честная сходимость фазы 2.
 func TestVerifyLeader_MultiplePendingDifferentEpochs(t *testing.T) {
-	mock := &mockTransportAE{replyTerm: 1}
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	// Терм отправки AppendEntries в вызове теста — константа; сверяется с
+	// currentTerm приспособления ниже (терм отправки должен равняться currentTerm).
+	const sendTerm = 1
+
+	mock := &mockTransportAE{replyTerm: 1, gateBlockAfter: 2, gateCh: make(chan struct{})}
 	cm := &ConsensusModule{
 		id:         0,
 		transport:  mock,
 		commitCh:   make(chan int, 1),
 		shutdownCh: make(chan struct{}),
 		leaderState: leaderState{
-			nextIndex:  map[int]int{1: 0},
-			matchIndex: map[int]int{1: -1},
-			inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextIndex:              map[int]int{1: 0},
+			matchIndex:             map[int]int{1: -1},
+			inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+			nextVerifyRedispatchAt: map[int]time.Time{},
 		},
 		cmState: cmState{
 			state:             Leader,
@@ -299,9 +387,33 @@ func TestVerifyLeader_MultiplePendingDifferentEpochs(t *testing.T) {
 	vfOld := newVerifyFuture(3, 2)
 	vfSame := newVerifyFuture(5, 3)
 	vfFuture := newVerifyFuture(7, 2)
+	// Согласование фикстуры с инвариантом «эпоха ожидающего запроса не больше
+	// verifyEpoch»: verifyEpoch = максимум эпох очереди. Перерассылка отправляет
+	// AE с эпохой newDispatchEpoch = verifyEpoch = 7, покрывающей все ожидающие
+	// запросы, поэтому эстафета горутин конечна, а голоса засчитываются.
+	cm.mu.Lock()
+	cm.leaderState.verifyEpoch = 7
 	cm.leaderState.pendingVerify = []*verifyFuture{vfOld, vfSame, vfFuture}
+	// Защитная проверка согласованности приспособления: сочетание достижимо
+	// в работающей системе, только если терм отправки равен currentTerm и эпоха
+	// каждого ожидающего запроса не превосходит verifyEpoch.
+	if cm.cmState.currentTerm != sendTerm {
+		t.Fatalf("sendTerm = %d, currentTerm = %d: приспособление несогласованно (терм отправки != currentTerm)",
+			sendTerm, cm.cmState.currentTerm)
+	}
+	for _, v := range cm.leaderState.pendingVerify {
+		if v.epoch > cm.leaderState.verifyEpoch {
+			t.Fatalf("verifyEpoch = %d < vf.epoch = %d: приспособление несогласованно (эпоха ожидающего запроса больше verifyEpoch)",
+				cm.leaderState.verifyEpoch, v.epoch)
+		}
+	}
+	cm.mu.Unlock()
 
-	cm.leaderSendAEsToPeer(1, 1, 5)
+	// Фаза 1: первый синхронный вызов с dispatchEpoch = 5. Голос засчитывается
+	// запросам с эпохой не больше 5 (vfOld, vfSame), запрос с эпохой 7
+	// (поставленный позже отправки) — нет. Гейт придерживает второй вызов
+	// (перерассылку), поэтому утверждения детерминированы.
+	cm.leaderSendAEsToPeer(1, sendTerm, 5, true)
 
 	if err := vfOld.Error(); err != nil {
 		t.Fatalf("vfOld.Error() = %v, want nil (quorum reached, epoch 3 <= 5)", err)
@@ -312,9 +424,55 @@ func TestVerifyLeader_MultiplePendingDifferentEpochs(t *testing.T) {
 	if vfFuture.votes != 1 {
 		t.Fatalf("vfFuture.votes = %d, want 1 (epoch 7 > 5 must not vote)", vfFuture.votes)
 	}
+	// Очередь читается под cm.mu: перерассылка после завершения AppendEntries
+	// (есть запрос с эпохой 7 > 5) запускает фоновую горутину репликации, которая
+	// меняет pendingVerify под блокировкой.
+	cm.mu.Lock()
 	remaining := cm.leaderState.pendingVerify
+	cm.mu.Unlock()
 	if len(remaining) != 2 || remaining[0] != vfSame || remaining[1] != vfFuture {
 		t.Fatalf("pendingVerify = %v, want [vfSame vfFuture] in the original order", remaining)
+	}
+
+	// Фаза 2: освобождение гейта. Перерассланный AE с новой эпохой
+	// (newDispatchEpoch = verifyEpoch = 7) голосует оставшимся запросам (эпохи
+	// 5 и 7): vfFuture добирает голос и завершается; vfSame остаётся в очереди
+	// (кворум 3, повторный голос соседа дедуплицирован). Третьей отправки нет
+	// (5 <= 7 — повторная перерассылка не запускается).
+	close(mock.gateCh)
+	waitFor(t, "перерассылка и сходимость очереди", inmemRPCTimeout, func() bool {
+		if mock.callCount.Load() < 2 {
+			return false
+		}
+		if cm.inflightAELoaded(1) {
+			return false
+		}
+		cm.mu.Lock()
+		stable := len(cm.leaderState.pendingVerify) == 1 && cm.leaderState.pendingVerify[0] == vfSame
+		cm.mu.Unlock()
+		return stable
+	})
+	// vfSame не завершён (остался в очереди) — Error() блокировался бы, поэтому
+	// незавершённость проверяется неблокирующим чтением канала завершения.
+	select {
+	case <-vfSame.ErrorCh():
+		t.Fatal("vfSame resolved, want non-resolved (quorum 3 not reached, remains queued)")
+	default:
+	}
+	if vfSame.votes != 2 {
+		t.Fatalf("vfSame.votes = %d, want 2 (deduplicated peer 1 vote, quorum 3 not reached)", vfSame.votes)
+	}
+	if err := vfFuture.Error(); err != nil {
+		t.Fatalf("vfFuture.Error() = %v, want nil (quorum reached, epoch 7 <= 7)", err)
+	}
+	cm.mu.Lock()
+	remaining = cm.leaderState.pendingVerify
+	cm.mu.Unlock()
+	if len(remaining) != 1 || remaining[0] != vfSame {
+		t.Fatalf("pendingVerify = %v, want [vfSame] after redispatch", remaining)
+	}
+	if got := mock.callCount.Load(); got != 2 {
+		t.Fatalf("AppendEntries calls = %d, want 2 (no third dispatch)", got)
 	}
 }
 
@@ -335,9 +493,10 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 			commitCh:   make(chan int, 1),
 			shutdownCh: make(chan struct{}),
 			leaderState: leaderState{
-				nextIndex:  map[int]int{1: nextIndex},
-				matchIndex: map[int]int{1: -1},
-				inflightAE: map[int]*atomic.Bool{1: new(atomic.Bool)},
+				nextIndex:              map[int]int{1: nextIndex},
+				matchIndex:             map[int]int{1: -1},
+				inflightAE:             map[int]*atomic.Bool{1: new(atomic.Bool)},
+				nextVerifyRedispatchAt: map[int]time.Time{},
 			},
 			cmState: cmState{
 				state:             Leader,
@@ -380,7 +539,7 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 		mock := &mockTransportAE{failReply: true, failConflictIndex: 8, failConflictTerm: -1, replyTerm: 1}
 		cm, vf := newCM(mock, nil, -1, 5, []LogEntry{{Index: 4, Term: 1}, {Index: 5, Term: 1}})
 
-		cm.leaderSendAEsToPeer(1, 1, 0)
+		cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 		if got := mock.callCount.Load(); got != 1 {
 			t.Fatalf("AppendEntries calls = %d, want 1", got)
@@ -418,7 +577,7 @@ func TestVerifyLeader_NoVoteOnFailureAndSnapshotPath(t *testing.T) {
 		// и первой записью журнала (5) — отправляется снимок.
 		cm, vf := newCM(mock, store, 3, 5, []LogEntry{{Index: 5, Term: 1}})
 
-		cm.leaderSendAEsToPeer(1, 1, 0)
+		cm.leaderSendAEsToPeer(1, 1, 0, true)
 
 		if got := mock.installCallCount.Load(); got != 1 {
 			t.Fatalf("InstallSnapshot calls = %d, want 1", got)
