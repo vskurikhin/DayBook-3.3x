@@ -1016,21 +1016,58 @@ func TestLeaderSendAEsToPeer_SnapshotPredicateBoundaries(t *testing.T) {
 }
 
 // TestReplicationBackoffDelay_Clamp — проверка формулы задержки
-// delay = min(HeartbeatTimeoutMs·2^min(f,5),
-// 1000) мс; при f >= 5 задержка не превышает потолок 1000 мс
-// (33·2⁵ = 1056 без ограничения диапазоном).
+// delay = min(base·2^min(f,5), ceiling), где потолок вычисляется от базы:
+// max(_minReplicationBackoff, _replicationBackoffHeartbeats × base).
+// На умолчальном пульсе 33 мс потолок 30·33 = 990 < 1000 мс проходит через
+// нижнее ограничение и равен ровно 1000 мс; ступени f=1…5 —
+// 66/132/264/528/1000 мс.
 func TestReplicationBackoffDelay_Clamp(t *testing.T) {
-	if got := replicationBackoffDelay(0); got != 0 {
+	if got := replicationBackoffDelay(DefaultHeartbeatTimeout, 0); got != 0 {
 		t.Fatalf("delay(0) = %v, want 0 (no backoff without failures)", got)
 	}
-	if got := replicationBackoffDelay(1); got != 66*time.Millisecond {
+	if got := replicationBackoffDelay(DefaultHeartbeatTimeout, 1); got != 66*time.Millisecond {
 		t.Fatalf("delay(1) = %v, want 66ms (33·2)", got)
 	}
-	if got := replicationBackoffDelay(5); got != 1000*time.Millisecond {
+	if got := replicationBackoffDelay(DefaultHeartbeatTimeout, 5); got != 1000*time.Millisecond {
 		t.Fatalf("delay(5) = %v, want 1000ms (clamped ceiling)", got)
 	}
-	if got := replicationBackoffDelay(50); got != 1000*time.Millisecond {
+	if got := replicationBackoffDelay(DefaultHeartbeatTimeout, 50); got != 1000*time.Millisecond {
 		t.Fatalf("delay(50) = %v, want 1000ms (clamped ceiling)", got)
+	}
+
+	// Вычисляемый потолок на умолчании побитово равен нижнему ограничению:
+	// на f=5 и f=6 экспонента упирается в ровно 1000 мс.
+	if got := replicationBackoffDelay(DefaultHeartbeatTimeout, 5); got != 1000*time.Millisecond {
+		t.Fatalf("delay(DefaultHB, 5) = %v, want bitwise 1000ms", got)
+	}
+	if got := replicationBackoffDelay(DefaultHeartbeatTimeout, 6); got != 1000*time.Millisecond {
+		t.Fatalf("delay(DefaultHB, 6) = %v, want bitwise 1000ms", got)
+	}
+
+	// При базе 5 мс потолок 1000 мс не связывает ни одну ступень:
+	// экспонента усекается на f=5 (5·2⁵ = 160 мс) и остаётся ниже потолка
+	// при любом числе ошибок — ступени 10/20/40/80/160 мс.
+	base5 := 5 * time.Millisecond
+	steps5 := []time.Duration{10, 20, 40, 80, 160}
+	for i, want := range steps5 {
+		f := i + 1
+		if got := replicationBackoffDelay(base5, f); got != want*time.Millisecond {
+			t.Fatalf("delay(5ms, %d) = %v, want %v", f, got, want*time.Millisecond)
+		}
+	}
+
+	// При базе 95 мс потолок 30·95 = 2850 мс связывает экспоненту на f=5:
+	// ступени 190/380/760/1520 мс, потолок побитово 2850 мс.
+	base95 := 95 * time.Millisecond
+	steps95 := []time.Duration{190, 380, 760, 1520}
+	for i, want := range steps95 {
+		f := i + 1
+		if got := replicationBackoffDelay(base95, f); got != want*time.Millisecond {
+			t.Fatalf("delay(95ms, %d) = %v, want %v", f, got, want*time.Millisecond)
+		}
+	}
+	if got := replicationBackoffDelay(base95, 5); got != 2850*time.Millisecond {
+		t.Fatalf("delay(95ms, 5) = %v, want bitwise 2850ms (=30·95)", got)
 	}
 }
 

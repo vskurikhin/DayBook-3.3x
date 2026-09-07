@@ -9,11 +9,14 @@ import (
 	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
-// Стресс‑режим для тестирования выборов: если задана переменная окружения,
-// функция electionTimeout() в трети случаев возвращает фиксированное значение
+// Стресс‑режим для тестирования выборов: если задана переменная окружения
+// (имя — forcedReelectionEnv из производственного файла), функция
+// electionTimeout() в трети случаев возвращает фиксированное значение
 // ReelectionTimeoutMs. Это отключает рандомизацию таймаута, чтобы провоцировать
 // одновременные попытки запуска выборов и проверять устойчивость алгоритма.
-const forcedReelectionEnv = "RAFT_FORCE_MORE_REELECTION"
+// Переменная читается один раз при создании CM и кэшируется в переменную
+// пакета _forcedReelectionHook (ADR-CONF-011); тесты выставляют её помощником
+// setForcedReelectionHook.
 
 const (
 	// hookSamples — размер выборки значений electionTimeout() в каждой
@@ -51,15 +54,13 @@ const (
 // примерно до 1/381. Это простой и надёжный способ убедиться, что изменение кода
 // действительно затронуло нужную логику.
 func TestElectionTimeout_ForcedReelectionHook(t *testing.T) {
-	// t.Setenv несовместим с t.Parallel — тест остаётся serial (§15).
+	// Переменная пакета _forcedReelectionHook — общее состояние, поэтому
+	// тест остаётся serial (t.Parallel не используется).
 	hooked := time.Duration(ReelectionTimeoutMs) * time.Millisecond
 
 	// Порядок ветвей: сначала контрольная (хук выключен), затем с хуком.
 	t.Run("hook disabled", func(t *testing.T) {
-		// Пустое значение неотличимо от отсутствия переменной для
-		// предиката production-кода (os.Getenv(...) != ""), но, в отличие
-		// от него, не зависит от окружения, в котором запущен бинарник.
-		t.Setenv(forcedReelectionEnv, "")
+		setForcedReelectionHook(t, false)
 
 		share := hookedShare(t, hooked)
 		if share > maxUnhookedShare {
@@ -71,7 +72,7 @@ func TestElectionTimeout_ForcedReelectionHook(t *testing.T) {
 	})
 
 	t.Run("hook enabled", func(t *testing.T) {
-		t.Setenv(forcedReelectionEnv, "1")
+		setForcedReelectionHook(t, true)
 
 		share := hookedShare(t, hooked)
 		if share < wantHookedShare {
@@ -80,6 +81,20 @@ func TestElectionTimeout_ForcedReelectionHook(t *testing.T) {
 				hooked, share, wantHookedShare,
 			)
 		}
+	})
+}
+
+// setForcedReelectionHook включает или выключает хук форсирования выборов
+// записью в переменную пакета _forcedReelectionHook и восстанавливает
+// прежнее значение через t.Cleanup. Применим только к тестам, не
+// конструирующим CM: запись в NewConsensusModule безусловна и перекрывает
+// выставленное значение.
+func setForcedReelectionHook(t *testing.T, enabled bool) {
+	t.Helper()
+	prev := _forcedReelectionHook.Load()
+	_forcedReelectionHook.Store(enabled)
+	t.Cleanup(func() {
+		_forcedReelectionHook.Store(prev)
 	})
 }
 

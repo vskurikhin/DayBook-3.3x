@@ -54,6 +54,15 @@ type ConsensusModule struct {
 	// в цикле лидера под cm.mu.
 	checkQuorumTimeout time.Duration
 
+	// Временные параметры узла. Записываются один раз до close(ready)
+	// (конструктор — умолчания, setTimerConfig — конфигурация), все записи
+	// и чтения — под cm.mu; чтение нормализует нулевое или отрицательное
+	// значение в соответствующее умолчание Default*.
+	applyBatchInterval time.Duration // интервал батча применения к FSM
+	heartbeatTimeout   time.Duration // период пульса лидера
+	reelectionTimeout  time.Duration // база тайм-аута выборов
+	tickerTimeout      time.Duration // такт тикера выборов
+
 	// latency — структура с агрегированными показателями задержки (латентности) ConsensusModule.
 	// Нулевое значение структуры корректно и готово к использованию: явная инициализация не требуется.
 	// Все поля имеют тип atomic.Int64, поэтому безопасны для чтения из любого контекста —
@@ -113,9 +122,10 @@ type ConsensusModule struct {
 
 	// verifyRedispatchMinInterval — минимальный интервал между немедленными
 	// перерассылками AppendEntries одному соседу при неудовлетворённом
-	// verify-запросе. Значение по умолчанию — _verifyRedispatchMinIntervalMs;
-	// поле, а не константа, чтобы тесты пакета могли задать заведомо малое
-	// значение (укороченное окно) для проверки границы частоты. Читается и
+	// verify-запросе. Значение по умолчанию вычисляется как
+	// heartbeatTimeout × 8 / 11 (строго меньше пульса); поле, а не
+	// константа, чтобы тесты пакета могли задать заведомо малое значение
+	// (укороченное окно) для проверки границы частоты. Читается и
 	// записывается только под cm.mu в redispatchVerifyIfPendingLocked.
 	verifyRedispatchMinInterval time.Duration
 }
@@ -376,6 +386,33 @@ func (cm *ConsensusModule) goSpawn(fn func()) {
 	cm.mu.Lock()
 	cm.goSpawnLocked(fn)
 	cm.mu.Unlock()
+}
+
+// initTimerDefaults устанавливает временные поля в значения по умолчанию
+// пересчитывает зависимую величину verify-перерассылки от пульса.
+// Вызывается из конструктора до первого goSpawn — горутины ещё не запущены,
+// поэтому блокировка cm.mu не требуется.
+func (cm *ConsensusModule) initTimerDefaults() {
+	cm.applyBatchInterval = DefaultApplyBatchInterval
+	cm.heartbeatTimeout = DefaultHeartbeatTimeout
+	cm.reelectionTimeout = DefaultReelectionTimeout
+	cm.tickerTimeout = DefaultTickerTimeout
+	cm.verifyRedispatchMinInterval = DefaultHeartbeatTimeout * 8 / 11
+}
+
+// setTimerConfig применяет временные параметры узла. Вызывается только
+// до close(ready) (единственный вызов в Server.Serve);
+// вызывающий обязан передать уже нормализованные значения (> 0), сеттер
+// пишет их как есть и пересчитывает зависимую величину verify-перерассылки.
+// Самостоятельно захватывает cm.mu и снимает её через defer.
+func (cm *ConsensusModule) setTimerConfig(tc TimerConfig) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	cm.applyBatchInterval = tc.ApplyBatch
+	cm.heartbeatTimeout = tc.Heartbeat
+	cm.reelectionTimeout = tc.Reelection
+	cm.tickerTimeout = tc.Ticker
+	cm.verifyRedispatchMinInterval = tc.Heartbeat * 8 / 11
 }
 
 func (cm *ConsensusModule) stdoutTracePrintln(msg string) {

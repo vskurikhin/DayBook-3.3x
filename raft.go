@@ -2,6 +2,7 @@ package raft
 
 import (
 	"log"
+	"os"
 	"sync/atomic"
 	"time"
 )
@@ -15,14 +16,30 @@ const (
 	ReelectionTimeoutMs = 127 * Quantum
 	TickerTimeoutMs     = 7 * Quantum
 
+	// DefaultApplyBatchInterval — интервал, с которым цикл лидера проверяет
+	// необходимость применения записей к FSM. Накопление уведомлений канала
+	// фиксации за этот интервал позволяет объединять несколько мелких
+	// фиксаций в один батч.
+	DefaultApplyBatchInterval = 50 * time.Millisecond
+
+	// DefaultHeartbeatTimeout — период пульса лидера по умолчанию.
+	DefaultHeartbeatTimeout = 33 * time.Millisecond
+
+	// DefaultReelectionTimeout — база тайм-аута выборов по умолчанию:
+	// фактический тайм-аут выводится из неё случайной величиной.
+	DefaultReelectionTimeout = 381 * time.Millisecond
+
+	// DefaultTickerTimeout — такт тикера выборов по умолчанию.
+	DefaultTickerTimeout = 21 * time.Millisecond
+
 	// LeaktestBudget — единый бюджет leaktest:
 	// max(_inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
 	LeaktestBudget = 600 * time.Millisecond
 
-	// _applyBatchInterval — интервал, с которым runApplyLoop проверяет
-	// необходимость применения записей к FSM. Накопление commitCh
-	// уведомлений за этот интервал позволяет объединять несколько
-	// мелких фиксаций в один батч.
+	// _applyBatchInterval — интервал, с которым цикл лидера проверяет
+	// необходимость применения записей к FSM. Накопление уведомлений канала
+	// фиксации за этот интервал позволяет объединять несколько мелких
+	// фиксаций в один батч.
 	_applyBatchInterval = 50 * time.Millisecond
 
 	// _batchApplyBuffer — ёмкость fsmMutateCh для burst-устойчивости.
@@ -93,16 +110,6 @@ const (
 	// состав.
 	_maxUncommittedEntries = 4096
 
-	// _verifyRedispatchMinIntervalMs — минимальный интервал между немедленными
-	// перерассылками AppendEntries одному соседу при плотном потоке verify.
-	// Значение строго меньше HeartbeatTimeoutMs (33 мс), поэтому перерассылка
-	// остаётся быстрее пульса: первая перерассылка немедленна, а запрос,
-	// заставший окно занятым, дожидается либо следующей перерассылки, либо
-	// пульса — не дольше пульса. По построению частота перерассылок на
-	// каждого соседа ограничена 1000/24 ≈ 41,7 перерассылок/с независимо от
-	// темпа клиентских запросов.
-	_verifyRedispatchMinIntervalMs = 8 * Quantum
-
 	// _verifyChBuffer — ёмкость verifyCh, канала запросов проверки
 	// лидера от клиентов. Читает единственный цикл лидера (по одному
 	// запросу за такт), буфер сглаживает пачки запросов между
@@ -110,6 +117,20 @@ const (
 	// остановки узла, не блокируя горутины модуля.
 	_verifyChBuffer = 64
 )
+
+// TimerConfig — набор временных параметров узла Raft. Все значения —
+// time.Duration; нулевое или отрицательное значение означает умолчание
+// соответствующей константы Default*.
+type TimerConfig struct {
+	// ApplyBatch — интервал батча применения записей к FSM.
+	ApplyBatch time.Duration
+	// Heartbeat — период пульса лидера.
+	Heartbeat time.Duration
+	// Reelection — база тайм-аута выборов.
+	Reelection time.Duration
+	// Ticker — такт тикера выборов.
+	Ticker time.Duration
+}
 
 // CommitEntry — это данные, которые Raft отправляет в канал фиксации.
 // Каждая запись фиксации уведомляет клиента о том, что консенсус по команде
@@ -193,6 +214,10 @@ func NewConsensusModule(
 	}
 	// Отмечаем факт создания CM для трассировки (set-once).
 	_traceCMCreated.Store(true)
+	// Единственное чтение переменной окружения хука форсирования выборов
+	// выполняется при старте: значение кэшируется в переменную пакета на
+	// весь процесс (см. ADR-CONF-011).
+	_forcedReelectionHook.Store(os.Getenv(forcedReelectionEnv) != "")
 	cm := new(ConsensusModule)
 	cm.id = id
 	cm.peerIds = peerIds
@@ -224,11 +249,12 @@ func NewConsensusModule(
 	cm.leaderState.matchIndex = make(map[int]int)
 	cm.leaderState.lastContact = make(map[int]time.Time)
 	cm.checkQuorumTimeout = _defaultCheckQuorumTimeout
-	cm.verifyRedispatchMinInterval = _verifyRedispatchMinIntervalMs * time.Millisecond
+	// Временные параметры инициализируются умолчаниями безусловно, до
+	// первого goSpawn; зависимые величины вычисляются от полей.
+	cm.initTimerDefaults()
 	cm.leaderState.inflightAE = make(map[int]*atomic.Bool)
 	cm.cmState.termIndexMap = make(map[int]int)
 	cm.cmState.electionTimerDone = make(chan struct{})
-	cm.preVoteDisabled = false
 	cm.cmState.leaderLastContact = time.Time{}
 	cm.cmState.leaderID = -1
 	cm.leaderState.leadershipTransferCh = make(chan *leadershipTransferFuture, 1)

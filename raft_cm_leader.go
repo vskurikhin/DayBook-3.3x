@@ -440,6 +440,17 @@ func (cm *ConsensusModule) runLeaderLoop() {
 	startNow := time.Now()
 	cm.mu.Lock()
 	cm.leaderLoopsAlive++
+	// Локальные копии таймингов с нормализацией нуля: тикеры создаются от
+	// локальных значений, а не от состояния модуля (переменная цикла, а не
+	// состояние модуля). Чтение под cm.mu на входе в цикл.
+	heartbeatTimeout := cm.heartbeatTimeout
+	if heartbeatTimeout <= 0 {
+		heartbeatTimeout = DefaultHeartbeatTimeout
+	}
+	applyBatchInterval := cm.applyBatchInterval
+	if applyBatchInterval <= 0 {
+		applyBatchInterval = DefaultApplyBatchInterval
+	}
 	cm.mu.Unlock()
 	defer func() {
 		cm.mu.Lock()
@@ -449,19 +460,19 @@ func (cm *ConsensusModule) runLeaderLoop() {
 		cm.traceLogf(_traceLevelLoops, "leaderLoop exit: elapsed=%v", elapsed)
 	}()
 
-	heartbeatTicker := time.NewTicker(HeartbeatTimeoutMs * time.Millisecond)
+	heartbeatTicker := time.NewTicker(heartbeatTimeout)
 	defer heartbeatTicker.Stop()
 
 	// Страховка на случай пропущенного уведомления о фиксации: основной
 	// путь применения — ветка commitCh, применяющая записи по факту
 	// фиксации.
-	applyTicker := time.NewTicker(_applyBatchInterval)
+	applyTicker := time.NewTicker(applyBatchInterval)
 	defer applyTicker.Stop()
 
 	for {
 		select {
 		case future := <-cm.applyCh:
-			if !cm.handleLeaderApplyBatch(future, heartbeatTicker) {
+			if !cm.handleLeaderApplyBatch(future, heartbeatTicker, heartbeatTimeout) {
 				return
 			}
 
@@ -564,13 +575,14 @@ func (cm *ConsensusModule) leaderLoopExitCleanupLocked() {
 // handleLeaderApplyBatch обрабатывает команду клиента, взятую циклом лидера
 // из канала команд: добирает из того же канала ещё до _leaderBatchSize - 1
 // команд, записывает всю группу в журнал одной записью, немедленно рассылает
-// её соседям и сдвигает тик пульса. Тикер пульса — переменная цикла, а не
-// состояние модуля, поэтому передаётся указателем.
+// её соседям и сдвигает тик пульса. Тикер пульса и его длительность —
+// переменные цикла, а не состояние модуля, поэтому передаются параметрами
+// из runLeaderLoop.
 //
 // Возвращает false, когда узел перестал быть лидером: цикл лидера в этом
 // случае завершается. Самостоятельно управляет cm.mu.
 func (cm *ConsensusModule) handleLeaderApplyBatch(
-	future *logFuture, heartbeatTicker *time.Ticker,
+	future *logFuture, heartbeatTicker *time.Ticker, heartbeat time.Duration,
 ) (keepRunning bool) {
 	cm.mu.Lock()
 	if cm.cmState.state != Leader {
@@ -595,7 +607,7 @@ groupCommit:
 	cm.leaderSendAEs()
 
 	heartbeatTicker.Stop()
-	heartbeatTicker.Reset(HeartbeatTimeoutMs * time.Millisecond)
+	heartbeatTicker.Reset(heartbeat)
 	return true
 }
 

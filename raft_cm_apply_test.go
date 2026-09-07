@@ -270,8 +270,12 @@ func TestClusterConvergence_ForcedReelections(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	// Стресс-смещение таймаутов выборов (см. doc выше). t.Setenv делает
-	// тест serial — t.Parallel не используется.
+	// тест serial — t.Parallel не используется. Переменная окружения
+	// выставляется до NewHarness, чтобы пережить создание CM внутри теста;
+	// после теста хук в переменной пакета _forcedReelectionHook гасится
+	// явно, иначе включённое значение утекло бы в последующие тесты.
 	t.Setenv("RAFT_FORCE_MORE_REELECTION", "1")
+	t.Cleanup(func() { _forcedReelectionHook.Store(false) })
 
 	h := NewHarness(t, 3)
 	defer h.Shutdown()

@@ -52,7 +52,7 @@ func TestLeaderApplyBatch_GroupCommitDrainsQueuedCommands(t *testing.T) {
 
 	// Первую команду забирает кейс select — здесь её забирает тест.
 	first := <-cm.applyCh
-	if !cm.handleLeaderApplyBatch(first, heartbeatTicker) {
+	if !cm.handleLeaderApplyBatch(first, heartbeatTicker, HeartbeatTimeoutMs*time.Millisecond) {
 		t.Fatal("handleLeaderApplyBatch = false, want true (лидерство не терялось)")
 	}
 
@@ -119,7 +119,7 @@ func TestLeaderApplyBatch_NotLeaderStopsLoop(t *testing.T) {
 	cm.mu.Unlock()
 
 	first := <-cm.applyCh
-	if cm.handleLeaderApplyBatch(first, heartbeatTicker) {
+	if cm.handleLeaderApplyBatch(first, heartbeatTicker, HeartbeatTimeoutMs*time.Millisecond) {
 		t.Fatal("handleLeaderApplyBatch = true, want false (лидерство потеряно — цикл завершается)")
 	}
 	if err := waitFuture(t, queuedFuture, time.Second); !errors.Is(err, ErrNotLeader) {

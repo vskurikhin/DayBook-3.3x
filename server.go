@@ -40,28 +40,49 @@ type Server struct {
 
 	snapshotInterval  time.Duration
 	snapshotThreshold int
+
+	// Временные параметры узла (см. TimerConfig): копируются из Config
+	// и применяются к ConsensusModule в Serve.
+	applyBatchInterval time.Duration
+	heartbeatTimeout   time.Duration
+	reelectionTimeout  time.Duration
+	tickerTimeout      time.Duration
 }
 
 // Config — конфигурация для создания нового сервера Raft.
 type Config struct {
+
+	// ApplyBatchInterval — интервал батча применения записей к FSM
+	// (0 = умолчание).
+	ApplyBatchInterval time.Duration
+
+	Fsm FSM
+
+	// HeartbeatTimeout — период пульса лидера (0 = умолчание).
+	HeartbeatTimeout time.Duration
+
 	PeerAddresses map[int]net.Addr
 	PeerIds       []int
 	ServerID      int
 
-	Fsm FSM
+	// ReelectionTimeout — база тайм-аута выборов (0 = умолчание).
+	ReelectionTimeout time.Duration
 
 	// SnapshotInterval — интервал проверки необходимости снимка
 	// (0 = дефолт конструктора).
 	SnapshotInterval time.Duration
 
+	// SnapshotStore — хранилище снимков. Если nil, снимки отключены.
+	SnapshotStore SnapshotStore
+
 	// SnapshotThreshold — минимальное количество записей после последнего
 	// снимка, при котором создаётся новый снимок (0 = дефолт конструктора).
 	SnapshotThreshold int
 
-	// SnapshotStore — хранилище снимков. Если nil, снимки отключены.
-	SnapshotStore SnapshotStore
-
 	Storage Storage
+
+	// TickerTimeout — такт тикера выборов (0 = умолчание).
+	TickerTimeout time.Duration
 
 	// Transport — транспорт с адресной книгой соседей и закрытием,
 	// создаётся вызывающим и передаётся в Server.
@@ -75,16 +96,20 @@ func New(cfg *Config, ready <-chan any) *Server {
 		panic("raft: Config.Transport is nil or typed nil: the transport must be created and passed by the caller")
 	}
 	s := &Server{
-		fsm:               cfg.Fsm,
-		peerIds:           cfg.PeerIds,
-		quit:              make(chan any),
-		ready:             ready,
-		serverID:          cfg.ServerID,
-		snapshotInterval:  cfg.SnapshotInterval,
-		snapshotStore:     cfg.SnapshotStore,
-		snapshotThreshold: cfg.SnapshotThreshold,
-		storage:           cfg.Storage,
-		transport:         cfg.Transport,
+		applyBatchInterval: cfg.ApplyBatchInterval,
+		fsm:                cfg.Fsm,
+		heartbeatTimeout:   cfg.HeartbeatTimeout,
+		peerIds:            cfg.PeerIds,
+		quit:               make(chan any),
+		ready:              ready,
+		reelectionTimeout:  cfg.ReelectionTimeout,
+		serverID:           cfg.ServerID,
+		snapshotInterval:   cfg.SnapshotInterval,
+		snapshotStore:      cfg.SnapshotStore,
+		snapshotThreshold:  cfg.SnapshotThreshold,
+		storage:            cfg.Storage,
+		tickerTimeout:      cfg.TickerTimeout,
+		transport:          cfg.Transport,
 	}
 	return s
 }
@@ -92,6 +117,33 @@ func New(cfg *Config, ready <-chan any) *Server {
 // Serve создаёт ConsensusModule поверх переданного транспорта.
 func (s *Server) Serve() {
 	s.cm = NewConsensusModule(s.serverID, s.peerIds, s.transport, s.storage, s.fsm, s.ready, s.snapshotStore)
+
+	// Применение временных параметров из конфигурации сразу после создания
+	// CM и до закрытия ready — CM ещё не участвует в выборах. Нормализация
+	// «<= 0 → умолчание» выполняется безусловно, вне зависимости от того,
+	// включены ли снимки. Сеттер — единая точка записи временных полей.
+	heartbeat := s.heartbeatTimeout
+	if heartbeat <= 0 {
+		heartbeat = DefaultHeartbeatTimeout
+	}
+	ticker := s.tickerTimeout
+	if ticker <= 0 {
+		ticker = DefaultTickerTimeout
+	}
+	reelection := s.reelectionTimeout
+	if reelection <= 0 {
+		reelection = DefaultReelectionTimeout
+	}
+	applyBatch := s.applyBatchInterval
+	if applyBatch <= 0 {
+		applyBatch = DefaultApplyBatchInterval
+	}
+	s.cm.setTimerConfig(TimerConfig{
+		ApplyBatch: applyBatch,
+		Heartbeat:  heartbeat,
+		Reelection: reelection,
+		Ticker:     ticker,
+	})
 
 	// Применение параметров снимков из конфигурации сразу после создания
 	// CM и до закрытия ready — CM ещё не участвует в выборах.

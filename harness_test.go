@@ -52,9 +52,9 @@ const (
 	// _singleLeaderBudget — бюджет схождения кластера к единственному лидеру.
 	// Два независимых worst-case: выборы (_leaderElectionBudget) и задержка
 	// step-down призрачного лидера прежнего терма, ограниченная потолком
-	// задержки повторов репликации (_maxReplicationBackoff):
+	// задержки повторов репликации (_minReplicationBackoff):
 	// 2286ms + 1000ms = 3286ms.
-	_singleLeaderBudget = _leaderElectionBudget + _maxReplicationBackoff
+	_singleLeaderBudget = _leaderElectionBudget + _minReplicationBackoff
 
 	// _snapshotConvergenceBudget — бюджет схождения снимка к вершине журнала.
 	// Вывод при интервале снимков, заданном тестом (например, 50 мс):
@@ -476,9 +476,9 @@ func (h *Harness) PeerDontDropCalls(id int) {
 // допустимое переходное состояние: изолированный лидер прежнего терма не
 // имеет кворума, ничего не фиксирует и уходит в step-down только при первом
 // контакте с большим термом, который откладывается задержкой повторов
-// репликации до _maxReplicationBackoff; опрос продолжается до схождения.
+// репликации до _minReplicationBackoff; опрос продолжается до схождения.
 //
-// Бюджет — _singleLeaderBudget = _leaderElectionBudget + _maxReplicationBackoff
+// Бюджет — _singleLeaderBudget = _leaderElectionBudget + _minReplicationBackoff
 // (два независимых worst-case: выборы и step-down призрачного лидера).
 // Значения connected снимаются под h.mu, Report() опрашивается вне
 // блокировки (инвариант границ). По исчерпании бюджета (ноль лидеров либо
@@ -583,7 +583,7 @@ func (h *Harness) nodeStates() string {
 // логикой опроса (Election Safety: два лидера в одном терме — немедленный
 // фатальный отказ; в разных термах — переходное состояние, шаг-down
 // изолированного лидера откладывается задержкой повторов репликации
-// до _maxReplicationBackoff). По исчерпании бюджета — фатальный отказ
+// до _minReplicationBackoff). По исчерпании бюджета — фатальный отказ
 // с диагностикой nodeStates(), без повторного прохода по бюджету.
 func (h *Harness) WaitForSingleLeader(timeout time.Duration) (int, int) {
 	h.t.Helper()
