@@ -10,6 +10,12 @@ GOCMD=$(GOBASE)/cmd
 
 TRACE=trace
 TRACE_LOG_LEVEL=0
+# Временные параметры узлов raftkv, в миллисекундах; суффикс
+# единицы времени подставляется в рецепте start-raft: -flag=$(VAR)ms.
+APPLY_BATCH_INTERVAL=50
+HEARTBEAT_TIMEOUT=45
+REELECTION_TIMEOUT=500
+TICKER_TIMEOUT=20
 CONCURRENCY=8
 DELETE_PERCENT=0
 DURATION=5m
@@ -87,6 +93,10 @@ start-raft: stop-raft
 		echo "  >  $(PROJECTNAME) is available at $$http"; \
 		$(GOBIN)/$(PROJECTNAME)kv -number $$n \
 			-http-addr=":$$http" -rpc-addr=":$$rpc" -peers="$$peers" \
+			-apply-batch-interval=$(APPLY_BATCH_INTERVAL)ms \
+			-heartbeat-timeout=$(HEARTBEAT_TIMEOUT)ms \
+			-reelection-timeout=$(REELECTION_TIMEOUT)ms \
+			-ticker-timeout=$(TICKER_TIMEOUT)ms \
 			-trace-log-level $(TRACE_LOG_LEVEL) \
 			-trace-cm-log-file "$(call trace_cm,$$n)" \
 			-trace-kv-log-file "$(call trace_kv,$$n)" \
