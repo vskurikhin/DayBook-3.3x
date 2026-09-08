@@ -389,7 +389,7 @@ func (kvs *KVService) ToggleHTTPResponsesEnabled(enable bool) {
 // и используются для моделирования различных сбоев.
 
 func (kvs *KVService) ConnectToRaftPeer(peerID int, addr net.Addr) error {
-	return kvs.rs.ConnectToPeerWithTimeout(peerID, addr, raft.TCPRPCTimeout)
+	return kvs.rs.ConnectToPeer(peerID, addr)
 }
 
 func (kvs *KVService) DisconnectFromAllRaftPeers() {
