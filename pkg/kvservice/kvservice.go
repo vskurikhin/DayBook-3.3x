@@ -302,12 +302,12 @@ func (kvs *KVService) ServeHTTP(address string) error {
 		return fmt.Errorf("kvservice %d: ServeHTTP called with existing server", kvs.id)
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /verifyleader/", kvs.handleVerifyLeader)
 	mux.HandleFunc("GET /weak-get/{key...}", kvs.handleWeakGet)
 	mux.HandleFunc("POST /cas/", kvs.handleCAS)
 	mux.HandleFunc("POST /delete/", kvs.handleDelete)
 	mux.HandleFunc("POST /get/", kvs.handleGet)
 	mux.HandleFunc("POST /put/", kvs.handlePut)
-	mux.HandleFunc("POST /verifyleader/", kvs.handleVerifyLeader)
 
 	ln, err := net.Listen("tcp", address)
 	if err != nil {
@@ -411,6 +411,10 @@ func (kvs *KVService) sendHTTPResponse(w http.ResponseWriter, v any) {
 }
 
 func (kvs *KVService) handleVerifyLeader(w http.ResponseWriter, _ *http.Request) {
+	// Вердикт о лидерстве актуален только на момент кворумного
+	// подтверждения ReadIndex — запрещаем хранение ответа кешами.
+	w.Header().Set("Cache-Control", "no-store")
+
 	// ReadIndex-проверка лидерства (Raft §8) без записи в журнал.
 	if err := kvs.rs.VerifyLeader().Error(); err != nil {
 		kvs.sendHTTPResponse(w, api.StatusResponse{RespStatus: api.StatusNotLeader})

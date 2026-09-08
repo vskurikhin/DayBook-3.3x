@@ -43,7 +43,8 @@ type KVClient struct {
 
 var (
 	// errMethodNotAllowed — сервер ответил 405 на GET-запрос слабого
-	// чтения: метод маршрута не совпадает с версией клиента и сервера.
+	// чтения или проверки лидерства: метод маршрута не совпадает
+	// с версией клиента и сервера.
 	errMethodNotAllowed = errors.New("server returned 405 Method Not Allowed")
 
 	// errRouteMismatch — сервер ответил 404: маршрут не совпал.
@@ -75,7 +76,8 @@ func NewWithTimeout(serviceAddrs []string, timeout time.Duration) *KVClient {
 var _clientCount atomic.Int32
 
 // VerifyLeader проверяет, является ли assumedLeader действующим лидером,
-// используя ReadIndex-запрос (Raft §8). Возвращает leaderID или ошибку.
+// используя ReadIndex-запрос (Raft §8). Запрос выполняется методом GET
+// без тела; ответ — StatusResponse. Возвращает leaderID или ошибку.
 // Если текущий assumedLeader не лидер, перебирает остальные адреса.
 // Позволяет клиенту быстро обнаружить смену лидера без лишних KV-запросов.
 func (c *KVClient) VerifyLeader(ctx context.Context) (int, error) {
@@ -84,18 +86,23 @@ func (c *KVClient) VerifyLeader(ctx context.Context) (int, error) {
 		path := fmt.Sprintf("http://%s/verifyleader/", c.addrs[leader])
 
 		reqCtx, cancel := context.WithTimeout(ctx, c.requestTimeout)
-		var resp api.Response
-		err := sendJSONRequest(reqCtx, path, nil, &resp)
+		var sr api.StatusResponse
+		err := sendJSONGetRequest(reqCtx, path, &sr)
 		cancel()
 		if err != nil {
 			if ctx.Err() != nil {
+				return -1, err
+			}
+			// Метод маршрута одинаков для всех узлов кластера —
+			// повтор по другому адресу бессмыслен.
+			if errors.Is(err, errMethodNotAllowed) || errors.Is(err, errRouteMismatch) {
 				return -1, err
 			}
 			c.nextLeader()
 			continue
 		}
 
-		switch resp.Status() {
+		switch sr.Status() {
 		case api.StatusOK:
 			return leader, nil
 		case api.StatusNotLeader:

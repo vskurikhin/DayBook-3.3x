@@ -481,7 +481,7 @@ func checkServiceReachable(t *testing.T, addr string) {
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodPost, "http://"+addr+"/verifyleader/", http.NoBody,
+		ctx, http.MethodGet, "http://"+addr+"/verifyleader/", http.NoBody,
 	)
 	if err != nil {
 		t.Fatalf("cannot build request for %s: %v", addr, err)
