@@ -191,7 +191,9 @@ func New(cfg *Config, readyChan <-chan any) *KVService {
 //     как кластер Raft будет готов к работе (все узлы запущены и соединены
 //     друг с другом).
 func NewKVService(address string, id int, peerIds []int, storage raft.Storage, readyChan <-chan any) *KVService {
-	transport, err := transp.NewTCPTransport(address, 0, 0)
+	// Нулевая структура TCPTimeouts означает использование значений по умолчанию для транспорта:
+	// конструктор подставляет вместо нулевых полей соответствующие константы из contract.
+	transport, err := transp.NewTCPTransport(address, transp.TCPTimeouts{}, 0)
 	if err != nil {
 		log.Fatalf("kvservice: failed to create TCP transport on %s: %v", address, err)
 	}

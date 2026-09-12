@@ -88,18 +88,18 @@ func TestNewServer(t *testing.T) {
 
 // TestDefaultTCPRPCTimeoutBarrier закрепляет контракт дефолтов тайм-аута
 // (AC-1): алиас TCPRPCTimeout несёт то же значение, что и каноническое
-// внутреннее имя _defaultTCPRPCTimeout (165 мс), а производная константа
+// внутреннее имя _defaultTCPRPCTimeout (200 мс), а производная константа
 // проверки кворума остаётся ровно двукратной (инвариант 2×RPC на уровне
-// дефолтов, 330 мс).
+// дефолтов, 400 мс).
 func TestDefaultTCPRPCTimeoutBarrier(t *testing.T) {
 	if TCPRPCTimeout != _defaultTCPRPCTimeout {
 		t.Fatalf("TCPRPCTimeout = %v, want %v", TCPRPCTimeout, _defaultTCPRPCTimeout)
 	}
-	if _defaultTCPRPCTimeout != 165*time.Millisecond {
-		t.Fatalf("_defaultTCPRPCTimeout = %v, want 165ms", _defaultTCPRPCTimeout)
+	if _defaultTCPRPCTimeout != 200*time.Millisecond {
+		t.Fatalf("_defaultTCPRPCTimeout = %v, want 200ms", _defaultTCPRPCTimeout)
 	}
-	if _defaultCheckQuorumTimeout != 330*time.Millisecond {
-		t.Fatalf("_defaultCheckQuorumTimeout = %v, want 330ms", _defaultCheckQuorumTimeout)
+	if _defaultCheckQuorumTimeout != 400*time.Millisecond {
+		t.Fatalf("_defaultCheckQuorumTimeout = %v, want 400ms", _defaultCheckQuorumTimeout)
 	}
 	if _defaultCheckQuorumTimeout != 2*_defaultTCPRPCTimeout {
 		t.Fatalf("_defaultCheckQuorumTimeout = %v, want 2*_defaultTCPRPCTimeout = %v",
@@ -108,10 +108,10 @@ func TestDefaultTCPRPCTimeoutBarrier(t *testing.T) {
 }
 
 // TestDefaultTimingBarrier закрепляет контракт дефолтов тайминговых
-// параметров: Default* равны 33/20/340/50 мс, формула verify-перерассылки
+// параметров: Default* равны 33/20/430/50 мс, формула verify-перерассылки
 // на умолчании даёт ровно 24 мс, а задержка повторов репликации на умолчании
 // совпадает с историческими числами (66 мс и ровно 1000 мс). Выборка
-// electionTimeout() на CM с умолчанием лежит в [340; 680) мс и кратна
+// electionTimeout() на CM с умолчанием лежит в [430; 860) мс и кратна
 // миллисекунде.
 func TestDefaultTimingBarrier(t *testing.T) {
 	if DefaultHeartbeatTimeout != 33*time.Millisecond {
@@ -120,8 +120,8 @@ func TestDefaultTimingBarrier(t *testing.T) {
 	if DefaultTickerTimeout != 20*time.Millisecond {
 		t.Fatalf("DefaultTickerTimeout = %v, want 20ms", DefaultTickerTimeout)
 	}
-	if DefaultReelectionTimeout != 340*time.Millisecond {
-		t.Fatalf("DefaultReelectionTimeout = %v, want 340ms", DefaultReelectionTimeout)
+	if DefaultReelectionTimeout != 430*time.Millisecond {
+		t.Fatalf("DefaultReelectionTimeout = %v, want 430ms", DefaultReelectionTimeout)
 	}
 	if DefaultApplyBatchInterval != 50*time.Millisecond {
 		t.Fatalf("DefaultApplyBatchInterval = %v, want 50ms", DefaultApplyBatchInterval)
@@ -141,13 +141,13 @@ func TestDefaultTimingBarrier(t *testing.T) {
 	if got := replicationBackoffDelay(DefaultHeartbeatTimeout, 5); got != 1000*time.Millisecond {
 		t.Fatalf("delay(DefaultHB, 5) = %v, want exactly 1000ms", got)
 	}
-	// Выборка electionTimeout() на CM с умолчанием: диапазон [340; 680) мс,
+	// Выборка electionTimeout() на CM с умолчанием: диапазон [430; 860) мс,
 	// все значения кратны миллисекунде.
 	cm := &ConsensusModule{}
 	for i := 0; i < 1000; i++ {
 		got := cm.electionTimeout()
-		if got < 340*time.Millisecond || got >= 680*time.Millisecond {
-			t.Fatalf("electionTimeout() = %v вне диапазона [340ms, 680ms) на выборке %d", got, i)
+		if got < 430*time.Millisecond || got >= 860*time.Millisecond {
+			t.Fatalf("electionTimeout() = %v вне диапазона [430ms, 860ms) на выборке %d", got, i)
 		}
 		if got%time.Millisecond != 0 {
 			t.Fatalf("electionTimeout() = %v не кратно миллисекунде на выборке %d", got, i)
@@ -182,7 +182,7 @@ func TestServeSnapshotConfig(t *testing.T) {
 	}()
 
 	ready := make(chan any)
-	transport, err := transp.NewTCPTransport("127.0.0.1:0", 0, 0)
+	transport, err := transp.NewTCPTransport("127.0.0.1:0", transp.TCPTimeouts{}, 0)
 	if err != nil {
 		t.Fatalf("NewTCPTransport: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestServeSnapshotConfigZeros(t *testing.T) {
 	}()
 
 	ready := make(chan any)
-	transport, err := transp.NewTCPTransport("127.0.0.1:0", 0, 0)
+	transport, err := transp.NewTCPTransport("127.0.0.1:0", transp.TCPTimeouts{}, 0)
 	if err != nil {
 		t.Fatalf("NewTCPTransport: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestServeSnapshotConfigDisabled(t *testing.T) {
 	}()
 
 	ready := make(chan any)
-	transport, err := transp.NewTCPTransport("127.0.0.1:0", 0, 0)
+	transport, err := transp.NewTCPTransport("127.0.0.1:0", transp.TCPTimeouts{}, 0)
 	if err != nil {
 		t.Fatalf("NewTCPTransport: %v", err)
 	}

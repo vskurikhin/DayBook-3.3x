@@ -10,17 +10,19 @@ writing to the log. The package is used by the KV service
 
 ## 1. Constants
 
-| Name | Value | Purpose |
-|---|---|---|
-| `ProtocolVersion` | 3 | Raft protocol version. Compatibility with versions 0–2 is not supported. |
-| `TCPRPCTimeout` | 165 ms | TCP RPC timeout in the production transport; 330/2, kept as a separate constant so that test-time timer acceleration does not affect the production transport. |
-| `DefaultApplyBatchInterval` | 50 ms | Interval at which the leader loop checks whether entries must be applied to the state machine; accumulated commits are merged into a single batch. |
-| `DefaultHeartbeatTimeout` | 33 ms | Default leader heartbeat period. |
-| `DefaultReelectionTimeout` | 340 ms | Default election timeout base: the actual timeout is derived from it by a random value. |
-| `DefaultTickerTimeout` | 20 ms | Default election ticker tick. |
-| `LeaktestBudget` | 600 ms | Unified goroutine leak-check budget: max(in-memory RPC timeout, TCPRPCTimeout) + 100 ms. |
-| `DefaultSnapshotInterval` | 3 s | Interval of snapshot necessity checks. |
-| `DefaultSnapshotThreshold` | 1024 | Minimum number of entries after the last snapshot that triggers a new one; a compromise between FSM load and recovery time. |
+| Name                        | Value  | Purpose                                                                                                                                                                                        |
+|-----------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ProtocolVersion`           | 3      | Raft protocol version. Compatibility with versions 0–2 is not supported.                                                                                                                       |
+| `TCPRPCTimeout`             | 200 ms | TCP RPC timeout in the production transport: the window of one request/reply RPC exchange; derivatives — the quorum check window = 2 × 200 = 400 ms, the heartbeat ceiling = ⌊400/4⌋ = 100 ms. |
+| `ConnectionTCPRPCTimeout`   | 165 ms | Deadline for establishing a TCP connection (net.DialTimeout); the historical RPC timeout value.                                                                                                |
+| `InstallSnapshotTimeout`    | 310 ms | Base of the snapshot transfer deadline: the final deadline scales with the data volume (base × ⌊DataSize/256KiB⌋) on the sender.                                                               |
+| `DefaultApplyBatchInterval` | 50 ms  | Interval at which the leader loop checks whether entries must be applied to the state machine; accumulated commits are merged into a single batch.                                             |
+| `DefaultHeartbeatTimeout`   | 33 ms  | Default leader heartbeat period.                                                                                                                                                               |
+| `DefaultReelectionTimeout`  | 430 ms | Default election timeout base: the actual timeout is derived from it by a random value; the election window is [430; 860).                                                                     |
+| `DefaultTickerTimeout`      | 20 ms  | Default election ticker tick.                                                                                                                                                                  |
+| `LeaktestBudget`            | 600 ms | Unified goroutine leak-check budget: max(in-memory RPC timeout, TCPRPCTimeout) + 100 ms.                                                                                                       |
+| `DefaultSnapshotInterval`   | 3 s    | Interval of snapshot necessity checks.                                                                                                                                                         |
+| `DefaultSnapshotThreshold`  | 1024   | Minimum number of entries after the last snapshot that triggers a new one; a compromise between FSM load and recovery time.                                                                    |
 
 Admissible timer bounds (`Min*`/`Max*`) — see section 2.
 
@@ -56,15 +58,15 @@ constant.
 
 ## 3. Errors of the raft package
 
-| Name | Message | When returned |
-|---|---|---|
-| `ErrNotLeader` | `raft: not leader` | A leader operation (`Apply`, `VerifyLeader`, `LeadershipTransfer`, a membership change) is invoked on a node that is not the leader. |
-| `ErrLeadershipLost` | `raft: leadership lost while committing` | Leadership was lost before commitment: pending futures are resolved with this error when the leader steps down to a follower. |
-| `ErrUnsupportedProtocol` | `raft: unsupported protocol version` | An incoming RPC uses a protocol version other than 3 (`checkRPCHeader`). |
-| `ErrLeadershipTransferInProgress` | `raft: leadership transfer in progress` | `Apply` during a leadership transfer; a repeated `LeadershipTransfer` while one is already in progress. |
-| `ErrTooManyUncommittedEntries` | `raft: too many uncommitted log entries` | The leader's uncommitted log tail reached the limit (4096): the quorum is unavailable or peers cannot keep up with the load. |
-| `ErrNothingNewToSnapshot` | `raft: nothing new to snapshot` | There are no new committed entries to create a snapshot from. |
-| `ErrBatchFSMResponseMismatch` | `raft: ApplyBatch response count mismatch` | `BatchingFSM.ApplyBatch` returned a number of responses not equal to the number of entries; the error is delivered to all futures of the batch via `ApplyFuture.Error()`. |
+| Name                              | Message                                    | When returned                                                                                                                                                             |
+|-----------------------------------|--------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ErrNotLeader`                    | `raft: not leader`                         | A leader operation (`Apply`, `VerifyLeader`, `LeadershipTransfer`, a membership change) is invoked on a node that is not the leader.                                      |
+| `ErrLeadershipLost`               | `raft: leadership lost while committing`   | Leadership was lost before commitment: pending futures are resolved with this error when the leader steps down to a follower.                                             |
+| `ErrUnsupportedProtocol`          | `raft: unsupported protocol version`       | An incoming RPC uses a protocol version other than 3 (`checkRPCHeader`).                                                                                                  |
+| `ErrLeadershipTransferInProgress` | `raft: leadership transfer in progress`    | `Apply` during a leadership transfer; a repeated `LeadershipTransfer` while one is already in progress.                                                                   |
+| `ErrTooManyUncommittedEntries`    | `raft: too many uncommitted log entries`   | The leader's uncommitted log tail reached the limit (4096): the quorum is unavailable or peers cannot keep up with the load.                                              |
+| `ErrNothingNewToSnapshot`         | `raft: nothing new to snapshot`            | There are no new committed entries to create a snapshot from.                                                                                                             |
+| `ErrBatchFSMResponseMismatch`     | `raft: ApplyBatch response count mismatch` | `BatchingFSM.ApplyBatch` returned a number of responses not equal to the number of entries; the error is delivered to all futures of the batch via `ApplyFuture.Error()`. |
 
 ## 4. Marker errors contract.Err*
 
@@ -77,12 +79,12 @@ and leaf packages.
 Complete inventory (taken from `go doc -all ./pkg/raft/contract`,
 VARIABLES section; the package has no other marker errors):
 
-| Name | Message | When returned |
-|---|---|---|
-| `contract.ErrEnqueueTimeout` | `raft: timeout enqueuing operation` | Timed-out enqueueing of an operation (e.g., `Apply` with a full `applyCh`). |
-| `contract.ErrNotImplemented` | `raft: not implemented` | RPC methods not implemented yet (`TimeoutNow`, `InstallSnapshot`, `AppendEntriesPipeline` in the transport). |
-| `contract.ErrNotReachable` | `raft: peer not reachable` | An RPC send attempt to a peer that is not connected to or disconnected from this transport. |
-| `contract.ErrRaftShutdown` | `raft: raft is shutdown` | Operations of a stopped Raft node (after `Stop`/`Shutdown`), including RPC sends over a closed transport. |
+| Name                         | Message                             | When returned                                                                                                |
+|------------------------------|-------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `contract.ErrEnqueueTimeout` | `raft: timeout enqueuing operation` | Timed-out enqueueing of an operation (e.g., `Apply` with a full `applyCh`).                                  |
+| `contract.ErrNotImplemented` | `raft: not implemented`             | RPC methods not implemented yet (`TimeoutNow`, `InstallSnapshot`, `AppendEntriesPipeline` in the transport). |
+| `contract.ErrNotReachable`   | `raft: peer not reachable`          | An RPC send attempt to a peer that is not connected to or disconnected from this transport.                  |
+| `contract.ErrRaftShutdown`   | `raft: raft is shutdown`            | Operations of a stopped Raft node (after `Stop`/`Shutdown`), including RPC sends over a closed transport.    |
 
 ## 5. Constructor and lifecycle
 
@@ -545,24 +547,24 @@ The public future of a user-initiated snapshot request.
 All types listed below are transparent aliases of declarations from
 `pkg/raft/contract` (`aliases.go`); the owner is the `contract` package.
 
-| Type | Owner | Purpose |
-|---|---|---|
-| `RPCHeader` | contract | Common RPC header: protocol version and sender identifier. |
-| `WithRPCHeader` | contract | Interface for obtaining the `RPCHeader` from an RPC message. |
-| `RequestVoteArgs` / `RequestVoteReply` | contract | Arguments and reply of the vote request. |
-| `RequestPreVoteArgs` / `RequestPreVoteReply` | contract | Arguments and reply of the pre-vote. |
-| `AppendEntriesArgs` / `AppendEntriesReply` | contract | Arguments and reply of the append-entries call (including the conflict-resolution fields). |
-| `InstallSnapshotRequest` / `InstallSnapshotResponse` | contract | Snapshot installation request and reply. |
-| `TimeoutNowRequest` / `TimeoutNowResponse` | contract | Immediate-election request and reply (leadership transfer). |
-| `RPC` | contract | Incoming RPC request from `Consumer()`: command, data stream, reply channel. |
-| `RPCResponse` | contract | RPC response: `Reply` or `Error`. |
-| `LogEntry` | contract | Log entry: index, term, type, data. |
-| `LogType` | contract | Log entry type (see section 1). |
-| `Configuration` | contract | Cluster composition. |
-| `ConfigServer` | contract | One server of the configuration: identifier, address, suffrage. |
-| `ServerSuffrage` | contract | Suffrage: `Voter`/`Nonvoter`. |
-| `ServerID` | contract | Server identifier. |
-| `ServerAddress` | contract | Server address (string). |
+| Type                                                 | Owner    | Purpose                                                                                    |
+|------------------------------------------------------|----------|--------------------------------------------------------------------------------------------|
+| `RPCHeader`                                          | contract | Common RPC header: protocol version and sender identifier.                                 |
+| `WithRPCHeader`                                      | contract | Interface for obtaining the `RPCHeader` from an RPC message.                               |
+| `RequestVoteArgs` / `RequestVoteReply`               | contract | Arguments and reply of the vote request.                                                   |
+| `RequestPreVoteArgs` / `RequestPreVoteReply`         | contract | Arguments and reply of the pre-vote.                                                       |
+| `AppendEntriesArgs` / `AppendEntriesReply`           | contract | Arguments and reply of the append-entries call (including the conflict-resolution fields). |
+| `InstallSnapshotRequest` / `InstallSnapshotResponse` | contract | Snapshot installation request and reply.                                                   |
+| `TimeoutNowRequest` / `TimeoutNowResponse`           | contract | Immediate-election request and reply (leadership transfer).                                |
+| `RPC`                                                | contract | Incoming RPC request from `Consumer()`: command, data stream, reply channel.               |
+| `RPCResponse`                                        | contract | RPC response: `Reply` or `Error`.                                                          |
+| `LogEntry`                                           | contract | Log entry: index, term, type, data.                                                        |
+| `LogType`                                            | contract | Log entry type (see section 1).                                                            |
+| `Configuration`                                      | contract | Cluster composition.                                                                       |
+| `ConfigServer`                                       | contract | One server of the configuration: identifier, address, suffrage.                            |
+| `ServerSuffrage`                                     | contract | Suffrage: `Voter`/`Nonvoter`.                                                              |
+| `ServerID`                                           | contract | Server identifier.                                                                         |
+| `ServerAddress`                                      | contract | Server address (string).                                                                   |
 
 ## 16. Utilities
 

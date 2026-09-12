@@ -99,6 +99,10 @@ const (
 	ProtocolVersion = contract.ProtocolVersion
 	// TCPRPCTimeout — тайм-аут TCP RPC.
 	TCPRPCTimeout = contract.TCPRPCTimeout
+	// ConnectionTCPRPCTimeout — предельное время на установку TCP‑соединения.
+	ConnectionTCPRPCTimeout = contract.ConnectionTCPRPCTimeout
+	// InstallSnapshotTimeout — базовый таймаут передачи снимка.
+	InstallSnapshotTimeout = contract.InstallSnapshotTimeout
 
 	// _defaultTCPRPCTimeout — константный алиас contract.TCPRPCTimeout,
 	// сохраняющий историческое внутреннее имя для производственного кода.

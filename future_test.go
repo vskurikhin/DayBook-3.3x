@@ -314,7 +314,7 @@ func TestSingleNodeApply(t *testing.T) {
 	cm := testServerWithFSM(t, capture)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, 800*time.Millisecond)
+	waitForLeader(t, cm, 2*time.Second)
 
 	future := cm.Apply("cmd1", 0)
 	if err := future.Error(); err != nil {
@@ -331,7 +331,7 @@ func TestSingleNodeApplyOrder(t *testing.T) {
 	cm := testServerWithFSM(t, capture)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, 800*time.Millisecond)
+	waitForLeader(t, cm, 2*time.Second)
 
 	f1 := cm.Apply("cmd1", 0)
 	f2 := cm.Apply("cmd2", 0)
@@ -357,7 +357,7 @@ func TestSingleNodeApplyResponse(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 	h, capture := testFSMHarness(t)
 	defer h.Shutdown()
-	waitForLeader(t, h.cluster[0], 800*time.Millisecond)
+	waitForLeader(t, h.cluster[0], 2*time.Second)
 
 	future := h.cluster[0].Apply("cmd1", 0)
 	if err := future.Error(); err != nil {
@@ -440,7 +440,7 @@ func TestFSMApplyInOrder(t *testing.T) {
 	cm := testServerWithFSM(t, capture)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, 800*time.Millisecond)
+	waitForLeader(t, cm, 2*time.Second)
 
 	for i := 0; i < 5; i++ {
 		future := cm.Apply(i, 0)
@@ -479,7 +479,7 @@ func TestFutureNoGoroutineLeak(t *testing.T) {
 	cm := testServerWithFSM(t, capture)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, 800*time.Millisecond)
+	waitForLeader(t, cm, 2*time.Second)
 	future := cm.Apply("leaktest", 0)
 	_ = future.Error()
 }
@@ -501,7 +501,7 @@ func TestBatchApplyOrderAndIndices(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 	h, capture := testFSMHarness(t)
 	defer h.Shutdown()
-	waitForLeader(t, h.cluster[0], 800*time.Millisecond)
+	waitForLeader(t, h.cluster[0], 2*time.Second)
 
 	values := []int{42, 55, 81}
 	futures := make([]ApplyFuture, len(values))

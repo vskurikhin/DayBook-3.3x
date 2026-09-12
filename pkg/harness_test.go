@@ -33,7 +33,7 @@ const (
 	_pollInterval = 10 * time.Millisecond
 
 	// _maxElectionTimeout — максимальный тайм-аут выборов:
-	// 2*DefaultReelectionTimeout = 680 мс.
+	// 2*DefaultReelectionTimeout = 860 мс.
 	_maxElectionTimeout = 2 * raft.DefaultReelectionTimeout
 
 	// _maxReplicationBackoff — потолок задержки повторов репликации
@@ -44,7 +44,7 @@ const (
 	// _singleLeaderBudget — бюджет схождения к единственному лидеру:
 	// два worst-case выборов (2*_maxElectionTimeout + раунд Pre-Vote)
 	// плюс задержка step-down призрачного лидера прежнего терма,
-	// ограниченная потолком задержки повторов: 3*680 + 1000 ≈ 3.0 с.
+	// ограниченная потолком задержки повторов: 3*860 + 1000 ≈ 3580 мс (3.6 с).
 	_singleLeaderBudget = 3*_maxElectionTimeout + _maxReplicationBackoff
 
 	// _serviceReadyBudget — бюджет ожидания готовности перезапущенного

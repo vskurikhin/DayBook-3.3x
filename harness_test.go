@@ -19,7 +19,7 @@ const _submitTimeout = 5 * time.Second
 
 const (
 	// _maxElectionTimeout — максимальный election timeout:
-	// 2*DefaultReelectionTimeout = 680ms.
+	// 2*DefaultReelectionTimeout = 860ms.
 	_maxElectionTimeout = 2 * DefaultReelectionTimeout
 
 	// _preVoteRound — worst-case раунда Pre-Vote (≈ _maxElectionTimeout).
@@ -35,16 +35,16 @@ const (
 	_commitBudgetSteady = 4 * (DefaultApplyBatchInterval + _inmemRPCTimeout)
 
 	// _failoverBudgetMargin — запас бюджета after-failover для поглощения
-	// межфазных задержек (worst-case 2*680 + 680 + 50 + 200 ≈ 2.3s = 2290 мс).
+	// межфазных задержек (worst-case 2*860 + 860 + 50 + 200 ≈ 2.8s = 2830 мс).
 	_failoverBudgetMargin = 200 * time.Millisecond
 
 	// _commitBudgetAfterFailover — бюджет ожидания фиксации для сценариев
 	// с возможными перевыборами (disconnect/restart/leadership transfer):
-	// 2*_maxElectionTimeout + _preVoteRound + DefaultApplyBatchInterval + запас = 2290 мс.
+	// 2*_maxElectionTimeout + _preVoteRound + DefaultApplyBatchInterval + запас = 2830 мс.
 	_commitBudgetAfterFailover = 2*_maxElectionTimeout + _preVoteRound + DefaultApplyBatchInterval + _failoverBudgetMargin
 
 	// _leaderElectionBudget — бюджет ожидания выборов лидера
-	// (§9 architecture.md): 2*_maxElectionTimeout + _preVoteRound = 2040 мс.
+	// (§9 architecture.md): 2*_maxElectionTimeout + _preVoteRound = 2580 мс.
 	// Применяется CheckSingleLeader вместо прежнего необоснованного
 	// окна 8×150ms = 1.2s.
 	_leaderElectionBudget = 2*_maxElectionTimeout + _preVoteRound
@@ -53,7 +53,7 @@ const (
 	// Два независимых worst-case: выборы (_leaderElectionBudget) и задержка
 	// step-down призрачного лидера прежнего терма, ограниченная потолком
 	// задержки повторов репликации (_minReplicationBackoff):
-	// 2040ms + 1000ms = 3040ms.
+	// 2580ms + 1000ms = 3580ms.
 	_singleLeaderBudget = _leaderElectionBudget + _minReplicationBackoff
 
 	// _snapshotConvergenceBudget — бюджет схождения снимка к вершине журнала.

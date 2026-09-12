@@ -118,6 +118,7 @@ The layers, top to bottom:
   through the configuration.
 
 The state machine of the consensus module:
+
 ```
 Start ────────────┐
                   ▼                      higher term
@@ -169,22 +170,22 @@ nodes; `make stop` also removes pid files; the targets `make clean`,
 Stand variables can be overridden on the make command line without
 editing the Makefile, for example `make start-raft DURATION=1m`:
 
-| Variable | Node or generator flag | Makefile default |
-|---|---|---|
-| `APPLY_BATCH_INTERVAL` | `-apply-batch-interval` | 50 |
-| `HEARTBEAT_TIMEOUT` | `-heartbeat-timeout` | 45 |
-| `REELECTION_TIMEOUT` | `-reelection-timeout` | 500 |
-| `TICKER_TIMEOUT` | `-ticker-timeout` | 20 |
-| `TRACE_LOG_LEVEL` | `-trace-log-level` | 0 |
-| `CONCURRENCY` | `-concurrency` | 8 |
-| `DELETE_PERCENT` | `-delete-percent` | 0 |
-| `DURATION` | `-duration` | 5m |
-| `GET_PERCENT` | `-get-percent` | 75 |
-| `REQUEST_RATE` | `-request-rate` | 200 |
-| `VALUE_SIZE` | `-value-size` | 128 |
-| `VERIFY_PERCENT` | `-verify-percent` | 33 |
-| `WEAK_GET_PERCENT` | `-weak-get-percent` | 0 |
-| `STAND` | — | empty |
+| Variable               | Node or generator flag  | Makefile default |
+|------------------------|-------------------------|------------------|
+| `APPLY_BATCH_INTERVAL` | `-apply-batch-interval` | 50               |
+| `HEARTBEAT_TIMEOUT`    | `-heartbeat-timeout`    | 45               |
+| `REELECTION_TIMEOUT`   | `-reelection-timeout`   | 500              |
+| `TICKER_TIMEOUT`       | `-ticker-timeout`       | 20               |
+| `TRACE_LOG_LEVEL`      | `-trace-log-level`      | 0                |
+| `CONCURRENCY`          | `-concurrency`          | 8                |
+| `DELETE_PERCENT`       | `-delete-percent`       | 0                |
+| `DURATION`             | `-duration`             | 5m               |
+| `GET_PERCENT`          | `-get-percent`          | 75               |
+| `REQUEST_RATE`         | `-request-rate`         | 200              |
+| `VALUE_SIZE`           | `-value-size`           | 128              |
+| `VERIFY_PERCENT`       | `-verify-percent`       | 33               |
+| `WEAK_GET_PERCENT`     | `-weak-get-percent`     | 0                |
+| `STAND`                | —                       | empty            |
 
 The `STAND` variable sets a prefix for stand artifact file names
 (traces, stdout/stderr, pid files) and lets artifact sets be told
@@ -195,14 +196,14 @@ two stands cannot run at the same time in one working tree.
 
 The KV service accepts JSON requests over six routes:
 
-| Route | Purpose |
-|---|---|
-| `GET /verifyleader/` | check that the node is the acting leader |
-| `GET /weak-get/{key...}` | weak read of a key value without a log write |
-| `POST /cas/` | conditional write: compare-and-swap of values |
-| `POST /delete/` | delete a key |
-| `POST /get/` | read a key value through the log |
-| `POST /put/` | write a key value |
+| Route                    | Purpose                                       |
+|--------------------------|-----------------------------------------------|
+| `GET /verifyleader/`     | check that the node is the acting leader      |
+| `GET /weak-get/{key...}` | weak read of a key value without a log write  |
+| `POST /cas/`             | conditional write: compare-and-swap of values |
+| `POST /delete/`          | delete a key                                  |
+| `POST /get/`             | read a key value through the log              |
+| `POST /put/`             | write a key value                             |
 
 Business responses always come back with HTTP 200; the outcome is
 carried by the `RespStatus` field: `StatusOK` — the operation
@@ -218,20 +219,22 @@ client behavior is [docs/API-HTTP.md](docs/API-HTTP.md).
 
 Default values of the node timing parameters:
 
-| Parameter | Node (flag default) | Stand (Makefile) |
-|---|---|---|
-| Heartbeat period (`-heartbeat-timeout`) | 33 ms | 45 ms |
-| Election timeout base (`-reelection-timeout`) | 340 ms | 500 ms |
-| Election ticker tick (`-ticker-timeout`) | 20 ms | 20 ms |
-| Apply batch interval (`-apply-batch-interval`) | 50 ms | 50 ms |
-| Trace level (`-trace-log-level`) | 1 | 0 |
+| Parameter                                      | Node (flag default) | Stand (Makefile) |
+|------------------------------------------------|---------------------|------------------|
+| Heartbeat period (`-heartbeat-timeout`)        | 33 ms               | 45 ms            |
+| Election timeout base (`-reelection-timeout`)  | 430 ms              | 500 ms           |
+| Election ticker tick (`-ticker-timeout`)       | 20 ms               | 20 ms            |
+| Apply batch interval (`-apply-batch-interval`) | 50 ms               | 50 ms            |
+| Trace level (`-trace-log-level`)               | 1                   | 0                |
 
 The parameters are tied by the invariant
 `reelection-timeout ≥ 10·heartbeat-timeout` (as well as
-`ticker-timeout ≤ reelection-timeout/10` and
-`apply-batch-interval ≤ reelection-timeout`). The check runs at startup
-with a fail-fast strategy: an invalid combination terminates the
-process before any work starts, and the message lists every violation.
+`ticker-timeout ≤ reelection-timeout/10`,
+`apply-batch-interval ≤ reelection-timeout`, and
+`reelection-timeout > 2 × raft.TCPRPCTimeout = 400 ms`).
+The check runs at startup with a fail-fast strategy: an invalid
+combination terminates the process before any work starts, and the
+message lists every violation.
 
 The full reference of raftkv and loadkv flags with defaults and value
 bounds is [docs/Flags.md](docs/Flags.md); the RPC transport timeout
@@ -301,5 +304,5 @@ The code is distributed under the license whose text is in the
 
 ## Version synchronization
 
-The Russian version (`README.md`) is the primary one. The English
-`README-en.md` is a translation.
+The Russian version (`README.md`) is the primary one.
+The English `README-en.md` is a translation.

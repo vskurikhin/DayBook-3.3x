@@ -47,9 +47,12 @@ func newTCPHarness(t *testing.T, n int) *tcpHarness {
 	alive := make([]bool, n)
 	ready := make(chan any)
 
-	// Создаём транспорты (каждый на своём порту).
+	// Создаём транспорты (каждый на своём порту). Равномерный тайм-аут
+	// 500 мс эквивалентен прежнему единому значению (установка соединения,
+	// дедлайн RPC, снимок, ответ); дефолты TCPTimeouts{} (165/200/310/200)
+	// изменили бы окна TCP-кластера против прежних 500 мс.
 	for i := 0; i < n; i++ {
-		trans, err := transp.NewTCPTransport("127.0.0.1:0", 500*time.Millisecond, 2)
+		trans, err := transp.NewTCPTransport("127.0.0.1:0", uniformTCPTimeouts(500*time.Millisecond), 2)
 		if err != nil {
 			t.Fatalf("NewTCPTransport(%d): %v", i, err)
 		}

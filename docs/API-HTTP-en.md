@@ -20,14 +20,14 @@ operation (see StatusNotLeader below).
 Routes are registered with the ServeMux router of the standard
 library ("method + path" patterns, Go 1.22+).
 
-| Route | Purpose | Request | Response |
-|---|---|---|---|
-| `GET /verifyleader/` | leader verification | no body | StatusResponse |
-| `GET /weak-get/{key...}` | weak read | key in path | GetResponse |
-| `POST /cas/` | conditional write | CASRequest | CASResponse |
-| `POST /delete/` | deletion | DeleteRequest | DeleteResponse |
-| `POST /get/` | consensus read | GetRequest | GetResponse |
-| `POST /put/` | write | PutRequest | PutResponse |
+| Route                    | Purpose             | Request       | Response       |
+|--------------------------|---------------------|---------------|----------------|
+| `GET /verifyleader/`     | leader verification | no body       | StatusResponse |
+| `GET /weak-get/{key...}` | weak read           | key in path   | GetResponse    |
+| `POST /cas/`             | conditional write   | CASRequest    | CASResponse    |
+| `POST /delete/`          | deletion            | DeleteRequest | DeleteResponse |
+| `POST /get/`             | consensus read      | GetRequest    | GetResponse    |
+| `POST /put/`             | write               | PutRequest    | PutResponse    |
 
 ## General rules
 
@@ -54,12 +54,12 @@ library ("method + path" patterns, Go 1.22+).
 
 The ResponseStatus type is declared in pkg/api/api.go.
 
-| Value | Name | Semantics |
-|---|---|---|
-| 0 | StatusInvalid / "invalid" | incompatible operation response |
-| 1 | StatusOK / "OK" | operation completed |
-| 2 | StatusNotLeader / "NotLeader" | the operation is not confirmed by this node: the node is not the leader, or the timeout for enqueueing the command into the consensus module queue has expired, or leadership is lost or being transferred, or the node is shutting down; the client should retry the command at another address |
-| 3 | StatusFailedCommit / "FailedCommit" | not returned by the handlers; the Go client treats it as "commit failed; retry" |
+| Value | Name                                | Semantics                                                                                                                                                                                                                                                                                        |
+|-------|-------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0     | StatusInvalid / "invalid"           | incompatible operation response                                                                                                                                                                                                                                                                  |
+| 1     | StatusOK / "OK"                     | operation completed                                                                                                                                                                                                                                                                              |
+| 2     | StatusNotLeader / "NotLeader"       | the operation is not confirmed by this node: the node is not the leader, or the timeout for enqueueing the command into the consensus module queue has expired, or leadership is lost or being transferred, or the node is shutting down; the client should retry the command at another address |
+| 3     | StatusFailedCommit / "FailedCommit" | not returned by the handlers; the Go client treats it as "commit failed; retry"                                                                                                                                                                                                                  |
 
 Notes on the table:
 
@@ -82,12 +82,12 @@ Notes on the table:
 
 ## Transport codes
 
-| Code | When returned |
-|---|---|
-| 400 | the Content-Type header is missing or is not application/json; the body is not valid JSON; a field type does not match; the body contains unknown fields (DisallowUnknownFields) |
-| 404 | route not found |
-| 405 | the HTTP method does not match the route pattern |
-| 500 | response serialization error (json.Marshal) |
+| Code | When returned                                                                                                                                                                    |
+|------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 400  | the Content-Type header is missing or is not application/json; the body is not valid JSON; a field type does not match; the body contains unknown fields (DisallowUnknownFields) |
+| 404  | route not found                                                                                                                                                                  |
+| 405  | the HTTP method does not match the route pattern                                                                                                                                 |
+| 500  | response serialization error (json.Marshal)                                                                                                                                      |
 
 Request context cancellation. If the client cancels the request
 context (drops the connection) before the operation completes, the
@@ -189,19 +189,19 @@ Every POST route, after parsing the body, performs the same steps:
 - Handler: handleCAS — pkg/kvservice/kvservice.go.
 - Request: CASRequest (pkg/api/api.go):
 
-  | Field | Type | Meaning |
-  |---|---|---|
-  | Key | string | key |
+  | Field        | Type   | Meaning                           |
+  |--------------|--------|-----------------------------------|
+  | Key          | string | key                               |
   | CompareValue | string | expected current value of the key |
-  | Value | string | value to write |
+  | Value        | string | value to write                    |
 
 - Response: CASResponse (pkg/api/api.go):
 
-  | Field | Type | Meaning |
-  |---|---|---|
-  | RespStatus | ResponseStatus (number) | operation status |
-  | KeyFound | bool | whether the key existed before the operation |
-  | PrevValue | string | key value before the operation |
+  | Field      | Type                    | Meaning                                      |
+  |------------|-------------------------|----------------------------------------------|
+  | RespStatus | ResponseStatus (number) | operation status                             |
+  | KeyFound   | bool                    | whether the key existed before the operation |
+  | PrevValue  | string                  | key value before the operation               |
 
 - Semantics: if the current value of key Key equals CompareValue,
   Value is written; KeyFound reports whether the key existed, and
@@ -214,11 +214,11 @@ Every POST route, after parsing the body, performs the same steps:
 - Request: DeleteRequest (pkg/api/api.go)
 - Response: DeleteResponse (pkg/api/api.go):
 
-  | Field | Type | Meaning |
-  |---|---|---|
-  | RespStatus | ResponseStatus (number) | operation status |
-  | KeyFound | bool | whether the key existed before the operation |
-  | PrevValue | string | key value before the operation |
+  | Field      | Type                    | Meaning                                      |
+  |------------|-------------------------|----------------------------------------------|
+  | RespStatus | ResponseStatus (number) | operation status                             |
+  | KeyFound   | bool                    | whether the key existed before the operation |
+  | PrevValue  | string                  | key value before the operation               |
 
 - Semantics: deletes the key; KeyFound and PrevValue describe the
   state before the deletion. The command is committed through the log
@@ -230,11 +230,11 @@ Every POST route, after parsing the body, performs the same steps:
 - Request: GetRequest (pkg/api/api.go).
 - Response: GetResponse (pkg/api/api.go):
 
-  | Field | Type | Meaning |
-  |---|---|---|
-  | RespStatus | ResponseStatus (number) | operation status |
-  | KeyFound | bool | whether the key exists |
-  | Value | string | key value |
+  | Field      | Type                    | Meaning                |
+  |------------|-------------------------|------------------------|
+  | RespStatus | ResponseStatus (number) | operation status       |
+  | KeyFound   | bool                    | whether the key exists |
+  | Value      | string                  | key value              |
 
 - Semantics: a read through the log — the command passes consensus
   and is applied to the state machine, so the result is consistent
@@ -246,18 +246,18 @@ Every POST route, after parsing the body, performs the same steps:
 - Handler: handlePut — pkg/kvservice/kvservice.go.
 - Request: PutRequest (pkg/api/api.go):
 
-  | Field | Type | Meaning |
-  |---|---|---|
-  | Key | string | key |
+  | Field | Type   | Meaning        |
+  |-------|--------|----------------|
+  | Key   | string | key            |
   | Value | string | value to write |
 
 - Response: PutResponse (pkg/api/api.go):
 
-  | Field | Type | Meaning |
-  |---|---|---|
-  | RespStatus | ResponseStatus (number) | operation status |
-  | KeyFound | bool | whether the key existed before the operation |
-  | PrevValue | string | key value before the operation |
+  | Field      | Type                    | Meaning                                      |
+  |------------|-------------------------|----------------------------------------------|
+  | RespStatus | ResponseStatus (number) | operation status                             |
+  | KeyFound   | bool                    | whether the key existed before the operation |
+  | PrevValue  | string                  | key value before the operation               |
 
 - Semantics: stores Value under key Key; KeyFound and PrevValue
   describe the state before the write. The command is committed

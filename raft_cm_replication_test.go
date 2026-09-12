@@ -1056,22 +1056,22 @@ func TestReplicationBackoffDelay_Clamp(t *testing.T) {
 		}
 	}
 
-	// При базе MaxHeartbeatTimeout (82 мс — верх диапазона ValidateTiming)
-	// потолок 30·82 = 2460 мс связывает экспоненту на f=5:
-	// ступени 164/328/656/1312 мс, потолок побитово 2460 мс.
+	// При базе MaxHeartbeatTimeout (100 мс — верх диапазона ValidateTiming)
+	// потолок 30·100 = 3000 мс связывает экспоненту на f=5:
+	// ступени 200/400/800/1600 мс, потолок побитово 3000 мс.
 	baseMax := MaxHeartbeatTimeout
-	stepsMax := []time.Duration{164, 328, 656, 1312}
+	stepsMax := []time.Duration{200, 400, 800, 1600}
 	for i, want := range stepsMax {
 		f := i + 1
 		if got := replicationBackoffDelay(baseMax, f); got != want*time.Millisecond {
 			t.Fatalf("delay(MaxHeartbeatTimeout, %d) = %v, want %v", f, got, want*time.Millisecond)
 		}
 	}
-	if got := replicationBackoffDelay(baseMax, 5); got != 2460*time.Millisecond {
-		t.Fatalf("delay(MaxHeartbeatTimeout, 5) = %v, want bitwise 2460ms (=30·82)", got)
+	if got := replicationBackoffDelay(baseMax, 5); got != 3000*time.Millisecond {
+		t.Fatalf("delay(MaxHeartbeatTimeout, 5) = %v, want bitwise 3000ms (=30·100)", got)
 	}
-	if got := replicationBackoffDelay(baseMax, 6); got != 2460*time.Millisecond {
-		t.Fatalf("delay(MaxHeartbeatTimeout, 6) = %v, want bitwise 2460ms (=30·82)", got)
+	if got := replicationBackoffDelay(baseMax, 6); got != 3000*time.Millisecond {
+		t.Fatalf("delay(MaxHeartbeatTimeout, 6) = %v, want bitwise 3000ms (=30·100)", got)
 	}
 }
 

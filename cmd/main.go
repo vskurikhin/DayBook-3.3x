@@ -106,7 +106,15 @@ func runWith(values *config.Values) (func(), error) {
 	// После успешного создания сервиса ответственность за транспорт переходит
 	// к Server (ownTransport = false). При возникновении ошибки транспорт
 	// корректно освобождается с помощью defer.
-	transport, err := transp.NewTCPTransport(values.RPCAddress.String(), values.TCPRPCTimeout, maxPool)
+	// Тайм‑ауты транспортного слоя вычисляются чистой функцией transportTimeouts
+	// на основе переданных значений. Окно RPC и время ожидания ответа потребителя
+	// соответствуют флагу -tcp-rpc-timeout. Нулевые поля автоматически заменяются
+	// значениями по умолчанию, заданными в конструкторе.
+	timeouts := transportTimeouts(values)
+	log.Printf("raftkv: TCP timeouts: connect=%v rpc=%v snapshot=%v response=%v",
+		timeouts.ConnectionTimeout, timeouts.GenericRPCTimeout,
+		timeouts.InstallSnapshotTimeout, timeouts.ResponseTimeout)
+	transport, err := transp.NewTCPTransport(values.RPCAddress.String(), timeouts, maxPool)
 	if err != nil {
 		stopPprof()
 		return nil, fmt.Errorf("failed to create TCP transport on %s: %w", values.RPCAddress, err)
@@ -142,6 +150,20 @@ func runWith(values *config.Values) (func(), error) {
 		}
 		stopPprof()
 	}, nil
+}
+
+// transportTimeouts формирует тайм‑ауты TCP‑транспорта на основе флагов узла.
+// ResponseTimeout (ожидание ответа потребителя) конструктивно совпадает
+// с GenericRPCTimeout (окно обычного RPC): это две стороны единого окна обмена.
+// Отдельного флага для времени ответа не предусмотрено. Нулевые значения полей
+// трактуются как использование значений по умолчанию, заданных в конструкторе транспорта.
+func transportTimeouts(values *config.Values) transp.TCPTimeouts {
+	return transp.TCPTimeouts{
+		ConnectionTimeout:      values.TCPConnectTimeout,
+		GenericRPCTimeout:      values.TCPRPCTimeout,
+		InstallSnapshotTimeout: values.InstallSnapshotTimeout,
+		ResponseTimeout:        values.TCPRPCTimeout,
+	}
 }
 
 // startPprof поднимает отдельный HTTP-сервер профилирования и включает сбор

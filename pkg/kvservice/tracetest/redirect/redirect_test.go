@@ -94,7 +94,7 @@ func TestTraceRedirect(t *testing.T) {
 func newTestService(t *testing.T) *kvservice.KVService {
 	t.Helper()
 	ready := make(chan any)
-	transport, err := transp.NewTCPTransport(":0", 0, 0)
+	transport, err := transp.NewTCPTransport(":0", transp.TCPTimeouts{}, 0)
 	if err != nil {
 		t.Fatalf("transp.NewTCPTransport: %v", err)
 	}

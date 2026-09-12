@@ -441,12 +441,12 @@ func TestSnapshot_Install(t *testing.T) {
 	snapIdxF := h.getLastSnapshotIndex(followerID)
 	lastLogIndex := h.getLastLogIndex(followerID)
 	if lastLogIndex < snapIdxF {
-		t.Fatalf("INV-S1 violated: lastLogIndex=%d < lastSnapshotIndex=%d", lastLogIndex, snapIdxF)
+		t.Fatalf("граница журнала и снимка нарушена: lastLogIndex=%d < lastSnapshotIndex=%d", lastLogIndex, snapIdxF)
 	}
 	if h.getLogLength(followerID) == 0 {
 		// Пустой суффикс: lastLogIndex/lastLogTerm == граница снимка.
 		if lastLogIndex != snapIdxF || h.getLastLogTerm(followerID) != h.getLastSnapshotTerm(followerID) {
-			t.Fatalf("INV-S2 violated: lastLog=(%d,%d), snapshot=(%d,%d)",
+			t.Fatalf("граница журнала и снимка нарушена: lastLog=(%d,%d), snapshot=(%d,%d)",
 				lastLogIndex, h.getLastLogTerm(followerID), snapIdxF, h.getLastSnapshotTerm(followerID))
 		}
 	}
@@ -1299,14 +1299,14 @@ func TestSnapshot_InstallPostConditions(t *testing.T) {
 	cm.mu.Unlock()
 
 	if lastLogIndex < lastSnapshotIndex {
-		t.Fatalf("INV-S1 violated: lastLogIndex=%d < lastSnapshotIndex=%d", lastLogIndex, lastSnapshotIndex)
+		t.Fatalf("граница журнала и снимка нарушена: lastLogIndex=%d < lastSnapshotIndex=%d", lastLogIndex, lastSnapshotIndex)
 	}
 	if logLen == 0 && (lastLogIndex != lastSnapshotIndex || lastLogTerm != lastSnapshotTerm) {
-		t.Fatalf("INV-S2 violated: lastLog=(%d,%d), snapshot=(%d,%d)",
+		t.Fatalf("граница журнала и снимка нарушена: lastLog=(%d,%d), snapshot=(%d,%d)",
 			lastLogIndex, lastLogTerm, lastSnapshotIndex, lastSnapshotTerm)
 	}
 	if lastApplied > lastLogIndex || commitIndex > lastLogIndex {
-		t.Fatalf("INV-S4 violated: lastApplied=%d commitIndex=%d > lastLogIndex=%d",
+		t.Fatalf("инвариант снимка нарушен: lastApplied=%d commitIndex=%d > lastLogIndex=%d",
 			lastApplied, commitIndex, lastLogIndex)
 	}
 	if lli != lastLogIndex || llt != lastLogTerm {
