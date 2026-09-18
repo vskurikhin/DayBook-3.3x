@@ -3,6 +3,7 @@ package raft
 import (
 	"net"
 	"testing"
+	"time"
 )
 
 func TestConfig(t *testing.T) {
@@ -52,5 +53,257 @@ func TestNewServerWrapper(t *testing.T) {
 	}
 	if len(s.peerIds) != 2 {
 		t.Fatalf("expected 2 peers, got %d", len(s.peerIds))
+	}
+}
+
+// TestServeMaxPool проверяет, что значение MaxPool из конфигурации доезжает
+// до TCP-транспорта, а ноль заменяется значением по умолчанию транспорта.
+func TestServeMaxPool(t *testing.T) {
+	tests := []struct {
+		name    string
+		maxPool int
+		want    int
+	}{
+		{name: "explicit", maxPool: 7, want: 7},
+		{name: "zero uses transport default", maxPool: 0, want: 2},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			commitChan := make(chan CommitEntry)
+			readerDone := make(chan any)
+			go func() {
+				defer close(readerDone)
+				for range commitChan {
+				}
+			}()
+
+			ready := make(chan any)
+			s := New(&Config{
+				Fsm:           NewCommitChannelFSM(commitChan),
+				MaxPool:       test.maxPool,
+				PeerIds:       []int{},
+				RPCAddress:    "127.0.0.1:0",
+				ServerID:      1,
+				Storage:       NewMapStorage(),
+				TCPRPCTimeout: TCPRPCTimeout,
+			}, ready)
+			s.Serve("127.0.0.1:0")
+			close(ready)
+			t.Cleanup(func() {
+				s.Shutdown()
+				close(commitChan)
+				<-readerDone
+			})
+
+			if s.transport.maxPool != test.want {
+				t.Fatalf("transport.maxPool = %d, want %d", s.transport.maxPool, test.want)
+			}
+		})
+	}
+}
+
+// TestDefaultTCPRPCTimeoutBarrier закрепляет контракт дефолтов тайм-аута
+// (AC-1): алиас TCPRPCTimeout несёт то же значение, что и каноническое
+// внутреннее имя _defaultTCPRPCTimeout (191 мс), а производная константа
+// проверки кворума остаётся ровно двукратной (инвариант 2×RPC на уровне
+// дефолтов, 382 мс).
+func TestDefaultTCPRPCTimeoutBarrier(t *testing.T) {
+	if TCPRPCTimeout != _defaultTCPRPCTimeout {
+		t.Fatalf("TCPRPCTimeout = %v, want %v", TCPRPCTimeout, _defaultTCPRPCTimeout)
+	}
+	if _defaultTCPRPCTimeout != 191*time.Millisecond {
+		t.Fatalf("_defaultTCPRPCTimeout = %v, want 191ms", _defaultTCPRPCTimeout)
+	}
+	if _defaultCheckQuorumTimeout != 382*time.Millisecond {
+		t.Fatalf("_defaultCheckQuorumTimeout = %v, want 382ms", _defaultCheckQuorumTimeout)
+	}
+	if _defaultCheckQuorumTimeout != 2*_defaultTCPRPCTimeout {
+		t.Fatalf("_defaultCheckQuorumTimeout = %v, want 2*_defaultTCPRPCTimeout = %v",
+			_defaultCheckQuorumTimeout, 2*_defaultTCPRPCTimeout)
+	}
+}
+
+// TestServeTCPRPCTimeout проверяет, что значение TCPRPCTimeout из конфигурации
+// доезжает до TCP-транспорта (мёртвый маршрут оживает, AC-3), а нулевая
+// конфигурация получает дефолт транспорта — те же эффективные 191 мс,
+// что и до починки маршрута (RISK-021 закрыт).
+func TestServeTCPRPCTimeout(t *testing.T) {
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		want    time.Duration
+	}{
+		{name: "explicit", timeout: 500 * time.Millisecond, want: 500 * time.Millisecond},
+		{name: "zero uses transport default", timeout: 0, want: TCPRPCTimeout},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			commitChan := make(chan CommitEntry)
+			readerDone := make(chan any)
+			go func() {
+				defer close(readerDone)
+				for range commitChan {
+				}
+			}()
+
+			ready := make(chan any)
+			s := New(&Config{
+				Fsm:           NewCommitChannelFSM(commitChan),
+				PeerIds:       []int{},
+				RPCAddress:    "127.0.0.1:0",
+				ServerID:      1,
+				Storage:       NewMapStorage(),
+				TCPRPCTimeout: test.timeout,
+			}, ready)
+			s.Serve("127.0.0.1:0")
+			close(ready)
+			t.Cleanup(func() {
+				s.Shutdown()
+				close(commitChan)
+				<-readerDone
+			})
+
+			if s.transport.timeout != test.want {
+				t.Fatalf("transport.timeout = %v, want %v", s.transport.timeout, test.want)
+			}
+		})
+	}
+}
+
+// TestDefaultSnapshotBarrier закрепляет экспортированные дефолты снимков
+// (AC-1): DefaultSnapshotInterval == 3 с и DefaultSnapshotThreshold == 1024.
+// Контрольная проверка отсутствия неэкспортированных имён выполняется
+// командным grep (см. отчёт задачи).
+func TestDefaultSnapshotBarrier(t *testing.T) {
+	if DefaultSnapshotInterval != 3*time.Second {
+		t.Fatalf("DefaultSnapshotInterval = %v, want 3s", DefaultSnapshotInterval)
+	}
+	if DefaultSnapshotThreshold != 1024 {
+		t.Fatalf("DefaultSnapshotThreshold = %d, want 1024", DefaultSnapshotThreshold)
+	}
+}
+
+// TestServeSnapshotConfig проверяет маршрут параметров снимков (AC-2):
+// значения SnapshotInterval/SnapshotThreshold из конфигурации доезжают
+// до ConsensusModule через сеттер в Serve, а trailingLogs не изменяется
+// (остаётся дефолтом конструктора).
+func TestServeSnapshotConfig(t *testing.T) {
+	commitChan := make(chan CommitEntry)
+	readerDone := make(chan any)
+	go func() {
+		defer close(readerDone)
+		for range commitChan {
+		}
+	}()
+
+	ready := make(chan any)
+	s := New(&Config{
+		Fsm:               NewCommitChannelFSM(commitChan),
+		PeerIds:           []int{},
+		RPCAddress:        "127.0.0.1:0",
+		ServerID:          1,
+		SnapshotInterval:  5 * time.Second,
+		SnapshotStore:     NewInmemSnapshotStore(),
+		SnapshotThreshold: 100,
+		Storage:           NewMapStorage(),
+		TCPRPCTimeout:     TCPRPCTimeout,
+	}, ready)
+	s.Serve("127.0.0.1:0")
+	close(ready)
+	t.Cleanup(func() {
+		s.Shutdown()
+		close(commitChan)
+		<-readerDone
+	})
+
+	if s.cm.snapshotInterval != 5*time.Second {
+		t.Fatalf("cm.snapshotInterval = %v, want 5s", s.cm.snapshotInterval)
+	}
+	if s.cm.snapshotThreshold != 100 {
+		t.Fatalf("cm.snapshotThreshold = %d, want 100", s.cm.snapshotThreshold)
+	}
+	if s.cm.trailingLogs != _defaultTrailingLogs {
+		t.Fatalf("cm.trailingLogs = %d, want %d", s.cm.trailingLogs, _defaultTrailingLogs)
+	}
+}
+
+// TestServeSnapshotConfigZeros проверяет контракт нулевых значений (AC-3):
+// нулевые поля снимков конфигурации заменяются дефолтами конструктора.
+func TestServeSnapshotConfigZeros(t *testing.T) {
+	commitChan := make(chan CommitEntry)
+	readerDone := make(chan any)
+	go func() {
+		defer close(readerDone)
+		for range commitChan {
+		}
+	}()
+
+	ready := make(chan any)
+	s := New(&Config{
+		Fsm:           NewCommitChannelFSM(commitChan),
+		PeerIds:       []int{},
+		RPCAddress:    "127.0.0.1:0",
+		ServerID:      1,
+		SnapshotStore: NewInmemSnapshotStore(),
+		Storage:       NewMapStorage(),
+		TCPRPCTimeout: TCPRPCTimeout,
+	}, ready)
+	s.Serve("127.0.0.1:0")
+	close(ready)
+	t.Cleanup(func() {
+		s.Shutdown()
+		close(commitChan)
+		<-readerDone
+	})
+
+	if s.cm.snapshotInterval != DefaultSnapshotInterval {
+		t.Fatalf("cm.snapshotInterval = %v, want %v", s.cm.snapshotInterval, DefaultSnapshotInterval)
+	}
+	if s.cm.snapshotThreshold != DefaultSnapshotThreshold {
+		t.Fatalf("cm.snapshotThreshold = %d, want %d", s.cm.snapshotThreshold, DefaultSnapshotThreshold)
+	}
+}
+
+// TestServeSnapshotConfigDisabled проверяет, что при выключенных снимках
+// (SnapshotStore == nil) сеттер не вызывается (AC-4): поля CM остаются
+// нулевыми, как и до введения маршрута.
+func TestServeSnapshotConfigDisabled(t *testing.T) {
+	commitChan := make(chan CommitEntry)
+	readerDone := make(chan any)
+	go func() {
+		defer close(readerDone)
+		for range commitChan {
+		}
+	}()
+
+	ready := make(chan any)
+	s := New(&Config{
+		Fsm:               NewCommitChannelFSM(commitChan),
+		PeerIds:           []int{},
+		RPCAddress:        "127.0.0.1:0",
+		ServerID:          1,
+		SnapshotInterval:  5 * time.Second,
+		SnapshotThreshold: 100,
+		Storage:           NewMapStorage(),
+		TCPRPCTimeout:     TCPRPCTimeout,
+	}, ready)
+	s.Serve("127.0.0.1:0")
+	close(ready)
+	t.Cleanup(func() {
+		s.Shutdown()
+		close(commitChan)
+		<-readerDone
+	})
+
+	if s.cm.snapshotStore != nil {
+		t.Fatalf("cm.snapshotStore = %v, want nil", s.cm.snapshotStore)
+	}
+	if s.cm.snapshotInterval != 0 {
+		t.Fatalf("cm.snapshotInterval = %v, want 0 (setter not called)", s.cm.snapshotInterval)
+	}
+	if s.cm.snapshotThreshold != 0 {
+		t.Fatalf("cm.snapshotThreshold = %d, want 0 (setter not called)", s.cm.snapshotThreshold)
 	}
 }

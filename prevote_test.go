@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -40,13 +41,13 @@ func TestPreVote_DisconnectedFollower_NoElection(t *testing.T) {
 	h.DisconnectPeer(otherID)
 
 	// keep: budgeted negative window — проверяется, что за целый
-	// worst-case election timeout (maxElectionTimeout = 2*ReelectionTimeoutMs)
+	// worst-case election timeout (_maxElectionTimeout = 2*ReelectionTimeoutMs)
 	// отключённый узел НЕ увеличил term и не сменил лидера. Опрос
 	// не доказывает отсутствия события — окно осознанно временное;
 	// его уменьшение ослабило бы assert.
 	// keep: timing — окно является предметом проверки в этом месте;
 	// наблюдаемого признака состояния здесь нет.
-	time.Sleep(maxElectionTimeout)
+	time.Sleep(_maxElectionTimeout)
 	newLid, newTerm := h.CheckSingleLeader()
 	if newLid != lid {
 		t.Errorf("leader changed from %d to %d, want same", lid, newLid)
@@ -79,7 +80,7 @@ func TestPreVote_CrashedLeader_NewElection(t *testing.T) {
 	h.CheckNoLeader()
 
 	// replace: позитивное ожидание — CheckSingleLeader сам опрашивает
-	// состояние до leaderElectionBudget (worst-case выборов), поэтому
+	// состояние до _leaderElectionBudget (worst-case выборов), поэтому
 	// отдельная фиксированная пауза не нужна.
 	newLid, _ := h.CheckSingleLeader()
 	if newLid == lid {
@@ -111,9 +112,9 @@ func TestPreVote_MajorityPartition(t *testing.T) {
 	h.DisconnectPeer(otherID)
 
 	// keep: budgeted negative window — за worst-case election timeout
-	// (maxElectionTimeout) minority не должен ни выиграть выборы,
+	// (_maxElectionTimeout) minority не должен ни выиграть выборы,
 	// ни увеличить term. Окно осознанно временное (см. выше).
-	time.Sleep(maxElectionTimeout)
+	time.Sleep(_maxElectionTimeout)
 	newLid, newTerm := h.CheckSingleLeader()
 	if newLid == otherID {
 		t.Errorf("minority node became leader, want majority")
@@ -193,14 +194,14 @@ func TestPreVote_Disabled(t *testing.T) {
 	// replace: позитивное ожидание — poll GetTerm с дедлайном вместо
 	// фиксированной паузы. В классическом Raft отключённый узел
 	// увеличивает term на каждом election timeout.
-	deadline := time.Now().Add(commitBudgetAfterFailover)
+	deadline := time.Now().Add(_commitBudgetAfterFailover)
 	disconnectedTerm := h.GetTerm(otherID)
 	for disconnectedTerm <= origTerm {
 		if !time.Now().Before(deadline) {
 			t.Fatalf("disconnected node term = %d, want > %d within %v",
-				disconnectedTerm, origTerm, commitBudgetAfterFailover)
+				disconnectedTerm, origTerm, _commitBudgetAfterFailover)
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 		disconnectedTerm = h.GetTerm(otherID)
 	}
 }
@@ -290,5 +291,180 @@ func TestPreVote_CandidateRetry(t *testing.T) {
 	}
 	if cm.cmState.state != Candidate {
 		t.Fatalf("state=%v after retry, want Candidate at new term", cm.cmState.state)
+	}
+}
+
+// newPreVoteTestCM собирает узел для прямого вызова runPreCandidate: сам узел
+// и один сосед с правом голоса, инициализированные каналы завершения таймера
+// выборов и остановки. becomeFollowerLocked запускает runElectionTimer, поэтому
+// вызывающий обязан закрыть cm.shutdownCh до проверки утечки горутин.
+func newPreVoteTestCM(transport Transport, term int) *ConsensusModule {
+	cm := &ConsensusModule{
+		id:         0,
+		transport:  transport,
+		storage:    NewMapStorage(),
+		shutdownCh: make(chan struct{}),
+		cmState: cmState{
+			state:              Follower,
+			currentTerm:        term,
+			votedFor:           -1,
+			electionResetEvent: time.Now(),
+			electionTimerDone:  make(chan struct{}),
+			configurations: configurations{
+				latest: Configuration{
+					ConfigServers: []ConfigServer{
+						{ID: 0, Suffrage: Voter},
+						{ID: 1, Suffrage: Voter},
+					},
+				},
+			},
+		},
+	}
+	cm.cmState.log = make([]LogEntry, 0)
+	return cm
+}
+
+// runPreCandidateOnce запускает runPreCandidate в отдельной горутине и ждёт
+// её завершения. Возвращает длительность перехода.
+func runPreCandidateOnce(t *testing.T, cm *ConsensusModule) time.Duration {
+	t.Helper()
+	done := make(chan struct{})
+	start := time.Now()
+	go func() {
+		cm.runPreCandidate()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runPreCandidate did not return")
+	}
+	return time.Since(start)
+}
+
+// blockingPreVoteTransport — транспорт, чей RequestPreVote блокируется до
+// закрытия канала release. Ответы в канал сбора не приходят вовсе, поэтому
+// select выходит по таймауту, а пост-select проверка потери недостижима.
+type blockingPreVoteTransport struct {
+	Transport
+	release chan struct{}
+}
+
+func (m *blockingPreVoteTransport) RequestPreVote(_ ServerID, _ RequestPreVoteArgs) (RequestPreVoteReply, error) {
+	<-m.release
+	return RequestPreVoteReply{}, errors.New("blocked transport released")
+}
+
+func (m *blockingPreVoteTransport) RequestVote(_ ServerID, _ RequestVoteArgs) (RequestVoteReply, error) {
+	return RequestVoteReply{}, nil
+}
+
+// refusingPreVoteTransport — транспорт, отвечающий отказом (VoteGranted: false)
+// на каждый запрос pre-vote с термом, равным текущему. Все ответы приходят,
+// кворум не собирается, и шаг вниз выполняет пост-select проверка потери.
+type refusingPreVoteTransport struct {
+	Transport
+	term int
+}
+
+func (m *refusingPreVoteTransport) RequestPreVote(_ ServerID, _ RequestPreVoteArgs) (RequestPreVoteReply, error) {
+	return RequestPreVoteReply{
+		RPCHeader:   RPCHeader{ProtocolVersion: ProtocolVersion, ServerID: 1},
+		Term:        m.term,
+		VoteGranted: false,
+	}, nil
+}
+
+func (m *refusingPreVoteTransport) RequestVote(_ ServerID, _ RequestVoteArgs) (RequestVoteReply, error) {
+	return RequestVoteReply{}, nil
+}
+
+// notImplementedPreVoteTransport — транспорт, чей RequestPreVote возвращает
+// ErrNotImplemented: ошибка засчитывается как выданный голос.
+type notImplementedPreVoteTransport struct {
+	Transport
+}
+
+func (m *notImplementedPreVoteTransport) RequestPreVote(_ ServerID, _ RequestPreVoteArgs) (RequestPreVoteReply, error) {
+	return RequestPreVoteReply{}, ErrNotImplemented
+}
+
+func (m *notImplementedPreVoteTransport) RequestVote(_ ServerID, _ RequestVoteArgs) (RequestVoteReply, error) {
+	return RequestVoteReply{}, nil
+}
+
+// TestPreVote_CollectTimeout_StepsDownToFollower пинирует ветку таймаута сбора
+// pre-vote: транспорт блокирует RequestPreVote, ответы не приходят, и select
+// выходит по кейсу таймаута. Узел завершает в Follower с неизменённым
+// currentTerm (pre-vote терм не инкрементирует), а переход занимает не менее
+// ReelectionTimeoutMs — это отличает ветку таймаута от ветки потери.
+func TestPreVote_CollectTimeout_StepsDownToFollower(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	release := make(chan struct{})
+	cm := newPreVoteTestCM(&blockingPreVoteTransport{release: release}, 2)
+	defer close(release)
+	defer close(cm.shutdownCh)
+
+	elapsed := runPreCandidateOnce(t, cm)
+
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if cm.cmState.state != Follower {
+		t.Fatalf("state = %v after pre-vote timeout, want Follower", cm.cmState.state)
+	}
+	if cm.cmState.currentTerm != 2 {
+		t.Fatalf("currentTerm = %d after pre-vote timeout, want 2 (pre-vote must not increment term)", cm.cmState.currentTerm)
+	}
+	if elapsed < time.Duration(ReelectionTimeoutMs)*time.Millisecond {
+		t.Fatalf("step-down via pre-vote timeout took %v, want >= %v", elapsed, time.Duration(ReelectionTimeoutMs)*time.Millisecond)
+	}
+}
+
+// TestPreVote_QuorumLost_StepsDownToFollower пинирует пост-select проверку
+// потери: транспорт отвечает отказом всем соседям, все ответы приходят,
+// votersResponded достигает totalVoters, и шаг вниз выполняет проверка потери,
+// а не кейс таймаута. Переход происходит строго быстрее ReelectionTimeoutMs —
+// без этой границы тест не отличает ветку потери от ветки таймаута.
+func TestPreVote_QuorumLost_StepsDownToFollower(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	cm := newPreVoteTestCM(&refusingPreVoteTransport{term: 2}, 2)
+	defer close(cm.shutdownCh)
+
+	elapsed := runPreCandidateOnce(t, cm)
+
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if cm.cmState.state != Follower {
+		t.Fatalf("state = %v after pre-vote loss, want Follower", cm.cmState.state)
+	}
+	if cm.cmState.currentTerm != 2 {
+		t.Fatalf("currentTerm = %d after pre-vote loss, want 2 (pre-vote must not increment term)", cm.cmState.currentTerm)
+	}
+	if elapsed >= time.Duration(ReelectionTimeoutMs)*time.Millisecond {
+		t.Fatalf("step-down via quorum loss took %v, want strictly faster than %v", elapsed, time.Duration(ReelectionTimeoutMs)*time.Millisecond)
+	}
+}
+
+// TestPreVote_ErrNotImplemented_Granted пинирует грант pre-vote при
+// ErrNotImplemented: транспорт, не поддерживающий PreVote, засчитывает голос
+// предоставленным. Узел переходит к выборам — состояние становится Candidate
+// (или Leader), currentTerm инкрементирован на 1.
+func TestPreVote_ErrNotImplemented_Granted(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+
+	cm := newPreVoteTestCM(&notImplementedPreVoteTransport{}, 2)
+	defer close(cm.shutdownCh)
+
+	runPreCandidateOnce(t, cm)
+
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if cm.cmState.state != Candidate && cm.cmState.state != Leader {
+		t.Fatalf("state = %v after ErrNotImplemented pre-vote, want Candidate or Leader", cm.cmState.state)
+	}
+	if cm.cmState.currentTerm != 3 {
+		t.Fatalf("currentTerm = %d, want 3 (ErrNotImplemented counts as granted vote, election started)", cm.cmState.currentTerm)
 	}
 }

@@ -85,6 +85,8 @@ type CommitChannelFSM struct {
 	commitChan chan<- CommitEntry
 }
 
+var _ FSM = (*CommitChannelFSM)(nil)
+
 func NewCommitChannelFSM(commitChan chan<- CommitEntry) *CommitChannelFSM {
 	return &CommitChannelFSM{commitChan: commitChan}
 }

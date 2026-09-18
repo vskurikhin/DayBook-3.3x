@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"hash"
 	"hash/crc32"
@@ -18,19 +19,19 @@ import (
 )
 
 const (
-	// snapshotsSubdir — поддиректория dataDir, в которой FileSnapshotStore
+	// _snapshotsSubdir — поддиректория dataDir, в которой FileSnapshotStore
 	// хранит снимки. Не конфликтует с FileStorage.loadAll: тот читает
 	// только *.dat-файлы в корне каталога.
-	snapshotsSubdir = "snapshots"
+	_snapshotsSubdir = "snapshots"
 
-	// metaFileName — имя файла метаданных внутри директории снимка.
-	metaFileName = "meta.dat"
+	// _metaFileName — имя файла метаданных внутри директории снимка.
+	_metaFileName = "meta.dat"
 
-	// stateFileName — имя файла данных FSM внутри директории снимка.
-	stateFileName = "state.bin"
+	// _stateFileName — имя файла данных FSM внутри директории снимка.
+	_stateFileName = "state.bin"
 
-	// tmpSuffix — суффикс временной директории незавершённого снимка.
-	tmpSuffix = ".tmp"
+	// _tmpSuffix — суффикс временной директории незавершённого снимка.
+	_tmpSuffix = ".tmp"
 )
 
 // fileSnapshotMeta — метаданные снимка на диске: SnapshotMeta
@@ -50,14 +51,16 @@ type FileSnapshotStore struct {
 	retain int
 }
 
+var _ SnapshotStore = (*FileSnapshotStore)(nil)
+
 // NewFileSnapshotStore создаёт FileSnapshotStore в поддиректории
 // snapshots каталога base. retain >= 1 — сколько снимков сохранять;
 // при создании нового снимка более старые удаляются.
 func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
 	if retain < 1 {
-		return nil, fmt.Errorf("raft: must retain at least one snapshot")
+		return nil, errors.New("raft: must retain at least one snapshot")
 	}
-	path := filepath.Join(base, snapshotsSubdir)
+	path := filepath.Join(base, _snapshotsSubdir)
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		return nil, fmt.Errorf("raft: snapshot path not accessible: %v", err)
 	}
@@ -69,19 +72,6 @@ func NewFileSnapshotStore(base string, retain int) (*FileSnapshotStore, error) {
 		return nil, fmt.Errorf("raft: permissions test failed: %v", err)
 	}
 	return store, nil
-}
-
-// testPermissions проверяет, что в каталог снимков можно писать.
-func (f *FileSnapshotStore) testPermissions() error {
-	path := filepath.Join(f.path, ".permissions-test")
-	fh, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	if err := fh.Close(); err != nil {
-		return err
-	}
-	return os.Remove(path)
 }
 
 // snapshotName генерирует имя директории снимка: <term>-<index>-<msec>.
@@ -98,46 +88,6 @@ func snapshotName(term, index int, msec int64) string {
 // Проигравший вызывающий обрабатывает эту ошибку как обычную ошибку создания снимка.
 func (f *FileSnapshotStore) Create(index, term int, configuration Configuration, configIndex int) (SnapshotSink, error) {
 	return f.createAt(index, term, configIndex, configuration, time.Now())
-}
-
-// createAt — Create с инъекцией времени для детерминированных тестов
-// коллизии имени директории.
-func (f *FileSnapshotStore) createAt(
-	index, term, configIndex int, configuration Configuration, now time.Time,
-) (SnapshotSink, error) {
-	name := snapshotName(term, index, now.UnixNano()/int64(time.Millisecond))
-	path := filepath.Join(f.path, name+tmpSuffix)
-
-	if err := os.Mkdir(path, 0o700); err != nil {
-		return nil, fmt.Errorf("raft: failed to make snapshot directory %s: %w", path, err)
-	}
-
-	sink := &FileSnapshotSink{
-		store:     f,
-		dir:       path,
-		parentDir: f.path,
-		meta: fileSnapshotMeta{
-			SnapshotMeta: SnapshotMeta{
-				Version:       ProtocolVersion,
-				ID:            name,
-				Index:         index,
-				Term:          term,
-				Configuration: configuration,
-				ConfigIndex:   configIndex,
-			},
-		},
-	}
-
-	statePath := filepath.Join(path, stateFileName)
-	fh, err := os.Create(statePath)
-	if err != nil {
-		_ = os.RemoveAll(path)
-		return nil, fmt.Errorf("raft: failed to create state file: %v", err)
-	}
-	sink.stateFile = fh
-	sink.stateHash = crc32.NewIEEE()
-	sink.buffered = bufio.NewWriter(io.MultiWriter(sink.stateFile, sink.stateHash))
-	return sink, nil
 }
 
 // List возвращает метаданные всех доступных снимков, упорядоченные
@@ -163,7 +113,7 @@ func (f *FileSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, error
 		return nil, nil, fmt.Errorf("raft: snapshot %s is corrupt: %v", id, err)
 	}
 
-	statePath := filepath.Join(f.path, id, stateFileName)
+	statePath := filepath.Join(f.path, id, _stateFileName)
 	fh, err := os.Open(statePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("raft: failed to open snapshot state %s: %v", id, err)
@@ -186,6 +136,59 @@ func (f *FileSnapshotStore) Open(id string) (*SnapshotMeta, io.ReadCloser, error
 	return &meta.SnapshotMeta, &bufferedReadCloser{Reader: bufio.NewReader(fh), fh: fh}, nil
 }
 
+// testPermissions проверяет, что в каталог снимков можно писать.
+func (f *FileSnapshotStore) testPermissions() error {
+	path := filepath.Join(f.path, ".permissions-test")
+	fh, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	if err := fh.Close(); err != nil {
+		return err
+	}
+	return os.Remove(path)
+}
+
+// createAt — Create с инъекцией времени для детерминированных тестов
+// коллизии имени директории.
+func (f *FileSnapshotStore) createAt(
+	index, term, configIndex int, configuration Configuration, now time.Time,
+) (SnapshotSink, error) {
+	name := snapshotName(term, index, now.UnixNano()/int64(time.Millisecond))
+	path := filepath.Join(f.path, name+_tmpSuffix)
+
+	if err := os.Mkdir(path, 0o700); err != nil {
+		return nil, fmt.Errorf("raft: failed to make snapshot directory %s: %w", path, err)
+	}
+
+	sink := &FileSnapshotSink{
+		store:     f,
+		dir:       path,
+		parentDir: f.path,
+		meta: fileSnapshotMeta{
+			SnapshotMeta: SnapshotMeta{
+				Version:       ProtocolVersion,
+				ID:            name,
+				Index:         index,
+				Term:          term,
+				Configuration: configuration,
+				ConfigIndex:   configIndex,
+			},
+		},
+	}
+
+	statePath := filepath.Join(path, _stateFileName)
+	fh, err := os.Create(statePath)
+	if err != nil {
+		_ = os.RemoveAll(path)
+		return nil, fmt.Errorf("raft: failed to create state file: %v", err)
+	}
+	sink.stateFile = fh
+	sink.stateHash = crc32.NewIEEE()
+	sink.buffered = bufio.NewWriter(io.MultiWriter(sink.stateFile, sink.stateHash))
+	return sink, nil
+}
+
 // getSnapshots возвращает все известные снимки, отсортированные
 // от новых к старым.
 func (f *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
@@ -196,7 +199,7 @@ func (f *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
 
 	var snapshots []*fileSnapshotMeta
 	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasSuffix(entry.Name(), tmpSuffix) {
+		if !entry.IsDir() || strings.HasSuffix(entry.Name(), _tmpSuffix) {
 			continue
 		}
 		meta, err := f.readMeta(entry.Name())
@@ -221,7 +224,7 @@ func (f *FileSnapshotStore) getSnapshots() ([]*fileSnapshotMeta, error) {
 
 // readMeta читает и декодирует meta.dat снимка id.
 func (f *FileSnapshotStore) readMeta(id string) (*fileSnapshotMeta, error) {
-	fh, err := os.Open(filepath.Join(f.path, id, metaFileName))
+	fh, err := os.Open(filepath.Join(f.path, id, _metaFileName))
 	if err != nil {
 		return nil, err
 	}
@@ -278,12 +281,14 @@ type FileSnapshotSink struct {
 	closed bool
 }
 
+var _ SnapshotSink = (*FileSnapshotSink)(nil)
+
 // Write пишет данные FSM в state.bin.
 func (s *FileSnapshotSink) Write(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return 0, fmt.Errorf("raft: snapshot sink is closed")
+		return 0, errors.New("raft: snapshot sink is closed")
 	}
 	return s.buffered.Write(p)
 }
@@ -311,7 +316,7 @@ func (s *FileSnapshotSink) Close() error {
 		return fmt.Errorf("raft: failed to close snapshot state: %v", err)
 	}
 
-	fi, err := os.Stat(filepath.Join(s.dir, stateFileName))
+	fi, err := os.Stat(filepath.Join(s.dir, _stateFileName))
 	if err != nil {
 		return fmt.Errorf("raft: failed to stat snapshot state: %v", err)
 	}
@@ -364,7 +369,7 @@ func (s *FileSnapshotSink) ID() string {
 
 // writeMeta записывает meta.dat с CRC32 и синхронизирует файл с диском.
 func (s *FileSnapshotSink) writeMeta() error {
-	fh, err := os.Create(filepath.Join(s.dir, metaFileName))
+	fh, err := os.Create(filepath.Join(s.dir, _metaFileName))
 	if err != nil {
 		return err
 	}

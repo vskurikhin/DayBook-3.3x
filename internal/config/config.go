@@ -9,6 +9,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/vskurikhin/raft"
 )
 
 const (
@@ -16,22 +19,41 @@ const (
 	PrefixRPC  = "rpc://"
 )
 
+// DefaultMaxPool — значение по умолчанию для количества соединений в пуле
+// на один адрес соседа у узла raftkv. Значение по умолчанию транспорта
+// в пакете raft другое и равно 2.
+const DefaultMaxPool = 4
+
 type Values struct {
 	HTTPAddress net.Addr
 	RPCAddress  net.Addr
 	Number      int
 	Peers       map[int]net.Addr
 
-	// TraceLogLevel — порог отладочных сообщений трассировки; передаётся
-	// в raft.TraceConfig.Level и kvservice.TraceConfig.Level.
-	TraceLogLevel int
+	// DataDir — директория для persistent-хранилища узла;
+	// пустая строка — вычисляется путь по умолчанию в cmd/main.go.
+	DataDir string
+	// MaxPool — максимальное количество соединений в пуле на один адрес
+	// соседа; ноль заменяется на DefaultMaxPool при сборке конфигурации узла.
+	MaxPool int
+	// SnapshotInterval — интервал проверки необходимости снимка.
+	// Ноль — защитное значение: применяется дефолт конструктора.
+	SnapshotInterval time.Duration
+	// SnapshotThreshold — минимальное количество записей после последнего
+	// снимка, при котором создаётся новый снимок.
+	// Ноль — защитное значение: применяется дефолт конструктора.
+	SnapshotThreshold int
+	// TCPRPCTimeout — тайм-аут TCP RPC к соседям. Ноль — защитное значение:
+	// применяется дефолт транспорта (raft.TCPRPCTimeout, 191 мс). Связь
+	// значения с проверкой кворума лидера — в подсказке флага.
+	TCPRPCTimeout time.Duration
 	// TraceCMLogFile — путь к файлу трассировки ConsensusModule; пустая строка — stderr.
 	TraceCMLogFile string
 	// TraceKVLogFile — путь к файлу трассировки Key-Value; пустая строка — stderr.
 	TraceKVLogFile string
-	// DataDir — директория для persistent-хранилища узла;
-	// пустая строка — вычисляется путь по умолчанию в cmd/main.go.
-	DataDir string
+	// TraceLogLevel — порог отладочных сообщений трассировки; передаётся
+	// в raft.TraceConfig.Level и kvservice.TraceConfig.Level.
+	TraceLogLevel int
 
 	// PprofAddress — адрес отдельного HTTP-сервера профилирования;
 	// пустая строка выключает профилирование.
@@ -46,17 +68,31 @@ type Values struct {
 
 func ParseFlags() Values {
 	fs := flag.NewFlagSet("raft", flag.ContinueOnError)
+	blockProfileRateFlag := fs.Int("block-profile-rate", 0, "Block profile rate (0 = disabled)")
+	dataDirFlag := fs.String("data-dir", "", "Directory for persistent storage")
 	httpAddressFlag := fs.String("http-addr", ":8880", "HTTP server listen address")
-	rpcAddressFlag := fs.String("rpc-addr", ":9990", "RPC server listen address")
+	maxPoolFlag := fs.Int("max-pool", DefaultMaxPool, "Max connections pooled per peer address (0 = transport default)")
+	mutexProfileFractionFlag := fs.Int("mutex-profile-fraction", 0, "Mutex profile fraction (0 = disabled)")
 	numberFlag := fs.Int("number", -1, "")
 	peersFlag := fs.String("peers", "", "Comma-separated list of peers servers (id=host:port)")
-	traceLogLevelFlag := fs.Int("trace-log-level", 1, "Trace log level for the raft and kvservice packages")
+	pprofAddressFlag := fs.String("pprof-addr", "", "Profiling HTTP server listen address (empty = disabled)")
+	rpcAddressFlag := fs.String("rpc-addr", ":9990", "RPC server listen address")
+	snapshotIntervalFlag := fs.Duration(
+		"snapshot-interval", raft.DefaultSnapshotInterval,
+		"Interval between snapshot checks (default 3s)",
+	)
+	snapshotThresholdFlag := fs.Int(
+		"snapshot-threshold", raft.DefaultSnapshotThreshold,
+		"Log entries since last snapshot to trigger a new one (default 1024)",
+	)
+	tcpRPCTimeoutFlag := fs.Duration(
+		"tcp-rpc-timeout", raft.TCPRPCTimeout,
+		"Timeout for TCP RPC calls to peers; the leader check-quorum timeout "+
+			"stays fixed at 382ms and does NOT scale with this flag (default 191ms)",
+	)
 	traceCMLogFileFlag := fs.String("trace-cm-log-file", "", "Trace consensus module log file path (empty = stderr)")
 	traceKVLogFileFlag := fs.String("trace-kv-log-file", "", "Trace key-value database log file path (empty = stderr)")
-	dataDirFlag := fs.String("data-dir", "", "Directory for persistent storage")
-	pprofAddressFlag := fs.String("pprof-addr", "", "Profiling HTTP server listen address (empty = disabled)")
-	blockProfileRateFlag := fs.Int("block-profile-rate", 0, "Block profile rate (0 = disabled)")
-	mutexProfileFractionFlag := fs.Int("mutex-profile-fraction", 0, "Mutex profile fraction (0 = disabled)")
+	traceLogLevelFlag := fs.Int("trace-log-level", 1, "Trace log level for the raft and kvservice packages")
 
 	args := make([]string, 0, len(os.Args)-1)
 	for _, arg := range os.Args[1:] {
@@ -78,15 +114,35 @@ func ParseFlags() Values {
 		peers = parsePeers(peers, *peersFlag)
 	}
 
+	// Ранняя отказка для недопустимых значений флагов узла: сообщение
+	// содержит имя флага, фактическое значение и требование. Верхняя
+	// граница тайм-аута не вводится.
+	if *tcpRPCTimeoutFlag <= 0 {
+		log.Fatalf("-tcp-rpc-timeout must be greater than 0, got %v", *tcpRPCTimeoutFlag)
+	}
+	if *maxPoolFlag < 0 {
+		log.Fatalf("-max-pool must not be negative, got %d", *maxPoolFlag)
+	}
+	if *snapshotIntervalFlag <= 0 {
+		log.Fatalf("-snapshot-interval must be greater than 0, got %v", *snapshotIntervalFlag)
+	}
+	if *snapshotThresholdFlag < 1 {
+		log.Fatalf("-snapshot-threshold must be at least 1, got %d", *snapshotThresholdFlag)
+	}
+
 	return Values{
-		HTTPAddress:    httpAddress,
-		RPCAddress:     rpcAddress,
-		Number:         *numberFlag,
-		Peers:          peers,
-		TraceLogLevel:  *traceLogLevelFlag,
-		TraceCMLogFile: *traceCMLogFileFlag,
-		TraceKVLogFile: *traceKVLogFileFlag,
-		DataDir:        *dataDirFlag,
+		HTTPAddress:       httpAddress,
+		RPCAddress:        rpcAddress,
+		Number:            *numberFlag,
+		Peers:             peers,
+		TraceLogLevel:     *traceLogLevelFlag,
+		TraceCMLogFile:    *traceCMLogFileFlag,
+		TraceKVLogFile:    *traceKVLogFileFlag,
+		DataDir:           *dataDirFlag,
+		MaxPool:           *maxPoolFlag,
+		TCPRPCTimeout:     *tcpRPCTimeoutFlag,
+		SnapshotInterval:  *snapshotIntervalFlag,
+		SnapshotThreshold: *snapshotThresholdFlag,
 
 		PprofAddress:         *pprofAddressFlag,
 		BlockProfileRate:     *blockProfileRateFlag,

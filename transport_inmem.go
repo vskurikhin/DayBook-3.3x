@@ -25,6 +25,14 @@ type InmemTransport struct {
 	timeout    time.Duration
 }
 
+var _ Transport = (*InmemTransport)(nil)
+
+// _inmemTransportTimeout — тайм-аут одного RPC внутрипроцессного
+// транспорта (500 мс). Корневой тестовый харнесс выводит свои
+// бюджеты ожидания из этой величины (_inmemRPCTimeout), поэтому
+// изменение значения меняет и бюджеты тестов.
+const _inmemTransportTimeout = 500 * time.Millisecond
+
 // NewInmemTransport создаёт новый InmemTransport с заданным локальным адресом.
 // Тайм-аут по умолчанию — 500ms.
 func NewInmemTransport(addr ServerAddress) *InmemTransport {
@@ -33,7 +41,7 @@ func NewInmemTransport(addr ServerAddress) *InmemTransport {
 		localAddr:  addr,
 		peers:      make(map[ServerID]*InmemTransport),
 		shutdownCh: make(chan struct{}),
-		timeout:    500 * time.Millisecond,
+		timeout:    _inmemTransportTimeout,
 	}
 }
 
@@ -286,6 +294,13 @@ func (t *InmemTransport) SetHeartbeatHandler(h func(RPC)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.heartbeat = h
+}
+
+// DisconnectAll отключает все соединения указанного транспорта.
+func (t *InmemTransport) DisconnectAll() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.peers = make(map[ServerID]*InmemTransport)
 }
 
 // Connect добавляет peer в карту peers. Используется Harness для

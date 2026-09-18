@@ -1,18 +1,18 @@
 package raft
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"os"
 	"sync/atomic"
 )
 
-// traceCM — порог детализации отладочных сообщений консенсус-модуля
+// _traceCM — порог детализации отладочных сообщений консенсус-модуля
 // (traceLogf, traceLogLocked). Сообщение с уровнем level выводится,
-// если traceCM > level. Значение задаётся полем TraceConfig.Level
+// если _traceCM > level. Значение задаётся полем TraceConfig.Level
 // единственного успешного вызова SetTrace, по умолчанию 0.
 // Изменяется только до старта горутин.
-var traceCM = 0
+var _traceCM = 0
 
 // _traceLogger — логгер отладочных сообщений консенсус-модуля (traceLogf,
 // traceLogfLocked). По умолчанию выводит в стандартный логгер (stderr).
@@ -20,18 +20,54 @@ var traceCM = 0
 var _traceLogger = log.Default()
 
 // traceEnabled сообщает, будет ли сообщение уровня level напечатано
-// трассировкой. Единственный источник истины для порога traceCM.
-func traceEnabled(level int) bool { return level < traceCM }
+// трассировкой. Единственный источник истины для порога _traceCM.
+func traceEnabled(level int) bool { return level < _traceCM }
 
-// traceConfigured — сторожевой флаг строгого set-once: единственная
+// Уровни сообщений трассировки консенсус-модуля (порог _traceCM:
+// сообщение уровня l печатается, если l < _traceCM). Уровни — ступени
+// подробности: увеличение порога добавляет новый слой сообщений,
+// не отключая предыдущие. Значения и состав ступеней — операционный
+// контракт вывода, они не меняются.
+const (
+	// _traceLevelKeyEvents — ключевые события: смена роли и терма,
+	// отправка и приём RequestVote, TimeoutNow, отказы отправки
+	// и создания снимка. Печатаются при пороге от 1.
+	_traceLevelKeyEvents = 0
+
+	// _traceLevelLoops — течение циклов выборов и лидера: таймер
+	// выборов, входы и выходы из циклов, шаг вниз лидера.
+	// Печатаются при пороге от 2.
+	_traceLevelLoops = 1
+
+	// _traceLevelProgress — результативные события: победа
+	// в выборах, продвижение индекса фиксации, длительность
+	// персиста. Печатаются при пороге от 3.
+	_traceLevelProgress = 2
+
+	// _traceLevelPreVote — предварительное голосование: отправка,
+	// отказы и тайм-ауты pre-vote, причины отказов в голосах;
+	// детали отправки снимка ведомому. Печатаются при пороге от 5.
+	_traceLevelPreVote = 4
+
+	// _traceLevelReplication — репликация: обработка RPC (handleRPC,
+	// AppendEntries и ответы), отправка AppendEntries, пульс.
+	// Печатаются при пороге от 9.
+	_traceLevelReplication = 8
+
+	// _traceLevelLogDump — полный дамп журнала после изменения.
+	// Печатается при пороге от 17.
+	_traceLevelLogDump = 16
+)
+
+// _traceConfigured — сторожевой флаг строгого set-once: единственная
 // успешная конфигурация трассировки на процесс уже выполнена.
 // Устанавливается только успешным вызовом SetTrace
 // (вызов, завершившийся ошибкой I/O, окно не расходует).
-var traceConfigured atomic.Bool
+var _traceConfigured atomic.Bool
 
-// traceCMCreated — сторожевой флаг: в процессе уже создавался
+// _traceCMCreated — сторожевой флаг: в процессе уже создавался
 // ConsensusModule. Устанавливается конструктором.
-var traceCMCreated atomic.Bool
+var _traceCMCreated atomic.Bool
 
 // TraceConfig — параметры трассировки консенсус-модуля, передаваемые
 // SetTrace. Тип является простым носителем значений: у него нет методов
@@ -67,17 +103,17 @@ type TraceConfig struct {
 //
 // SetTrace — единственная точка конфигурации трассировки пакета.
 func SetTrace(cfg TraceConfig) error {
-	if traceConfigured.Load() || traceCMCreated.Load() {
-		return fmt.Errorf(
+	if _traceConfigured.Load() || _traceCMCreated.Load() {
+		return errors.New(
 			"raft: trace configuration must be set exactly once, " +
 				"before the first ConsensusModule is created; repeated " +
 				"calls are forbidden",
 		)
 	}
 	if cfg.LogFile == "" {
-		traceCM = cfg.Level
+		_traceCM = cfg.Level
 		_traceLogger = log.Default()
-		traceConfigured.Store(true)
+		_traceConfigured.Store(true)
 		return nil
 	}
 	// Порог присваивается только после успешного открытия файла:
@@ -87,8 +123,8 @@ func SetTrace(cfg TraceConfig) error {
 	if err != nil {
 		return err
 	}
-	traceCM = cfg.Level
+	_traceCM = cfg.Level
 	_traceLogger = log.New(f, "", log.LstdFlags|log.Lmicroseconds)
-	traceConfigured.Store(true)
+	_traceConfigured.Store(true)
 	return nil
 }

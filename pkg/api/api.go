@@ -14,8 +14,8 @@ package api
 // идентификацию запроса.
 
 type PutRequest struct {
-	Key   string
-	Value string
+	Key   string `json:"Key"`
+	Value string `json:"Value"`
 }
 
 type Response interface {
@@ -23,40 +23,46 @@ type Response interface {
 }
 
 type PutResponse struct {
-	RespStatus ResponseStatus
-	KeyFound   bool
-	PrevValue  string
+	RespStatus ResponseStatus `json:"RespStatus"`
+	KeyFound   bool           `json:"KeyFound"`
+	PrevValue  string         `json:"PrevValue"`
 }
+
+var _ Response = (*PutResponse)(nil)
 
 func (pr *PutResponse) Status() ResponseStatus {
 	return pr.RespStatus
 }
 
 type GetRequest struct {
-	Key string
+	Key string `json:"Key"`
 }
 
 type GetResponse struct {
-	RespStatus ResponseStatus
-	KeyFound   bool
-	Value      string
+	RespStatus ResponseStatus `json:"RespStatus"`
+	KeyFound   bool           `json:"KeyFound"`
+	Value      string         `json:"Value"`
 }
+
+var _ Response = (*GetResponse)(nil)
 
 func (gr *GetResponse) Status() ResponseStatus {
 	return gr.RespStatus
 }
 
 type CASRequest struct {
-	Key          string
-	CompareValue string
-	Value        string
+	Key          string `json:"Key"`
+	CompareValue string `json:"CompareValue"`
+	Value        string `json:"Value"`
 }
 
 type CASResponse struct {
-	RespStatus ResponseStatus
-	KeyFound   bool
-	PrevValue  string
+	RespStatus ResponseStatus `json:"RespStatus"`
+	KeyFound   bool           `json:"KeyFound"`
+	PrevValue  string         `json:"PrevValue"`
 }
+
+var _ Response = (*CASResponse)(nil)
 
 func (cr *CASResponse) Status() ResponseStatus {
 	return cr.RespStatus
@@ -74,20 +80,26 @@ const (
 // StatusResponse — минимальный ответ, содержащий только статус.
 // Используется для VerifyLeader и других операций без данных.
 type StatusResponse struct {
-	RespStatus ResponseStatus
+	RespStatus ResponseStatus `json:"RespStatus"`
 }
+
+var _ Response = (*StatusResponse)(nil)
 
 func (s *StatusResponse) Status() ResponseStatus {
 	return s.RespStatus
 }
 
-var responseName = map[ResponseStatus]string{
-	StatusInvalid:      "invalid",
-	StatusOK:           "OK",
-	StatusNotLeader:    "NotLeader",
-	StatusFailedCommit: "FailedCommit",
-}
-
 func (rs ResponseStatus) String() string {
-	return responseName[rs]
+	switch rs {
+	case StatusInvalid:
+		return "invalid"
+	case StatusOK:
+		return "OK"
+	case StatusNotLeader:
+		return "NotLeader"
+	case StatusFailedCommit:
+		return "FailedCommit"
+	default:
+		return ""
+	}
 }

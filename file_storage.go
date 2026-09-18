@@ -25,6 +25,21 @@ type FileStorage struct {
 	writes  int
 }
 
+var _ Storage = (*FileStorage)(nil)
+
+const (
+	// _dataFileSuffix — суффикс файла данных: каждый ключ Storage
+	// хранится в файле <ключ>.dat; часть формата имён файлов на диске.
+	_dataFileSuffix = ".dat"
+
+	// _tmpFileSuffix — суффикс временного файла атомарной записи
+	// (запись, fsync, переименование). Значение совпадает с суффиксом
+	// временных директорий хранилища снимков (_tmpSuffix), но это разные
+	// форматы: константы не связываются, правка одного формата не
+	// должна менять другой.
+	_tmpFileSuffix = ".tmp"
+)
+
 // NewFileStorage создаёт FileStorage в указанной директории, создавая её
 // при необходимости и загружая существующие .dat-файлы в in-memory кэш.
 func NewFileStorage(dir string) *FileStorage {
@@ -57,8 +72,8 @@ func (fs *FileStorage) Set(key string, value []byte) {
 		return
 	}
 
-	path := filepath.Join(fs.dir, key+".dat")
-	tmpPath := path + ".tmp"
+	path := filepath.Join(fs.dir, key+_dataFileSuffix)
+	tmpPath := path + _tmpFileSuffix
 
 	f, err := os.Create(tmpPath)
 	if err != nil {
@@ -131,10 +146,10 @@ func (fs *FileStorage) loadAll() {
 	}
 	for _, entry := range entries {
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".dat") {
+		if !strings.HasSuffix(name, _dataFileSuffix) {
 			continue
 		}
-		key := strings.TrimSuffix(name, ".dat")
+		key := strings.TrimSuffix(name, _dataFileSuffix)
 		f, err := os.Open(filepath.Join(fs.dir, name))
 		if err != nil {
 			continue

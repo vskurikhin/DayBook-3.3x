@@ -116,7 +116,7 @@ func TestClientConcurrentUse(t *testing.T) {
 }
 
 // TestNewUsesDefaultTimeout проверяет, что New даёт таймаут запроса
-// defaultRequestTimeout: запрос к «висящему» адресу прерывается примерно
+// _defaultRequestTimeout: запрос к «висящему» адресу прерывается примерно
 // через это время, и клиент переключается на следующий адрес.
 func TestNewUsesDefaultTimeout(t *testing.T) {
 	done := make(chan struct{})
@@ -136,11 +136,11 @@ func TestNewUsesDefaultTimeout(t *testing.T) {
 	}
 	elapsed := time.Since(start)
 
-	if elapsed < defaultRequestTimeout/2 {
-		t.Errorf("elapsed = %v, want at least %v", elapsed, defaultRequestTimeout/2)
+	if elapsed < _defaultRequestTimeout/2 {
+		t.Errorf("elapsed = %v, want at least %v", elapsed, _defaultRequestTimeout/2)
 	}
-	if elapsed > 2*defaultRequestTimeout {
-		t.Errorf("elapsed = %v, want at most %v", elapsed, 2*defaultRequestTimeout)
+	if elapsed > 2*_defaultRequestTimeout {
+		t.Errorf("elapsed = %v, want at most %v", elapsed, 2*_defaultRequestTimeout)
 	}
 	if got := client.leader(); got != 1 {
 		t.Errorf("leader = %d, want 1", got)

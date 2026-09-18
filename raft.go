@@ -19,23 +19,31 @@ const (
 	ReelectionTimeoutMs = 127 * Quantum
 	TickerTimeoutMs     = 7 * Quantum
 
-	// verifyRedispatchMinIntervalMs — минимальный интервал между немедленными
-	// перерассылками AppendEntries одному соседу при плотном потоке verify.
-	// Значение строго меньше HeartbeatTimeoutMs (33 мс), поэтому перерассылка
-	// остаётся быстрее пульса: первая перерассылка немедленна, а запрос,
-	// заставший окно занятым, дожидается либо следующей перерассылки, либо
-	// пульса — не дольше пульса. По построению частота перерассылок на
-	// каждого соседа ограничена 1000/24 ≈ 41,7 перерассылок/с независимо от
-	// темпа клиентских запросов.
-	verifyRedispatchMinIntervalMs = 8 * Quantum
+	// LeaktestBudget — единый бюджет leaktest:
+	// max(_inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
+	LeaktestBudget = 600 * time.Millisecond
 
-	// TCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
+	// _defaultTCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
 	// в production-транспорте. Исходное значение 85ms получено из 382/2 при
 	// Quantum=3. Вынесено в независимую константу, чтобы изменение Quantum
 	// для ускорения тестов не влияло на production-развёртывание.
-	TCPRPCTimeout = 191 * time.Millisecond
+	_defaultTCPRPCTimeout = 191 * time.Millisecond
 
-	// defaultCheckQuorumTimeout — предельный срок без ответов от кворума
+	// TCPRPCTimeout — алиас _defaultTCPRPCTimeout, сохранённый для обратной
+	// совместимости публичного API.
+	TCPRPCTimeout = _defaultTCPRPCTimeout
+
+	// _applyBatchInterval — интервал, с которым runApplyLoop проверяет
+	// необходимость применения записей к FSM. Накопление commitCh
+	// уведомлений за этот интервал позволяет объединять несколько
+	// мелких фиксаций в один батч.
+	_applyBatchInterval = 50 * time.Millisecond
+
+	// _batchApplyBuffer — ёмкость fsmMutateCh для burst-устойчивости.
+	// Выбрана как 1024: при массовой фиксации processLogs не блокируется.
+	_batchApplyBuffer = 1024
+
+	// _defaultCheckQuorumTimeout — предельный срок без ответов от кворума
 	// голосующих, после которого лидер шагает вниз, в ведомые. Значение
 	// 2 × TCPRPCTimeout: отметка контакта по соседу обновляется не чаще,
 	// чем завершается один RPC (AppendEntries к одному соседу
@@ -44,9 +52,52 @@ const (
 	// двукратный запас покрывает один полный тайм-аут RPC. Итоговая
 	// величина близка к ReelectionTimeoutMs: лидер обнаруживает потерю
 	// кворума не позже, чем ведомый начинает выборы.
-	defaultCheckQuorumTimeout = 2 * TCPRPCTimeout
+	_defaultCheckQuorumTimeout = 2 * _defaultTCPRPCTimeout
 
-	// maxUncommittedEntries — предел незафиксированного хвоста журнала,
+	// DefaultSnapshotInterval — интервал проверки необходимости снимка.
+	// Каждые 3 секунды runSnapshots проверяет, не превышен ли порог
+	// DefaultSnapshotThreshold.
+	DefaultSnapshotInterval = 3 * time.Second
+
+	// DefaultSnapshotThreshold — минимальное количество записей после
+	// последнего снимка, при котором создаётся новый снимок.
+	// Значение 1024 выбрано как компромисс: частые снимки создают
+	// нагрузку на FSM.Snapshot(), редкие — увеличивают время восстановления
+	// и объём журнала, который нужно передавать отстающим узлам.
+	DefaultSnapshotThreshold = 1024
+
+	// _defaultTakeSnapshotTimeout — тайм-аут отправки запроса на снимок
+	// в fsmSnapshotCh. Если runFSM не принимает запрос за это время,
+	// takeSnapshot возвращает ошибку вместо вечной блокировки.
+	// Значение 30 секунд выбрано как разумный максимум для создания
+	// снимка в production (запись состояния + persist на диск).
+	_defaultTakeSnapshotTimeout = 30 * time.Second
+
+	// _defaultTrailingLogs — количество записей журнала, сохраняемых
+	// после самого свежего снимка. Нужно для поддержки репликации
+	// без отправки полного снимка каждому новому follower.
+	// Значение 128 — разумный минимум для большинства сценариев.
+	_defaultTrailingLogs = 128
+
+	// _leaderBatchSize — количество записей, которые лидер собирает из applyCh
+	// перед одним вызовом dispatchLogs. Компромисс между latency (одиночные
+	// записи) и throughput (групповой commit, Raft §5.1).
+	_leaderBatchSize = 256
+
+	// _maxApplyBatchSize — максимальное количество записей в одном батче,
+	// отправляемом в fsmMutateCh. Если commitIndex - lastApplied превышает
+	// этот порог, processLogs делит диапазон на под-батчи.
+	_maxApplyBatchSize = 512
+
+	// _maxSnapshotDataSize — максимальный допустимый размер данных снимка
+	// в байтах. Значение 1 ГБ выбрано как разумный предел для production
+	// (больше типичного размера состояния, но достаточно для обнаружения
+	// некорректного DataSize в запросе InstallSnapshot).
+	// Установлено в 1 << 30 для согласованности.
+	// Защита от паники io.Copy при повреждённом DataSize.
+	_maxSnapshotDataSize = 1 << 30
+
+	// _maxUncommittedEntries — предел незафиксированного хвоста журнала,
 	// при котором лидер перестаёт принимать новые команды клиентов.
 	// Это не протокольная гарантия, а ограничение ущерба: лидер, потерявший
 	// кворум, не должен наращивать журнал неограниченно. Предел действует
@@ -54,60 +105,24 @@ const (
 	// лидерство и записи конфигурации) им не проверяются, иначе кластер
 	// с накопленным хвостом не смог бы ни избрать лидера, ни изменить
 	// состав.
-	maxUncommittedEntries = 4096
+	_maxUncommittedEntries = 4096
 
-	// leaderBatchSize — количество записей, которые лидер собирает из applyCh
-	// перед одним вызовом dispatchLogs. Компромисс между latency (одиночные
-	// записи) и throughput (групповой commit, Raft §5.1).
-	leaderBatchSize = 256
+	// _verifyRedispatchMinIntervalMs — минимальный интервал между немедленными
+	// перерассылками AppendEntries одному соседу при плотном потоке verify.
+	// Значение строго меньше HeartbeatTimeoutMs (33 мс), поэтому перерассылка
+	// остаётся быстрее пульса: первая перерассылка немедленна, а запрос,
+	// заставший окно занятым, дожидается либо следующей перерассылки, либо
+	// пульса — не дольше пульса. По построению частота перерассылок на
+	// каждого соседа ограничена 1000/24 ≈ 41,7 перерассылок/с независимо от
+	// темпа клиентских запросов.
+	_verifyRedispatchMinIntervalMs = 8 * Quantum
 
-	// maxApplyBatchSize — максимальное количество записей в одном батче,
-	// отправляемом в fsmMutateCh. Если commitIndex - lastApplied превышает
-	// этот порог, processLogs делит диапазон на под-батчи.
-	maxApplyBatchSize = 512
-
-	// applyBatchInterval — интервал, с которым runApplyLoop проверяет
-	// необходимость применения записей к FSM. Накопление commitCh
-	// уведомлений за этот интервал позволяет объединять несколько
-	// мелких фиксаций в один батч.
-	applyBatchInterval = 50 * time.Millisecond
-
-	// batchApplyBuffer — ёмкость fsmMutateCh для burst-устойчивости.
-	// Выбрана как 1024: при массовой фиксации processLogs не блокируется.
-	batchApplyBuffer = 1024
-
-	// defaultSnapshotThreshold — минимальное количество записей после
-	// последнего снимка, при котором создаётся новый снимок.
-	// Значение 1024 выбрано как компромисс: частые снимки создают
-	// нагрузку на FSM.Snapshot(), редкие — увеличивают время восстановления
-	// и объём журнала, который нужно передавать отстающим узлам.
-	defaultSnapshotThreshold = 1024
-
-	// defaultSnapshotInterval — интервал проверки необходимости снимка.
-	// Каждые 3 секунды runSnapshots проверяет, не превышен ли порог
-	// defaultSnapshotThreshold.
-	defaultSnapshotInterval = 3 * time.Second
-
-	// defaultTakeSnapshotTimeout — тайм-аут отправки запроса на снимок
-	// в fsmSnapshotCh. Если runFSM не принимает запрос за это время,
-	// takeSnapshot возвращает ошибку вместо вечной блокировки.
-	// Значение 30 секунд выбрано как разумный максимум для создания
-	// снимка в production (запись состояния + persist на диск).
-	defaultTakeSnapshotTimeout = 30 * time.Second
-
-	// defaultTrailingLogs — количество записей журнала, сохраняемых
-	// после самого свежего снимка. Нужно для поддержки репликации
-	// без отправки полного снимка каждому новому follower.
-	// Значение 128 — разумный минимум для большинства сценариев.
-	defaultTrailingLogs = 128
-
-	// maxSnapshotDataSize — максимальный допустимый размер данных снимка
-	// в байтах. Значение 1 ГБ выбрано как разумный предел для production
-	// (больше типичного размера состояния, но достаточно для обнаружения
-	// некорректного DataSize в запросе InstallSnapshot).
-	// Установлено в 1 << 30 для согласованности.
-	// Защита от паники io.Copy при повреждённом DataSize.
-	maxSnapshotDataSize = 1 << 30
+	// _verifyChBuffer — ёмкость verifyCh, канала запросов проверки
+	// лидера от клиентов. Читает единственный цикл лидера (по одному
+	// запросу за такт), буфер сглаживает пачки запросов между
+	// тактами; при заполнении VerifyLeader ожидает места или
+	// остановки узла, не блокируя горутины модуля.
+	_verifyChBuffer = 64
 )
 
 // CommitEntry — это данные, которые Raft отправляет в канал фиксации.
@@ -181,6 +196,8 @@ type configurationChangeFuture struct {
 	index int
 }
 
+var _ IndexFuture = (*configurationChangeFuture)(nil)
+
 func (f *configurationChangeFuture) Index() int {
 	return f.index
 }
@@ -205,7 +222,7 @@ func NewConsensusModule(
 		log.Fatalln("raft: NewConsensusModule: transport is nil")
 	}
 	// Отмечаем факт создания CM для трассировки (set-once).
-	traceCMCreated.Store(true)
+	_traceCMCreated.Store(true)
 	cm := new(ConsensusModule)
 	cm.id = id
 	cm.peerIds = peerIds
@@ -213,14 +230,14 @@ func NewConsensusModule(
 	cm.storage = storage
 	cm.fsm = fsm
 	// Канал для передачи зафиксированных записей в runFSM.
-	// Ёмкость batchApplyBuffer обеспечивает устойчивость к всплескам:
+	// Ёмкость _batchApplyBuffer обеспечивает устойчивость к всплескам:
 	// при массовой фиксации processLogs отправляет записи батчем без блокировки.
-	cm.fsmMutateCh = make(chan []*commitTuple, batchApplyBuffer)
+	cm.fsmMutateCh = make(chan []*commitTuple, _batchApplyBuffer)
 	cm.shutdownCh = make(chan struct{})
 	cm.applyCh = make(chan *logFuture)
 	// Канал для ReadIndex‑подтверждения лидерства.
 	// Ёмкость 64 рассчитана на всплески нагрузки: при 10k RPS VerifyLeader не блокируется.
-	cm.verifyCh = make(chan *verifyFuture, 64)
+	cm.verifyCh = make(chan *verifyFuture, _verifyChBuffer)
 	cm.leaderState.inflight = make(map[int]*logFuture)
 	cm.commitCh = make(chan int, 1)
 	cm.stepDown = make(chan struct{}, 1)
@@ -236,8 +253,8 @@ func NewConsensusModule(
 	cm.leaderState.nextIndex = make(map[int]int)
 	cm.leaderState.matchIndex = make(map[int]int)
 	cm.leaderState.lastContact = make(map[int]time.Time)
-	cm.checkQuorumTimeout = defaultCheckQuorumTimeout
-	cm.verifyRedispatchMinInterval = verifyRedispatchMinIntervalMs * time.Millisecond
+	cm.checkQuorumTimeout = _defaultCheckQuorumTimeout
+	cm.verifyRedispatchMinInterval = _verifyRedispatchMinIntervalMs * time.Millisecond
 	cm.leaderState.inflightAE = make(map[int]*atomic.Bool)
 	cm.cmState.termIndexMap = make(map[int]int)
 	cm.cmState.electionTimerDone = make(chan struct{})
@@ -252,9 +269,9 @@ func NewConsensusModule(
 	cm.cmState.lastSnapshotTerm = -1
 	if len(snapshots) > 0 && snapshots[0] != nil {
 		cm.snapshotStore = snapshots[0]
-		cm.snapshotThreshold = defaultSnapshotThreshold
-		cm.snapshotInterval = defaultSnapshotInterval
-		cm.trailingLogs = defaultTrailingLogs
+		cm.snapshotThreshold = DefaultSnapshotThreshold
+		cm.snapshotInterval = DefaultSnapshotInterval
+		cm.trailingLogs = _defaultTrailingLogs
 		cm.snapshotCh = make(chan struct{}, 1)
 		cm.fsmSnapshotCh = make(chan *reqSnapshotFuture)
 	}

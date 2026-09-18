@@ -4,6 +4,9 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/vskurikhin/raft"
 )
 
 func TestParsePeerAddress(t *testing.T) {
@@ -162,6 +165,36 @@ func TestParseFlagsTraceLogDefaults(t *testing.T) {
 	}
 }
 
+// TestParseFlagsNodeDefaults — сводная сверка контракта дефолтов четырёх
+// параметров узла. Таблица «флаг → ожидаемое значение» против единого
+// источника — raft.TCPRPCTimeout / DefaultMaxPool /
+// raft.DefaultSnapshotInterval / raft.DefaultSnapshotThreshold. Защита
+// от рассинхрона дефолтов между internal/config и пакетом raft (RISK-023).
+func TestParseFlagsNodeDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+
+	cases := []struct {
+		name string
+		got  any
+		want any
+	}{
+		{"tcp-rpc-timeout", v.TCPRPCTimeout, raft.TCPRPCTimeout},
+		{"max-pool", v.MaxPool, DefaultMaxPool},
+		{"snapshot-interval", v.SnapshotInterval, raft.DefaultSnapshotInterval},
+		{"snapshot-threshold", v.SnapshotThreshold, raft.DefaultSnapshotThreshold},
+	}
+	for _, tc := range cases {
+		if tc.got != tc.want {
+			t.Errorf("%s = %v, want default %v", tc.name, tc.got, tc.want)
+		}
+	}
+}
+
 func TestParseFlagsTraceLog(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
@@ -214,9 +247,9 @@ func TestParseFlagsDataDirDefault(t *testing.T) {
 
 func TestValuesImplements(t *testing.T) {
 	v := Values{
-		RPCAddress: mustParseAddr("127.0.0.1:9990"),
+		RPCAddress: mustParseAddr(t, "127.0.0.1:9990"),
 		Number:     0,
-		Peers:      map[int]net.Addr{1: mustParseAddr("127.0.0.1:9991")},
+		Peers:      map[int]net.Addr{1: mustParseAddr(t, "127.0.0.1:9991")},
 	}
 	if v.Number != 0 {
 		t.Errorf("RequestRate = %d, want 0", v.Number)
@@ -229,10 +262,11 @@ func TestValuesImplements(t *testing.T) {
 	}
 }
 
-func mustParseAddr(s string) net.Addr {
+func mustParseAddr(t *testing.T, s string) net.Addr {
+	t.Helper()
 	addr, err := net.ResolveTCPAddr("tcp", s)
 	if err != nil {
-		panic(err)
+		t.Fatalf("parse addr %q: %v", s, err)
 	}
 	return addr
 }
@@ -275,5 +309,118 @@ func TestParseFlagsProfiling(t *testing.T) {
 	}
 	if v.MutexProfileFraction != 5 {
 		t.Errorf("MutexProfileFraction = %d, want 5", v.MutexProfileFraction)
+	}
+}
+
+func TestParseFlagsMaxPoolDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.MaxPool != DefaultMaxPool {
+		t.Errorf("MaxPool = %d, want default %d", v.MaxPool, DefaultMaxPool)
+	}
+	if DefaultMaxPool != 4 {
+		t.Errorf("DefaultMaxPool = %d, want 4", DefaultMaxPool)
+	}
+}
+
+func TestParseFlagsMaxPool(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{
+		"raft", "-number", "1",
+		"--max-pool", "8",
+	}
+
+	v := ParseFlags()
+	if v.MaxPool != 8 {
+		t.Errorf("MaxPool = %d, want 8", v.MaxPool)
+	}
+}
+
+// TestParseFlagsTCPRPCTimeoutDefaults проверяет дефолт флага -tcp-rpc-timeout:
+// без флага поле Values.TCPRPCTimeout равно raft.TCPRPCTimeout (191 мс).
+// Одновременно это защита от рассинхрона дефолта между internal/config
+// и пакетом raft (RISK-023): единый источник — алиас raft.TCPRPCTimeout.
+func TestParseFlagsTCPRPCTimeoutDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.TCPRPCTimeout != raft.TCPRPCTimeout {
+		t.Errorf("TCPRPCTimeout = %v, want default %v", v.TCPRPCTimeout, raft.TCPRPCTimeout)
+	}
+	if raft.TCPRPCTimeout != 191*time.Millisecond {
+		t.Errorf("raft.TCPRPCTimeout = %v, want 191ms", raft.TCPRPCTimeout)
+	}
+}
+
+// TestParseFlagsTCPRPCTimeout проверяет, что нестандартное значение
+// флага -tcp-rpc-timeout доезжает в поле Values.TCPRPCTimeout.
+func TestParseFlagsTCPRPCTimeout(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{
+		"raft", "-number", "1",
+		"--tcp-rpc-timeout", "500ms",
+	}
+
+	v := ParseFlags()
+	if v.TCPRPCTimeout != 500*time.Millisecond {
+		t.Errorf("TCPRPCTimeout = %v, want 500ms", v.TCPRPCTimeout)
+	}
+}
+
+// TestParseFlagsSnapshotDefaults проверяет дефолты флагов снимков: без флага
+// поля Values.SnapshotInterval/SnapshotThreshold равны экспортированным
+// дефолтам пакета raft. Это защита от рассинхрона дефолтов между
+// internal/config и пакетом raft (RISK-023): единый источник —
+// raft.DefaultSnapshotInterval/raft.DefaultSnapshotThreshold.
+func TestParseFlagsSnapshotDefaults(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if v.SnapshotInterval != raft.DefaultSnapshotInterval {
+		t.Errorf("SnapshotInterval = %v, want default %v", v.SnapshotInterval, raft.DefaultSnapshotInterval)
+	}
+	if v.SnapshotThreshold != raft.DefaultSnapshotThreshold {
+		t.Errorf("SnapshotThreshold = %d, want default %d", v.SnapshotThreshold, raft.DefaultSnapshotThreshold)
+	}
+	if raft.DefaultSnapshotInterval != 3*time.Second {
+		t.Errorf("raft.DefaultSnapshotInterval = %v, want 3s", raft.DefaultSnapshotInterval)
+	}
+	if raft.DefaultSnapshotThreshold != 1024 {
+		t.Errorf("raft.DefaultSnapshotThreshold = %d, want 1024", raft.DefaultSnapshotThreshold)
+	}
+}
+
+// TestParseFlagsSnapshot проверяет, что нестандартные значения флагов
+// -snapshot-interval и -snapshot-threshold доезжают в поля Values.
+func TestParseFlagsSnapshot(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{
+		"raft", "-number", "1",
+		"--snapshot-interval", "10s",
+		"--snapshot-threshold", "2048",
+	}
+
+	v := ParseFlags()
+	if v.SnapshotInterval != 10*time.Second {
+		t.Errorf("SnapshotInterval = %v, want 10s", v.SnapshotInterval)
+	}
+	if v.SnapshotThreshold != 2048 {
+		t.Errorf("SnapshotThreshold = %d, want 2048", v.SnapshotThreshold)
 	}
 }

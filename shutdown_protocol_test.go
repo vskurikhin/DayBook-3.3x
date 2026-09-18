@@ -131,8 +131,8 @@ func TestJoinFiniteWhenReceiverStopped(t *testing.T) {
 	if !errors.Is(err, ErrEnqueueTimeout) {
 		t.Fatalf("AppendEntries: got %v, want ErrEnqueueTimeout", err)
 	}
-	if elapsed := time.Since(start); elapsed > 2*inmemRPCTimeout {
-		t.Fatalf("enqueue blocked for %v, want <= %v", elapsed, 2*inmemRPCTimeout)
+	if elapsed := time.Since(start); elapsed > 2*_inmemRPCTimeout {
+		t.Fatalf("enqueue blocked for %v, want <= %v", elapsed, 2*_inmemRPCTimeout)
 	}
 
 	// Join отправителя конечен.
@@ -186,7 +186,7 @@ func TestCrashPeerQuiesce(t *testing.T) {
 // вспомогательных горутин стресс-тестов; недостижимость условия
 // выражается возвратом -1.
 func (h *Harness) waitLeader() int {
-	deadline := time.Now().Add(commitBudgetAfterFailover)
+	deadline := time.Now().Add(_commitBudgetAfterFailover)
 	for time.Now().Before(deadline) {
 		for i := 0; i < h.n; i++ {
 			if h.connected[i] {

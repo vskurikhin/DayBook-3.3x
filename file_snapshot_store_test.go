@@ -145,7 +145,7 @@ func TestFileSnapshotStore_Cancel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	tmpDir := filepath.Join(store.path, sink.ID()+tmpSuffix)
+	tmpDir := filepath.Join(store.path, sink.ID()+_tmpSuffix)
 	if _, err := os.Stat(tmpDir); err != nil {
 		t.Fatalf("tmp dir %s should exist: %v", tmpDir, err)
 	}
@@ -206,7 +206,7 @@ func TestFileSnapshotStore_DetectsCorruption(t *testing.T) {
 	}
 	id := writeSnapshot(t, store, 12, 2, []byte("state data"))
 
-	statePath := filepath.Join(store.path, id, stateFileName)
+	statePath := filepath.Join(store.path, id, _stateFileName)
 	fh, err := os.OpenFile(statePath, os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatalf("cannot open state file: %v", err)
@@ -309,7 +309,7 @@ func TestFileSnapshotStore_CreateNameCollision(t *testing.T) {
 
 	fixed := time.UnixMilli(1700000000000)
 	name := snapshotName(4, 42, fixed.UnixNano()/int64(time.Millisecond))
-	collisionPath := filepath.Join(store.path, name+tmpSuffix)
+	collisionPath := filepath.Join(store.path, name+_tmpSuffix)
 	if err := os.Mkdir(collisionPath, 0o700); err != nil {
 		t.Fatalf("cannot pre-create collision dir: %v", err)
 	}

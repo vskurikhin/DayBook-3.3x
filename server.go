@@ -14,21 +14,23 @@ import (
 type Server struct {
 	mu sync.Mutex
 
-	serverID int
-	peerIds  []int
-	maxPool  int
-
-	storage       Storage
 	fsm           FSM
 	snapshotStore SnapshotStore
+	storage       Storage
 
-	transport *TCPTransport
 	cm        *ConsensusModule
+	transport *TCPTransport
+
+	maxPool  int
+	peerIds  []int
+	serverID int
 
 	ready <-chan any
 	quit  chan any
 
-	tcpRPCTimeout time.Duration
+	tcpRPCTimeout     time.Duration
+	snapshotInterval  time.Duration
+	snapshotThreshold int
 }
 
 // Config — конфигурация для создания нового сервера Raft.
@@ -41,8 +43,16 @@ type Config struct {
 	Fsm FSM
 
 	// MaxPool — максимальное количество соединений в пуле на один целевой
-	// адрес (0 = defaultMaxPool).
+	// адрес (0 = _defaultMaxPool).
 	MaxPool int
+
+	// SnapshotInterval — интервал проверки необходимости снимка
+	// (0 = дефолт конструктора).
+	SnapshotInterval time.Duration
+
+	// SnapshotThreshold — минимальное количество записей после последнего
+	// снимка, при котором создаётся новый снимок (0 = дефолт конструктора).
+	SnapshotThreshold int
 
 	// SnapshotStore — хранилище снимков. Если nil, снимки отключены.
 	SnapshotStore SnapshotStore
@@ -56,15 +66,17 @@ type Config struct {
 // каналом уведомления ready и FSM для применения зафиксированных записей журнала.
 func New(cfg *Config, ready <-chan any) *Server {
 	s := &Server{
-		fsm:           cfg.Fsm,
-		maxPool:       cfg.MaxPool,
-		peerIds:       cfg.PeerIds,
-		quit:          make(chan any),
-		ready:         ready,
-		serverID:      cfg.ServerID,
-		snapshotStore: cfg.SnapshotStore,
-		storage:       cfg.Storage,
-		tcpRPCTimeout: cfg.TCPRPCTimeout,
+		fsm:               cfg.Fsm,
+		maxPool:           cfg.MaxPool,
+		peerIds:           cfg.PeerIds,
+		quit:              make(chan any),
+		ready:             ready,
+		serverID:          cfg.ServerID,
+		snapshotInterval:  cfg.SnapshotInterval,
+		snapshotStore:     cfg.SnapshotStore,
+		snapshotThreshold: cfg.SnapshotThreshold,
+		storage:           cfg.Storage,
+		tcpRPCTimeout:     cfg.TCPRPCTimeout,
 	}
 	return s
 }
@@ -78,13 +90,13 @@ func NewServer(serverID int, peerIds []int, fsm FSM, ready <-chan any) *Server {
 		Fsm:           fsm,
 		PeerIds:       peerIds,
 		Storage:       NewMapStorage(),
-		TCPRPCTimeout: TCPRPCTimeout,
+		TCPRPCTimeout: _defaultTCPRPCTimeout,
 	}, ready)
 }
 
 // Serve запускает TCP-транспорт на указанном адресе и создаёт ConsensusModule.
 func (s *Server) Serve(address string) {
-	transport, err := NewTCPTransport(address, TCPRPCTimeout, s.maxPool)
+	transport, err := NewTCPTransport(address, s.tcpRPCTimeout, s.maxPool)
 	if err != nil {
 		log.Fatalf("raft: failed to create TCPTransport: %v", err)
 	}
@@ -93,6 +105,24 @@ func (s *Server) Serve(address string) {
 	s.mu.Unlock()
 
 	s.cm = NewConsensusModule(s.serverID, s.peerIds, transport, s.storage, s.fsm, s.ready, s.snapshotStore)
+
+	// Применение параметров снимков из конфигурации сразу после создания
+	// CM и до закрытия ready — CM ещё не участвует в выборах. Выполняется
+	// только при включённых снимках (snapshotStore != nil); нулевые и
+	// отрицательные значения заменяются дефолтами конструктора. Сеттер —
+	// единая точка записи параметров снимков; сигнал snapshotCh безопасен
+	// (shouldSnapshot — фильтр) и лишь ускоряет применение нового интервала.
+	if s.snapshotStore != nil {
+		interval := s.snapshotInterval
+		if interval <= 0 {
+			interval = DefaultSnapshotInterval
+		}
+		threshold := s.snapshotThreshold
+		if threshold <= 0 {
+			threshold = DefaultSnapshotThreshold
+		}
+		s.cm.SetSnapshotConfig(threshold, interval, _defaultTrailingLogs)
+	}
 }
 
 // Apply отправляет команду в Raft-кластер и возвращает ApplyFuture.

@@ -71,8 +71,8 @@ func TestTraceRedirect(t *testing.T) {
 		<-readerDone
 	})
 
-	// Эмиттер трассировки — cm.Stop() (traceLogf(0, "CM.Stop called /
-	// becomes Dead"), печатается при traceCM=1 > 0): после Stop файл
+	// Эмиттер трассировки — cm.Stop() (traceLogf(_traceLevelKeyEvents, "CM.Stop called /
+	// becomes Dead"), печатается при _traceCM=1 > 0): после Stop файл
 	// не пуст.
 	//
 	// Эта же проверка закрывает требование «ошибка I/O не изменила

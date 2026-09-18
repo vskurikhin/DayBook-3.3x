@@ -27,35 +27,58 @@ func init() {
 // Именованные бюджеты и периоды опроса system-харнесса: выводятся из
 // констант протокола, литеральные длительности в ожиданиях запрещены.
 const (
-	// pollInterval — период опроса примитивов ожидания (класс pollInterval
+	// _pollInterval — период опроса примитивов ожидания (класс _pollInterval
 	// корневого харнесса, 10 мс).
-	pollInterval = 10 * time.Millisecond
+	_pollInterval = 10 * time.Millisecond
 
-	// maxElectionTimeout — максимальный тайм-аут выборов:
+	// _maxElectionTimeout — максимальный тайм-аут выборов:
 	// 2*ReelectionTimeoutMs = 762 мс.
-	maxElectionTimeout = 2 * raft.ReelectionTimeoutMs * time.Millisecond
+	_maxElectionTimeout = 2 * raft.ReelectionTimeoutMs * time.Millisecond
 
-	// maxReplicationBackoff — потолок задержки повторов репликации
+	// _maxReplicationBackoff — потолок задержки повторов репликации
 	// (1000 мс). Дублирует не экспортированное значение пакета raft;
 	// при рассинхроне источник истины — raft_cm_replication.go.
-	maxReplicationBackoff = 1000 * time.Millisecond
+	_maxReplicationBackoff = 1000 * time.Millisecond
 
-	// singleLeaderBudget — бюджет схождения к единственному лидеру:
-	// два worst-case выборов (2*maxElectionTimeout + раунд Pre-Vote)
+	// _singleLeaderBudget — бюджет схождения к единственному лидеру:
+	// два worst-case выборов (2*_maxElectionTimeout + раунд Pre-Vote)
 	// плюс задержка step-down призрачного лидера прежнего терма,
 	// ограниченная потолком задержки повторов: 3*762 + 1000 ≈ 3.3 с.
-	singleLeaderBudget = 3*maxElectionTimeout + maxReplicationBackoff
+	_singleLeaderBudget = 3*_maxElectionTimeout + _maxReplicationBackoff
 
-	// serviceReadyBudget — бюджет ожидания готовности перезапущенного
+	// _serviceReadyBudget — бюджет ожидания готовности перезапущенного
 	// сервиса (подъём HTTP-слушателя и Raft-узла новой инкарнации);
-	// принят равным singleLeaderBudget: готовность не требует лидера,
+	// принят равным _singleLeaderBudget: готовность не требует лидера,
 	// поэтому запас относительно worst-case подъёма кратный.
-	serviceReadyBudget = singleLeaderBudget
+	_serviceReadyBudget = _singleLeaderBudget
 
-	// serviceProbeTimeout — тайм-аут одного HTTP-пробника готовности
+	// _serviceProbeTimeout — тайм-аут одного HTTP-пробника готовности
 	// (тот же порядок, что у клиентских запросов харнесса:
 	// 600*Quantum = 1.8 с).
-	serviceProbeTimeout = 600 * raft.Quantum * time.Millisecond
+	_serviceProbeTimeout = 600 * raft.Quantum * time.Millisecond
+
+	// _clientOpTimeout — тайм-аут контекста клиентских операций Put/Get
+	// (600*Quantum = 1.8 с); тот же порядок величины, что у пробника
+	// готовности сервиса (_serviceProbeTimeout).
+	_clientOpTimeout = 600 * raft.Quantum * time.Millisecond
+
+	// _clientOpTimeoutCAS — тайм-аут контекста CAS (800*Quantum =
+	// 2.4 с); увеличенный относительно Put/Get запас.
+	_clientOpTimeoutCAS = 800 * raft.Quantum * time.Millisecond
+
+	// _clientOpTimeoutProbe — тайм-аут контекста Get-пробников:
+	// проверка отсутствия ключа и одиночный запрос в ожидании
+	// значения (500*Quantum = 1.5 с).
+	_clientOpTimeoutProbe = 500 * raft.Quantum * time.Millisecond
+
+	// _clientOpTimeoutShort — короткий дедлайн Get в контроле истечения
+	// тайм-аута клиентом (300*Quantum = 0.9 с): сервис с отключёнными
+	// ответами не успевает зафиксировать команду за это время.
+	_clientOpTimeoutShort = 300 * raft.Quantum * time.Millisecond
+
+	// _waitKeyValueBudget — бюджет схождения значения ключа
+	// в ожидании WaitForKeyValue (2 с).
+	_waitKeyValueBudget = 2 * time.Second
 )
 
 // Harness Тестовый стенд для системного тестирования kvservice и клиента.
@@ -312,16 +335,16 @@ func (h *Harness) RestartService(id int) {
 // CheckSingleLeader/WaitForSingleLeader и WaitForKeyValue.
 func (h *Harness) waitForServiceReady(id int) {
 	h.t.Helper()
-	deadline := time.Now().Add(serviceReadyBudget)
+	deadline := time.Now().Add(_serviceReadyBudget)
 	for time.Now().Before(deadline) {
 		if h.serviceReady(id) {
 			return
 		}
 		// poll-интервал condition-wait (не фиксированная пауза).
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 	h.t.Fatalf("restarted service %d did not become ready within %v\n  %s",
-		id, serviceReadyBudget, h.serviceStates())
+		id, _serviceReadyBudget, h.serviceStates())
 }
 
 // serviceReady вычисляет признак готовности R1 ∧ R2 ∧ R3 (см.
@@ -353,7 +376,7 @@ func (h *Harness) serviceReady(id int) bool {
 	}
 
 	// R3: завершённый round-trip через существующий эндпоинт.
-	ctx, cancel := context.WithTimeout(h.ctx, serviceProbeTimeout)
+	ctx, cancel := context.WithTimeout(h.ctx, _serviceProbeTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		"http://"+want+"/verifyleader/", nil)
@@ -484,7 +507,7 @@ func (h *Harness) ServiceAddr(id int) string {
 // (Election Safety с термами): расхождение сознательное.
 func (h *Harness) CheckSingleLeader() int {
 	h.t.Helper()
-	return h.WaitForSingleLeader(singleLeaderBudget)
+	return h.WaitForSingleLeader(_singleLeaderBudget)
 }
 
 // Try*/Check* — две формы одних и тех же проверок.
@@ -498,7 +521,7 @@ func (h *Harness) CheckSingleLeader() int {
 // TryPut отправляет через клиента c запрос Put. Возвращает
 // (prevValue, keyFound, error) без обращения к *testing.T.
 func (h *Harness) TryPut(c *kvclient.KVClient, key, value string) (string, bool, error) {
-	ctx, cancel := context.WithTimeout(h.ctx, 600*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeout)
 	defer cancel()
 	return c.Put(ctx, key, value)
 }
@@ -507,7 +530,7 @@ func (h *Harness) TryPut(c *kvclient.KVClient, key, value string) (string, bool,
 // найден и его значение совпадает с ожидаемым. Возвращает ошибку
 // без обращения к *testing.T.
 func (h *Harness) TryGet(c *kvclient.KVClient, key string, wantValue string) error {
-	ctx, cancel := context.WithTimeout(h.ctx, 600*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeout)
 	defer cancel()
 	gv, f, err := c.Get(ctx, key)
 	if err != nil {
@@ -525,7 +548,7 @@ func (h *Harness) TryGet(c *kvclient.KVClient, key string, wantValue string) err
 // TryCAS отправляет через клиента c запрос CAS. Возвращает
 // (prevValue, keyFound, error) без обращения к *testing.T.
 func (h *Harness) TryCAS(c *kvclient.KVClient, key, compare, value string) (string, bool, error) {
-	ctx, cancel := context.WithTimeout(h.ctx, 800*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeoutCAS)
 	defer cancel()
 	return c.CAS(ctx, key, compare, value)
 }
@@ -533,7 +556,7 @@ func (h *Harness) TryCAS(c *kvclient.KVClient, key, compare, value string) (stri
 // TryGetNotFound отправляет через клиента c запрос Get и проверяет,
 // что ключ отсутствует. Возвращает ошибку без обращения к *testing.T.
 func (h *Harness) TryGetNotFound(c *kvclient.KVClient, key string) error {
-	ctx, cancel := context.WithTimeout(h.ctx, 500*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeoutProbe)
 	defer cancel()
 	_, f, err := c.Get(ctx, key)
 	if err != nil {
@@ -577,12 +600,12 @@ func (h *Harness) WaitForSingleLeader(timeout time.Duration) int {
 			break
 		}
 		// poll-интервал condition-wait (не фиксированная пауза).
-		time.Sleep(pollInterval)
+		time.Sleep(_pollInterval)
 	}
 	h.t.Fatalf(
 		"no single leader within budget %v (polled %v):\n"+
 			"  expected: exactly one leader among connected services\n  %s",
-		timeout, pollInterval, h.serviceStates(),
+		timeout, _pollInterval, h.serviceStates(),
 	)
 	return -1
 }
@@ -636,7 +659,7 @@ func (h *Harness) CheckGetNotFound(c *kvclient.KVClient, key string) {
 // поскольку клиент не сможет добиться фиксации своей команды сервисом.
 func (h *Harness) CheckGetTimesOut(c *kvclient.KVClient, key string) {
 	h.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 300*raft.Quantum*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), _clientOpTimeoutShort)
 	defer cancel()
 	_, _, err := c.Get(ctx, key)
 	if err == nil {
@@ -660,9 +683,9 @@ func (h *Harness) CheckGetTimesOut(c *kvclient.KVClient, key string) {
 // h.CheckGet, который завершит тест с Fatal.
 func (h *Harness) WaitForKeyValue(c *kvclient.KVClient, key, expectedValue string) {
 	h.t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(_waitKeyValueBudget)
 	for time.Now().Before(deadline) {
-		ctx, cancel := context.WithTimeout(h.ctx, 500*raft.Quantum*time.Millisecond)
+		ctx, cancel := context.WithTimeout(h.ctx, _clientOpTimeoutProbe)
 		val, _, err := c.Get(ctx, key)
 		cancel()
 		if err == nil && val == expectedValue {

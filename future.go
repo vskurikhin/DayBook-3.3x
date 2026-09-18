@@ -15,7 +15,7 @@ var (
 	ErrLeadershipTransferInProgress = errors.New("raft: leadership transfer in progress")
 
 	// ErrTooManyUncommittedEntries возвращается клиенту, когда
-	// незафиксированный хвост журнала лидера достиг maxUncommittedEntries.
+	// незафиксированный хвост журнала лидера достиг _maxUncommittedEntries.
 	// Признак того, что фиксация не продвигается: кворум недоступен либо
 	// соседи не успевают за нагрузкой.
 	ErrTooManyUncommittedEntries = errors.New("raft: too many uncommitted log entries")
@@ -37,6 +37,152 @@ type Future interface {
 	// ErrorCh возвращает канал, по которому приходит ошибка выполнения.
 	// Позволяет использовать select для ожидания без создания го-рутины.
 	ErrorCh() <-chan error
+}
+
+// IndexFuture — Future, возвращающая индекс записи в журнале.
+type IndexFuture interface {
+	Future
+	Index() int
+}
+
+// ApplyFuture — Future для Apply-операции.
+type ApplyFuture interface {
+	IndexFuture
+	Response() any
+}
+
+// ConfigurationFuture — Future, возвращающая конфигурацию кластера.
+type ConfigurationFuture interface {
+	IndexFuture
+	Configuration() Configuration
+}
+
+// SnapshotFuture — публичный future для пользовательского Snapshot().
+type SnapshotFuture struct {
+	deferError
+}
+
+// deferError — базовая реализация Future с каналом завершения.
+type deferError struct {
+	err        error
+	errCh      chan error
+	once       sync.Once
+	responded  bool
+	mu         sync.Mutex
+	shutdownCh chan struct{}
+}
+
+func (d *deferError) Error() error {
+	d.once.Do(func() {
+		select {
+		case d.err = <-d.errCh:
+		case <-d.shutdownCh:
+			d.err = ErrRaftShutdown
+		}
+	})
+	return d.err
+}
+
+// ErrorCh возвращает канал, по которому приходит ошибка выполнения future.
+// Позволяет использовать select для ожидания без создания го-рутины.
+func (d *deferError) ErrorCh() <-chan error {
+	return d.errCh
+}
+
+func (d *deferError) init(shutdownCh chan struct{}) {
+	d.errCh = make(chan error, 1)
+	d.shutdownCh = shutdownCh
+}
+
+func (d *deferError) respond(err error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.errCh == nil || d.responded {
+		return
+	}
+	d.responded = true
+	d.mu.Unlock()
+	d.errCh <- err
+	close(d.errCh)
+	d.mu.Lock()
+}
+
+// logFuture — future для одной записи журнала.
+type logFuture struct {
+	deferError
+
+	log      LogEntry
+	response any
+	dispatch time.Time
+}
+
+var _ ApplyFuture = (*logFuture)(nil)
+
+func (l *logFuture) Index() int {
+	return l.log.Index
+}
+
+func (l *logFuture) Response() any {
+	return l.response
+}
+
+// configurationsFuture — future для GetConfiguration.
+type configurationsFuture struct {
+	deferError
+
+	config Configuration
+}
+
+var _ ConfigurationFuture = (*configurationsFuture)(nil)
+
+func (f *configurationsFuture) Index() int {
+	return 0
+}
+
+func (f *configurationsFuture) Configuration() Configuration {
+	return f.config
+}
+
+// LeadershipTransferFuture используется для ожидания результата
+// передачи лидерства от одного узла другому.
+type LeadershipTransferFuture interface {
+	Future
+}
+
+// leadershipTransferFuture — future для отслеживания передачи лидерства.
+type leadershipTransferFuture struct {
+	deferError
+
+	targetID ServerID
+}
+
+var _ LeadershipTransferFuture = (*leadershipTransferFuture)(nil)
+
+// errorFuture — future с заранее известной ошибкой.
+type errorFuture struct {
+	err error
+}
+
+var _ ApplyFuture = errorFuture{}
+
+func (e errorFuture) Error() error { return e.err }
+func (e errorFuture) ErrorCh() <-chan error {
+	ch := make(chan error, 1)
+	ch <- e.err
+	close(ch)
+	return ch
+}
+func (e errorFuture) Index() int                   { return 0 }
+func (e errorFuture) Response() any                { return nil }
+func (e errorFuture) Configuration() Configuration { return Configuration{} }
+
+// reqSnapshotFuture — внутренний future для запроса снимка у runFSM.
+type reqSnapshotFuture struct {
+	deferError
+
+	index    int
+	term     int
+	snapshot FSMSnapshot
 }
 
 // verifyFuture — Future для подтверждения ReadIndex (Raft §8).
@@ -73,6 +219,8 @@ type verifyFuture struct {
 	enqueuedAtHeartbeat uint64
 }
 
+var _ Future = (*verifyFuture)(nil)
+
 // vote регистрирует голос узла peerID при подтверждении лидерства.
 // Если лидерство не подтверждено (leader == false), future завершается
 // с ErrNotLeader.
@@ -93,142 +241,4 @@ func (v *verifyFuture) vote(peerID int, leader bool) {
 	if v.votes >= v.quorumSize {
 		v.respond(nil)
 	}
-}
-
-// IndexFuture — Future, возвращающая индекс записи в журнале.
-type IndexFuture interface {
-	Future
-	Index() int
-}
-
-// ApplyFuture — Future для Apply-операции.
-type ApplyFuture interface {
-	IndexFuture
-	Response() any
-}
-
-// ConfigurationFuture — Future, возвращающая конфигурацию кластера.
-type ConfigurationFuture interface {
-	IndexFuture
-	Configuration() Configuration
-}
-
-// deferError — базовая реализация Future с каналом завершения.
-type deferError struct {
-	err        error
-	errCh      chan error
-	once       sync.Once
-	responded  bool
-	mu         sync.Mutex
-	shutdownCh chan struct{}
-}
-
-func (d *deferError) init(shutdownCh chan struct{}) {
-	d.errCh = make(chan error, 1)
-	d.shutdownCh = shutdownCh
-}
-
-func (d *deferError) Error() error {
-	d.once.Do(func() {
-		select {
-		case d.err = <-d.errCh:
-		case <-d.shutdownCh:
-			d.err = ErrRaftShutdown
-		}
-	})
-	return d.err
-}
-
-func (d *deferError) respond(err error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.errCh == nil || d.responded {
-		return
-	}
-	d.responded = true
-	d.mu.Unlock()
-	d.errCh <- err
-	close(d.errCh)
-	d.mu.Lock()
-}
-
-// ErrorCh возвращает канал, по которому приходит ошибка выполнения future.
-// Позволяет использовать select для ожидания без создания го-рутины.
-func (d *deferError) ErrorCh() <-chan error {
-	return d.errCh
-}
-
-// logFuture — future для одной записи журнала.
-type logFuture struct {
-	deferError
-
-	log      LogEntry
-	response any
-	dispatch time.Time
-}
-
-func (l *logFuture) Index() int {
-	return l.log.Index
-}
-
-func (l *logFuture) Response() any {
-	return l.response
-}
-
-// configurationsFuture — future для GetConfiguration.
-type configurationsFuture struct {
-	deferError
-
-	config Configuration
-}
-
-func (f *configurationsFuture) Index() int {
-	return 0
-}
-
-func (f *configurationsFuture) Configuration() Configuration {
-	return f.config
-}
-
-// LeadershipTransferFuture используется для ожидания результата
-// передачи лидерства от одного узла другому.
-type LeadershipTransferFuture interface {
-	Future
-}
-
-// leadershipTransferFuture — future для отслеживания передачи лидерства.
-type leadershipTransferFuture struct {
-	deferError
-
-	targetID ServerID
-}
-
-// errorFuture — future с заранее известной ошибкой.
-type errorFuture struct {
-	err error
-}
-
-func (e errorFuture) Error() error { return e.err }
-func (e errorFuture) ErrorCh() <-chan error {
-	ch := make(chan error, 1)
-	ch <- e.err
-	close(ch)
-	return ch
-}
-func (e errorFuture) Index() int                   { return 0 }
-func (e errorFuture) Response() any                { return nil }
-func (e errorFuture) Configuration() Configuration { return Configuration{} }
-
-// reqSnapshotFuture — внутренний future для запроса снимка у runFSM.
-type reqSnapshotFuture struct {
-	deferError
-
-	index    int
-	term     int
-	snapshot FSMSnapshot
-}
-
-// SnapshotFuture — публичный future для пользовательского Snapshot().
-type SnapshotFuture struct {
-	deferError
 }

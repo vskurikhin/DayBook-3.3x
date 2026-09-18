@@ -97,6 +97,25 @@ func TestTCPNewTransport(t *testing.T) {
 	}
 }
 
+// TestTCPNewTransportZeroTimeout проверяет защитную проверку конструктора
+// (AC-2): нулевой тайм-аут заменяется дефолтом _defaultTCPRPCTimeout, чтобы
+// транспорт всегда имел действующие дедлайны. Без этой проверки нулевая
+// конфигурация дала бы транспорт без дедлайнов (RISK-021).
+func TestTCPNewTransportZeroTimeout(t *testing.T) {
+	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	trans, err := NewTCPTransport("127.0.0.1:0", 0, 2)
+	if err != nil {
+		t.Fatalf("NewTCPTransport: %v", err)
+	}
+	defer trans.Close()
+	if trans.timeout != _defaultTCPRPCTimeout {
+		t.Fatalf("timeout = %v, want default %v", trans.timeout, _defaultTCPRPCTimeout)
+	}
+	if trans.timeout != TCPRPCTimeout {
+		t.Fatalf("timeout = %v, want alias TCPRPCTimeout = %v", trans.timeout, TCPRPCTimeout)
+	}
+}
+
 // TestTCPNewTransportInvalidAddr проверяет ошибку при неверном адресе.
 func TestTCPNewTransportInvalidAddr(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
@@ -613,4 +632,29 @@ func TestTCPTransportNoGoroutineLeak(t *testing.T) {
 		t.Fatalf("NewTCPTransport: %v", err)
 	}
 	trans.Close()
+}
+
+// TestRPCFramingBytes фиксирует байты фрейминга TCP RPC: значения
+// используются как поле Type запроса, кодируются gob и уходят
+// в сеть, поэтому смена любого значения — изменение проводного
+// формата.
+func TestRPCFramingBytes(t *testing.T) {
+	tests := []struct {
+		name string
+		got  byte
+		want byte
+	}{
+		{"rpcAppendEntries", _rpcAppendEntries, 0},
+		{"rpcRequestVote", _rpcRequestVote, 1},
+		{"rpcInstallSnapshot", _rpcInstallSnapshot, 2},
+		{"rpcTimeoutNow", _rpcTimeoutNow, 3},
+		{"rpcRequestPreVote", _rpcRequestPreVote, 4},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.want {
+				t.Fatalf("got %d, want %d", tt.got, tt.want)
+			}
+		})
+	}
 }

@@ -21,7 +21,7 @@ import (
 var buf syncBuffer
 
 // traceLevel — порог трассировки бинарника. Задаётся явно: эмиттер
-// сценария (kvs.ServeHTTP) печатается под гейтом traceKV > 0,
+// сценария (kvs.ServeHTTP) печатается под гейтом _traceKV > 0,
 // а TraceConfig{} означает выключенную трассировку.
 const traceLevel = 1
 
