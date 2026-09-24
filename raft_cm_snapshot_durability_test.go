@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // errStorageWriteAborted — значение паники прерывающего хранилища.
@@ -19,7 +20,7 @@ var errStorageWriteAborted = errors.New("storage write aborted")
 // исполнение через log.Fatalf. Прерывание внутри процесса позволяет
 // наблюдать, что узел успел пообещать лидеру к моменту отказа записи.
 type abortOnWriteStorage struct {
-	*MapStorage
+	*store.MapStorage
 
 	armed atomic.Bool
 	hits  atomic.Int64
@@ -37,7 +38,7 @@ func (s *abortOnWriteStorage) Set(key string, value []byte) {
 // снимком (lastSnapshotIndex=10, терм 2, пустой журнал) и хранилищем,
 // прерывающим запись постоянного состояния.
 func newAbortOnWriteInstallSnapshotCM() (*ConsensusModule, *abortOnWriteStorage) {
-	storage := &abortOnWriteStorage{MapStorage: NewMapStorage()}
+	storage := &abortOnWriteStorage{MapStorage: store.NewMapStorage()}
 	cm, _ := newInstallSnapshotCM()
 	cm.storage = storage
 	return cm, storage
@@ -107,7 +108,7 @@ func TestInstallSnapshot_StateDurableOnSuccess(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm, _ := newInstallSnapshotCM()
-	storage, ok := cm.storage.(*MapStorage)
+	storage, ok := cm.storage.(*store.MapStorage)
 	if !ok {
 		t.Fatalf("unexpected storage type %T", cm.storage)
 	}

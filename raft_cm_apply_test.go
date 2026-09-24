@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // TestSendBatch_SkipsMissingPrefix проверяет, что sendBatch не добавляет
@@ -187,7 +189,7 @@ func TestFSMRetainedEntryImmutable(t *testing.T) {
 
 	//Сжимаем журнал. Заменяет backing array (make+copy).
 	cm.mu.Lock()
-	cm.compactLogs(2)
+	cm.compactLogsLocked(2)
 	cm.mu.Unlock()
 
 	// Удержанный объект и его payload неизменны.
@@ -226,7 +228,7 @@ func TestCompactLogs_PendingBatchUnchanged(t *testing.T) {
 
 	// Сжатие журнала во время удержания батча (замена массива make+copy).
 	cm.mu.Lock()
-	cm.compactLogs(2)
+	cm.compactLogsLocked(2)
 	cm.mu.Unlock()
 
 	fsm.releaseApply()
@@ -396,7 +398,7 @@ func forceLeaderChange(t *testing.T, h *Harness) leaderObservation {
 // fsm и запуск runFSM выполняет вызывающий.
 func newAliasTestCM(k int) *ConsensusModule {
 	cm := &ConsensusModule{}
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.fsmMutateCh = make(chan []*commitTuple, _batchApplyBuffer)
 	cm.shutdownCh = make(chan struct{})
 	cm.leaderState.inflight = make(map[int]*logFuture)
@@ -469,10 +471,10 @@ func (f *gateBatchFSM) ApplyBatch(logs []*LogEntry) []any {
 func (f *gateBatchFSM) Apply(*LogEntry) any { return nil }
 
 // Snapshot — заглушка; в этих тестах снимки не используются.
-func (f *gateBatchFSM) Snapshot() (FSMSnapshot, error) { return nil, ErrNotImplemented }
+func (f *gateBatchFSM) Snapshot() (FSMSnapshot, error) { return nil, contract.ErrNotImplemented }
 
 // Restore — заглушка; в этих тестах восстановление не используется.
-func (f *gateBatchFSM) Restore(io.ReadCloser) error { return ErrNotImplemented }
+func (f *gateBatchFSM) Restore(io.ReadCloser) error { return contract.ErrNotImplemented }
 
 // getApplied возвращает копию применённых Data (потокобезопасно).
 func (f *gateBatchFSM) getApplied() []any {

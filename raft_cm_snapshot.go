@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // SetSnapshotConfig обновляет параметры снимков и сигнализирует
 // runSnapshots о необходимости проверить, нужно ли создать снимок.
-func (cm *ConsensusModule) SetSnapshotConfig(threshold int, interval time.Duration, trailing int) {
+func (cm *ConsensusModule) SetSnapshotConfig(threshold, trailing int, interval time.Duration) {
 	cm.mu.Lock()
 	cm.snapshotThreshold = threshold
 	cm.snapshotInterval = interval
@@ -48,7 +50,7 @@ func (cm *ConsensusModule) handleFsmSnapshot(req *reqSnapshotFuture) {
 		return
 	}
 	// Снимок с индексом, не превышающим lastSnapshotIndex, не добавляет
-	// информации: compactLogs с тем же аргументом ничего не сжимает,
+	// информации: compactLogsLocked с тем же аргументом ничего не сжимает,
 	// а повторение цикла «создать снимок → сжатие вхолостую» только
 	// нагружает хранилище. Защищает и монотонность lastSnapshotIndex.
 	if cm.cmState.fsmAppliedIndex <= cm.cmState.lastSnapshotIndex {
@@ -98,9 +100,9 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	var rpcErr error
 	defer func() {
 		if rpc.Reader != nil {
-			// Drain остатка данных снимка с лимитом, чтобы не зависнуть
-			// при повреждённом соединении. Лимит _maxSnapshotDataSize
-			// гарантирует завершение drain даже при некорректном DataSize.
+			// Выполняется поэтапное чтение (drain) оставшихся данных снимка с ограничением по объёму,
+			// чтобы исключить блокировку при повреждённом соединении. Лимит _maxSnapshotDataSize
+			// гарантирует завершение операции даже при ошибочном значении DataSize.
 			_, _ = io.CopyN(io.Discard, rpc.Reader, _maxSnapshotDataSize)
 		}
 		rpc.RespChan <- RPCResponse{Reply: resp, Error: rpcErr}
@@ -126,11 +128,11 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	}
 
 	// Идемпотентность: если у узла уже есть снимок с LastLogIndex ≥ запрошенного,
-	// установка не требуется (no-op).
+	// повторная установка не требуется — операция не выполняет действий.
 	cm.mu.Lock()
 	stale := req.LastLogIndex <= cm.cmState.lastSnapshotIndex
 	if stale {
-		cm.counters.installSnapshotSkippedStale = incPeerCount(cm.counters.installSnapshotSkippedStale, req.LeaderID)
+		cm.counters.installSnapshotSkippedStale = incPeerCountLocked(cm.counters.installSnapshotSkippedStale, req.LeaderID)
 	}
 	lastSnapshotIndex := cm.cmState.lastSnapshotIndex
 	cm.mu.Unlock()
@@ -218,8 +220,8 @@ func (cm *ConsensusModule) installSnapshotStateLocked(meta *SnapshotMeta) {
 	} else {
 		cm.cmState.log = nil
 	}
-	cm.rebuildLastLog()
-	cm.rebuildTermIndexMap()
+	cm.rebuildLastLogLocked()
+	cm.rebuildTermIndexMapLocked()
 	// Проверка непрерывности границы снимка и журнала (защита от регрессий).
 	// При нарушении — только счётчик и трассировка, без паники и изменения Success.
 	if err := cm.checkSnapshotLogContinuity(); err != nil {
@@ -242,7 +244,7 @@ func (cm *ConsensusModule) installSnapshotStateLocked(meta *SnapshotMeta) {
 func (cm *ConsensusModule) receiveAndSealSnapshot(
 	rpc RPC, req *InstallSnapshotRequest, cfg Configuration,
 ) (sinkID string, err error) {
-	sink, err := cm.snapshotStore.Create(req.LastLogIndex, req.LastLogTerm, cfg, req.ConfigIndex)
+	sink, err := cm.snapshotStore.Create(req.LastLogIndex, req.LastLogTerm, req.ConfigIndex, cfg)
 	if err != nil {
 		return "", err
 	}
@@ -321,7 +323,7 @@ func (cm *ConsensusModule) takeSnapshot() error {
 	select {
 	case cm.fsmSnapshotCh <- snapReq:
 	case <-cm.shutdownCh:
-		return ErrRaftShutdown
+		return contract.ErrRaftShutdown
 	case <-time.After(_defaultTakeSnapshotTimeout):
 		cm.mu.Lock()
 		applied := cm.cmState.fsmAppliedIndex
@@ -351,7 +353,7 @@ func (cm *ConsensusModule) takeSnapshot() error {
 	committedIndex := cm.cmState.configurations.committedIndex
 	cm.mu.Unlock()
 
-	sink, err := cm.snapshotStore.Create(snapReq.index, snapReq.term, committed, committedIndex)
+	sink, err := cm.snapshotStore.Create(snapReq.index, snapReq.term, committedIndex, committed)
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot: %w", err)
 	}
@@ -371,7 +373,7 @@ func (cm *ConsensusModule) takeSnapshot() error {
 	cm.mu.Lock()
 	cm.cmState.lastSnapshotIndex = snapReq.index
 	cm.cmState.lastSnapshotTerm = snapReq.term
-	cm.compactLogs(snapReq.index - cm.trailingLogs)
+	cm.compactLogsLocked(snapReq.index - cm.trailingLogs)
 	cm.persistToStorage()
 	cm.mu.Unlock()
 

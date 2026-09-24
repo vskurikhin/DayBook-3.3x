@@ -1,4 +1,4 @@
-package raft
+package store
 
 import (
 	"bytes"
@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // FileStorage — file-backed реализация интерфейса Storage. Каждый ключ
@@ -25,7 +27,7 @@ type FileStorage struct {
 	writes  int
 }
 
-var _ Storage = (*FileStorage)(nil)
+var _ contract.Storage = (*FileStorage)(nil)
 
 const (
 	// _dataFileSuffix — суффикс файла данных: каждый ключ Storage
@@ -94,7 +96,7 @@ func (fs *FileStorage) Set(key string, value []byte) {
 		log.Fatalf("FileStorage.Set: rename %s -> %s: %v", tmpPath, path, err)
 	}
 
-	// fsync родительской директории, чтобы rename пережил крэш ОС.
+	// fsync родительской директории, чтобы rename пережил аварийный сбой ОС.
 	if err := syncDir(fs.dir); err != nil {
 		log.Fatalf("FileStorage.Set: sync dir %s: %v", fs.dir, err)
 	}
@@ -127,10 +129,10 @@ func (fs *FileStorage) HasData() bool {
 	return fs.hasData
 }
 
-// writeCount возвращает число фактически выполненных записей на диск.
+// WriteCount возвращает число фактически выполненных записей на диск.
 // Служебный счётчик наблюдаемости для тестов и бенчмарков пакета: вызовы Set,
 // пропущенные из-за совпадения значения с закэшированным, в него не входят.
-func (fs *FileStorage) writeCount() int {
+func (fs *FileStorage) WriteCount() int {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 	return fs.writes

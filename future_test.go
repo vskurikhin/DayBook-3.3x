@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // --- deferError ---
@@ -46,7 +49,7 @@ func TestDeferErrorShutdown(t *testing.T) {
 	d := &deferError{}
 	d.init(shutdownCh)
 	close(shutdownCh)
-	if err := d.Error(); err != ErrRaftShutdown {
+	if err := d.Error(); err != contract.ErrRaftShutdown {
 		t.Fatalf("got %v, want ErrRaftShutdown", err)
 	}
 }
@@ -113,7 +116,7 @@ func TestDeferErrorConcurrentCalls(t *testing.T) {
 	wg.Wait()
 
 	for i, err := range errs {
-		if err != ErrRaftShutdown {
+		if err != contract.ErrRaftShutdown {
 			t.Errorf("errs[%d] = %v, want ErrRaftShutdown", i, err)
 		}
 	}
@@ -186,11 +189,11 @@ func (f *CaptureFSM) Entries() []LogEntry {
 }
 
 func (f *CaptureFSM) Snapshot() (FSMSnapshot, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 func (f *CaptureFSM) Restore(_ io.ReadCloser) error {
-	return ErrNotImplemented
+	return contract.ErrNotImplemented
 }
 
 // captureCommitFSM отправляет данные и в CaptureFSM, и в CommitChannelFSM.
@@ -215,7 +218,7 @@ func copyBytes(b []byte) []byte {
 // testServerWithFSM creates a single-node ConsensusModule with the given FSM.
 func testServerWithFSM(t testing.TB, fsm FSM) *ConsensusModule {
 	t.Helper()
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(0); err != nil {
 		t.Fatal(err)
@@ -235,7 +238,7 @@ func testServerWithFSM(t testing.TB, fsm FSM) *ConsensusModule {
 	ready := make(chan any)
 	close(ready)
 
-	transport := NewInmemTransport("single")
+	transport := transp.NewInmemTransport("single")
 	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready)
 	return cm
 }
@@ -246,8 +249,8 @@ func testFSMHarness(t *testing.T) (*Harness, *CaptureFSM) {
 	t.Helper()
 	n := 1
 	cluster := make([]*ConsensusModule, n)
-	transports := make([]*InmemTransport, n)
-	storage := make([]*MapStorage, n)
+	transports := make([]*transp.InmemTransport, n)
+	storage := make([]*store.MapStorage, n)
 	commitChans := make([]chan CommitEntry, n)
 	commits := make([][]CommitEntry, n)
 	connected := make([]bool, n)
@@ -256,8 +259,8 @@ func testFSMHarness(t *testing.T) (*Harness, *CaptureFSM) {
 
 	capture := &CaptureFSM{}
 
-	transports[0] = NewInmemTransport("single-0")
-	storage[0] = NewMapStorage()
+	transports[0] = transp.NewInmemTransport("single-0")
+	storage[0] = store.NewMapStorage()
 	commitChans[0] = make(chan CommitEntry)
 	fsm := &captureCommitFSM{
 		CaptureFSM:    capture,
@@ -399,7 +402,7 @@ func TestApplyAfterShutdown(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	future := cm.Apply("cmd", 0)
-	if err := future.Error(); err != ErrRaftShutdown {
+	if err := future.Error(); err != contract.ErrRaftShutdown {
 		t.Fatalf("got %v, want ErrRaftShutdown", err)
 	}
 }
@@ -565,7 +568,7 @@ func TestApplyInflightOnLeaderCrash(t *testing.T) {
 	h.waitForApplyInflight(origLeaderId, inflightBefore+1, _commitBudgetSteady)
 	h.CrashPeer(origLeaderId)
 
-	if err := future.Error(); err != ErrLeadershipLost && err != ErrRaftShutdown {
+	if err := future.Error(); err != ErrLeadershipLost && err != contract.ErrRaftShutdown {
 		t.Fatalf("got %v, want ErrLeadershipLost or ErrRaftShutdown", err)
 	}
 }

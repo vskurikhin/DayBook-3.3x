@@ -1,4 +1,4 @@
-package raft
+package store
 
 import (
 	"errors"
@@ -10,22 +10,23 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft"
 )
 
-// testConfig — конфигурация кластера для тестов FileSnapshotStore.
-func testConfig() Configuration {
-	return Configuration{
-		ConfigServers: []ConfigServer{
-			{ID: 1, Address: "node1", Suffrage: Voter},
-			{ID: 2, Address: "node2", Suffrage: Voter},
+// testConfig — конфигурация кластера для тестов FileSnapshot.
+func testConfig() raft.Configuration {
+	return raft.Configuration{
+		ConfigServers: []raft.ConfigServer{
+			{ID: 1, Address: "node1", Suffrage: raft.Voter},
+			{ID: 2, Address: "node2", Suffrage: raft.Voter},
 		},
 	}
 }
 
 // writeSnapshot создаёт и закрывает снимок с данными data, возвращая sink.ID.
-func writeSnapshot(t *testing.T, store *FileSnapshotStore, index, term int, data []byte) string {
+func writeSnapshot(t *testing.T, store *FileSnapshot, index, term int, data []byte) string {
 	t.Helper()
-	sink, err := store.Create(index, term, testConfig(), index)
+	sink, err := store.Create(index, term, index, testConfig())
 	if err != nil {
 		t.Fatalf("Create(%d, %d) failed: %v", index, term, err)
 	}
@@ -38,14 +39,14 @@ func writeSnapshot(t *testing.T, store *FileSnapshotStore, index, term int, data
 	return sink.ID()
 }
 
-// TestFileSnapshotStore_RoundTrip проверяет полный цикл
+// TestFileSnapshot_RoundTrip проверяет полный цикл
 // Create → Write → Close → List → Open.
-func TestFileSnapshotStore_RoundTrip(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestFileSnapshot_RoundTrip(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store, err := NewFileSnapshotStore(t.TempDir(), 2)
+	store, err := NewFileSnapshot(t.TempDir(), 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 
 	data := []byte("snapshot state data")
@@ -92,22 +93,22 @@ func TestFileSnapshotStore_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestFileSnapshotStore_SurvivesRestart проверяет, что новый экземпляр стора
+// TestFileSnapshot_SurvivesRestart проверяет, что новый экземпляр стора
 // на той же директории видит ранее записанные снимки.
-func TestFileSnapshotStore_SurvivesRestart(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestFileSnapshot_SurvivesRestart(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
 	dir := t.TempDir()
-	store, err := NewFileSnapshotStore(dir, 2)
+	store, err := NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 	data := []byte("durable data")
 	id := writeSnapshot(t, store, 7, 2, data)
 
-	store2, err := NewFileSnapshotStore(dir, 2)
+	store2, err := NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore (restart) failed: %v", err)
+		t.Fatalf("NewFileSnapshot (restart) failed: %v", err)
 	}
 	snapshots, err := store2.List()
 	if err != nil {
@@ -130,18 +131,18 @@ func TestFileSnapshotStore_SurvivesRestart(t *testing.T) {
 	}
 }
 
-// TestFileSnapshotStore_Cancel проверяет, что Cancel удаляет временную
+// TestFileSnapshot_Cancel проверяет, что Cancel удаляет временную
 // директорию и не затрагивает ранее созданные снимки.
-func TestFileSnapshotStore_Cancel(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestFileSnapshot_Cancel(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store, err := NewFileSnapshotStore(t.TempDir(), 2)
+	store, err := NewFileSnapshot(t.TempDir(), 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 	writeSnapshot(t, store, 5, 1, []byte("keep"))
 
-	sink, err := store.Create(6, 1, testConfig(), 6)
+	sink, err := store.Create(6, 1, 6, testConfig())
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -168,16 +169,16 @@ func TestFileSnapshotStore_Cancel(t *testing.T) {
 	}
 }
 
-// TestFileSnapshotStore_InvisibleBeforeClose проверяет, что незакрытый
+// TestFileSnapshot_InvisibleBeforeClose проверяет, что незакрытый
 // снимок не виден в List.
-func TestFileSnapshotStore_InvisibleBeforeClose(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestFileSnapshot_InvisibleBeforeClose(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store, err := NewFileSnapshotStore(t.TempDir(), 2)
+	store, err := NewFileSnapshot(t.TempDir(), 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
-	sink, err := store.Create(11, 2, testConfig(), 11)
+	sink, err := store.Create(11, 2, 11, testConfig())
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -195,14 +196,14 @@ func TestFileSnapshotStore_InvisibleBeforeClose(t *testing.T) {
 	}
 }
 
-// TestFileSnapshotStore_DetectsCorruption проверяет, что порча state.bin
+// TestFileSnapshot_DetectsCorruption проверяет, что порча state.bin
 // детектируется CRC32 при Open.
-func TestFileSnapshotStore_DetectsCorruption(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestFileSnapshot_DetectsCorruption(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store, err := NewFileSnapshotStore(t.TempDir(), 2)
+	store, err := NewFileSnapshot(t.TempDir(), 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 	id := writeSnapshot(t, store, 12, 2, []byte("state data"))
 
@@ -224,14 +225,14 @@ func TestFileSnapshotStore_DetectsCorruption(t *testing.T) {
 	}
 }
 
-// TestFileSnapshotStore_Retain проверяет, что после создания снимков
+// TestFileSnapshot_Retain проверяет, что после создания снимков
 // сверх retain старейшие удаляются.
-func TestFileSnapshotStore_Retain(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestFileSnapshot_Retain(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store, err := NewFileSnapshotStore(t.TempDir(), 2)
+	store, err := NewFileSnapshot(t.TempDir(), 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 
 	id1 := writeSnapshot(t, store, 1, 1, []byte("one"))
@@ -253,24 +254,24 @@ func TestFileSnapshotStore_Retain(t *testing.T) {
 	}
 }
 
-// TestFileSnapshotStore_InvalidRetain проверяет валидацию retain в конструкторе.
-func TestFileSnapshotStore_InvalidRetain(t *testing.T) {
-	if _, err := NewFileSnapshotStore(t.TempDir(), 0); err == nil {
-		t.Fatal("NewFileSnapshotStore with retain=0: want error, got nil")
+// TestFileSnapshot_InvalidRetain проверяет валидацию retain в конструкторе.
+func TestFileSnapshot_InvalidRetain(t *testing.T) {
+	if _, err := NewFileSnapshot(t.TempDir(), 0); err == nil {
+		t.Fatal("NewFileSnapshot with retain=0: want error, got nil")
 	}
-	if _, err := NewFileSnapshotStore(t.TempDir(), -1); err == nil {
-		t.Fatal("NewFileSnapshotStore with retain=-1: want error, got nil")
+	if _, err := NewFileSnapshot(t.TempDir(), -1); err == nil {
+		t.Fatal("NewFileSnapshot with retain=-1: want error, got nil")
 	}
 }
 
-// TestFileSnapshotStore_ListSortedByMeta проверяет сортировку List
+// TestFileSnapshot_ListSortedByMeta проверяет сортировку List
 // по (Term, Index) в порядке убывания, а не по имени директории.
-func TestFileSnapshotStore_ListSortedByMeta(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestFileSnapshot_ListSortedByMeta(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store, err := NewFileSnapshotStore(t.TempDir(), 5)
+	store, err := NewFileSnapshot(t.TempDir(), 5)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 
 	writeSnapshot(t, store, 5, 2, []byte("a"))
@@ -295,16 +296,16 @@ func TestFileSnapshotStore_ListSortedByMeta(t *testing.T) {
 	}
 }
 
-// TestFileSnapshotStore_CreateNameCollision — детерминированный тест коллизии
+// TestFileSnapshot_CreateNameCollision — детерминированный тест коллизии
 // имени временной директории (ревью MEDIUM-1): существующая <name>.tmp
 // заставляет Create завершиться ошибкой os.IsExist вместо молчаливого
 // переиспользования каталога.
-func TestFileSnapshotStore_CreateNameCollision(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestFileSnapshot_CreateNameCollision(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store, err := NewFileSnapshotStore(t.TempDir(), 2)
+	store, err := NewFileSnapshot(t.TempDir(), 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 
 	fixed := time.UnixMilli(1700000000000)
@@ -324,7 +325,7 @@ func TestFileSnapshotStore_CreateNameCollision(t *testing.T) {
 }
 
 // snapshotIDs возвращает ID снимков для сообщений об ошибках.
-func snapshotIDs(snapshots []*SnapshotMeta) []string {
+func snapshotIDs(snapshots []*raft.SnapshotMeta) []string {
 	ids := make([]string, len(snapshots))
 	for i, s := range snapshots {
 		ids[i] = s.ID

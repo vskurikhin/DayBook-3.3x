@@ -10,19 +10,21 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // snapshotHarness — тестовый стенд для интеграционных тестов снимков.
 // Отличается от Harness тем, что использует snapshotTestFSM и
-// InmemSnapshotStore для каждого узла.
+// InmemSnapshot для каждого узла.
 type snapshotHarness struct {
 	t          *testing.T
 	n          int
 	cluster    []*ConsensusModule
 	fsms       []*snapshotTestFSM
-	stores     []*InmemSnapshotStore
-	storage    []*MapStorage
-	transports []*InmemTransport
+	stores     []*store.InmemSnapshot
+	storage    []*store.MapStorage
+	transports []*transp.InmemTransport
 	alive      []bool
 	connected  []bool
 	ready      chan any
@@ -61,7 +63,7 @@ func (c *isReceivedCounters) target(id int) *atomic.Int64 {
 // работают с нижележащим транспортом без изменений; перехватывается
 // только исходящий вызов InstallSnapshot.
 type snapshotCountingTransport struct {
-	*InmemTransport
+	*transp.InmemTransport
 	counters *isReceivedCounters
 }
 
@@ -76,9 +78,9 @@ func newSnapshotHarness(t *testing.T, n int) *snapshotHarness {
 
 	cluster := make([]*ConsensusModule, n)
 	fsms := make([]*snapshotTestFSM, n)
-	stores := make([]*InmemSnapshotStore, n)
-	storage := make([]*MapStorage, n)
-	transports := make([]*InmemTransport, n)
+	stores := make([]*store.InmemSnapshot, n)
+	storage := make([]*store.MapStorage, n)
+	transports := make([]*transp.InmemTransport, n)
 	alive := make([]bool, n)
 	connected := make([]bool, n)
 	ready := make(chan any)
@@ -86,7 +88,7 @@ func newSnapshotHarness(t *testing.T, n int) *snapshotHarness {
 
 	// Создаём транспорты и соединяем их.
 	for i := 0; i < n; i++ {
-		transports[i] = NewInmemTransport(ServerAddress("raft-" + itoa(i)))
+		transports[i] = transp.NewInmemTransport(ServerAddress("raft-" + itoa(i)))
 	}
 	for i := 0; i < n; i++ {
 		for j := 0; j < n; j++ {
@@ -107,9 +109,9 @@ func newSnapshotHarness(t *testing.T, n int) *snapshotHarness {
 			}
 		}
 
-		storage[i] = NewMapStorage()
+		storage[i] = store.NewMapStorage()
 		fsms[i] = newSnapshotTestFSM()
-		stores[i] = NewInmemSnapshotStore()
+		stores[i] = store.NewInmemSnapshot()
 
 		cluster[i] = NewConsensusModule(
 			i, peerIds, &snapshotCountingTransport{InmemTransport: transports[i], counters: counters},
@@ -192,7 +194,7 @@ func (h *snapshotHarness) RestartPeer(id int) {
 
 	ready := make(chan any)
 	addr := ServerAddress("raft-" + itoa(h.n) + "-" + itoa(id))
-	h.transports[id] = NewInmemTransport(addr)
+	h.transports[id] = transp.NewInmemTransport(addr)
 
 	for j := 0; j < h.n; j++ {
 		if j != id && h.alive[j] {
@@ -208,11 +210,11 @@ func (h *snapshotHarness) RestartPeer(id int) {
 	// restoreFromSnapshotStore (пустой store при усечённом логе).
 	fsm := newSnapshotTestFSM()
 	h.fsms[id] = fsm
-	store := h.stores[id]
+	stor := h.stores[id]
 
 	h.cluster[id] = NewConsensusModule(
 		id, peerIds, &snapshotCountingTransport{InmemTransport: h.transports[id], counters: h.isCounters},
-		h.storage[id], fsm, ready, store,
+		h.storage[id], fsm, ready, stor,
 	)
 	close(ready)
 	h.alive[id] = true
@@ -351,7 +353,7 @@ func TestSnapshot_Creation(t *testing.T) {
 
 	// Устанавливаем низкий порог для быстрого снимка.
 	for i := 0; i < h.n; i++ {
-		h.cluster[i].SetSnapshotConfig(8, 50*time.Millisecond, 4)
+		h.cluster[i].SetSnapshotConfig(8, 4, 50*time.Millisecond)
 	}
 
 	// Ждём лидера.
@@ -483,7 +485,7 @@ func TestSnapshot_Install(t *testing.T) {
 // случаем AE — см. blocker DEV-001 (.ai/developer/).
 func (h *snapshotHarness) driveSnapshotInstall(threshold, trailing, numCmds int) (int, int, int, int64) {
 	for i := 0; i < h.n; i++ {
-		h.cluster[i].SetSnapshotConfig(threshold, 50*time.Millisecond, trailing)
+		h.cluster[i].SetSnapshotConfig(threshold, trailing, 50*time.Millisecond)
 	}
 
 	leaderID := h.waitForSingleLeader()
@@ -603,10 +605,10 @@ func (h *snapshotHarness) waitForFSMStateEqual(a, b int, timeout time.Duration) 
 // TestCompactLog_Basic проверяет базовое сжатие журнала.
 func TestCompactLog_Basic(t *testing.T) {
 	// Создаём CM с 5 записями в логе (Index: 1, 2, 3, 4, 5).
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	ready := make(chan any)
 	close(ready)
-	cm := NewConsensusModule(0, []int{}, NewInmemTransport("test"), storage, newSnapshotTestFSM(), ready)
+	cm := NewConsensusModule(0, []int{}, transp.NewInmemTransport("test"), storage, newSnapshotTestFSM(), ready)
 
 	cm.mu.Lock()
 	cm.cmState.log = []LogEntry{
@@ -620,7 +622,7 @@ func TestCompactLog_Basic(t *testing.T) {
 	cm.cmState.lastLogTerm = 1
 
 	// очищаем старые записи с Index < 3.
-	cm.compactLogs(3)
+	cm.compactLogsLocked(3)
 	cm.mu.Unlock()
 
 	// Проверяем, что остались записи с Index: 3, 4, 5.
@@ -649,7 +651,7 @@ func TestCompactLog_All(t *testing.T) {
 		{Index: 1, Term: 1},
 		{Index: 2, Term: 1},
 	}
-	cm.compactLogs(10)
+	cm.compactLogsLocked(10)
 	if len(cm.cmState.log) != 0 {
 		t.Fatalf("log length = %d, want 0", len(cm.cmState.log))
 	}
@@ -667,7 +669,7 @@ func TestCompactLog_Nothing(t *testing.T) {
 		{Index: 6, Term: 1},
 		{Index: 7, Term: 1},
 	}
-	cm.compactLogs(3)
+	cm.compactLogsLocked(3)
 	if len(cm.cmState.log) != 3 {
 		t.Fatalf("log length = %d, want 3", len(cm.cmState.log))
 	}
@@ -682,7 +684,7 @@ func TestCompactLog_Empty(t *testing.T) {
 
 	cm := &ConsensusModule{}
 	cm.shutdownCh = make(chan struct{})
-	cm.compactLogs(5)
+	cm.compactLogsLocked(5)
 	if len(cm.cmState.log) != 0 {
 		t.Fatalf("log length = %d, want 0", len(cm.cmState.log))
 	}
@@ -751,7 +753,7 @@ func TestLogPosition_AfterCompact(t *testing.T) {
 	}
 	// Оба метода требуют удержания cm.mu — вызываем под блокировкой.
 	cm.mu.Lock()
-	cm.compactLogs(3)
+	cm.compactLogsLocked(3)
 	if pos := cm.logPositionLocked(3); pos != 0 {
 		cm.mu.Unlock()
 		t.Fatalf("logPositionLocked(3) = %d, want 0", pos)
@@ -786,7 +788,7 @@ func (h *snapshotHarness) waitForSingleLeader() int {
 }
 
 // TestSnapshot_MultipleSnapshots проверяет, что при множественных снимках
-// InmemSnapshotStore хранит только последний, а журнал сжимается.
+// InmemSnapshot хранит только последний, а журнал сжимается.
 //
 // Порог снимков 1: при любом lastSnapshotIndex < lastLogIndex выполняется
 // delta >= 1, и ближайший тик цикла снимков создаёт снимок — процесс
@@ -801,14 +803,14 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	// Одноузловой кластер с порогом 1.
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	fsm := newSnapshotTestFSM()
-	store := NewInmemSnapshotStore()
+	stor := store.NewInmemSnapshot()
 	ready := make(chan any)
 	close(ready)
 
-	transport := NewInmemTransport("single")
-	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, store)
+	transport := transp.NewInmemTransport("single")
+	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, stor)
 	defer cm.Stop()
 
 	// replace: ожидание лидерства — condition-wait по наблюдаемому признаку
@@ -832,7 +834,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	}
 
 	// Порог 1, интервал 50 мс, хвост журнала 2 записи.
-	cm.SetSnapshotConfig(1, 50*time.Millisecond, 2)
+	cm.SetSnapshotConfig(1, 2, 50*time.Millisecond)
 
 	// snapshotState читает четвёрку для диагностики ожиданий снимка.
 	snapshotState := func() string {
@@ -904,7 +906,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	if s2 <= s1 {
 		t.Fatalf("S2 = %d, want > S1 = %d (multiple snapshots expected)", s2, s1)
 	}
-	list, _ := store.List()
+	list, _ := stor.List()
 	if len(list) != 1 {
 		t.Fatalf("store has %d snapshots, want 1", len(list))
 	}
@@ -912,8 +914,8 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 		t.Fatalf("store holds snapshot with index %d, want the latest S2=%d", list[0].Index, s2)
 	}
 
-	// Сжатие журнала: takeSnapshot вызывает compactLogs(index - trailing),
-	// а compactLogs сохраняет записи с индексом >= compactIndex; после
+	// Сжатие журнала: takeSnapshot вызывает compactLogsLocked(index - trailing),
+	// а compactLogsLocked сохраняет записи с индексом >= compactIndex; после
 	// схождения (lastSnapshotIndex == lastLogIndex == S) журнал содержит
 	// ровно индексы S-trailing..S, то есть trailing + 1 = 2 + 1 = 3 записи.
 	if logLen != 3 {
@@ -921,7 +923,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 	}
 
 	// Проверяем, что данные снимка корректны.
-	meta, reader, err := store.Open(list[0].ID)
+	meta, reader, err := stor.Open(list[0].ID)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -931,7 +933,7 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 
 	// Восстанавливаем новую FSM из снимка.
 	fsm2 := newSnapshotTestFSM()
-	_, r2, err := store.Open(list[0].ID)
+	_, r2, err := stor.Open(list[0].ID)
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
@@ -950,25 +952,25 @@ func TestSnapshot_MultipleSnapshots(t *testing.T) {
 // снимка, сжатия журнала на диске и полного рестарта узла FSM
 // обязан восстановиться из снимка на диске (включая ключи до линии
 // сжатия), а суффикс лога — доиграться существующим механизмом.
-// Используются реальные FileStorage и FileSnapshotStore в одной директории.
+// Используются реальные FileStorage и FileSnapshot в одной директории.
 func TestSnapshot_RestartRestoresFSM(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	dir := t.TempDir()
-	storage := NewFileStorage(dir)
-	store, err := NewFileSnapshotStore(dir, 2)
+	storage := store.NewFileStorage(dir)
+	snapStore, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 	fsm := newSnapshotTestFSM()
 	ready := make(chan any)
 	close(ready)
-	transport := NewInmemTransport("single")
+	transport := transp.NewInmemTransport("single")
 
-	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, store)
+	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, snapStore)
 	waitForLeader(t, cm, 5*time.Second)
 
-	cm.SetSnapshotConfig(8, 50*time.Millisecond, 2)
+	cm.SetSnapshotConfig(8, 2, 50*time.Millisecond)
 
 	const numCommands = 30
 	for i := 0; i < numCommands; i++ {
@@ -994,15 +996,15 @@ func TestSnapshot_RestartRestoresFSM(t *testing.T) {
 	transport.Close()
 
 	// Полный рестарт: новые экземпляры хранилищ и FSM в той же директории.
-	storage2 := NewFileStorage(dir)
-	store2, err := NewFileSnapshotStore(dir, 2)
+	storage2 := store.NewFileStorage(dir)
+	store2, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore (restart) failed: %v", err)
+		t.Fatalf("NewFileSnapshot (restart) failed: %v", err)
 	}
 	fsm2 := newSnapshotTestFSM()
 	ready2 := make(chan any)
 	close(ready2)
-	transport2 := NewInmemTransport("single-2")
+	transport2 := transp.NewInmemTransport("single-2")
 
 	cm2 := NewConsensusModule(0, []int{}, transport2, storage2, fsm2, ready2, store2)
 	defer cm2.Stop()
@@ -1054,7 +1056,7 @@ func TestSnapshot_LeaderCrash(t *testing.T) {
 
 	// Устанавливаем низкий порог.
 	for i := 0; i < h.n; i++ {
-		h.cluster[i].SetSnapshotConfig(15, 50*time.Millisecond, 8)
+		h.cluster[i].SetSnapshotConfig(15, 8, 50*time.Millisecond)
 	}
 
 	leaderID := h.waitForSingleLeader()
@@ -1191,7 +1193,7 @@ func TestSnapshot_CatchUpWithinTrailingWindow(t *testing.T) {
 
 	// Широкое trailing-окно: записи follower'а остаются в срезе лидера.
 	for i := 0; i < h.n; i++ {
-		h.cluster[i].SetSnapshotConfig(30, 50*time.Millisecond, 128)
+		h.cluster[i].SetSnapshotConfig(30, 128, 50*time.Millisecond)
 	}
 
 	leaderID := h.waitForSingleLeader()
@@ -1269,7 +1271,7 @@ func TestSnapshot_CatchUpBehindSnapshot(t *testing.T) {
 
 // TestSnapshot_InstallPostConditions — Case C (/004): после
 // установки снимка, покрывающего весь лог follower'а, выполнены
-// lastLogIndexAndTerm() согласован с метаданными
+// lastLogIndexAndTermLocked() согласован с метаданными
 // снимка (защита Leader Completeness: logOk в RequestVote/PreVote
 // считается против корректной пары, а не (-1,-1)).
 func TestSnapshot_InstallPostConditions(t *testing.T) {
@@ -1293,7 +1295,7 @@ func TestSnapshot_InstallPostConditions(t *testing.T) {
 	lastApplied := cm.cmState.lastApplied
 	commitIndex := cm.cmState.commitIndex
 	logLen := len(cm.cmState.log)
-	lli, llt := cm.lastLogIndexAndTerm()
+	lli, llt := cm.lastLogIndexAndTermLocked()
 	cm.mu.Unlock()
 
 	if lastLogIndex < lastSnapshotIndex {
@@ -1308,7 +1310,7 @@ func TestSnapshot_InstallPostConditions(t *testing.T) {
 			lastApplied, commitIndex, lastLogIndex)
 	}
 	if lli != lastLogIndex || llt != lastLogTerm {
-		t.Fatalf("lastLogIndexAndTerm() = (%d,%d), want (%d,%d) — vote-safety pair corrupted",
+		t.Fatalf("lastLogIndexAndTermLocked() = (%d,%d), want (%d,%d) — vote-safety pair corrupted",
 			lli, llt, lastLogIndex, lastLogTerm)
 	}
 }
@@ -1447,7 +1449,7 @@ func TestSnapshot_InstallIdempotency(t *testing.T) {
 	// Счётчик no-op'ов на follower'е учитывает обе отправки.
 	cm := h.cluster[followerID]
 	cm.mu.Lock()
-	stale := peerSum(cm.counters.installSnapshotSkippedStale)
+	stale := peerSumLocked(cm.counters.installSnapshotSkippedStale)
 	cm.mu.Unlock()
 	if stale < 2 {
 		t.Fatalf("installSnapshotSkippedStale = %d, want >= 2", stale)
@@ -1474,7 +1476,7 @@ func TestSnapshot_InstallQuorumFiveNodes(t *testing.T) {
 	defer h.Shutdown()
 
 	for i := 0; i < h.n; i++ {
-		h.cluster[i].SetSnapshotConfig(20, 50*time.Millisecond, 2)
+		h.cluster[i].SetSnapshotConfig(20, 2, 50*time.Millisecond)
 	}
 
 	leaderID := h.waitForSingleLeader()
@@ -1547,7 +1549,7 @@ func TestReplicationBackoff_BoundsAttemptsToUnavailablePeer(t *testing.T) {
 	defer h.Shutdown()
 
 	for i := 0; i < h.n; i++ {
-		h.cluster[i].SetSnapshotConfig(20, 50*time.Millisecond, 8)
+		h.cluster[i].SetSnapshotConfig(20, 8, 50*time.Millisecond)
 	}
 
 	leaderID := h.waitForSingleLeader()
@@ -1614,7 +1616,7 @@ func TestReplicationBackoff_RecoveryAfterReconnect(t *testing.T) {
 	defer h.Shutdown()
 
 	for i := 0; i < h.n; i++ {
-		h.cluster[i].SetSnapshotConfig(20, 50*time.Millisecond, 8)
+		h.cluster[i].SetSnapshotConfig(20, 8, 50*time.Millisecond)
 	}
 
 	leaderID := h.waitForSingleLeader()

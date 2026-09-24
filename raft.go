@@ -7,10 +7,6 @@ import (
 )
 
 const (
-	// ProtocolVersion — версия протокола Raft, используемая данной реализацией.
-	// Значение 3. Совместимость с версиями 0-2 не поддерживается.
-	ProtocolVersion = 3
-
 	// Quantum — множитель для всех Raft-таймеров.
 	// Для тестового ускорения Quantum не меняется — используются
 	// test-only хуки (RAFT_FORCE_MORE_REELECTION и аналоги).
@@ -22,16 +18,6 @@ const (
 	// LeaktestBudget — единый бюджет leaktest:
 	// max(_inmemRPCTimeout, TCPRPCTimeout) + 100ms = 600ms.
 	LeaktestBudget = 600 * time.Millisecond
-
-	// _defaultTCPRPCTimeout — тайм-аут TCP RPC (не зависит от Quantum), используется
-	// в production-транспорте. Исходное значение 85ms получено из 382/2 при
-	// Quantum=3. Вынесено в независимую константу, чтобы изменение Quantum
-	// для ускорения тестов не влияло на production-развёртывание.
-	_defaultTCPRPCTimeout = 191 * time.Millisecond
-
-	// TCPRPCTimeout — алиас _defaultTCPRPCTimeout, сохранённый для обратной
-	// совместимости публичного API.
-	TCPRPCTimeout = _defaultTCPRPCTimeout
 
 	// _applyBatchInterval — интервал, с которым runApplyLoop проверяет
 	// необходимость применения записей к FSM. Накопление commitCh
@@ -166,22 +152,6 @@ func (s CMState) String() string {
 	}
 }
 
-// LogType определяет тип записи журнала.
-type LogType int
-
-const (
-	LogCommand LogType = iota
-	LogNoop
-	LogConfiguration
-)
-
-type LogEntry struct {
-	Index int
-	Term  int
-	Type  LogType
-	Data  any
-}
-
 // commitTuple связывает запись журнала с future для отправки в FSM.
 type commitTuple struct {
 	log    *LogEntry
@@ -218,7 +188,7 @@ func NewConsensusModule(
 	ready <-chan any,
 	snapshots ...SnapshotStore,
 ) *ConsensusModule {
-	if isNilInterface(transport) {
+	if IsNilInterface(transport) {
 		log.Fatalln("raft: NewConsensusModule: transport is nil")
 	}
 	// Отмечаем факт создания CM для трассировки (set-once).
@@ -281,8 +251,9 @@ func NewConsensusModule(
 		cm.restoreFromStorage()
 		cm.cmState.logNeedsPersist = false
 		// Однопоточное восстановление FSM из снимка до запуска горутин.
-		// Fail‑fast: узел должен громко упасть при невосстановимом состоянии,
-		// чтобы избежать молчаливой потери подтверждённых данных.
+		// Стратегия немедленного отказа: при невосстановимом состоянии узел
+		// аварийно завершается с явной ошибкой, чтобы избежать молчаливой
+		// потери подтверждённых данных.
 		if err := cm.restoreFromSnapshotStore(); err != nil {
 			log.Fatalf("raft: startup snapshot restore failed: %v", err)
 		}
@@ -312,19 +283,6 @@ func NewConsensusModule(
 	return cm
 }
 
-// RPCHeader — общий заголовок для всех RPC-сообщений Raft.
-// Встраивается во все структуры аргументов и ответов RPC.
-// Содержит версию протокола и идентификатор узла-отправителя.
-type RPCHeader struct {
-	ProtocolVersion int
-	ServerID        int
-}
-
-// WithRPCHeader — интерфейс, позволяющий получить RPCHeader из RPC-сообщения.
-type WithRPCHeader interface {
-	GetRPCHeader() RPCHeader
-}
-
 // checkRPCHeader проверяет, что RPC-сообщение использует поддерживаемую
 // версию протокола. Для v3-only возвращает nil только при ProtocolVersion == 3.
 func checkRPCHeader(rpc WithRPCHeader) error {
@@ -334,94 +292,6 @@ func checkRPCHeader(rpc WithRPCHeader) error {
 	}
 
 	return nil
-}
-
-// RequestVoteArgs См. рисунок 2 в статье.
-type RequestVoteArgs struct {
-	RPCHeader
-
-	Term         int
-	CandidateID  int
-	LastLogIndex int
-	LastLogTerm  int
-	// LeadershipTransfer — true, если запрос голоса вызван TimeoutNow.
-	// Позволяет bypass проверку "есть лидер" в RequestVote handler.
-	LeadershipTransfer bool
-}
-
-func (r *RequestVoteArgs) GetRPCHeader() RPCHeader {
-	return r.RPCHeader
-}
-
-type RequestVoteReply struct {
-	RPCHeader
-
-	Term        int
-	VoteGranted bool
-}
-
-func (r *RequestVoteReply) GetRPCHeader() RPCHeader {
-	return r.RPCHeader
-}
-
-// RequestPreVoteArgs — аргументы RPC предварительного голосования (§4 Pre-Vote).
-// PreVote НЕ увеличивает currentTerm, НЕ меняет votedFor, НЕ персистится.
-// Получатель проверяет только актуальность лога (log-safety) и наличие активного лидера.
-type RequestPreVoteArgs struct {
-	RPCHeader
-
-	Term         int
-	LastLogIndex int
-	LastLogTerm  int
-}
-
-func (r *RequestPreVoteArgs) GetRPCHeader() RPCHeader {
-	return r.RPCHeader
-}
-
-// RequestPreVoteReply — ответ на RequestPreVote RPC.
-type RequestPreVoteReply struct {
-	RPCHeader
-
-	Term        int
-	VoteGranted bool
-}
-
-func (r *RequestPreVoteReply) GetRPCHeader() RPCHeader {
-	return r.RPCHeader
-}
-
-// AppendEntriesArgs См. рисунок 2 в статье.
-type AppendEntriesArgs struct {
-	RPCHeader
-
-	Term     int
-	LeaderID int
-
-	PrevLogIndex int
-	PrevLogTerm  int
-	Entries      []LogEntry
-	LeaderCommit int
-}
-
-func (r *AppendEntriesArgs) GetRPCHeader() RPCHeader {
-	return r.RPCHeader
-}
-
-type AppendEntriesReply struct {
-	RPCHeader
-
-	Term    int
-	Success bool
-
-	// Faster conflict resolution optimization (described near the end of section
-	// 5.3 in the paper.)
-	ConflictIndex int
-	ConflictTerm  int
-}
-
-func (r *AppendEntriesReply) GetRPCHeader() RPCHeader {
-	return r.RPCHeader
 }
 
 // quorumSize возвращает минимальное количество голосов для достижения кворума.

@@ -1,4 +1,4 @@
-package raft
+package transp
 
 import (
 	"errors"
@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // newInmemPair создаёт два соединённых InmemTransport с уникальными адресами.
@@ -41,16 +43,16 @@ func startInmemHandler(t *testing.T, trans *InmemTransport, consume bool) func()
 					return
 				}
 				switch cmd := rpc.Command.(type) {
-				case *AppendEntriesArgs:
-					rpc.RespChan <- RPCResponse{
-						Reply: &AppendEntriesReply{
+				case *contract.AppendEntriesArgs:
+					rpc.RespChan <- contract.RPCResponse{
+						Reply: &contract.AppendEntriesReply{
 							Success: true,
 							Term:    cmd.Term,
 						},
 					}
-				case *RequestVoteArgs:
-					rpc.RespChan <- RPCResponse{
-						Reply: &RequestVoteReply{
+				case *contract.RequestVoteArgs:
+					rpc.RespChan <- contract.RPCResponse{
+						Reply: &contract.RequestVoteReply{
 							VoteGranted: true,
 							Term:        cmd.Term,
 						},
@@ -66,7 +68,7 @@ func startInmemHandler(t *testing.T, trans *InmemTransport, consume bool) func()
 
 // TestInmemNewTransport проверяет создание InmemTransport.
 func TestInmemNewTransport(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	trans := NewInmemTransport("raft-42")
 	if trans.Consumer() == nil {
 		t.Fatal("Consumer() returned nil")
@@ -82,7 +84,7 @@ func TestInmemNewTransport(t *testing.T) {
 
 // TestInmemDefaultTimeout проверяет таймаут по умолчанию.
 func TestInmemDefaultTimeout(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	trans := NewInmemTransport("test")
 	if trans.timeout != 500*time.Millisecond {
 		t.Fatalf("default timeout = %v, want 500ms", trans.timeout)
@@ -92,17 +94,17 @@ func TestInmemDefaultTimeout(t *testing.T) {
 
 // TestInmemAppendEntriesSuccess проверяет успешную отправку и получение ответа.
 func TestInmemAppendEntriesSuccess(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 	defer startInmemHandler(t, t2, true)()
 
-	args := AppendEntriesArgs{
+	args := contract.AppendEntriesArgs{
 		Term:         1,
 		LeaderID:     0,
 		PrevLogIndex: -1,
 		PrevLogTerm:  -1,
-		Entries:      []LogEntry{},
+		Entries:      []raft.LogEntry{},
 		LeaderCommit: -1,
 	}
 	reply, err := t1.AppendEntries(1, args)
@@ -119,23 +121,23 @@ func TestInmemAppendEntriesSuccess(t *testing.T) {
 
 // TestInmemAppendEntriesDisconnectedPeer проверяет отправку отключённому peer.
 func TestInmemAppendEntriesDisconnectedPeer(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1 := NewInmemTransport("test-0")
 	t2 := NewInmemTransport("test-1")
 	defer t1.Close()
 	defer t2.Close()
 
 	// Не вызываем Connect()
-	args := AppendEntriesArgs{Term: 1}
+	args := contract.AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrNotReachable {
+	if err != contract.ErrNotReachable {
 		t.Fatalf("want ErrNotReachable, got %v", err)
 	}
 }
 
 // TestInmemAppendEntriesAfterClose проверяет отправку после закрытия.
 func TestInmemAppendEntriesAfterClose(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2 := NewInmemTransport("test-0"), NewInmemTransport("test-1")
 	t1.Connect(1, t2)
 	t2.Connect(0, t1)
@@ -144,31 +146,31 @@ func TestInmemAppendEntriesAfterClose(t *testing.T) {
 
 	t1.Close() // закрываем t1
 
-	args := AppendEntriesArgs{Term: 1}
+	args := contract.AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
 
 // TestInmemAppendEntriesPeerClosed проверяет отправку, когда peer закрыт.
 func TestInmemAppendEntriesPeerClosed(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 
 	t2.Close() // закрываем peer
 
-	args := AppendEntriesArgs{Term: 1}
+	args := contract.AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
 
 // TestInmemAppendEntriesTimeout проверяет таймаут ожидания ответа.
 func TestInmemAppendEntriesTimeout(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 	// Не запускаем обработчик — consumerCh будет заблокирован
@@ -186,21 +188,21 @@ func TestInmemAppendEntriesTimeout(t *testing.T) {
 		// Ничего не делаем — не отправляем ответ
 	}()
 
-	args := AppendEntriesArgs{Term: 1}
+	args := contract.AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrEnqueueTimeout {
+	if err != contract.ErrEnqueueTimeout {
 		t.Fatalf("want ErrEnqueueTimeout, got %v", err)
 	}
 }
 
 // TestInmemRequestVoteSuccess проверяет успешную отправку RequestVote.
 func TestInmemRequestVoteSuccess(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 	defer startInmemHandler(t, t2, true)()
 
-	args := RequestVoteArgs{
+	args := contract.RequestVoteArgs{
 		Term:         2,
 		CandidateID:  0,
 		LastLogIndex: -1,
@@ -220,22 +222,22 @@ func TestInmemRequestVoteSuccess(t *testing.T) {
 
 // TestInmemRequestVoteDisconnectedPeer проверяет отправку RequestVote отключённому peer.
 func TestInmemRequestVoteDisconnectedPeer(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1 := NewInmemTransport("test-0")
 	t2 := NewInmemTransport("test-1")
 	defer t1.Close()
 	defer t2.Close()
 
-	args := RequestVoteArgs{Term: 1}
+	args := contract.RequestVoteArgs{Term: 1}
 	_, err := t1.RequestVote(1, args)
-	if err != ErrNotReachable {
+	if err != contract.ErrNotReachable {
 		t.Fatalf("want ErrNotReachable, got %v", err)
 	}
 }
 
 // TestInmemRequestVoteAfterClose проверяет отправку RequestVote после закрытия.
 func TestInmemRequestVoteAfterClose(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2 := NewInmemTransport("test-0"), NewInmemTransport("test-1")
 	t1.Connect(1, t2)
 	t2.Connect(0, t1)
@@ -244,31 +246,31 @@ func TestInmemRequestVoteAfterClose(t *testing.T) {
 
 	t1.Close()
 
-	args := RequestVoteArgs{Term: 1}
+	args := contract.RequestVoteArgs{Term: 1}
 	_, err := t1.RequestVote(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
 
 // TestInmemRequestVotePeerClosed проверяет отправку RequestVote, когда peer закрыт.
 func TestInmemRequestVotePeerClosed(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 
 	t2.Close()
 
-	args := RequestVoteArgs{Term: 1}
+	args := contract.RequestVoteArgs{Term: 1}
 	_, err := t1.RequestVote(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
 
 // TestInmemConnect проверяет Connect.
 func TestInmemConnect(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1 := NewInmemTransport("test-0")
 	t2 := NewInmemTransport("test-1")
 	defer t1.Close()
@@ -286,7 +288,7 @@ func TestInmemConnect(t *testing.T) {
 
 // TestInmemDisconnect проверяет Disconnect.
 func TestInmemDisconnect(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 	_ = t2
@@ -297,16 +299,16 @@ func TestInmemDisconnect(t *testing.T) {
 	}
 
 	// Убедимся, что после Disconnect отправка не работает
-	args := AppendEntriesArgs{Term: 1}
+	args := contract.AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrNotReachable {
+	if err != contract.ErrNotReachable {
 		t.Fatalf("want ErrNotReachable, got %v", err)
 	}
 }
 
 // TestInmemDisconnectAll проверяет DisconnectAll.
 func TestInmemDisconnectAll(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1 := NewInmemTransport("test-0")
 	t2 := NewInmemTransport("test-1")
 	t3 := NewInmemTransport("test-2")
@@ -332,7 +334,7 @@ func TestInmemDisconnectAll(t *testing.T) {
 
 // TestInmemDoubleDisconnect проверяет, что Disconnect несуществующего peer не паникует.
 func TestInmemDoubleDisconnect(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1 := NewInmemTransport("test-0")
 	defer t1.Close()
 
@@ -348,13 +350,13 @@ func TestInmemDoubleDisconnect(t *testing.T) {
 // TestInmemConnectThenSend проверяет, что после Connect отправка работает,
 // а после Disconnect — нет.
 func TestInmemConnectThenSend(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 	defer startInmemHandler(t, t2, true)()
 
 	// После Connect — отправка работает
-	args := AppendEntriesArgs{Term: 1}
+	args := contract.AppendEntriesArgs{Term: 1}
 	reply, err := t1.AppendEntries(1, args)
 	if err != nil {
 		t.Fatalf("AppendEntries after Connect failed: %v", err)
@@ -368,14 +370,14 @@ func TestInmemConnectThenSend(t *testing.T) {
 
 	// После Disconnect — отправка не работает
 	_, err = t1.AppendEntries(1, args)
-	if err != ErrNotReachable {
+	if err != contract.ErrNotReachable {
 		t.Fatalf("want ErrNotReachable, got %v", err)
 	}
 }
 
 // TestInmemClose проверяет, что после Close все методы возвращают ошибку.
 func TestInmemClose(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2 := NewInmemTransport("test-0"), NewInmemTransport("test-1")
 	t1.Connect(1, t2)
 	t2.Connect(0, t1)
@@ -384,16 +386,16 @@ func TestInmemClose(t *testing.T) {
 
 	t1.Close()
 
-	args := AppendEntriesArgs{Term: 1}
+	args := contract.AppendEntriesArgs{Term: 1}
 	_, err := t1.AppendEntries(1, args)
-	if err != ErrRaftShutdown {
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
 
 // TestInmemDoubleClose проверяет, что вызов Close дважды не вызывает panic.
 func TestInmemDoubleClose(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1 := NewInmemTransport("test-0")
 	t1.Close()
 	t1.Close() // не должно panic
@@ -401,7 +403,7 @@ func TestInmemDoubleClose(t *testing.T) {
 
 // TestInmemCloseConsumerDrain проверяет, что после Close consumerCh пуст.
 func TestInmemCloseConsumerDrain(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 
@@ -410,7 +412,7 @@ func TestInmemCloseConsumerDrain(t *testing.T) {
 	// Но мы не ждём — закрываем t2 и проверяем, что Close дренирует consumerCh.
 	errCh := make(chan error, 1)
 	go func() {
-		_, err := t1.AppendEntries(1, AppendEntriesArgs{Term: 1})
+		_, err := t1.AppendEntries(1, contract.AppendEntriesArgs{Term: 1})
 		errCh <- err
 	}()
 
@@ -426,7 +428,7 @@ func TestInmemCloseConsumerDrain(t *testing.T) {
 	// Проверяем, что AppendEntries завершился с ошибкой, а не заблокировался навсегда
 	select {
 	case err := <-errCh:
-		if err != ErrRaftShutdown {
+		if err != contract.ErrRaftShutdown {
 			t.Fatalf("want ErrRaftShutdown, got %v", err)
 		}
 	case <-time.After(time.Second):
@@ -435,36 +437,36 @@ func TestInmemCloseConsumerDrain(t *testing.T) {
 }
 
 // TestInmemStubsReturnNotImplemented проверяет, что stub-методы
-// возвращают ErrNotImplemented. RequestPreVote не проверяется —
+// возвращают contract.ErrNotImplemented. RequestPreVote не проверяется —
 // он реализован для InmemTransport.
 func TestInmemStubsReturnNotImplemented(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	trans := NewInmemTransport("test")
 	defer trans.Close()
 	t.Run("TimeoutNow", func(t *testing.T) {
-		_, err := trans.TimeoutNow(1, TimeoutNowRequest{})
-		if err != ErrNotReachable {
+		_, err := trans.TimeoutNow(1, contract.TimeoutNowRequest{})
+		if err != contract.ErrNotReachable {
 			t.Fatalf("want ErrNotReachable, got %v", err)
 		}
 	})
 	t.Run("InstallSnapshot", func(t *testing.T) {
-		_, err := trans.InstallSnapshot(1, InstallSnapshotRequest{}, nil)
-		// InstallSnapshot теперь реализован — peer не подключён, ошибка ErrNotReachable.
-		if err != ErrNotReachable {
+		_, err := trans.InstallSnapshot(1, contract.InstallSnapshotRequest{}, nil)
+		// InstallSnapshot теперь реализован — peer не подключён, ошибка contract.ErrNotReachable.
+		if err != contract.ErrNotReachable {
 			t.Fatalf("want ErrNotReachable, got %v", err)
 		}
 	})
 }
 
 // TestInmemAppendPipelineReturnsNotImplemented проверяет, что
-// AppendEntriesPipeline возвращает ErrNotImplemented.
+// AppendEntriesPipeline возвращает contract.ErrNotImplemented.
 func TestInmemAppendPipelineReturnsNotImplemented(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	trans := NewInmemTransport("test")
 	defer trans.Close()
 
 	_, err := trans.AppendEntriesPipeline(1)
-	if err != ErrNotImplemented {
+	if err != contract.ErrNotImplemented {
 		t.Fatalf("want ErrNotImplemented, got %v", err)
 	}
 }
@@ -472,7 +474,7 @@ func TestInmemAppendPipelineReturnsNotImplemented(t *testing.T) {
 // TestInmemConcurrentSend проверяет, что 10 горутин одновременно
 // могут отправлять AppendEntries разным peers.
 func TestInmemConcurrentSend(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	// Создаём 3 транспорта, соединённых в полную mesh-сеть
 	t0 := NewInmemTransport("test-0")
 	t1 := NewInmemTransport("test-1")
@@ -499,13 +501,13 @@ func TestInmemConcurrentSend(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			var peer ServerID
+			var peer contract.ServerID
 			if id%2 == 0 {
 				peer = 1
 			} else {
 				peer = 2
 			}
-			args := AppendEntriesArgs{Term: 1, LeaderID: 0}
+			args := contract.AppendEntriesArgs{Term: 1, LeaderID: 0}
 			reply, err := t0.AppendEntries(peer, args)
 			if err != nil {
 				t.Errorf("AppendEntries to peer %d failed: %v", peer, err)
@@ -522,7 +524,7 @@ func TestInmemConcurrentSend(t *testing.T) {
 // TestInmemConcurrentConnectDisconnect проверяет Connect/Disconnect
 // из нескольких горутин. Запускать с -race.
 func TestInmemConcurrentConnectDisconnect(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t0 := NewInmemTransport("test-0")
 	t1 := NewInmemTransport("test-1")
 	defer t0.Close()
@@ -542,13 +544,13 @@ func TestInmemConcurrentConnectDisconnect(t *testing.T) {
 
 // TestInmemManyRoundTrips проверяет 100 последовательных AppendEntries.
 func TestInmemManyRoundTrips(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 	defer startInmemHandler(t, t2, true)()
 
 	for i := 0; i < 100; i++ {
-		args := AppendEntriesArgs{
+		args := contract.AppendEntriesArgs{
 			Term:     i + 1,
 			LeaderID: 0,
 		}
@@ -565,7 +567,7 @@ func TestInmemManyRoundTrips(t *testing.T) {
 // TestInmemTransportNoGoroutineLeak проверяет, что после Close
 // не остаётся goroutine.
 func TestInmemTransportNoGoroutineLeak(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1 := NewInmemTransport("test-0")
 	// Просто создаём и закрываем — проверяем только утечку
 	t1.Close()
@@ -573,7 +575,7 @@ func TestInmemTransportNoGoroutineLeak(t *testing.T) {
 
 // TestInmemLocalAddr проверяет LocalAddr().
 func TestInmemLocalAddr(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	trans := NewInmemTransport("my-addr")
 	defer trans.Close()
 	if addr := trans.LocalAddr(); addr != "my-addr" {
@@ -583,19 +585,19 @@ func TestInmemLocalAddr(t *testing.T) {
 
 // TestInmemSetHeartbeatHandler проверяет, что SetHeartbeatHandler сохраняет функцию.
 func TestInmemSetHeartbeatHandler(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	trans := NewInmemTransport("test")
 	defer trans.Close()
 
 	called := false
-	trans.SetHeartbeatHandler(func(rpc RPC) {
+	trans.SetHeartbeatHandler(func(rpc contract.RPC) {
 		called = true
 	})
 	if trans.heartbeat == nil {
 		t.Fatal("heartbeat handler is nil after SetHeartbeatHandler")
 	}
 	// Вызываем сохранённую функцию
-	trans.heartbeat(RPC{})
+	trans.heartbeat(contract.RPC{})
 	if !called {
 		t.Fatal("heartbeat handler was not called")
 	}
@@ -604,7 +606,7 @@ func TestInmemSetHeartbeatHandler(t *testing.T) {
 // TestInmemConsumerIsUnbuffered проверяет, что Consumer() возвращает
 // небуферизированный канал.
 func TestInmemConsumerIsUnbuffered(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	trans := NewInmemTransport("test")
 	defer trans.Close()
 	if cap(trans.Consumer()) != 0 {
@@ -615,7 +617,7 @@ func TestInmemConsumerIsUnbuffered(t *testing.T) {
 // TestInmemDisconnectPeerCallsSideEffect проверяет, что Disconnect на
 // одном транспорте не влияет на другой транспорт (симметричность не требуется).
 func TestInmemDisconnectPeerCallsSideEffect(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 
@@ -626,7 +628,7 @@ func TestInmemDisconnectPeerCallsSideEffect(t *testing.T) {
 	// Проверяем через startInmemHandler
 	defer startInmemHandler(t, t1, true)()
 
-	args := AppendEntriesArgs{Term: 1}
+	args := contract.AppendEntriesArgs{Term: 1}
 	reply, err := t2.AppendEntries(0, args)
 	if err != nil {
 		t.Fatalf("AppendEntries from t2 to t1 failed after t1 disconnected: %v", err)
@@ -639,7 +641,7 @@ func TestInmemDisconnectPeerCallsSideEffect(t *testing.T) {
 // TestInmemAppendEntriesRequestVoteError проверяет, что если обработчик
 // возвращает ошибку в RespChan, AppendEntries/RequestVote возвращают её.
 func TestInmemAppendEntriesError(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 
@@ -648,13 +650,13 @@ func TestInmemAppendEntriesError(t *testing.T) {
 	go func() {
 		select {
 		case rpc := <-t2.Consumer():
-			rpc.RespChan <- RPCResponse{Error: errors.New("raft: test error")}
+			rpc.RespChan <- contract.RPCResponse{Error: errors.New("raft: test error")}
 		case <-done:
 		}
 	}()
 	defer close(done)
 
-	_, err := t1.AppendEntries(1, AppendEntriesArgs{Term: 1})
+	_, err := t1.AppendEntries(1, contract.AppendEntriesArgs{Term: 1})
 	if err == nil || err.Error() != "raft: test error" {
 		t.Fatalf("want 'raft: test error', got %v", err)
 	}
@@ -663,7 +665,7 @@ func TestInmemAppendEntriesError(t *testing.T) {
 // TestInmemRequestVoteError проверяет, что ошибка от обработчика
 // RequestVote пробрасывается вызывающей стороне.
 func TestInmemRequestVoteError(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 
@@ -671,14 +673,14 @@ func TestInmemRequestVoteError(t *testing.T) {
 	go func() {
 		select {
 		case rpc := <-t2.Consumer():
-			rpc.RespChan <- RPCResponse{Error: ErrRaftShutdown}
+			rpc.RespChan <- contract.RPCResponse{Error: contract.ErrRaftShutdown}
 		case <-done:
 		}
 	}()
 	defer close(done)
 
-	_, err := t1.RequestVote(1, RequestVoteArgs{Term: 1})
-	if err != ErrRaftShutdown {
+	_, err := t1.RequestVote(1, contract.RequestVoteArgs{Term: 1})
+	if err != contract.ErrRaftShutdown {
 		t.Fatalf("want ErrRaftShutdown, got %v", err)
 	}
 }
@@ -686,14 +688,14 @@ func TestInmemRequestVoteError(t *testing.T) {
 // TestInmemCloseWithPendingRPC проверяет, что Close() не блокируется,
 // если есть RPC-запрос, ожидающий в consumerCh.
 func TestInmemCloseWithPendingRPC(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 
 	// Отправляем RPC без обработчика — он зависнет в consumerCh
 	errCh := make(chan error, 1)
 	go func() {
-		_, err := t1.AppendEntries(1, AppendEntriesArgs{Term: 1})
+		_, err := t1.AppendEntries(1, contract.AppendEntriesArgs{Term: 1})
 		errCh <- err
 	}()
 
@@ -708,7 +710,7 @@ func TestInmemCloseWithPendingRPC(t *testing.T) {
 
 	select {
 	case err := <-errCh:
-		if err != ErrRaftShutdown {
+		if err != contract.ErrRaftShutdown {
 			t.Fatalf("want ErrRaftShutdown, got %v", err)
 		}
 	case <-time.After(time.Second):
@@ -719,7 +721,7 @@ func TestInmemCloseWithPendingRPC(t *testing.T) {
 // TestInmemAppendEntriesWithEntries проверяет, что AppendEntries
 // с записями журнала работает корректно.
 func TestInmemAppendEntriesWithEntries(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	t1, t2, cleanup := newInmemPair(t)
 	defer cleanup()
 
@@ -727,13 +729,13 @@ func TestInmemAppendEntriesWithEntries(t *testing.T) {
 	go func() {
 		select {
 		case rpc := <-t2.Consumer():
-			cmd, ok := rpc.Command.(*AppendEntriesArgs)
+			cmd, ok := rpc.Command.(*contract.AppendEntriesArgs)
 			if !ok {
-				t.Errorf("Command = %T, want *AppendEntriesArgs", rpc.Command)
+				t.Errorf("Command = %T, want *contract.AppendEntriesArgs", rpc.Command)
 				return
 			}
-			rpc.RespChan <- RPCResponse{
-				Reply: &AppendEntriesReply{
+			rpc.RespChan <- contract.RPCResponse{
+				Reply: &contract.AppendEntriesReply{
 					Success:       true,
 					Term:          cmd.Term,
 					ConflictIndex: cmd.PrevLogIndex + len(cmd.Entries),
@@ -744,8 +746,8 @@ func TestInmemAppendEntriesWithEntries(t *testing.T) {
 	}()
 	defer close(done)
 
-	entries := []LogEntry{{Index: 0, Term: 1, Data: "cmd1"}}
-	args := AppendEntriesArgs{
+	entries := []raft.LogEntry{{Index: 0, Term: 1, Data: "cmd1"}}
+	args := contract.AppendEntriesArgs{
 		Term:         1,
 		LeaderID:     0,
 		PrevLogIndex: -1,
@@ -768,7 +770,7 @@ func TestInmemAppendEntriesWithEntries(t *testing.T) {
 // TestInmemCloseIdempotent проверяет, что множественный Close
 // не вызывает проблем с каналами.
 func TestInmemCloseIdempotent(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	trans := NewInmemTransport("test")
 	trans.Close()
 	trans.Close()
@@ -779,10 +781,10 @@ func TestInmemCloseIdempotent(t *testing.T) {
 // TestInmemNewTransportMultiple проверяет, что несколько транспортов
 // создаются независимо.
 func TestInmemNewTransportMultiple(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 	for i := 0; i < 10; i++ {
-		trans := NewInmemTransport(ServerAddress(fmt.Sprintf("node-%d", i)))
-		if trans.LocalAddr() != ServerAddress(fmt.Sprintf("node-%d", i)) {
+		trans := NewInmemTransport(contract.ServerAddress(fmt.Sprintf("node-%d", i)))
+		if trans.LocalAddr() != contract.ServerAddress(fmt.Sprintf("node-%d", i)) {
 			t.Fatalf("unexpected address for node %d", i)
 		}
 		trans.Close()

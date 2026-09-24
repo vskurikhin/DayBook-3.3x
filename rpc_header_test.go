@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // NoopFSM — FSM, ничего не делающая в Apply.
@@ -12,11 +13,11 @@ type NoopFSM struct{}
 
 func (NoopFSM) Apply(*LogEntry) any { return nil }
 func (NoopFSM) Snapshot() (FSMSnapshot, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 func (NoopFSM) Restore(_ io.ReadCloser) error {
-	return ErrNotImplemented
+	return contract.ErrNotImplemented
 }
 
 // testWithHeader — вспомогательный тип для теста checkRPCHeader.

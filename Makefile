@@ -175,7 +175,7 @@ verify-imports:
 		exit 1; \
 	fi
 
-go-test: verify-imports go-test-root go-test-tracetest go-test-pkg go-test-kvservice
+go-test: verify-imports go-test-root go-test-pkg-raft go-test-pkg go-test-kvservice
 
 verify-race-scope:
 	@ROOT_PKG=$$(go list -m); \
@@ -207,9 +207,9 @@ go-test-root:
 	@echo "  >  Running tests: . $(TESTFLAGS)"
 	@go test $(TESTFLAGS) .
 
-go-test-tracetest:
-	@echo "  >  Running tests: pkg/raft/tracetest/... $(TESTFLAGS)"
-	@go test $(TESTFLAGS) ./pkg/raft/tracetest/...
+go-test-pkg-raft:
+	@echo "  >  Running tests: pkg/raft/... $(TESTFLAGS)"
+	@go test $(TESTFLAGS) ./pkg/raft/...
 
 go-lint:
 	@echo "  >  Running golangci-lint: $(PKG) $(LINTFLAGS)"

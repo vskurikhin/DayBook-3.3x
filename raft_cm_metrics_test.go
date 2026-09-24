@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // -- Тесты подсистемы latency-метрик. ---
@@ -120,7 +122,7 @@ func TestLatencyZeroValueCMMetricPaths(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{}
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.fsmMutateCh = make(chan []*commitTuple, _batchApplyBuffer)
 	cm.shutdownCh = make(chan struct{})
 	cm.leaderState.inflight = make(map[int]*logFuture)
@@ -534,7 +536,7 @@ func (f *countBatchesFSM) appliedCount() int {
 func (f *countBatchesFSM) Apply(*LogEntry) any { return nil }
 
 // Snapshot — заглушка; в T9 снимки не используются.
-func (f *countBatchesFSM) Snapshot() (FSMSnapshot, error) { return nil, ErrNotImplemented }
+func (f *countBatchesFSM) Snapshot() (FSMSnapshot, error) { return nil, contract.ErrNotImplemented }
 
 // Restore — заглушка; в T9 восстановление не используется.
-func (f *countBatchesFSM) Restore(io.ReadCloser) error { return ErrNotImplemented }
+func (f *countBatchesFSM) Restore(io.ReadCloser) error { return contract.ErrNotImplemented }

@@ -1,4 +1,4 @@
-package raft
+package contract
 
 import (
 	"errors"
@@ -147,8 +147,18 @@ type Transport interface {
 	// предписывая целевому узлу начать немедленные выборы.
 	TimeoutNow(ServerID, TimeoutNowRequest) (TimeoutNowResponse, error)
 
-	// InstallSnapshot отправляет snapshot узлу peerID.
-	// В текущей реализации возвращает ErrNotImplemented.
+	// InstallSnapshot отправляет снимок узлу peerID. Данные снимка
+	// передаются из data (io.Reader); размер задаётся полем DataSize запроса.
+	// Вызывается лидером при передаче снимка соседу, отставшему за границу
+	// доступного журнала.
+	//
+	// Возвращает:
+	//   - транспортную ошибку при недоступности peer (ErrNotReachable,
+	//     ErrRaftShutdown, ErrEnqueueTimeout);
+	//   - логическую ошибку Raft (терм выше) — в reply, err == nil.
+	//     Success отражает результат установки снимка на узле-получателе.
+	//
+	// После Close() возвращает ErrRaftShutdown.
 	InstallSnapshot(ServerID, InstallSnapshotRequest, io.Reader) (InstallSnapshotResponse, error)
 
 	// AppendEntriesPipeline возвращает конвейер для AppendEntries.

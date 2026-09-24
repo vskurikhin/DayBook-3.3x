@@ -8,13 +8,15 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // writeSnapshotData записывает снимок с gob-кодированным map в
-// FileSnapshotStore и возвращает его метаданные.
-func writeSnapshotData(t *testing.T, store *FileSnapshotStore, index, term int, state map[string]string) *SnapshotMeta {
+// FileSnapshot и возвращает его метаданные.
+func writeSnapshotData(t *testing.T, store *store.FileSnapshot, index, term int, state map[string]string) *SnapshotMeta {
 	t.Helper()
-	sink, err := store.Create(index, term, Configuration{}, index)
+	sink, err := store.Create(index, term, index, Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -86,27 +88,27 @@ func waitForSnapshotQuiescence(t *testing.T, cm *ConsensusModule, storage Storag
 }
 
 // TestRestoreFromSnapshotStore_RestoresFSMAndIndex — рестарт узла с
-// FileStorage + FileSnapshotStore: FSM восстанавливается из снимка,
+// FileStorage + FileSnapshot: FSM восстанавливается из снимка,
 // lastApplied/commitIndex соответствуют индексу снимка, суффикс лога
 // реплицируется после выборов.
 func TestRestoreFromSnapshotStore_RestoresFSMAndIndex(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	dir := t.TempDir()
-	storage1 := NewFileStorage(dir)
-	store1, err := NewFileSnapshotStore(dir, 2)
+	storage1 := store.NewFileStorage(dir)
+	store1, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 	fsm1 := newSnapshotTestFSM()
 	ready1 := make(chan any)
 	close(ready1)
-	transport1 := NewInmemTransport("single")
+	transport1 := transp.NewInmemTransport("single")
 
 	cm1 := NewConsensusModule(0, []int{}, transport1, storage1, fsm1, ready1, store1)
 	waitForLeader(t, cm1, 5*time.Second)
 
-	cm1.SetSnapshotConfig(4, 50*time.Millisecond, 2)
+	cm1.SetSnapshotConfig(4, 2, 50*time.Millisecond)
 
 	const numCommands = 10
 	for i := 0; i < numCommands; i++ {
@@ -130,15 +132,15 @@ func TestRestoreFromSnapshotStore_RestoresFSMAndIndex(t *testing.T) {
 	transport1.Close()
 
 	// Пересоздаём узел в той же директории (полный рестарт процесса).
-	storage2 := NewFileStorage(dir)
-	store2, err := NewFileSnapshotStore(dir, 2)
+	storage2 := store.NewFileStorage(dir)
+	store2, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore (restart) failed: %v", err)
+		t.Fatalf("NewFileSnapshot (restart) failed: %v", err)
 	}
 	fsm2 := newSnapshotTestFSM()
 	ready2 := make(chan any)
 	close(ready2)
-	transport2 := NewInmemTransport("single-2")
+	transport2 := transp.NewInmemTransport("single-2")
 
 	cm2 := NewConsensusModule(0, []int{}, transport2, storage2, fsm2, ready2, store2)
 	defer cm2.Stop()
@@ -189,7 +191,7 @@ func TestRestoreFromSnapshotStore_EmptyStoreNoSnapshots(t *testing.T) {
 
 	cm := &ConsensusModule{
 		fsm:           newSnapshotTestFSM(),
-		snapshotStore: NewInmemSnapshotStore(),
+		snapshotStore: store.NewInmemSnapshot(),
 	}
 	cm.cmState.lastSnapshotIndex = -1
 	cm.cmState.lastSnapshotTerm = -1
@@ -216,7 +218,7 @@ func TestRestoreFromSnapshotStore_FailFastGap(t *testing.T) {
 	// 1. Пустой store + lastSnapshotIndex >= 0 → ошибка.
 	cm := &ConsensusModule{
 		fsm:           newSnapshotTestFSM(),
-		snapshotStore: NewInmemSnapshotStore(),
+		snapshotStore: store.NewInmemSnapshot(),
 	}
 	cm.cmState.lastSnapshotIndex = 5
 	cm.cmState.lastSnapshotTerm = 1
@@ -227,15 +229,15 @@ func TestRestoreFromSnapshotStore_FailFastGap(t *testing.T) {
 	}
 
 	// 2. Снимок в сторе старее lastSnapshotIndex из storage → ошибка.
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(3, 1, Configuration{}, 3)
+	stor := store.NewInmemSnapshot()
+	sink, err := stor.Create(3, 1, 3, Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 	_ = sink.Close()
 	cm = &ConsensusModule{
 		fsm:           newSnapshotTestFSM(),
-		snapshotStore: store,
+		snapshotStore: stor,
 	}
 	cm.cmState.lastSnapshotIndex = 5
 	cm.cmState.lastSnapshotTerm = 1
@@ -267,27 +269,27 @@ func TestRestoreFromSnapshotStore_FailFastGap(t *testing.T) {
 }
 
 // TestRestoreFromSnapshotStore_SelfHealsStalePersistKey — ветка
-// самовосстановления (ревью HIGH-2): снимок в постоянном хранилище новее
-// lastSnapshotIndex на диске (окно крэша) — конструктор не
-// падает, метаданные берутся из стора и исправляются на диске.
+// самовосстановления (ревью HIGH-2): снимок в постоянном хранилище
+// новее lastSnapshotIndex на диске (окно сбоя) — конструктор не
+// падает, метаданные считываются из хранилища и актуализируются на диске.
 func TestRestoreFromSnapshotStore_SelfHealsStalePersistKey(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	dir := t.TempDir()
-	storage1 := NewFileStorage(dir)
-	store1, err := NewFileSnapshotStore(dir, 2)
+	storage1 := store.NewFileStorage(dir)
+	store1, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
 	fsm1 := newSnapshotTestFSM()
 	ready1 := make(chan any)
 	close(ready1)
-	transport1 := NewInmemTransport("single")
+	transport1 := transp.NewInmemTransport("single")
 
 	cm1 := NewConsensusModule(0, []int{}, transport1, storage1, fsm1, ready1, store1)
 	waitForLeader(t, cm1, 5*time.Second)
 
-	cm1.SetSnapshotConfig(4, 50*time.Millisecond, 2)
+	cm1.SetSnapshotConfig(4, 2, 50*time.Millisecond)
 
 	for i := 0; i < 10; i++ {
 		cmd := "k" + itoa(i) + "=v" + itoa(i)
@@ -308,23 +310,23 @@ func TestRestoreFromSnapshotStore_SelfHealsStalePersistKey(t *testing.T) {
 	cm1.Stop()
 	transport1.Close()
 
-	// Имитация крэша между Close снимка и persistToStorage:
-	// состариваем ключ lastSnapshotIndex на диске.
-	storage2 := NewFileStorage(dir)
+	// Имитация сбоя ОС между Close снимка и persistToStorage:
+	// искусственно занижаем значение ключа lastSnapshotIndex на диске.
+	storage2 := store.NewFileStorage(dir)
 	staleIdx := -1
 	if snapIdx > 1 {
 		staleIdx = snapIdx - 1
 	}
 	storage2.Set("lastSnapshotIndex", gobEncode(t, staleIdx))
 
-	store2, err := NewFileSnapshotStore(dir, 2)
+	store2, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore (restart) failed: %v", err)
+		t.Fatalf("NewFileSnapshot (restart) failed: %v", err)
 	}
 	fsm2 := newSnapshotTestFSM()
 	ready2 := make(chan any)
 	close(ready2)
-	transport2 := NewInmemTransport("single-2")
+	transport2 := transp.NewInmemTransport("single-2")
 
 	// Конструктор не должен завершить процесс.
 	cm2 := NewConsensusModule(0, []int{}, transport2, storage2, fsm2, ready2, store2)
@@ -368,7 +370,7 @@ func TestRestoreFromSnapshotStore_EmptyLogWithSnapshot(t *testing.T) {
 	dir := t.TempDir()
 
 	// Вручную заполняем storage: метаданные + пустой журнал.
-	storage := NewFileStorage(dir)
+	storage := store.NewFileStorage(dir)
 	storage.Set("currentTerm", gobEncode(t, 1))
 	storage.Set("votedFor", gobEncode(t, 0))
 	storage.Set("log", gobEncode(t, []LogEntry{}))
@@ -376,18 +378,18 @@ func TestRestoreFromSnapshotStore_EmptyLogWithSnapshot(t *testing.T) {
 	storage.Set("lastSnapshotTerm", gobEncode(t, 1))
 
 	// Снимок с индексом 5 в постоянном хранилище.
-	store, err := NewFileSnapshotStore(dir, 2)
+	stor, err := store.NewFileSnapshot(dir, 2)
 	if err != nil {
-		t.Fatalf("NewFileSnapshotStore failed: %v", err)
+		t.Fatalf("NewFileSnapshot failed: %v", err)
 	}
-	writeSnapshotData(t, store, 5, 1, map[string]string{"k0": "v0"})
+	writeSnapshotData(t, stor, 5, 1, map[string]string{"k0": "v0"})
 
 	fsm := newSnapshotTestFSM()
 	ready := make(chan any)
 	close(ready)
-	transport := NewInmemTransport("single")
+	transport := transp.NewInmemTransport("single")
 
-	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, store)
+	cm := NewConsensusModule(0, []int{}, transport, storage, fsm, ready, stor)
 	defer cm.Stop()
 
 	cm.mu.Lock()
@@ -431,13 +433,16 @@ func (r *recordingStorage) keysSnapshot() []string {
 // persistKeys — ключи, которые вправе записывать persistToStorage.
 var persistKeys = []string{"currentTerm", "votedFor", "lastSnapshotIndex", "lastSnapshotTerm", "log"}
 
-// assertPersistKeyOrder проверяет инвариант крэш-безопасности по наблюдённой
-// последовательности записанных ключей: снимок-ключи предшествуют журналу,
-// журнал записан последним, каждый ключ известен и записан не более раза.
+// assertPersistKeyOrder проверяет инвариант отказоустойчивости
+// на основе наблюдаемой последовательности ключей: ключи снимка
+// идут до ключей журнала, журнал зафиксирован последним.
+// Гарантируется, что каждый ключ встречается в последовательности
+// не более одного раза.
 //
-// Число записанных ключей инвариантом не является: слой хранения вправе
-// пропустить запись значения, которое уже лежит на диске, поэтому любой ключ
-// может отсутствовать в последовательности — его значение уже долговечно.
+// Число ключей не входит в инвариант: слой хранения может
+// пропускать повторную запись, если значение уже присутствует
+// на диске. Отсутствие ключа в последовательности допустимо —
+// его значение уже является долговечным.
 func assertPersistKeyOrder(t *testing.T, keys []string) {
 	t.Helper()
 
@@ -472,12 +477,12 @@ func assertPersistKeyOrder(t *testing.T, keys []string) {
 }
 
 // TestPersistToStorage_LogWrittenLast проверяет относительный порядок записи:
-// снимок-ключи записываются ДО усечённого журнала, чтобы крэш между записями
-// не оставлял «журнал усечён, а lastSnapshotIndex старый».
+// ключи снимка записываются ДО усечённого журнала, чтобы сбой между операциями
+// не привёл к состоянию «журнал усечён, а lastSnapshotIndex старый».
 func TestPersistToStorage_LogWrittenLast(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	rec := &recordingStorage{Storage: NewMapStorage()}
+	rec := &recordingStorage{Storage: store.NewMapStorage()}
 	cm := &ConsensusModule{storage: rec}
 	cm.cmState.log = []LogEntry{{Index: 5, Term: 1}}
 	cm.cmState.logNeedsPersist = true
@@ -511,7 +516,7 @@ func (s *skippingStorage) Set(key string, value []byte) {
 func TestPersistToStorage_KeyOrderWithSkippedWrites(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	rec := &recordingStorage{Storage: NewMapStorage()}
+	rec := &recordingStorage{Storage: store.NewMapStorage()}
 	skipping := &skippingStorage{
 		Storage: rec,
 		allowed: map[string]bool{"currentTerm": true, "log": true},
@@ -535,7 +540,7 @@ func TestPersistToStorage_KeyOrderWithSkippedWrites(t *testing.T) {
 func TestPersistToStorage_NoWritesWhenUnchanged(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	storage := NewFileStorage(t.TempDir())
+	storage := store.NewFileStorage(t.TempDir())
 	cm := &ConsensusModule{storage: storage}
 	cm.cmState.currentTerm = 1
 	cm.cmState.votedFor = -1
@@ -545,21 +550,21 @@ func TestPersistToStorage_NoWritesWhenUnchanged(t *testing.T) {
 	cm.cmState.logNeedsPersist = true
 
 	cm.persistToStorage()
-	if got := storage.writeCount(); got != 5 {
+	if got := storage.WriteCount(); got != 5 {
 		t.Fatalf("writeCount = %d after first persist, want 5", got)
 	}
 
-	before := storage.writeCount()
+	before := storage.WriteCount()
 	cm.persistToStorage()
-	if got := storage.writeCount() - before; got != 0 {
+	if got := storage.WriteCount() - before; got != 0 {
 		t.Fatalf("%d writes for unchanged state, want 0", got)
 	}
 
 	cm.cmState.log = append(cm.cmState.log, LogEntry{Index: 1, Term: 1})
 	cm.cmState.logNeedsPersist = true
-	before = storage.writeCount()
+	before = storage.WriteCount()
 	cm.persistToStorage()
-	if got := storage.writeCount() - before; got != 1 {
+	if got := storage.WriteCount() - before; got != 1 {
 		t.Fatalf("%d writes for changed log, want 1", got)
 	}
 }
@@ -568,7 +573,7 @@ func TestPersistToStorage_NoWritesWhenUnchanged(t *testing.T) {
 // снимок-ключей для сжатого журнала.
 func TestCheckSnapshotKeysConsistency(t *testing.T) {
 	// Сжатый журнал без снимок-ключей → ошибка.
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	storage.Set("currentTerm", gobEncode(t, 1))
 	storage.Set("votedFor", gobEncode(t, 0))
 	storage.Set("log", gobEncode(t, []LogEntry{{Index: 5, Term: 1}}))
@@ -610,8 +615,8 @@ func TestRestoreFromSnapshotStore_RestoresConfiguration(t *testing.T) {
 
 	newRestoredCM := func(t *testing.T, configIndex int) *ConsensusModule {
 		t.Helper()
-		store := NewInmemSnapshotStore()
-		sink, err := store.Create(10, 1, snapConfig, configIndex)
+		snapStore := store.NewInmemSnapshot()
+		sink, err := snapStore.Create(10, 1, configIndex, snapConfig)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -623,8 +628,8 @@ func TestRestoreFromSnapshotStore_RestoresConfiguration(t *testing.T) {
 		}
 		cm := &ConsensusModule{
 			fsm:           newSnapshotTestFSM(),
-			snapshotStore: store,
-			storage:       NewMapStorage(),
+			snapshotStore: snapStore,
+			storage:       store.NewMapStorage(),
 		}
 		cm.cmState.lastSnapshotIndex = 10
 		cm.cmState.lastSnapshotTerm = 1

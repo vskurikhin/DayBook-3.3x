@@ -1,0 +1,10 @@
+github.com/vskurikhin/raft.AppendEntriesArgs
+github.com/vskurikhin/raft.AppendEntriesReply
+github.com/vskurikhin/raft.RequestVoteArgs
+github.com/vskurikhin/raft.RequestVoteReply
+github.com/vskurikhin/raft.TimeoutNowRequest
+github.com/vskurikhin/raft.TimeoutNowResponse
+github.com/vskurikhin/raft.RequestPreVoteArgs
+github.com/vskurikhin/raft.RequestPreVoteReply
+github.com/vskurikhin/raft.InstallSnapshotRequest
+github.com/vskurikhin/raft.InstallSnapshotResponse

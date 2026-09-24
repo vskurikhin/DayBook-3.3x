@@ -1,8 +1,11 @@
 package raft
 
 import (
+	"fmt"
 	"io"
 	"testing"
+
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // benchNoopFSM — тривиальная машина состояний для измерений apply-пути.
@@ -17,7 +20,7 @@ func (benchNoopFSM) Restore(io.ReadCloser) error { return nil }
 // newBenchCM собирает ConsensusModule с постоянным хранилищем в каталоге dir
 // прямой инициализацией структуры, без запуска горутин.
 func newBenchCM(dir string) *ConsensusModule {
-	cm := &ConsensusModule{storage: NewFileStorage(dir)}
+	cm := &ConsensusModule{storage: store.NewFileStorage(dir)}
 	cm.cmState.currentTerm = 1
 	cm.cmState.votedFor = -1
 	cm.cmState.lastSnapshotIndex = -1
@@ -87,4 +90,25 @@ func BenchmarkProcessLogsFileStorage(b *testing.B) {
 	b.StopTimer()
 	close(cm.shutdownCh)
 	<-consumerDone
+}
+
+// benchValueSizeLog — размер, сопоставимый с журналом работающего узла.
+// Локальная копия, предназначенная для тестов пакета raft.
+const benchValueSizeLog = 97 * 1024
+
+// benchLogEntries формирует журнал, кодированный размер которого близок
+// к totalBytes: полезная нагрузка распределена по entries записям.
+// Локальная копия, предназначенная для тестов пакета raft.
+func benchLogEntries(entries, totalBytes int) []LogEntry {
+	payload := totalBytes / entries
+	log := make([]LogEntry, 0, entries)
+	for i := 0; i < entries; i++ {
+		log = append(log, LogEntry{
+			Index: i,
+			Term:  1,
+			Type:  LogCommand,
+			Data:  fmt.Sprintf("%0*d", payload, i),
+		})
+	}
+	return log
 }

@@ -2,6 +2,8 @@ package raft
 
 import (
 	"io"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // FSM — интерфейс машины состояний клиента Raft.
@@ -54,26 +56,6 @@ type FSMSnapshot interface {
 	Release()
 }
 
-// SnapshotSink — получатель данных снимка.
-// FSM пишет сериализованное состояние через Write, завершает Close.
-// При ошибке вызывает Cancel.
-type SnapshotSink interface {
-	io.WriteCloser
-	ID() string
-	Cancel() error
-}
-
-// SnapshotMeta — метаданные снимка.
-type SnapshotMeta struct {
-	Version       int
-	ID            string
-	Index         int
-	Term          int
-	Configuration Configuration
-	ConfigIndex   int
-	Size          int64
-}
-
 // CommitChannelFSM оборачивает chan<- CommitEntry в FSM для
 // обратной совместимости с тестовой инфраструктурой.
 //
@@ -104,11 +86,11 @@ func (f *CommitChannelFSM) Apply(log *LogEntry) any {
 }
 
 func (f *CommitChannelFSM) Snapshot() (FSMSnapshot, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 func (f *CommitChannelFSM) Restore(_ io.ReadCloser) error {
-	return ErrNotImplemented
+	return contract.ErrNotImplemented
 }
 
 // BatchingFSM — опциональное расширение FSM для группового применения

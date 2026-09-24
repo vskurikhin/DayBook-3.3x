@@ -14,6 +14,8 @@ import (
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft"
 	"github.com/vskurikhin/raft/pkg/kvservice"
+	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // buf — синхронизированный приёмник стандартного логгера: запись
@@ -69,14 +71,17 @@ func TestTraceReset(t *testing.T) {
 func newTestService(t *testing.T) *kvservice.KVService {
 	t.Helper()
 	ready := make(chan any)
+	transport, err := transp.NewTCPTransport(":0", 0, 0)
+	if err != nil {
+		t.Fatalf("transp.NewTCPTransport: %v", err)
+	}
 	cfg := &kvservice.Config{
 		HTTPAddress: ":0",
 		Config: raft.Config{
-			PeerIds:       []int{},
-			RPCAddress:    ":0",
-			ServerID:      7,
-			Storage:       raft.NewMapStorage(),
-			TCPRPCTimeout: raft.TCPRPCTimeout,
+			PeerIds:   []int{},
+			ServerID:  7,
+			Storage:   store.NewMapStorage(),
+			Transport: transport,
 		},
 	}
 	kvs := kvservice.New(cfg, ready)

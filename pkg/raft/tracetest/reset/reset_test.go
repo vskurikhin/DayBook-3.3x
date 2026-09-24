@@ -13,6 +13,8 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/vskurikhin/raft"
+	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 // buf — синхронизированный приёмник стандартного логгера: запись
@@ -55,8 +57,8 @@ func TestTraceReset(t *testing.T) {
 	}()
 	ready := make(chan any)
 	cm := raft.NewConsensusModule(
-		0, []int{}, raft.NewInmemTransport("trace-reset"),
-		raft.NewMapStorage(), raft.NewCommitChannelFSM(commitCh), ready,
+		0, []int{}, transp.NewInmemTransport("trace-reset"),
+		store.NewMapStorage(), raft.NewCommitChannelFSM(commitCh), ready,
 	)
 	close(ready)
 	t.Cleanup(func() {

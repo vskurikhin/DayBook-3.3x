@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/vskurikhin/raft"
+	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 func TestConfig(t *testing.T) {
@@ -12,7 +14,6 @@ func TestConfig(t *testing.T) {
 		Config: raft.Config{
 			PeerAddresses: map[int]net.Addr{1: nil, 2: nil},
 			PeerIds:       []int{1, 2},
-			RPCAddress:    ":0",
 			ServerID:      0,
 		},
 		HTTPAddress: ":8080",
@@ -26,15 +27,19 @@ func TestConfig(t *testing.T) {
 }
 
 func TestNewKVService(t *testing.T) {
-	storage := raft.NewMapStorage()
+	storage := store.NewMapStorage()
 	ready := make(chan any)
+	transport, err := transp.NewTCPTransport(":0", 0, 0)
+	if err != nil {
+		t.Fatalf("transp.NewTCPTransport: %v", err)
+	}
 
 	kvs := New(&Config{
 		Config: raft.Config{
-			PeerIds:    []int{1, 2},
-			RPCAddress: ":0",
-			ServerID:   0,
-			Storage:    storage,
+			PeerIds:   []int{1, 2},
+			ServerID:  0,
+			Storage:   storage,
+			Transport: transport,
 		},
 		HTTPAddress: ":8080",
 	}, ready)
@@ -48,7 +53,7 @@ func TestNewKVService(t *testing.T) {
 }
 
 func TestNewKVServiceWrapper(t *testing.T) {
-	storage := raft.NewMapStorage()
+	storage := store.NewMapStorage()
 	ready := make(chan any)
 
 	kvs := NewKVService(":0", 1, []int{0, 2}, storage, ready)
@@ -59,8 +64,8 @@ func TestNewKVServiceWrapper(t *testing.T) {
 }
 
 func TestConnectToRaftPeer(t *testing.T) {
-	storage0 := raft.NewMapStorage()
-	storage1 := raft.NewMapStorage()
+	storage0 := store.NewMapStorage()
+	storage1 := store.NewMapStorage()
 	ready0 := make(chan any)
 	ready1 := make(chan any)
 

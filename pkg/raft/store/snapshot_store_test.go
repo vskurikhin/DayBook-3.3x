@@ -1,4 +1,4 @@
-package raft
+package store
 
 import (
 	"bytes"
@@ -6,23 +6,24 @@ import (
 	"testing"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft"
 )
 
-// TestInmemSnapshotStore_CreateAndList проверяет создание снимка и получение
+// TestInmemSnapshot_CreateAndList проверяет создание снимка и получение
 // списка. Create должен перезаписывать предыдущий снимок.
-func TestInmemSnapshotStore_CreateAndList(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestInmemSnapshot_CreateAndList(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
+	store := NewInmemSnapshot()
 
 	// Создаём первый снимок с Index=10, Term=3.
-	cfg := Configuration{
-		ConfigServers: []ConfigServer{
-			{ID: 1, Address: "node1", Suffrage: Voter},
-			{ID: 2, Address: "node2", Suffrage: Voter},
+	cfg := raft.Configuration{
+		ConfigServers: []raft.ConfigServer{
+			{ID: 1, Address: "node1", Suffrage: raft.Voter},
+			{ID: 2, Address: "node2", Suffrage: raft.Voter},
 		},
 	}
-	sink, err := store.Create(10, 3, cfg, 5)
+	sink, err := store.Create(10, 3, 5, cfg)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -50,7 +51,7 @@ func TestInmemSnapshotStore_CreateAndList(t *testing.T) {
 	}
 
 	// Создаём второй снимок — должен перезаписать первый.
-	sink2, err := store.Create(20, 4, Configuration{}, 10)
+	sink2, err := store.Create(20, 4, 10, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -71,12 +72,12 @@ func TestInmemSnapshotStore_CreateAndList(t *testing.T) {
 	}
 }
 
-// TestInmemSnapshotStore_Open проверяет открытие снимка по ID.
-func TestInmemSnapshotStore_Open(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+// TestInmemSnapshot_Open проверяет открытие снимка по ID.
+func TestInmemSnapshot_Open(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(10, 3, Configuration{}, 0)
+	store := NewInmemSnapshot()
+	sink, err := store.Create(10, 3, 0, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -111,11 +112,11 @@ func TestInmemSnapshotStore_Open(t *testing.T) {
 	}
 }
 
-// TestInmemSnapshotStore_ListEmpty проверяет, что пустой store возвращает nil.
-func TestInmemSnapshotStore_ListEmpty(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+// TestInmemSnapshot_ListEmpty проверяет, что пустой store возвращает nil.
+func TestInmemSnapshot_ListEmpty(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
+	store := NewInmemSnapshot()
 	snapshots, err := store.List()
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
@@ -127,10 +128,10 @@ func TestInmemSnapshotStore_ListEmpty(t *testing.T) {
 
 // TestInmemSnapshotSink_WriteCloseCancel проверяет базовые операции SnapshotSink.
 func TestInmemSnapshotSink_WriteCloseCancel(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(5, 2, Configuration{}, 0)
+	store := NewInmemSnapshot()
+	sink, err := store.Create(5, 2, 0, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -160,13 +161,13 @@ func TestInmemSnapshotSink_WriteCloseCancel(t *testing.T) {
 	}
 }
 
-// TestInmemSnapshotStore_ListDoesNotMutate проверяет, что List возвращает
+// TestInmemSnapshot_ListDoesNotMutate проверяет, что List возвращает
 // копию метаданных, а не указатель на внутренние данные.
-func TestInmemSnapshotStore_ListDoesNotMutate(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestInmemSnapshot_ListDoesNotMutate(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(10, 3, Configuration{}, 5)
+	store := NewInmemSnapshot()
+	sink, err := store.Create(10, 3, 5, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -182,13 +183,13 @@ func TestInmemSnapshotStore_ListDoesNotMutate(t *testing.T) {
 	}
 }
 
-// TestInmemSnapshotStore_OpenReturnsCopy проверяет, что Open возвращает
+// TestInmemSnapshot_OpenReturnsCopy проверяет, что Open возвращает
 // копию данных, а не ссылку на внутренний буфер.
-func TestInmemSnapshotStore_OpenReturnsCopy(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+func TestInmemSnapshot_OpenReturnsCopy(t *testing.T) {
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(10, 3, Configuration{}, 0)
+	store := NewInmemSnapshot()
+	sink, err := store.Create(10, 3, 0, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -213,10 +214,10 @@ func TestInmemSnapshotStore_OpenReturnsCopy(t *testing.T) {
 // TestInmemStore_VisibleOnlyAfterClose проверяет контракт: снимок виден
 // в List/Open только после успешного Close.
 func TestInmemStore_VisibleOnlyAfterClose(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(10, 3, Configuration{}, 0)
+	store := NewInmemSnapshot()
+	sink, err := store.Create(10, 3, 0, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -255,10 +256,10 @@ func TestInmemStore_VisibleOnlyAfterClose(t *testing.T) {
 // TestInmemStore_CancelKeepsPrevious проверяет контракт: Cancel
 // незавершённого снимка сохраняет предыдущий завершённый.
 func TestInmemStore_CancelKeepsPrevious(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
-	sinkA, err := store.Create(10, 1, Configuration{}, 10)
+	store := NewInmemSnapshot()
+	sinkA, err := store.Create(10, 1, 10, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create A failed: %v", err)
 	}
@@ -269,7 +270,7 @@ func TestInmemStore_CancelKeepsPrevious(t *testing.T) {
 		t.Fatalf("Close A failed: %v", err)
 	}
 
-	sinkB, err := store.Create(11, 1, Configuration{}, 11)
+	sinkB, err := store.Create(11, 1, 11, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create B failed: %v", err)
 	}
@@ -304,10 +305,10 @@ func TestInmemStore_CancelKeepsPrevious(t *testing.T) {
 // TestInmemStore_CloseIdempotent проверяет, что повторный Close не падает
 // и не создаёт дубликатов в List.
 func TestInmemStore_CloseIdempotent(t *testing.T) {
-	defer leaktest.CheckTimeout(t, LeaktestBudget)()
+	defer leaktest.CheckTimeout(t, raft.LeaktestBudget)()
 
-	store := NewInmemSnapshotStore()
-	sink, err := store.Create(10, 3, Configuration{}, 0)
+	store := NewInmemSnapshot()
+	sink, err := store.Create(10, 3, 0, raft.Configuration{})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}

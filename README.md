@@ -68,26 +68,26 @@ raft/
 │   │   ├── datastore_test.go
 │   │   └── json.go          — Вспомогательные функции для работы с JSON
 │   ├── system_test.go       — Системные тесты (сквозное тестирование KV-сервиса)
-│   └── testharness.go       — Системный Harness (управление жизненным циклом кластера KVService)
+│   └── harness_test.go      — Системный Harness (управление жизненным циклом кластера KVService)
 ├── raft.go                  — ConsensusModule (основной алгоритм Raft)
 ├── server.go                — Server (RPC-сервер + RPCProxy)
-├── storage.go               — Интерфейс Storage и реализация MapStorage
-├── testharness.go           — Тестовый Harness для модульных тестов Raft
+├── pkg/raft/store/          — Интерфейс Storage и реализация MapStorage (вынесены из корня)
+├── harness_test.go          — Тестовый Harness для модульных тестов Raft
 ├── raft_test.go             — Модульные тесты Raft
 └── README.md
 ```
 
 ### Основные файлы и их назначение
 
-| Файл                         | Назначение                                                                                            |
-|------------------------------|-------------------------------------------------------------------------------------------------------|
-| `raft.go`                    | Основной алгоритм Raft: ConsensusModule, выборы лидера, репликация журнала, фиксация (commit) записей |
-| `server.go`                  | Обёртка над RPC-сервером: Server, RPCProxy (перенаправление RPC и моделирование сбоев)                |
-| `storage.go`                 | Интерфейс Storage и его реализация MapStorage, работающая в памяти                                    |
-| `testharness.go`             | Harness для модульных тестов уровня Raft (управление жизненным циклом кластера серверов)              |
-| `pkg/kvservice/kvservice.go` | KV-сервис: HTTP API + реплицируемый автомат состояний на основе Raft                                  |
-| `pkg/system_test.go`         | Системные тесты, проверяющие работу всего стека KVService + Raft                                      |
-| `pkg/testharness.go`         | Harness для системных тестов (управление жизненным циклом кластера KVService)                         |
+| Файл                          | Назначение                                                                                             |
+|-------------------------------|--------------------------------------------------------------------------------------------------------|
+| `raft.go`                     | Основной алгоритм Raft: ConsensusModule, выборы лидера, репликация журнала, фиксация (commit) записей  |
+| `server.go`                   | Обёртка над RPC-сервером: Server, RPCProxy (перенаправление RPC и моделирование сбоев)                 |
+| `pkg/raft/store/storage.go`   | Интерфейс Storage и его реализация MapStorage, работающая в памяти (вынесены в `pkg/raft/store`)       |
+| `harness_test.go`             | Harness для модульных тестов уровня Raft (управление жизненным циклом кластера серверов)               |
+| `pkg/kvservice/kvservice.go`  | KV-сервис: HTTP API + реплицируемый автомат состояний на основе Raft                                   |
+| `pkg/system_test.go`          | Системные тесты, проверяющие работу всего стека KVService + Raft                                       |
+| `pkg/harness_test.go`         | Harness для системных тестов (управление жизненным циклом кластера KVService)                          |
 
 ---
 

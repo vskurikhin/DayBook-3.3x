@@ -222,3 +222,5 @@ target/
 .history
 .psql_history
 .doc/*
+docs/TODO*.md
+exportToHTML/*

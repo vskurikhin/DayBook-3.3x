@@ -18,6 +18,8 @@ import (
 	"github.com/vskurikhin/raft/internal/_init"
 	"github.com/vskurikhin/raft/internal/config"
 	"github.com/vskurikhin/raft/pkg/kvservice"
+	"github.com/vskurikhin/raft/pkg/raft/store"
+	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
 const (
@@ -68,7 +70,7 @@ func runWith(values *config.Values) (func(), error) {
 	// Постоянное хранилище снимков: сжатие усекает журнал на диске,
 	// поэтому снимок обязан переживать рестарт процесса. retain=2 —
 	// запас на случай повреждения последнего снимка.
-	snapshotStore, err := raft.NewFileSnapshotStore(dataDir, 2)
+	snapshotStore, err := store.NewFileSnapshot(dataDir, 2)
 	if err != nil {
 		stopPprof()
 		return nil, fmt.Errorf("failed to create file snapshot store in %s: %w", dataDir, err)
@@ -86,17 +88,35 @@ func runWith(values *config.Values) (func(), error) {
 		Config: raft.Config{
 			PeerAddresses:     values.Peers,
 			PeerIds:           nums,
-			RPCAddress:        values.RPCAddress.String(),
 			ServerID:          values.Number,
 			SnapshotStore:     snapshotStore,
-			Storage:           raft.NewFileStorage(dataDir),
-			TCPRPCTimeout:     values.TCPRPCTimeout,
-			MaxPool:           maxPool,
+			Storage:           store.NewFileStorage(dataDir),
 			SnapshotInterval:  values.SnapshotInterval,
 			SnapshotThreshold: values.SnapshotThreshold,
 		},
 	}
+
+	// Инициализация транспорта откладывается до момента непосредственно перед
+	// вызовом kvservice.New, чтобы сократить период, в течение которого
+	// сетевой слушатель активен без готового потребителя.
+	// После успешного создания сервиса ответственность за транспорт переходит
+	// к Server (ownTransport = false). При возникновении ошибки транспорт
+	// корректно освобождается с помощью defer.
+	transport, err := transp.NewTCPTransport(values.RPCAddress.String(), values.TCPRPCTimeout, maxPool)
+	if err != nil {
+		stopPprof()
+		return nil, fmt.Errorf("failed to create TCP transport on %s: %w", values.RPCAddress, err)
+	}
+	ownTransport := true
+	defer func() {
+		if ownTransport {
+			transport.Close()
+		}
+	}()
+
+	cfg.Transport = transport
 	kvs := kvservice.New(&cfg, ready)
+	ownTransport = false
 	_wg.Add(len(nums) / 2)
 	for _, num := range nums {
 		go connect(num, kvs, values, nums)
@@ -121,7 +141,7 @@ func runWith(values *config.Values) (func(), error) {
 }
 
 // startPprof поднимает отдельный HTTP-сервер профилирования и включает сбор
-// профилей блокировок и состязаний за мьютекс, если заданы соответствующие
+// профилей блокировок и конкуренции за мьютекс, если заданы соответствующие
 // параметры. При пустом адресе не создаётся ни слушающего сокета, ни
 // накладных расходов среды выполнения. Возвращает функцию остановки.
 func startPprof(values *config.Values) func() {

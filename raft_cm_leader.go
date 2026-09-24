@@ -3,6 +3,8 @@ package raft
 import (
 	"sync/atomic"
 	"time"
+
+	"github.com/vskurikhin/raft/pkg/raft/contract"
 )
 
 // _leadershipTransferPollInterval — период опроса nextIndex целевого
@@ -54,7 +56,7 @@ func (cm *ConsensusModule) AddVoter(id ServerID, addr ServerAddress) IndexFuture
 func (cm *ConsensusModule) Apply(command any, timeout time.Duration) ApplyFuture {
 	select {
 	case <-cm.shutdownCh:
-		return errorFuture{ErrRaftShutdown}
+		return errorFuture{contract.ErrRaftShutdown}
 	default:
 	}
 
@@ -86,9 +88,9 @@ func (cm *ConsensusModule) Apply(command any, timeout time.Duration) ApplyFuture
 	}
 	select {
 	case <-timer:
-		return errorFuture{ErrEnqueueTimeout}
+		return errorFuture{contract.ErrEnqueueTimeout}
 	case <-cm.shutdownCh:
-		return errorFuture{ErrRaftShutdown}
+		return errorFuture{contract.ErrRaftShutdown}
 	case cm.applyCh <- future:
 		return future
 	}
@@ -151,7 +153,7 @@ func (cm *ConsensusModule) LeadershipTransfer(targetID ServerID) LeadershipTrans
 	case cm.leaderState.leadershipTransferCh <- future:
 		return future
 	case <-cm.shutdownCh:
-		return errorFuture{ErrRaftShutdown}
+		return errorFuture{contract.ErrRaftShutdown}
 	}
 }
 
@@ -196,7 +198,7 @@ func (cm *ConsensusModule) VerifyLeader() Future {
 	case cm.verifyCh <- vf:
 		return vf
 	case <-cm.shutdownCh:
-		return errorFuture{err: ErrRaftShutdown}
+		return errorFuture{err: contract.ErrRaftShutdown}
 	}
 }
 
@@ -233,7 +235,7 @@ func (cm *ConsensusModule) appendConfigurationEntry(future *configurationChangeF
 	cm.cmState.configurations.latest = nextCfg
 	cm.cmState.configurations.latestIndex = cm.cmState.lastLogIndex + 1
 
-	cm.dispatchLogsUnsafe([]*logFuture{entry})
+	cm.dispatchLogsLocked([]*logFuture{entry})
 	cm.cmState.configurations.latestIndex = entry.log.Index
 	future.index = entry.log.Index
 
@@ -315,7 +317,7 @@ func (cm *ConsensusModule) enqueueConfigurationChange(future *configurationChang
 	case cm.confChangeCh <- future:
 		return nil
 	case <-cm.shutdownCh:
-		return ErrRaftShutdown
+		return contract.ErrRaftShutdown
 	}
 }
 
@@ -383,7 +385,7 @@ func (cm *ConsensusModule) handleLeadershipTransfer(future *leadershipTransferFu
 			}
 		case <-cm.shutdownCh:
 			atomic.StoreInt32(&cm.leaderState.leadershipTransferInProgress, 0)
-			future.respond(ErrRaftShutdown)
+			future.respond(contract.ErrRaftShutdown)
 			return
 		case <-time.After(cm.electionTimeout()):
 			atomic.StoreInt32(&cm.leaderState.leadershipTransferInProgress, 0)
@@ -809,10 +811,10 @@ func (cm *ConsensusModule) startLeaderLocked() {
 		},
 	}
 	noop.init(cm.shutdownCh)
-	cm.dispatchLogsUnsafe([]*logFuture{noop})
+	cm.dispatchLogsLocked([]*logFuture{noop})
 
 	// Синхронизировать self-match трекера с только что добавленной
-	// noop-записью: dispatchLogsUnsafe трекер
+	// noop-записью: dispatchLogsLocked трекер
 	// не обновляет (в отличие от dispatchLogs — raft_cm_log.go), а
 	// setMatch(self, …) выше был выполнен ДО noop. Без этого вызова
 	// медиана при чётном n попадает на запись прошлого терма и

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/contract"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 func TestElectionBasic(t *testing.T) {
@@ -720,7 +722,7 @@ func TestDisconnectAfterSubmit(t *testing.T) {
 
 // getPersistedTerm считывает значение currentTerm из указанного хранилища
 // (используя тот же формат кодирования, что и persistToStorage).
-func getPersistedTerm(storage *MapStorage) int {
+func getPersistedTerm(storage *store.MapStorage) int {
 	data, found := storage.Get("currentTerm")
 	if !found {
 		return 0
@@ -1073,7 +1075,7 @@ func TestBecomeFollowerDoubleClose(t *testing.T) {
 		},
 
 		id:           1,
-		storage:      NewMapStorage(),
+		storage:      store.NewMapStorage(),
 		applyCh:      make(chan *logFuture),
 		verifyCh:     make(chan *verifyFuture, 64),
 		shutdownCh:   make(chan struct{}),
@@ -1713,10 +1715,10 @@ func TestLeader_Shutdown_NoInflight(t *testing.T) {
 // незавершённом Apply. Гарантия: остановка не оставляет клиентское
 // обещание неразрешённым — ответ обязан прийти по каналу ErrorCh в
 // пределах бюджета. Ожидание идёт через ErrorCh, а не через Error:
-// после остановки Error возвращает ErrRaftShutdown по запасному
+// после остановки Error возвращает contract.ErrRaftShutdown по запасному
 // исходу даже для неотвеченного обещания. Из-за гонки между Apply и
 // остановкой законны исходы: nil (запись успела зафиксироваться и
-// примениться), ErrLeadershipLost, ErrRaftShutdown, ErrNotLeader;
+// примениться), ErrLeadershipLost, contract.ErrRaftShutdown, ErrNotLeader;
 // иная ошибка — отказ. При nil у записи обязан быть присвоенный
 // индекс журнала.
 func TestLeader_Shutdown_DuringApply(t *testing.T) {
@@ -1735,7 +1737,7 @@ func TestLeader_Shutdown_DuringApply(t *testing.T) {
 		if future.Index() < 1 {
 			t.Fatalf("got success without a log index: Index() = %d", future.Index())
 		}
-	case ErrLeadershipLost, ErrRaftShutdown, ErrNotLeader:
+	case ErrLeadershipLost, contract.ErrRaftShutdown, ErrNotLeader:
 		// Штатные исходы гонки между Apply и остановкой.
 	default:
 		t.Fatalf("got %v, want nil or ErrLeadershipLost or ErrRaftShutdown or ErrNotLeader", err)
@@ -1824,7 +1826,7 @@ func TestCommitmentInteg_NoCommitWithoutMajority(t *testing.T) {
 		if err == nil {
 			t.Fatal("Apply succeeded without majority, expected error")
 		}
-		// Ошибка ErrLeadershipLost или ErrRaftShutdown — допустимо.
+		// Ошибка ErrLeadershipLost или contract.ErrRaftShutdown — допустимо.
 	case <-time.After(1000 * time.Millisecond):
 		// Future заблокирован — это ожидаемое поведение (нет кворума).
 	}
@@ -2127,11 +2129,11 @@ func (f *RecordingBatchingFSM) Apply(_ *LogEntry) any {
 }
 
 func (f *RecordingBatchingFSM) Snapshot() (FSMSnapshot, error) {
-	return nil, ErrNotImplemented
+	return nil, contract.ErrNotImplemented
 }
 
 func (f *RecordingBatchingFSM) Restore(_ io.ReadCloser) error {
-	return ErrNotImplemented
+	return contract.ErrNotImplemented
 }
 
 func (f *RecordingBatchingFSM) ApplyBatch(logs []*LogEntry) []any {
@@ -2368,7 +2370,7 @@ func (f *mismatchBatchingFSM) ApplyBatch(logs []*LogEntry) []any {
 //     ошибка ErrBatchFSMResponseMismatch доставляется через future
 //     немедленно. Если бы runFSM упала при первом нарушении контракта,
 //     этот future остался бы без ответа (таймаут) или завершился бы
-//     ErrRaftShutdown только при Stop().
+//     contract.ErrRaftShutdown только при Stop().
 //
 // Примечание: часть записей могла уйти отдельными батчами, поэтому на
 // ошибку проверяется каждый future из первоначальной пачки команд;
@@ -2404,7 +2406,7 @@ func TestBatchingFSM_ApplyBatchResponseMismatch(t *testing.T) {
 	f := cm.Apply(1000, 0)
 	select {
 	case err := <-f.ErrorCh():
-		if errors.Is(err, ErrRaftShutdown) {
+		if errors.Is(err, contract.ErrRaftShutdown) {
 			t.Fatalf("runFSM appears dead after mismatch: got ErrRaftShutdown")
 		}
 		if err != nil && !errors.Is(err, ErrBatchFSMResponseMismatch) {
@@ -2835,14 +2837,14 @@ func TestVerifyLeader_Timeout(t *testing.T) {
 }
 
 // TestApply_Timeout проверяет, что Apply с ненулевым таймаутом возвращает
-// ErrEnqueueTimeout при недоступности лидера.
+// contract.ErrEnqueueTimeout при недоступности лидера.
 func TestApply_Timeout(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 	h := NewHarness(t, 1)
 	defer h.Shutdown()
 
 	future := h.cluster[0].Apply(42, 10*time.Millisecond)
-	if err := future.Error(); err != ErrNotLeader && err != ErrEnqueueTimeout {
+	if err := future.Error(); err != ErrNotLeader && err != contract.ErrEnqueueTimeout {
 		t.Fatalf("expected ErrNotLeader or ErrEnqueueTimeout, got %v", err)
 	}
 }
@@ -2854,7 +2856,7 @@ func TestApply_TimeoutDoesNotBlock(t *testing.T) {
 	h := NewHarness(t, 1)
 	h.Shutdown()
 	future := h.cluster[0].Apply(42, 0)
-	if err := future.Error(); err != ErrRaftShutdown {
+	if err := future.Error(); err != contract.ErrRaftShutdown {
 		t.Fatalf("expected ErrRaftShutdown, got %v", err)
 	}
 }
@@ -3369,12 +3371,12 @@ func TestIntegration_TermIndexAfterLogTruncation(t *testing.T) {
 }
 
 // TestRace_TermIndexMapDispatchAndConflict проверяет, что конкурентное
-// инкрементальное обновление termIndexMap (dispatchLogsUnsafe) и
+// инкрементальное обновление termIndexMap (dispatchLogsLocked) и
 // чтение (leaderSendAEsToPeer с ConflictTerm) не вызывают data race.
 //
 // Сценарий:
 //  1. Создать CM-лидер.
-//  2. Запустить горутину dispatch, вызывающую dispatchLogsUnsafe.
+//  2. Запустить горутину dispatch, вызывающую dispatchLogsLocked.
 //  3. Запустить горутину conflict, вызывающую leaderSendAEsToPeer.
 //  4. Остановить через shutdownCh.
 //
@@ -3382,7 +3384,7 @@ func TestIntegration_TermIndexAfterLogTruncation(t *testing.T) {
 func TestRace_TermIndexMapDispatchAndConflict(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
-	storage := NewMapStorage()
+	storage := store.NewMapStorage()
 	mock := &mockTransportConflict{replyTerm: 1, success: false, conflictTerm: 1}
 	cm := &ConsensusModule{
 		leaderState: leaderState{
@@ -3441,7 +3443,7 @@ func TestRace_TermIndexMapDispatchAndConflict(t *testing.T) {
 					log:        LogEntry{Type: LogCommand, Data: []byte("x")},
 				}
 				cm.mu.Lock()
-				cm.dispatchLogsUnsafe([]*logFuture{f})
+				cm.dispatchLogsLocked([]*logFuture{f})
 				cm.mu.Unlock()
 				dispatchIters.Add(1)
 			}
@@ -3477,12 +3479,12 @@ func TestRace_TermIndexMapDispatchAndConflict(t *testing.T) {
 }
 
 // TestRace_TermIndexMapCompactAndRead проверяет, что конкурентное
-// сжатие (compactLogs, перестраивает termIndexMap) и
+// сжатие (compactLogsLocked, перестраивает termIndexMap) и
 // чтение termIndexMap не вызывают data race.
 //
 // Сценарий:
 //  1. Создать CM с логом из 10 записей.
-//  2. Запустить горутину compact, вызывающую compactLogs.
+//  2. Запустить горутину compact, вызывающую compactLogsLocked.
 //  3. Запустить горутину reader, читающую termIndexMap.
 //  4. Остановить через shutdownCh.
 //
@@ -3496,7 +3498,7 @@ func TestRace_TermIndexMapCompactAndRead(t *testing.T) {
 			matchIndex: map[int]int{},
 		},
 
-		storage:    NewMapStorage(),
+		storage:    store.NewMapStorage(),
 		shutdownCh: make(chan struct{}),
 		cmState: cmState{
 			state:        Follower,
@@ -3512,7 +3514,7 @@ func TestRace_TermIndexMapCompactAndRead(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		cm.cmState.log = append(cm.cmState.log, LogEntry{Index: i + 1, Term: 1})
 	}
-	cm.rebuildTermIndexMap()
+	cm.rebuildTermIndexMapLocked()
 	cm.mu.Unlock()
 	defer cm.Stop()
 
@@ -3532,7 +3534,7 @@ func TestRace_TermIndexMapCompactAndRead(t *testing.T) {
 				return
 			default:
 				cm.mu.Lock()
-				cm.compactLogs(5)
+				cm.compactLogsLocked(5)
 				cm.mu.Unlock()
 				compactIters.Add(1)
 			}

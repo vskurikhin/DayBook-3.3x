@@ -18,6 +18,7 @@ import (
 	"github.com/vskurikhin/raft/pkg/api"
 	"github.com/vskurikhin/raft/pkg/kvclient"
 	"github.com/vskurikhin/raft/pkg/kvservice"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 func init() {
@@ -101,7 +102,7 @@ type Harness struct {
 	// сервисы KV принимают клиентские команды.
 	kvServiceAddrs []string
 
-	storage []*raft.MapStorage
+	storage []*store.MapStorage
 
 	t *testing.T
 
@@ -128,7 +129,7 @@ func NewHarness(t *testing.T, n int) *Harness {
 	ready := make(chan any)
 	connected := make([]bool, n)
 	alive := make([]bool, n)
-	storage := make([]*raft.MapStorage, n)
+	storage := make([]*store.MapStorage, n)
 
 	// Создать все экземпляры KVService, входящие в этот кластер.
 	for i := range n {
@@ -139,7 +140,7 @@ func NewHarness(t *testing.T, n int) *Harness {
 			}
 		}
 
-		storage[i] = raft.NewMapStorage()
+		storage[i] = store.NewMapStorage()
 		kvss[i] = kvservice.NewKVService(":0", i, peerIds, storage[i], ready)
 		alive[i] = true
 	}

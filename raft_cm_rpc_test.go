@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // -- Тесты генерации ConflictIndex в AppendEntries. ---
@@ -27,7 +28,7 @@ func TestAppendEntries_ConflictIndexSnapshotBoundary(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{}
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.cmState.state = Follower
 	cm.cmState.currentTerm = 1
 	cm.cmState.votedFor = -1
@@ -64,7 +65,7 @@ func TestAppendEntries_ConflictIndexSnapshotBoundaryCorrupted(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{}
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.cmState.state = Follower
 	cm.cmState.currentTerm = 1
 	cm.cmState.votedFor = -1
@@ -107,7 +108,7 @@ func TestAppendEntries_StaleTermFollower_NoStateChange(t *testing.T) {
 
 	cm := &ConsensusModule{}
 	cm.id = 5
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.cmState.state = Follower
 	cm.cmState.currentTerm = 2
 	cm.cmState.votedFor = 1
@@ -185,7 +186,7 @@ func TestAppendEntries_CandidateFromLeadershipTransfer_NoStepDown(t *testing.T) 
 		t.Run(tc.name, func(t *testing.T) {
 			cm := &ConsensusModule{}
 			cm.id = 7
-			cm.storage = NewMapStorage()
+			cm.storage = store.NewMapStorage()
 			cm.shutdownCh = make(chan struct{})
 			cm.cmState.state = Candidate
 			cm.cmState.currentTerm = currentTerm
@@ -255,7 +256,7 @@ func TestAppendEntries_HigherTerm_StepsDownInHandler(t *testing.T) {
 
 	cm := &ConsensusModule{}
 	cm.id = 3
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.shutdownCh = make(chan struct{})
 	cm.cmState.state = Candidate
 	cm.cmState.currentTerm = 2

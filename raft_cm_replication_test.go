@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/vskurikhin/raft/pkg/raft/store"
 )
 
 // mockTransportAE — минимальная реализация Transport для тестов,
@@ -330,7 +331,7 @@ func TestInflightAE_DeferResetOnSnapshotPath(t *testing.T) {
 
 		id:        0,
 		transport: transport,
-		storage:   NewMapStorage(),
+		storage:   store.NewMapStorage(),
 		snapshotStore: &mockSnapshotStoreCfg{
 			listResult: []*SnapshotMeta{{ID: "snap-3", Index: 3, Term: 1, Size: 100}},
 			openMeta:   &SnapshotMeta{Index: 3, Term: 1, Size: 100},
@@ -503,21 +504,6 @@ func TestInflightAE_CASConcurrent(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-}
-
-// mockSnapshotStore — минимальная реализация SnapshotStore для тестов.
-type mockSnapshotStore struct {
-	SnapshotStore
-}
-
-func (m *mockSnapshotStore) List() ([]*SnapshotMeta, error) {
-	return []*SnapshotMeta{
-		{Index: 0, Term: 1, Size: 0},
-	}, nil
-}
-
-func (m *mockSnapshotStore) Open(_ string) (*SnapshotMeta, io.ReadCloser, error) {
-	return &SnapshotMeta{Index: 0, Term: 1, Size: 0}, io.NopCloser(bytes.NewReader(nil)), nil
 }
 
 // mockSnapshotStoreCfg — конфигурируемая реализация SnapshotStore для
@@ -1105,7 +1091,7 @@ func TestReplicationBackoff_LeaderStateReinitialized(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
 	cm := &ConsensusModule{}
-	cm.storage = NewMapStorage()
+	cm.storage = store.NewMapStorage()
 	cm.shutdownCh = make(chan struct{})
 	cm.commitCh = make(chan int, 1)
 	cm.stepDown = make(chan struct{}, 1)
@@ -1248,7 +1234,7 @@ func TestLeaderSendAEsToPeer_HigherTermStepsDown(t *testing.T) {
 		},
 		id:         0,
 		transport:  mock,
-		storage:    NewMapStorage(),
+		storage:    store.NewMapStorage(),
 		stepDown:   make(chan struct{}, 1),
 		shutdownCh: make(chan struct{}),
 	}

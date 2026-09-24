@@ -487,10 +487,10 @@ func TestLeadershipTransfer_VoteBypass(t *testing.T) {
 	// leadership transfer increment term). follower должен проголосовать,
 	// несмотря на знание о лидере: в новом term votedFor = -1, а bypass
 	// пропускает проверку leaderID.
-	// lastLogIndexAndTerm требует удержания cm.mu — читаем под блокировкой.
+	// lastLogIndexAndTermLocked требует удержания cm.mu — читаем под блокировкой.
 	cm := h.cluster[followerID]
 	cm.mu.Lock()
-	lastLogIndex, _ := cm.lastLogIndexAndTerm()
+	lastLogIndex, _ := cm.lastLogIndexAndTermLocked()
 	cm.mu.Unlock()
 	candidateID := (origLeaderID + 2) % 3
 	args := RequestVoteArgs{
@@ -650,7 +650,7 @@ func waitForTermAbove(h *Harness, id, want int, budget time.Duration) {
 }
 
 // TestLeadershipTransfer_AfterShutdown проверяет, что LeadershipTransfer
-// после остановки модуля возвращает ошибку (ErrNotLeader или ErrRaftShutdown).
+// после остановки модуля возвращает ошибку (ErrNotLeader или contract.ErrRaftShutdown).
 func TestLeadershipTransfer_AfterShutdown(t *testing.T) {
 	defer leaktest.CheckTimeout(t, LeaktestBudget)()
 
