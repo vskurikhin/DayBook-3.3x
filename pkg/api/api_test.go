@@ -53,6 +53,16 @@ func TestJSONWireFormat(t *testing.T) {
 			want:    `{"RespStatus":2}`,
 			subject: StatusResponse{RespStatus: StatusNotLeader},
 		},
+		{
+			name:    "DeleteRequest",
+			want:    `{"Key":"k"}`,
+			subject: DeleteRequest{Key: "k"},
+		},
+		{
+			name:    "DeleteResponse",
+			want:    `{"RespStatus":1,"KeyFound":true,"PrevValue":"prev"}`,
+			subject: DeleteResponse{RespStatus: StatusOK, KeyFound: true, PrevValue: "prev"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

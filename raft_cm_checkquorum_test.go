@@ -11,7 +11,7 @@ import (
 
 // checkQuorumBudget — запас времени на обнаружение потери кворума:
 // два срока checkQuorumTimeout плюс период тика пульса.
-const checkQuorumBudget = 2*_defaultCheckQuorumTimeout + 4*HeartbeatTimeoutMs*time.Millisecond
+const checkQuorumBudget = 2*_defaultCheckQuorumTimeout + 4*DefaultHeartbeatTimeout
 
 // withCheckQuorumTimeout — опция Harness: срок проверки кворума контактов.
 // Значение «заведомо большее» отключает шаг вниз по потере контакта,

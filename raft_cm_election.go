@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"math/rand"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -17,6 +16,18 @@ import (
 // предотвращая одновременный переход в кандидаты с одинаковым
 // термом (split vote).
 const _preVoteJitterMs = 50
+
+// forcedReelectionEnv — имя переменной окружения стресс-хука форсирования
+// выборов. Значение читается один раз при старте узла и кэшируется в
+// _forcedReelectionHook (ADR-CONF-011); тестовое смещение, в промышленных
+// запусках не задаётся.
+const forcedReelectionEnv = "RAFT_FORCE_MORE_REELECTION"
+
+// _forcedReelectionHook — кэш переменной окружения forcedReelectionEnv:
+// при значении true electionTimeoutLocked в трети вызовов возвращает ровно
+// базу, отключая рандомизацию тайм-аута выборов (стресс-смещение).
+// Записывается один раз при создании CM, читается атомарно.
+var _forcedReelectionHook atomic.Bool
 
 // becomeFollowerLocked делает cm последователем и сбрасывает его состояние.
 // Если cm был лидером, отправляет сигнал в stepDown, чтобы leaderLoop
@@ -203,6 +214,12 @@ func (cm *ConsensusModule) runElectionTimer() {
 	cm.mu.Lock()
 	termStarted := cm.cmState.currentTerm
 	electionTimerDone := cm.cmState.electionTimerDone
+	// Такт тикера читается под cm.mu и нормализуется: нулевое или
+	// отрицательное значение (литеральный тестовый CM) заменяется умолчанием.
+	tickerTimeout := cm.tickerTimeout
+	if tickerTimeout <= 0 {
+		tickerTimeout = DefaultTickerTimeout
+	}
 
 	// Nonvoter не участвует в выборах — не запускаем таймер.
 	if !hasVote(cm.cmState.configurations.latest, cm.id) {
@@ -220,7 +237,7 @@ func (cm *ConsensusModule) runElectionTimer() {
 	//   - Узел вышел из состояний Follower/Candidate (например, стал лидером).
 	//   - Получен сигнал остановки таймера (electionTimerDone) или общий сигнал
 	//     завершения работы модуля (shutdownCh).
-	ticker := time.NewTicker(TickerTimeoutMs * time.Millisecond)
+	ticker := time.NewTicker(tickerTimeout)
 	defer ticker.Stop()
 	for {
 		select {
@@ -517,15 +534,40 @@ func (cm *ConsensusModule) startElectionAfterPreVote(grantedVotes int) {
 	cm.mu.Unlock()
 }
 
-// electionTimeout генерирует псевдослучайную длительность тайм-аута выборов.
-func (cm *ConsensusModule) electionTimeout() time.Duration {
-	// Если установлен параметр RAFT_FORCE_MORE_REELECTION, проведите стресс-тест, намеренно
-	// генерируя жестко заданное число очень часто. Это вызовет коллизии
-	// между различными серверами и приведет к увеличению количества перевыборов.
-	if os.Getenv("RAFT_FORCE_MORE_REELECTION") != "" && rand.Intn(3) == 0 {
-		return time.Duration(ReelectionTimeoutMs) * time.Millisecond
+// electionTimeoutLocked генерирует псевдослучайную длительность тайм-аута
+// выборов от базы cm.reelectionTimeout с сохранением миллисекундной
+// дискретности: результат лежит диапозоне в [база; 2·база) с шагом 1 мс.
+// База нормализуется условием d < time.Millisecond → умолчание:
+// гарантирует, что аргумент rand.Intn(int(base/time.Millisecond)) ≥ 1,
+// и закрывает положительные субмиллисекундные значения.
+//
+// Стресс-хук: при включённом _forcedReelectionHook в трети вызовов
+// возвращается ровно база (рандомизация отключена — провоцирует
+// коллизии выборов).
+//
+// Требует удержания cm.mu.
+func (cm *ConsensusModule) electionTimeoutLocked() time.Duration {
+	d := cm.reelectionTimeout
+	if d < time.Millisecond {
+		d = DefaultReelectionTimeout
 	}
-	return time.Duration(ReelectionTimeoutMs+rand.Intn(ReelectionTimeoutMs)) * time.Millisecond
+	base := d
+	// Если установлен хук форсирования выборов, в трети случаев вернуть
+	// ровно базу: намеренно частое совпадение тайм-аутов разных узлов
+	// вызывает коллизии и рост числа перевыборов.
+	if _forcedReelectionHook.Load() && rand.Intn(3) == 0 {
+		return base
+	}
+	return base + time.Duration(rand.Intn(int(base/time.Millisecond)))*time.Millisecond
+}
+
+// electionTimeout — обёртка над electionTimeoutLocked для вызывающих без
+// удержания cm.mu. Самостоятельно захватывает cm.mu и снимает её через
+// defer; никогда не вызывается из-под cm.mu (sync.Mutex не реентерентен).
+func (cm *ConsensusModule) electionTimeout() time.Duration {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return cm.electionTimeoutLocked()
 }
 
 // timeoutNow обрабатывает входящий TimeoutNowRequest.

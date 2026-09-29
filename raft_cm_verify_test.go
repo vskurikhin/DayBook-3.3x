@@ -161,7 +161,7 @@ func TestVerifyCounters_MultiplePending(t *testing.T) {
 // Механизм: verify-запрос, поставленный в момент, когда соседу уже летит
 // AppendEntries, не получает голоса от этого AppendEntries (ответ имеет старую
 // эпоху) и без перерассылки ждал бы ближайшего пульса — до
-// HeartbeatTimeoutMs = 33 мс. Перерассылка в defer горутины репликации
+// DefaultHeartbeatTimeout = 33 мс. Перерассылка в defer горутины репликации
 // отправляет свежий AppendEntries с новой эпохой сразу после снятия флага,
 // не меняя ни одного правила кворума.
 
@@ -328,7 +328,7 @@ func waitFor(t *testing.T, desc string, budget time.Duration, cond func() bool) 
 
 // TestVerifyRedispatch_AC1_CompletesBeforeHeartbeat — главный тайминговый
 // критерий AC-1: VerifyLeader, поставленный в момент активной горутины
-// репликации соседа, завершается быстрее HeartbeatTimeoutMs благодаря
+// репликации соседа, завершается быстрее DefaultHeartbeatTimeout благодаря
 // немедленной перерассылке.
 //
 // Сценарий:
@@ -372,7 +372,7 @@ func TestVerifyRedispatch_AC1_CompletesBeforeHeartbeat(t *testing.T) {
 	})
 	// Детерминизм против пульса: фиксируем счётчик тиков в момент постановки
 	// запроса и дожидаемся, чтобы после неё прошёл полный тик пульса.
-	// Ближайший пульс после него будет на расстоянии ~HeartbeatTimeoutMs,
+	// Ближайший пульс после него будет на расстоянии ~DefaultHeartbeatTimeout,
 	// поэтому без перерассылки запрос завершился бы за ~33 мс (порог 20 мс
 	// нарушен), а перерассылка завершает его за микросекунды ещё до
 	// следующего пульса.
@@ -1120,7 +1120,7 @@ func TestVerifyLeader_TwoNodes_FollowerDownNoQuorum(t *testing.T) {
 	select {
 	case err := <-future.ErrorCh():
 		t.Fatalf("VerifyLeader confirmed without follower ack (err=%v)", err)
-	case <-time.After(HeartbeatTimeoutMs * 5 * time.Millisecond):
+	case <-time.After(5 * DefaultHeartbeatTimeout):
 	}
 
 	h.ReconnectPeer(follower)
@@ -1157,7 +1157,7 @@ func TestVerifyLeader_FourNodes_OneFollowerNotEnough(t *testing.T) {
 	select {
 	case err := <-future.ErrorCh():
 		t.Fatalf("VerifyLeader confirmed with 2/4 votes (err=%v)", err)
-	case <-time.After(HeartbeatTimeoutMs * 5 * time.Millisecond):
+	case <-time.After(5 * DefaultHeartbeatTimeout):
 	}
 
 	// Подключить второго follower'а — 3/4 = кворум.
@@ -1242,7 +1242,7 @@ func TestVerifyLeader_NonvoterAckDoesNotVote(t *testing.T) {
 	select {
 	case err := <-future.ErrorCh():
 		t.Fatalf("VerifyLeader confirmed by nonvoter acks (err=%v)", err)
-	case <-time.After(HeartbeatTimeoutMs * 5 * time.Millisecond):
+	case <-time.After(5 * DefaultHeartbeatTimeout):
 	}
 }
 

@@ -428,7 +428,7 @@ func (cm *ConsensusModule) RequestPreVote(args RequestPreVoteArgs, reply *Reques
 	// обновлён в пределах election timeout). Это предотвращает выборы при
 	// кратковременных сетевых сбоях — кандидат явно не актуальный лидер.
 	if !cm.cmState.leaderLastContact.IsZero() {
-		leaderKnown := time.Since(cm.cmState.leaderLastContact) < cm.electionTimeout()
+		leaderKnown := time.Since(cm.cmState.leaderLastContact) < cm.electionTimeoutLocked()
 		if leaderKnown && args.GetRPCHeader().ServerID != cm.cmState.leaderID {
 			cm.traceLockedLogf(_traceLevelPreVote, "... RequestPreVote denied: leader known")
 			return nil

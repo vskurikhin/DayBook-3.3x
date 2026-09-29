@@ -78,3 +78,13 @@ func (ds *DataStore) CAS(key, compare, value string) (string, bool) {
 	}
 	return prevValue, ok
 }
+
+// Delete удаляет ключ из хранилища. Возвращает прежнее значение
+// ключа и признак его существования до удаления.
+func (ds *DataStore) Delete(key string) (string, bool) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	prev, found := ds.data[key]
+	delete(ds.data, key)
+	return prev, found
+}

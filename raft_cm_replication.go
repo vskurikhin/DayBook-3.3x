@@ -17,12 +17,20 @@ const (
 	_replicationAppend
 )
 
-// _maxReplicationBackoff — потолок задержки повторов репликации на каждого
-// соседа (1000 мс). Объявлен на уровне пакета, а не внутри функции, чтобы
-// тестовые бюджеты ожидания схождения кластера выводились из него, а не
-// дублировали литерал. Значение ограничивает сверху задержку step-down
-// изолированного лидера прежнего терма.
-const _maxReplicationBackoff = 1000 * time.Millisecond
+// _minReplicationBackoff — нижняя граница потолка задержки повторов
+// репликации на каждого соседа (1000 мс). Потолок вычисляется как
+// max(_minReplicationBackoff, _replicationBackoffHeartbeats × база),
+// то есть «не менее секунды и не более ~30 пульсов». Объявлены на уровне
+// пакета, а не внутри функции, чтобы тестовые бюджеты ожидания схождения
+// кластера выводились из них, а не дублировали литерал.
+const _minReplicationBackoff = 1000 * time.Millisecond
+
+// _replicationBackoffHeartbeats — коэффициент потолка задержки повторов
+// репликации, выраженный в пульсах: ⌊1000/33⌋ = 30.
+// На временном значении пульса по умолчанию это 33 мс 30·33 = 990 мс < 1000 мс,
+// поэтому потолок проходит через нижнее ограничение и равен ровно 1000 мс
+// (побитовое совпадение с прежним абсолютным _maxReplicationBackoff).
+const _replicationBackoffHeartbeats = 30
 
 // nextIndexArgsEntries формирует аргументы для AppendEntries и сопутствующие данные
 // для отправки конкретному последователю (peerID).
@@ -269,7 +277,7 @@ func (cm *ConsensusModule) inflightPresentLocked(peerID int) bool {
 // отстоят не менее чем на verifyRedispatchMinInterval, поэтому их частота
 // ≤ 1000/интервал независимо от темпа запросов. Запрос, заставший окно
 // занятым, дожидается либо следующей перерассылки, либо пульса — не дольше
-// пульса (интервал строго меньше HeartbeatTimeoutMs). Перерассылка выполняется
+// пульса (интервал строго меньше пульса: 8/11 от него). Перерассылка выполняется
 // только владельцем флага (инвариант «на одного соседа не более одной живой
 // горутины репликации»), поэтому каскад горутин невозможен. Ветка
 // _replicationSkip не перерассылает: AE всё равно не был бы отправлен, а смена
@@ -439,12 +447,18 @@ func (cm *ConsensusModule) countVerifyVotesLocked(peerID int, dispatchEpoch uint
 // replicationBackoffActiveLocked сообщает, активен ли задержка повторов для попытки
 // репликации текущего лидерства: с последней реальной
 // попытки прошло меньше задержки, вычисленной по числу транспортных
-// ошибок. Требует удержания cm.mu.
+// ошибок. База задержки — нормализованный пульс (нулевое или
+// отрицательное значение литерального тестового CM заменяется умолчанием).
+// Требует удержания cm.mu.
 func (cm *ConsensusModule) replicationBackoffActiveLocked(peerID, savedCurrentTerm int) bool {
 	if !cm.isLeaderForTermLocked(savedCurrentTerm) {
 		return false
 	}
-	delay := replicationBackoffDelay(cm.leaderState.replFailures[peerID])
+	base := cm.heartbeatTimeout
+	if base <= 0 {
+		base = DefaultHeartbeatTimeout
+	}
+	delay := replicationBackoffDelay(base, cm.leaderState.replFailures[peerID])
 	return delay > 0 && !cm.leaderState.lastAttempt[peerID].IsZero() &&
 		time.Since(cm.leaderState.lastAttempt[peerID]) < delay
 }
@@ -713,19 +727,25 @@ func failedAETrace(peerID, nextIndex, matchIndex, conflictIndex, conflictTerm in
 	)
 }
 
-// replicationBackoffDelay вычисляет задержку на каждого соседа между попытками
-// репликации по числу подряд идущих транспортных ошибок:
-// delay = min(HeartbeatTimeoutMs * 2^min(failures, 5), 1000) мс.
-// Принудительное ограничение в заданных пределах: при HeartbeatTimeoutMs = 33
-// и показателе 5 получается 33·2⁵ = 1056 мс > потолка 1000 мс.
-// При нуле ошибок задержка нулевая — поведение прежнее.
-func replicationBackoffDelay(failures int) time.Duration {
+// replicationBackoffDelay — чистая функция задержки на каждого соседа между
+// попытками репликации по числу подряд идущих транспортных ошибок:
+// delay = min(base × 2^min(failures, 5), ceiling), где потолок вычисляется
+// от базы как max(_minReplicationBackoff, _replicationBackoffHeartbeats × base).
+// На умолчальном пульсе 33 мс потолок равен ровно 1000 мс
+// (30·33 = 990 < 1000), ступени f=1…5 — 66/132/264/528/1000 мс.
+// При нуле ошибок задержка нулевая — поведение прежнее. Нормализация базы —
+// обязанность вызывающего; функция умолчания не знает.
+func replicationBackoffDelay(base time.Duration, failures int) time.Duration {
 	if failures <= 0 {
 		return 0
 	}
-	delay := HeartbeatTimeoutMs * time.Millisecond * time.Duration(1<<min(failures, 5))
-	if delay > _maxReplicationBackoff {
-		delay = _maxReplicationBackoff
+	ceiling := _minReplicationBackoff
+	if proportional := _replicationBackoffHeartbeats * base; proportional > ceiling {
+		ceiling = proportional
+	}
+	delay := base * time.Duration(1<<min(failures, 5))
+	if delay > ceiling {
+		delay = ceiling
 	}
 	return delay
 }

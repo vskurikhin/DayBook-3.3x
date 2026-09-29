@@ -10,8 +10,8 @@ package api
 // «не лидер» или «не удалось зафиксировать команду», не имеют
 // подходящих аналогов среди стандартных HTTP-кодов.
 //
-// Каждый тип запроса содержит поля, обеспечивающие уникальную
-// идентификацию запроса.
+// Состав полей каждого типа запроса определяется семантикой
+// соответствующей команды, а не общим контрактом идентификации.
 
 type PutRequest struct {
 	Key   string `json:"Key"`
@@ -66,6 +66,22 @@ var _ Response = (*CASResponse)(nil)
 
 func (cr *CASResponse) Status() ResponseStatus {
 	return cr.RespStatus
+}
+
+type DeleteRequest struct {
+	Key string `json:"Key"`
+}
+
+type DeleteResponse struct {
+	RespStatus ResponseStatus `json:"RespStatus"`
+	KeyFound   bool           `json:"KeyFound"`
+	PrevValue  string         `json:"PrevValue"`
+}
+
+var _ Response = (*DeleteResponse)(nil)
+
+func (dr *DeleteResponse) Status() ResponseStatus {
+	return dr.RespStatus
 }
 
 type ResponseStatus int

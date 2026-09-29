@@ -3,6 +3,7 @@ package kvclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -41,6 +42,22 @@ func hangingHandler(done <-chan struct{}) http.Handler {
 	})
 }
 
+// methodNotAllowedHandler отвечает 405 Method Not Allowed на любой
+// запрос — имитация рассинхрона версий: сервер отвергает метод.
+func methodNotAllowedHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+}
+
+// notFoundHandler отвечает 404 Not Found на любой запрос — имитация
+// несовпадения маршрута (например, прокси без маршрута /weak-get/).
+func notFoundHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "not found", http.StatusNotFound)
+	})
+}
+
 // slowHandler отвечает статусом OK с задержкой delay.
 func slowHandler(t *testing.T, delay time.Duration) http.Handler {
 	t.Helper()
@@ -60,8 +77,12 @@ func writeResponse(t *testing.T, w http.ResponseWriter, r *http.Request, status 
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/get/"):
 		resp = api.GetResponse{RespStatus: status, KeyFound: true, Value: "value"}
+	case strings.HasPrefix(r.URL.Path, "/weak-get/"):
+		resp = api.GetResponse{RespStatus: status, KeyFound: true, Value: "value"}
 	case strings.HasPrefix(r.URL.Path, "/put/"):
 		resp = api.PutResponse{RespStatus: status}
+	case strings.HasPrefix(r.URL.Path, "/delete/"):
+		resp = api.DeleteResponse{RespStatus: status, KeyFound: true, PrevValue: "prev"}
 	default:
 		resp = api.StatusResponse{RespStatus: status}
 	}
@@ -101,18 +122,67 @@ func TestClientConcurrentUse(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			for range perGoroutine {
-				if _, _, err := client.Get(ctx, "key"); err != nil {
-					t.Errorf("goroutine %d: Get: %v", id, err)
+				if _, _, err := client.ConsensusGet(ctx, "key"); err != nil {
+					t.Errorf("goroutine %d: ConsensusGet: %v", id, err)
+					return
+				}
+				if _, _, err := client.WeakGet(ctx, "key"); err != nil {
+					t.Errorf("goroutine %d: WeakGet: %v", id, err)
 					return
 				}
 				if _, _, err := client.Put(ctx, "key", "value"); err != nil {
 					t.Errorf("goroutine %d: Put: %v", id, err)
 					return
 				}
+				if _, _, err := client.Delete(ctx, "key"); err != nil {
+					t.Errorf("goroutine %d: Delete: %v", id, err)
+					return
+				}
 			}
 		}(i)
 	}
 	wg.Wait()
+}
+
+// TestWeakGetReturnsValueAndFound проверяет, что WeakGet возвращает
+// из ответа сервера ожидаемые value и found (семантика ветки
+// /weak-get/ тестового сервера).
+func TestWeakGetReturnsValueAndFound(t *testing.T) {
+	okSrv := httptest.NewServer(okHandler(t))
+	defer okSrv.Close()
+
+	client := New([]string{serverAddr(t, okSrv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	value, found, err := client.WeakGet(ctx, "key")
+	if err != nil {
+		t.Fatalf("WeakGet: %v", err)
+	}
+	if value != "value" || !found {
+		t.Errorf("WeakGet = (%q, %v); want (%q, %v)", value, found, "value", true)
+	}
+}
+
+// TestDeleteReturnsPrevAndFound проверяет, что Delete возвращает из
+// ответа сервера ожидаемые prev и found (семантика ветки /delete/
+// тестового сервера), а не только отсутствие ошибки: значение и признак
+// существования берутся из тела ответа DeleteResponse.
+func TestDeleteReturnsPrevAndFound(t *testing.T) {
+	okSrv := httptest.NewServer(okHandler(t))
+	defer okSrv.Close()
+
+	client := New([]string{serverAddr(t, okSrv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	prev, found, err := client.Delete(ctx, "key")
+	if err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if prev != "prev" || !found {
+		t.Errorf("Delete = (%q, %v); want (%q, %v)", prev, found, "prev", true)
+	}
 }
 
 // TestNewUsesDefaultTimeout проверяет, что New даёт таймаут запроса
@@ -131,8 +201,8 @@ func TestNewUsesDefaultTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	start := time.Now()
-	if _, _, err := client.Get(ctx, "key"); err != nil {
-		t.Fatalf("Get: %v", err)
+	if _, _, err := client.ConsensusGet(ctx, "key"); err != nil {
+		t.Fatalf("ConsensusGet: %v", err)
 	}
 	elapsed := time.Since(start)
 
@@ -161,8 +231,8 @@ func TestNewWithTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	start := time.Now()
-	if _, _, err := client.Get(ctx, "key"); err != nil {
-		t.Fatalf("Get with 5s timeout: %v", err)
+	if _, _, err := client.ConsensusGet(ctx, "key"); err != nil {
+		t.Fatalf("ConsensusGet with 5s timeout: %v", err)
 	}
 	if elapsed := time.Since(start); elapsed < responseDelay {
 		t.Errorf("elapsed = %v, want at least %v", elapsed, responseDelay)
@@ -173,7 +243,61 @@ func TestNewWithTimeout(t *testing.T) {
 	defaultClient := New(addrs)
 	shortCtx, shortCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer shortCancel()
-	if _, _, err := defaultClient.Get(shortCtx, "key"); err == nil {
-		t.Error("Get with default timeout: want error, got nil")
+	if _, _, err := defaultClient.ConsensusGet(shortCtx, "key"); err == nil {
+		t.Error("ConsensusGet with default timeout: want error, got nil")
+	}
+}
+
+// TestWeakGetMethodNotAllowedFailsFast — 405 на GET-запрос слабого
+// чтения возвращает явную ошибку без ротации адресов: метод
+// одинаков для всех узлов кластера, повтор бессмыслен.
+func TestWeakGetMethodNotAllowedFailsFast(t *testing.T) {
+	srv := httptest.NewServer(methodNotAllowedHandler())
+	defer srv.Close()
+
+	client := New([]string{serverAddr(t, srv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	_, _, err := client.WeakGet(ctx, "key")
+	if err == nil {
+		t.Fatal("WeakGet: want error, got nil")
+	}
+	if !errors.Is(err, errMethodNotAllowed) {
+		t.Errorf("WeakGet error = %v; want errors.Is(err, errMethodNotAllowed)", err)
+	}
+	if elapsed := time.Since(start); elapsed >= 2*time.Second {
+		t.Errorf("WeakGet took %v; want < 2s (fails fast, not deadline)", elapsed)
+	}
+	if got := client.leader(); got != 0 {
+		t.Errorf("leader = %d, want 0 (no rotation)", got)
+	}
+}
+
+// TestWeakGetRouteMismatchFailsFast — 404 на GET-запрос слабого чтения
+// возвращает явную ошибку errRouteMismatch без ротации адресов: класс
+// «маршрут не совпал» детерминирован для всех узлов, повтор бессмыслен.
+func TestWeakGetRouteMismatchFailsFast(t *testing.T) {
+	srv := httptest.NewServer(notFoundHandler())
+	defer srv.Close()
+
+	client := New([]string{serverAddr(t, srv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	_, _, err := client.WeakGet(ctx, "key")
+	if err == nil {
+		t.Fatal("WeakGet: want error, got nil")
+	}
+	if !errors.Is(err, errRouteMismatch) {
+		t.Errorf("WeakGet error = %v; want errors.Is(err, errRouteMismatch)", err)
+	}
+	if elapsed := time.Since(start); elapsed >= 2*time.Second {
+		t.Errorf("WeakGet took %v; want < 2s (fails fast, not deadline)", elapsed)
+	}
+	if got := client.leader(); got != 0 {
+		t.Errorf("leader = %d, want 0 (no rotation)", got)
 	}
 }

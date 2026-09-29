@@ -10,12 +10,20 @@ GOCMD=$(GOBASE)/cmd
 
 TRACE=trace
 TRACE_LOG_LEVEL=0
+# Временные параметры узлов raftkv, в миллисекундах; суффикс
+# единицы времени подставляется в рецепте start-raft: -flag=$(VAR)ms.
+APPLY_BATCH_INTERVAL=50
+HEARTBEAT_TIMEOUT=45
+REELECTION_TIMEOUT=500
+TICKER_TIMEOUT=20
 CONCURRENCY=8
+DELETE_PERCENT=0
 DURATION=5m
 GET_PERCENT=75
 REQUEST_RATE=200
 VALUE_SIZE=128
 VERIFY_PERCENT=33
+WEAK_GET_PERCENT=0
 
 STAND=
 STAND_PREFIX := $(if $(STAND),$(STAND)_,"")
@@ -85,9 +93,13 @@ start-raft: stop-raft
 		echo "  >  $(PROJECTNAME) is available at $$http"; \
 		$(GOBIN)/$(PROJECTNAME)kv -number $$n \
 			-http-addr=":$$http" -rpc-addr=":$$rpc" -peers="$$peers" \
+			-apply-batch-interval=$(APPLY_BATCH_INTERVAL)ms \
+			-heartbeat-timeout=$(HEARTBEAT_TIMEOUT)ms \
+			-reelection-timeout=$(REELECTION_TIMEOUT)ms \
+			-ticker-timeout=$(TICKER_TIMEOUT)ms \
 			-trace-log-level $(TRACE_LOG_LEVEL) \
-			--trace-cm-log-file "$(call trace_cm,$$n)" \
-			--trace-kv-log-file "$(call trace_kv,$$n)" \
+			-trace-cm-log-file "$(call trace_cm,$$n)" \
+			-trace-kv-log-file "$(call trace_kv,$$n)" \
 			1>"$(call stdout,$$n)" 2>"$(call stderr,$$n)" & \
 		echo $$! > $(call pid_file,$$n); \
 		sed "/^/s/^/  \>  PID$$n: /" $(call pid_file,$$n); \
@@ -97,12 +109,14 @@ start-raft: stop-raft
 	peers=$$(for p in $(NODES); do printf ':888%s,' $$p; done | sed 's/,$$//'); \
 	echo "peers=$$peers" ; $(GOBIN)/loadkv \
 		-concurrency $(CONCURRENCY) \
+		-delete-percent $(DELETE_PERCENT) \
 		-duration $(DURATION) \
 		-get-percent $(GET_PERCENT) \
 		-peers "$$peers" \
 		-request-rate $(REQUEST_RATE) \
 		-value-size $(VALUE_SIZE) \
 		-verify-percent $(VERIFY_PERCENT) \
+		-weak-get-percent $(WEAK_GET_PERCENT) \
 		> $(OUT_LOAD_KV_FILE) 2>&1 & echo $$! > $(PID_LOADKV)
 	@sed "/^/s/^/  \>  PID4: /" $(PID_LOADKV)
 
@@ -175,7 +189,7 @@ verify-imports:
 		exit 1; \
 	fi
 
-go-test: verify-imports go-test-root go-test-pkg-raft go-test-pkg go-test-kvservice
+go-test: verify-imports go-test-root go-test-pkg-raft go-test-pkg go-test-internal go-test-kvservice
 
 verify-race-scope:
 	@ROOT_PKG=$$(go list -m); \
@@ -183,6 +197,10 @@ verify-race-scope:
 		echo "race scope lost root raft package: $$ROOT_PKG not in $(RACE_PKGS)" >&2; \
 		exit 1; \
 	}
+
+go-test-internal:
+	@echo "  >  Running tests: pinternal/... $(TESTFLAGS)"
+	@go test $(TESTFLAGS) ./internal/...
 
 go-test-kvservice:
 	@echo "  >  Running tests: pkg/kvservice/... $(TESTFLAGS)"
