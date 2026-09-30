@@ -301,3 +301,60 @@ func TestWeakGetRouteMismatchFailsFast(t *testing.T) {
 		t.Errorf("leader = %d, want 0 (no rotation)", got)
 	}
 }
+
+// TestVerifyLeaderMethodNotAllowedFailsFast — 405 на GET-запрос
+// проверки лидерства возвращает явную ошибку без ротации адресов:
+// метод одинаков для всех узлов кластера, повтор бессмыслен.
+func TestVerifyLeaderMethodNotAllowedFailsFast(t *testing.T) {
+	srv := httptest.NewServer(methodNotAllowedHandler())
+	defer srv.Close()
+
+	// Двухадресный клиент: при len(addrs)==2 ротация наблюдаема
+	// ((0+1)%2=1) — ассерт leader()==0 действительно доказывает
+	// отсутствие ротации (одноадресный клиент делает его вакуумным).
+	client := New([]string{serverAddr(t, srv), serverAddr(t, srv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	_, err := client.VerifyLeader(ctx)
+	if err == nil {
+		t.Fatal("VerifyLeader: want error, got nil")
+	}
+	if !errors.Is(err, errMethodNotAllowed) {
+		t.Errorf("VerifyLeader error = %v; want errors.Is(err, errMethodNotAllowed)", err)
+	}
+	if elapsed := time.Since(start); elapsed >= 2*time.Second {
+		t.Errorf("VerifyLeader took %v; want < 2s (fails fast, not deadline)", elapsed)
+	}
+	if got := client.leader(); got != 0 {
+		t.Errorf("leader = %d, want 0 (no rotation)", got)
+	}
+}
+
+// TestVerifyLeaderRouteMismatchFailsFast — 404: тот же класс «маршрут
+// не совпал», детерминирован для всех узлов кластера.
+func TestVerifyLeaderRouteMismatchFailsFast(t *testing.T) {
+	srv := httptest.NewServer(notFoundHandler())
+	defer srv.Close()
+
+	// Двухадресный клиент (см. TestVerifyLeaderMethodNotAllowedFailsFast).
+	client := New([]string{serverAddr(t, srv), serverAddr(t, srv)})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	_, err := client.VerifyLeader(ctx)
+	if err == nil {
+		t.Fatal("VerifyLeader: want error, got nil")
+	}
+	if !errors.Is(err, errRouteMismatch) {
+		t.Errorf("VerifyLeader error = %v; want errors.Is(err, errRouteMismatch)", err)
+	}
+	if elapsed := time.Since(start); elapsed >= 2*time.Second {
+		t.Errorf("VerifyLeader took %v; want < 2s (fails fast, not deadline)", elapsed)
+	}
+	if got := client.leader(); got != 0 {
+		t.Errorf("leader = %d, want 0 (no rotation)", got)
+	}
+}

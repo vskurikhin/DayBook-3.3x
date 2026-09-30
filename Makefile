@@ -199,7 +199,7 @@ verify-race-scope:
 	}
 
 go-test-internal:
-	@echo "  >  Running tests: pinternal/... $(TESTFLAGS)"
+	@echo "  >  Running tests: internal/... $(TESTFLAGS)"
 	@go test $(TESTFLAGS) ./internal/...
 
 go-test-kvservice:

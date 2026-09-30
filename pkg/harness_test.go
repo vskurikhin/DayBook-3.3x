@@ -321,7 +321,7 @@ func (h *Harness) RestartService(id int) {
 //   - R1: GetHTTPListenAddr() != "" и выведенный из него localhost:<port>
 //     совпадает с h.kvServiceAddrs[id] (адрес инкарнации обновлён);
 //   - R2: GetRaftListenAddr() != nil (слушатель Raft-транспорта открыт);
-//   - R3: POST /verifyleader/ возвращает 200 и тело, декодируемое
+//   - R3: GET /verifyleader/ возвращает 200 и тело, декодируемое
 //     в api.StatusResponse со статусом StatusOK либо StatusNotLeader —
 //     обработчик проходит через VerifyLeader, поэтому завершённый
 //     round-trip доказывает и обслуживание HTTP, и отзывчивость
@@ -378,7 +378,7 @@ func (h *Harness) serviceReady(id int) bool {
 	// R3: завершённый round-trip через существующий эндпоинт.
 	ctx, cancel := context.WithTimeout(h.ctx, _serviceProbeTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		"http://"+want+"/verifyleader/", nil)
 	if err != nil {
 		return false
