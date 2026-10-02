@@ -48,7 +48,7 @@ func TestRebuildLastLog_EmptyLogWithSnapshot(t *testing.T) {
 	cm.rebuildLastLogLocked()
 
 	if cm.cmState.lastLogIndex != 10 || cm.cmState.lastLogTerm != 2 {
-		t.Fatalf("lastLog = (%d, %d), want (10, 2) — INV-S2 violated",
+		t.Fatalf("lastLog = (%d, %d), want (10, 2) — граница журнала и снимка нарушена",
 			cm.cmState.lastLogIndex, cm.cmState.lastLogTerm)
 	}
 }

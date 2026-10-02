@@ -69,7 +69,7 @@ func TestRunWithPeerConnect(t *testing.T) {
 		for range commitChannel {
 		}
 	}()
-	peerTransport, err := transp.NewTCPTransport(":0", 0, 0)
+	peerTransport, err := transp.NewTCPTransport(":0", transp.TCPTimeouts{}, 0)
 	if err != nil {
 		t.Fatalf("transp.NewTCPTransport: %v", err)
 	}
@@ -96,6 +96,57 @@ func TestRunWithPeerConnect(t *testing.T) {
 		t.Fatalf("runWith returned: %v", err)
 	}
 	t.Cleanup(stop)
+}
+
+// TestTransportTimeouts проверяет маршрут «флаг → поле» сборки
+// TCPTimeouts из Values: каждое поле берётся из своего значения
+// конфигурации, ResponseTimeout конструктивно равен GenericRPCTimeout,
+// нулевые Values дают нулевую структуру (дефолты ставит конструктор
+// транспорта).
+func TestTransportTimeouts(t *testing.T) {
+	tests := []struct {
+		name   string
+		values config.Values
+		want   transp.TCPTimeouts
+	}{
+		{
+			name: "distinct values map field to field",
+			values: config.Values{
+				TCPConnectTimeout:      11 * time.Millisecond,
+				TCPRPCTimeout:          22 * time.Millisecond,
+				InstallSnapshotTimeout: 33 * time.Millisecond,
+			},
+			want: transp.TCPTimeouts{
+				ConnectionTimeout:      11 * time.Millisecond,
+				GenericRPCTimeout:      22 * time.Millisecond,
+				InstallSnapshotTimeout: 33 * time.Millisecond,
+				ResponseTimeout:        22 * time.Millisecond,
+			},
+		},
+		{
+			name: "response equals generic",
+			values: config.Values{
+				TCPRPCTimeout: 77 * time.Millisecond,
+			},
+			want: transp.TCPTimeouts{
+				GenericRPCTimeout: 77 * time.Millisecond,
+				ResponseTimeout:   77 * time.Millisecond,
+			},
+		},
+		{
+			name:   "zero values give zero struct",
+			values: config.Values{},
+			want:   transp.TCPTimeouts{},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := transportTimeouts(&tc.values)
+			if got != tc.want {
+				t.Errorf("transportTimeouts(%+v) = %+v, want %+v", tc.values, got, tc.want)
+			}
+		})
+	}
 }
 
 // newTestValues собирает конфигурацию узла для тестов:

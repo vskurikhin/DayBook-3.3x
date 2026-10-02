@@ -388,7 +388,7 @@ func decodeSnapshotState(t *testing.T, store SnapshotStore, id string) map[strin
 	return state
 }
 
-// checkSnapshotsContainAppliedCommands проверяет INV-SNAP по содержимому:
+// checkSnapshotsContainAppliedCommands проверяет инвариант снимка по содержимому:
 // снимок с meta.Index = N обязан содержать результат применения всех
 // команд, записи которых имеют индекс ≤ N.
 func checkSnapshotsContainAppliedCommands(t *testing.T, store SnapshotStore, byIndex commandIndexMap) {

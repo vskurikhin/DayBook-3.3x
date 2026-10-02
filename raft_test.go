@@ -340,7 +340,7 @@ func TestNoCommitWithNoQuorum(t *testing.T) {
 	// Изолируем обоих follower'ов: у лидера остаётся 1/3 — кворума нет.
 	// Прежняя схема опиралась на инвариант «время изоляции < min election
 	// timeout» (комментарий «246ms < 254ms»); фактические константы
-	// (DefaultReelectionTimeout=340ms) его нарушали — изоляция 300+93ms
+	// (DefaultReelectionTimeout=430ms) его нарушали — изоляция 300+93ms
 	// превышала минимальный election timeout, и тест был flaky.
 	// Инвариант снят: тест больше не зависит от того, начнут ли изолированные
 	// follower'ы выборы.
@@ -419,7 +419,7 @@ func TestDisconnectLeaderBriefly(t *testing.T) {
 
 	// Отключаем лидера на короткое время (меньше тайм-аута выборов у соседей).
 	// keep: timing — предмет теста. Длительность разрыва (90 мс) заведомо
-	// меньше минимального election timeout (DefaultReelectionTimeout = 340 мс),
+	// меньше минимального election timeout (DefaultReelectionTimeout = 430 мс),
 	// поэтому соседи не начинают выборы.
 	h.DisconnectPeer(origLeaderId)
 	sleepMs(90)
@@ -2242,7 +2242,7 @@ func TestBatchingFSM_Basic(t *testing.T) {
 	cm := testServerWithFSM(t, fsm)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, 800*time.Millisecond)
+	waitForLeader(t, cm, 2*time.Second)
 
 	for i := 0; i < 5; i++ {
 		future := cm.Apply(i, 0)
@@ -2269,7 +2269,7 @@ func TestBatchingFSM_BatchBoundary(t *testing.T) {
 	cm := testServerWithFSM(t, fsm)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, 800*time.Millisecond)
+	waitForLeader(t, cm, 2*time.Second)
 
 	n := _maxApplyBatchSize * 3
 	for i := 0; i < n; i++ {
@@ -2299,7 +2299,7 @@ func TestBatchingFSM_ApplyBatchResponseMatching(t *testing.T) {
 	cm := testServerWithFSM(t, fsm)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, 800*time.Millisecond)
+	waitForLeader(t, cm, 2*time.Second)
 
 	futures := make([]ApplyFuture, 3)
 	for i := range futures {
@@ -2382,7 +2382,7 @@ func TestBatchingFSM_ApplyBatchResponseMismatch(t *testing.T) {
 	cm := testServerWithFSM(t, fsm)
 	defer cm.Stop()
 
-	waitForLeader(t, cm, 800*time.Millisecond)
+	waitForLeader(t, cm, 2*time.Second)
 
 	// Первая пачка команд должна завершиться ошибкой ErrBatchFSMResponseMismatch:
 	// хотя бы один батч, отправленный в ApplyBatch, вернёт неверное число ответов.
