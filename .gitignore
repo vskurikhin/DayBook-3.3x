@@ -222,5 +222,8 @@ target/
 .history
 .psql_history
 .doc/*
+docs/ORCHESTRATOR-usage.md
+docs/TASK/
 docs/TODO*.md
+docs/TODO/
 exportToHTML/*

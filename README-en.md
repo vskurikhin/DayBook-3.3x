@@ -286,6 +286,79 @@ layer constants are 0/1/2/4/8/16. The flag works as follows:
 Trace files are set by the flags `-trace-cm-log-file` and
 `-trace-kv-log-file` (empty value — the standard error stream).
 
+### Load generator summary (loadkv)
+
+When a run finishes, the generator prints a summary. Since version 1.2.0
+the summary includes `rps:` and `ops:` lines after the operation latency
+lines. Summary messages are printed through `slog` with a timestamp and
+the `INFO` level; on the stand they are written to `trace/loadkv.out`.
+The example below illustrates the format: its values are illustrative
+and do not come from a single run.
+
+    rps: seconds=3 mean=200.0 median=200.0 stddev=10.0 min=190 max=210 total=600
+    ops: done=29903 (get=75.2% put=24.8% verify=0.0% weak-get=0.0% delete=0.0% delete-verify=0.0%)
+
+The `rps:` line contains statistics of the per-second operation rate.
+Every second the generator prints an `RPS=` line and stores its value
+in the series used to compute the summary:
+
+* `seconds` — the number of seconds included after excluding the first;
+* `mean` — the arithmetic mean of the per-second values, in operations
+  per second, with one decimal place;
+* `median` — the middle value of the sorted series; for an even number
+  of values, the average of the two middle values;
+* `stddev` — the sample standard deviation, in operations per second,
+  with divisor n−1, where n is the number of included seconds; zero
+  when only one second is included;
+* `min` and `max` — the smallest and largest values in the series;
+* `total` — the sum of the included values.
+
+The first second is excluded from all statistics as the initial window
+for establishing connections. If fewer than two `RPS=` lines were
+printed during the run, all values in the `rps:` line are zero,
+including `seconds=0`.
+
+RPS for a second is the increase in the total number of completed
+operations of six kinds: `get`, `put`, `verify`, `weak-get`, `delete`,
+and `delete-verify`. Both successful and failed operations are counted.
+Re-reads after a write or deletion are counted separately (`verify`,
+`delete-verify`), so the operation rate may exceed the pace set by
+`-request-rate`. Call errors appear in the `fail` fields of the `done:`
+and `RPS=` lines. The `bad` fields of re-read checks count errors and
+value mismatches; mismatches require analysis and do not by themselves
+indicate a service failure. The `DELETE-VERIFY ok/bad` counters appear
+only in the `done:` line.
+
+Only seconds with a printed `RPS=` line enter the series. The interval
+between the last such line and the end of the run is excluded from the
+statistics. Operations started before the stop and completed after it
+are counted in `done:` and `ops:`, but not in `rps:`. Therefore
+`rps: total` never exceeds `ops: done`.
+
+The `ops:` line shows the total number of completed operations for the
+run (`done`) and the percentage of each kind. When `done=0`, all shares
+are `0.0`. Since version 1.2.0 the last summary line is `ops:`;
+previously it was the `DELETE` latency line. Parsing by message prefix
+is preserved, while parsing by position from the end of the output
+changes.
+
+Since version 1.2.0 the generator releases requests on an absolute
+schedule. If a ticker wakeup is late, the generator processes all ticks
+whose scheduled time has already arrived: the delay does not lose them.
+If the concurrency limiter is busy, the request is not released and
+the tick is counted in `_dropped`. Thus, since version 1.2.0 the counter
+includes every tick whose scheduled time has arrived but which was not
+released, including ticks processed after a delayed wakeup. Before
+version 1.2.0 it counted only ticks that encountered a busy limiter at
+the moment of a wakeup. Values of `_dropped` are not comparable with
+runs of earlier versions. At the same `-request-rate`, summary numbers
+may also differ from runs of versions before 1.2.0 and are unsuitable
+for direct comparison with them.
+
+The format of the `run:` and `done:` lines is unchanged. The set of
+generator flags and their defaults is unchanged. The change affects
+only the generator: `raftkv` nodes and protocols are unaffected.
+
 ## Documentation
 
 * [docs/README.md](docs/README.md) — documentation index;
