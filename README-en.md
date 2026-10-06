@@ -372,8 +372,24 @@ only the generator: `raftkv` nodes and protocols are unaffected.
 
 ## License
 
-The code is distributed under the license whose text is in the
-[LICENSE](LICENSE) file.
+Starting with version **1.2.0**, the project is distributed under the
+**Apache License 2.0** (`Apache-2.0`); the full text is in
+[LICENSE](LICENSE).
+
+This project is based on [eliben/raft](https://github.com/eliben/raft)
+by Eli Bendersky, released under the Unlicense. Attribution is provided
+in [NOTICE](NOTICE), and the original Unlicense text is preserved in
+[LICENSES/Unlicense.txt](LICENSES/Unlicense.txt).
+
+The transition to Apache-2.0 does not revoke rights to code previously
+published under the Unlicense, including commits preparing version
+1.2.0 before the license change. That code remains available under
+its original terms. New changes after the transition are provided
+under Apache-2.0 unless explicitly stated otherwise for individual
+components; third-party components retain their own licenses.
+
+The terms for submitting new contributions to the project are defined
+in Section 5 of the Apache License 2.0.
 
 ## Version synchronization
 

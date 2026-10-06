@@ -1,0 +1,11 @@
+Raft
+https://github.com/vskurikhin/raft
+
+Copyright 2026 Victor N. Skurikhin (new contributions under Apache-2.0).
+
+This project includes code derived from the Raft implementation by
+Eli Bendersky:
+https://github.com/eliben/raft
+
+The upstream code was released under the Unlicense. A copy of that
+text is included in LICENSES/Unlicense.txt.
