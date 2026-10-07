@@ -216,3 +216,14 @@ target/
 
 .history
 .psql_history
+
+## TODO
+docs/TODO*.md
+docs/TODO/
+
+# AI
+.ai/
+.claude/
+.codex/
+.kimi-code/
+.opencode/
