@@ -70,4 +70,6 @@ services:
       - ./volumes/nginx-react-app/2021:/usr/share/nginx/html/2021
       - ./volumes/nginx-react-app/2022:/usr/share/nginx/html/2022
       - ./volumes/nginx-react-app/2023:/usr/share/nginx/html/2023
+      - ./volumes/nginx-react-app/2024:/usr/share/nginx/html/2024
+      - ./volumes/nginx-react-app/2025:/usr/share/nginx/html/2025
       - ./volumes/nginx-react-app/2026:/usr/share/nginx/html/2026

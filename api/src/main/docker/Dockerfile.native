@@ -18,7 +18,7 @@
 ###
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 
-RUN /bin/microdnf reinstall -y tzdata
+RUN /bin/microdnf install -y tzdata
 
 ENV TZ=Europe/Moscow
 
