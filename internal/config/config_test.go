@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"flag"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -150,6 +151,56 @@ func TestParseFlagsDefaultAddr(t *testing.T) {
 	}
 }
 
+// TestParseFlagsStatsOutputDefaultsTrue — отсутствие флага -stats-output
+// включает вывод периодической статистики: умолчание равно true.
+func TestParseFlagsStatsOutputDefaultsTrue(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1"}
+
+	v := ParseFlags()
+	if !v.StatsOutput {
+		t.Errorf("StatsOutput = false, want true (умолчание)")
+	}
+}
+
+// TestParseFlagsStatsOutputFalse — явное -stats-output=false доезжает
+// до Values.StatsOutput и не связано с уровнем трассировки.
+func TestParseFlagsStatsOutputFalse(t *testing.T) {
+	origArgs := os.Args
+	t.Cleanup(func() { os.Args = origArgs })
+
+	os.Args = []string{"raft", "-number", "1", "-stats-output=false", "-trace-log-level=5"}
+
+	v := ParseFlags()
+	if v.StatsOutput {
+		t.Errorf("StatsOutput = true, want false (явное отключение)")
+	}
+	if v.TraceLogLevel != 5 {
+		t.Errorf("TraceLogLevel = %d, want 5 (настройки независимы)", v.TraceLogLevel)
+	}
+}
+
+// TestAddStatsOutputFlagRejectsInvalidValue — небулево значение обязано
+// отклоняться штатной ошибкой парсера флагов, без log.Fatal: проверяется
+// регистрация флага на отдельном наборе.
+func TestAddStatsOutputFlagRejectsInvalidValue(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	_ = addStatsOutputFlag(fs)
+
+	err := fs.Parse([]string{"-stats-output=maybe"})
+	if err == nil {
+		t.Fatal("ожидалась ошибка парсера для небулева значения")
+	}
+	if !strings.Contains(err.Error(), "invalid boolean value") {
+		t.Errorf("ошибка парсера = %q, want стандартное сообщение о небулевом значении", err)
+	}
+}
+
+// TestParseFlagsTraceLogDefaults — проверка значений по умолчанию для
+// флагов трассировки.
 func TestParseFlagsTraceLogDefaults(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
@@ -168,11 +219,7 @@ func TestParseFlagsTraceLogDefaults(t *testing.T) {
 	}
 }
 
-// TestParseFlagsNodeDefaults — сводная сверка контракта дефолтов четырёх
-// параметров узла. Таблица «флаг → ожидаемое значение» против единого
-// источника — raft.TCPRPCTimeout / DefaultMaxPool /
-// raft.DefaultSnapshotInterval / raft.DefaultSnapshotThreshold. Защита
-// от рассинхрона дефолтов между internal/config и пакетом raft (RISK-023).
+// TestParseFlagsNodeDefaults — проверка значений по умолчанию для четырёх флагов узла.
 func TestParseFlagsNodeDefaults(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
@@ -578,11 +625,8 @@ func TestValidateElectionQuorumInvariant(t *testing.T) {
 	}
 }
 
-// TestParseFlagsSnapshotDefaults проверяет дефолты флагов снимков: без флага
-// поля Values.SnapshotInterval/SnapshotThreshold равны экспортированным
-// дефолтам пакета raft. Это защита от рассинхрона дефолтов между
-// internal/config и пакетом raft (RISK-023): единый источник —
-// raft.DefaultSnapshotInterval/raft.DefaultSnapshotThreshold.
+// TestParseFlagsSnapshotDefaults — проверка значений по умолчанию для флагов снимков:
+// без явного флага используется ожидаемое умолчание.
 func TestParseFlagsSnapshotDefaults(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })

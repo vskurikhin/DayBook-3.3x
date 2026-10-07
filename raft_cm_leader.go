@@ -1,3 +1,5 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
@@ -253,7 +255,9 @@ func (cm *ConsensusModule) appendConfigurationEntry(future *configurationChangeF
 	cm.leaderState.commitmentTracker.commit(cm.cmState.lastLogIndex, cm.lookupTermLocked)
 	savedCommitIndex := cm.cmState.commitIndex
 	if newCI := cm.leaderState.commitmentTracker.getCommitIndex(); newCI > cm.cmState.commitIndex {
-		cm.traceLockedLogf(_traceLevelProgress, "leader sets commitIndex := %d", newCI)
+		if traceEnabled(_traceLevelProgress) {
+			cm.traceLogfLocked("leader sets commitIndex := %d", newCI)
+		}
 		cm.cmState.commitIndex = newCI
 	}
 	// Значение снимается в критической секции до Unlock (RISK-002):
@@ -457,7 +461,9 @@ func (cm *ConsensusModule) runLeaderLoop() {
 		cm.leaderLoopExitCleanupLocked()
 		cm.mu.Unlock()
 		elapsed := time.Since(startNow)
-		cm.traceLogf(_traceLevelLoops, "leaderLoop exit: elapsed=%v", elapsed)
+		if traceEnabled(_traceLevelLoops) {
+			cm.traceLogf("leaderLoop exit: elapsed=%v", elapsed)
+		}
 	}()
 
 	heartbeatTicker := time.NewTicker(heartbeatTimeout)
@@ -496,7 +502,9 @@ func (cm *ConsensusModule) runLeaderLoop() {
 
 		case <-cm.stepDown:
 			cm.mu.Lock()
-			cm.traceLockedLogf(_traceLevelLoops, "leader stepping down")
+			if traceEnabled(_traceLevelLoops) {
+				cm.traceLogfLocked("leader stepping down")
+			}
 			if cm.leaderState.leadershipTransferFuture != nil {
 				atomic.StoreInt32(&cm.leaderState.leadershipTransferInProgress, 0)
 				cm.leaderState.leadershipTransferFuture.respond(nil)
@@ -550,7 +558,9 @@ func (cm *ConsensusModule) leaderLoopExitCleanupLocked() {
 		cm.leaderState.pendingVerify = nil
 	}
 	inflightCount := len(cm.leaderState.inflight)
-	cm.traceLockedLogf(_traceLevelLoops, "leaderLoop exit: responding to %d inflight futures", inflightCount)
+	if traceEnabled(_traceLevelLoops) {
+		cm.traceLogfLocked("leaderLoop exit: responding to %d inflight futures", inflightCount)
+	}
 	for _, future := range cm.leaderState.inflight {
 		future.respond(ErrLeadershipLost)
 	}
@@ -623,7 +633,9 @@ groupCommit:
 func (cm *ConsensusModule) handleLeaderCommitAdvance(newCommitIndex int) (keepRunning bool) {
 	cm.mu.Lock()
 	if newCommitIndex > cm.cmState.commitIndex {
-		cm.traceLockedLogf(_traceLevelProgress, "leader sets commitIndex := %d", newCommitIndex)
+		if traceEnabled(_traceLevelProgress) {
+			cm.traceLogfLocked("leader sets commitIndex := %d", newCommitIndex)
+		}
 		cm.cmState.commitIndex = newCommitIndex
 
 		// Обновить committed конфигурацию, если latest был зафиксирован.
@@ -635,7 +647,9 @@ func (cm *ConsensusModule) handleLeaderCommitAdvance(newCommitIndex int) (keepRu
 
 		// Проверить, остался ли лидер в committed конфигурации.
 		if !hasVote(cm.cmState.configurations.committed, cm.id) {
-			cm.traceLockedLogf(_traceLevelLoops, "leader stepping down: not in committed configuration")
+			if traceEnabled(_traceLevelLoops) {
+				cm.traceLogfLocked("leader stepping down: not in committed configuration")
+			}
 			cm.counters.stepDowns.configExit.Add(1)
 			cm.becomeFollowerLocked(cm.cmState.currentTerm)
 			cm.mu.Unlock()
@@ -723,11 +737,12 @@ func (cm *ConsensusModule) checkQuorumContact() {
 	if cm.cmState.state != Leader || cm.quorumContactedLocked(time.Now()) {
 		return
 	}
-	cm.traceLockedLogf(
-		_traceLevelKeyEvents,
-		"leader stepping down: no contact with quorum of voters for %v",
-		cm.checkQuorumTimeout,
-	)
+	if traceEnabled(_traceLevelKeyEvents) {
+		cm.traceLogfLocked(
+			"leader stepping down: no contact with quorum of voters for %v",
+			cm.checkQuorumTimeout,
+		)
+	}
 	cm.counters.stepDowns.checkQuorum.Add(1)
 	cm.becomeFollowerLocked(cm.cmState.currentTerm)
 }
@@ -802,10 +817,12 @@ func (cm *ConsensusModule) startLeaderLocked() {
 		}
 		cm.leaderState.inflightAE[peerID].Store(false)
 	}
-	cm.traceLockedLogf(
-		_traceLevelKeyEvents, "becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; len(log)=%d",
-		cm.cmState.currentTerm, cm.leaderState.nextIndex, cm.leaderState.matchIndex, len(cm.cmState.log),
-	)
+	if traceEnabled(_traceLevelKeyEvents) {
+		cm.traceSprintfLocked(
+			"becomes Leader; term=%d, nextIndex=%v, matchIndex=%v; len(log)=%d",
+			cm.cmState.currentTerm, cm.leaderState.nextIndex, cm.leaderState.matchIndex, len(cm.cmState.log),
+		)
+	}
 
 	cm.leaderState.leaderStartIndex = cm.cmState.lastLogIndex
 	cm.leaderState.commitmentTracker = newCommitmentTracker(

@@ -1,3 +1,5 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
@@ -65,11 +67,12 @@ func (cm *ConsensusModule) handleFsmSnapshot(req *reqSnapshotFuture) {
 		// отстаёт от диспетчеризации. Ранее индекс брался из lastApplied,
 		// и снимок фиксировался с завышенным индексом.
 		cm.counters.snapshotIndexBehindDispatched.Add(1)
-		cm.traceLockedLogf(
-			_traceLevelPreVote,
-			"handleFsmSnapshot: FSM behind dispatch: fsmAppliedIndex=%d lastApplied=%d lastSnapshotIndex=%d",
-			cm.cmState.fsmAppliedIndex, cm.cmState.lastApplied, cm.cmState.lastSnapshotIndex,
-		)
+		if traceEnabled(_traceLevelPreVote) {
+			cm.traceLogfLocked(
+				"handleFsmSnapshot: FSM behind dispatch: fsmAppliedIndex=%d lastApplied=%d lastSnapshotIndex=%d",
+				cm.cmState.fsmAppliedIndex, cm.cmState.lastApplied, cm.cmState.lastSnapshotIndex,
+			)
+		}
 	}
 	cm.mu.Unlock()
 
@@ -137,11 +140,12 @@ func (cm *ConsensusModule) handleInstallSnapshot(rpc RPC, req *InstallSnapshotRe
 	lastSnapshotIndex := cm.cmState.lastSnapshotIndex
 	cm.mu.Unlock()
 	if stale {
-		cm.traceLogf(
-			_traceLevelPreVote,
-			"InstallSnapshot skipped as no-op: LastLogIndex=%d <= lastSnapshotIndex=%d (leaderID=%d)",
-			req.LastLogIndex, lastSnapshotIndex, req.LeaderID,
-		)
+		if traceEnabled(_traceLevelPreVote) {
+			cm.traceLogf(
+				"InstallSnapshot skipped as no-op: LastLogIndex=%d <= lastSnapshotIndex=%d (leaderID=%d)",
+				req.LastLogIndex, lastSnapshotIndex, req.LeaderID,
+			)
+		}
 		resp.Success = true
 		return
 	}
@@ -226,11 +230,12 @@ func (cm *ConsensusModule) installSnapshotStateLocked(meta *SnapshotMeta) {
 	// При нарушении — только счётчик и трассировка, без паники и изменения Success.
 	if err := cm.checkSnapshotLogContinuity(); err != nil {
 		cm.counters.snapshotLogBoundaryViolation.Add(1)
-		cm.traceLockedLogf(
-			_traceLevelKeyEvents,
-			"handleInstallSnapshot: snapshot/log boundary violation: %v (lastLogIndex=%d, lastSnapshotIndex=%d)",
-			err, cm.cmState.lastLogIndex, cm.cmState.lastSnapshotIndex,
-		)
+		if traceEnabled(_traceLevelKeyEvents) {
+			cm.traceLogfLocked(
+				"handleInstallSnapshot: snapshot/log boundary violation: %v (lastLogIndex=%d, lastSnapshotIndex=%d)",
+				err, cm.cmState.lastLogIndex, cm.cmState.lastSnapshotIndex,
+			)
+		}
 	}
 	cm.cmState.logNeedsPersist = true
 	cm.persistToStorage()
@@ -297,13 +302,17 @@ func (cm *ConsensusModule) runSnapshots() {
 				if err := cm.takeSnapshot(); err != nil {
 					// Ошибки создания снимка не должны быть тихими
 					// ретрай обеспечивает следующий цикл.
-					cm.traceLogf(_traceLevelKeyEvents, "runSnapshots: takeSnapshot failed: %v", err)
+					if traceEnabled(_traceLevelKeyEvents) {
+						cm.traceLogf("runSnapshots: takeSnapshot failed: %v", err)
+					}
 				}
 			}
 		case <-time.After(interval):
 			if cm.shouldSnapshot() {
 				if err := cm.takeSnapshot(); err != nil {
-					cm.traceLogf(_traceLevelKeyEvents, "runSnapshots: takeSnapshot failed: %v", err)
+					if traceEnabled(_traceLevelKeyEvents) {
+						cm.traceLogf("runSnapshots: takeSnapshot failed: %v", err)
+					}
 				}
 			}
 		case <-cm.shutdownCh:

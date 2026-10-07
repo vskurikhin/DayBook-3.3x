@@ -135,6 +135,22 @@ requires the base to be at least `-tcp-rpc-timeout`.
   binary default is 1; the stand value differs (see the section "Node
   Profile vs Stand Profile").
 
+### Periodic Stats
+
+| Flag            | Default | Unit | Bounds |
+|-----------------|---------|------|--------|
+| `-stats-output` | true    | bool | —      |
+
+- `-stats-output` — periodic node stats output: once a second three
+  lines are written to standard output — latency, Raft counters and
+  `PersistV1` with JSON. The setting is **independent of
+  `-trace-log-level`**: the three lines are printed at any trace level,
+  including 0. A value of `false` disables publication of all three
+  lines only; the per-second collection, including the latency window
+  reset, keeps running. Event tracing, startup messages and error
+  messages of other subsystems are not affected. The default is true;
+  changing it at runtime is not supported.
+
 ### Profiling
 
 | Flag                      | Default       | Unit    | Bounds |

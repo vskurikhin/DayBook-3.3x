@@ -430,7 +430,9 @@ func (kvs *KVService) handleWeakGet(w http.ResponseWriter, req *http.Request) {
 	gr := &api.GetRequest{Key: req.PathValue("key")}
 	defer func() {
 		elapsed := time.Since(start)
-		kvs.traceLogf("HTTP WEAK-GET %v took %v", gr, elapsed)
+		if _traceKV > 0 {
+			kvs.traceLogf("HTTP WEAK-GET %v took %v", gr, elapsed)
+		}
 	}()
 
 	// GET семантически кешируем: значение слабого чтения актуально
@@ -466,7 +468,9 @@ func (kvs *KVService) handleCAS(w http.ResponseWriter, req *http.Request) {
 	cr := &api.CASRequest{}
 	defer func() {
 		elapsed := time.Since(start)
-		kvs.traceLogf("HTTP CAS %v took %v", cr, elapsed)
+		if _traceKV > 0 {
+			kvs.traceLogf("HTTP CAS %v took %v", cr, elapsed)
+		}
 	}()
 
 	if err := readRequestJSON(req, cr); err != nil {
@@ -515,7 +519,9 @@ func (kvs *KVService) handleDelete(w http.ResponseWriter, req *http.Request) {
 	dr := &api.DeleteRequest{}
 	defer func() {
 		elapsed := time.Since(start)
-		kvs.traceLogf("HTTP DELETE %v took %v", dr, elapsed)
+		if _traceKV > 0 {
+			kvs.traceLogf("HTTP DELETE %v took %v", dr, elapsed)
+		}
 	}()
 
 	if err := readRequestJSON(req, dr); err != nil {
@@ -562,7 +568,9 @@ func (kvs *KVService) handleGet(w http.ResponseWriter, req *http.Request) {
 	gr := &api.GetRequest{}
 	defer func() {
 		elapsed := time.Since(start)
-		kvs.traceLogf("HTTP GET %v took %v", gr, elapsed)
+		if _traceKV > 0 {
+			kvs.traceLogf("HTTP GET %v took %v", gr, elapsed)
+		}
 	}()
 
 	if err := readRequestJSON(req, gr); err != nil {
@@ -609,7 +617,9 @@ func (kvs *KVService) handlePut(w http.ResponseWriter, req *http.Request) {
 	pr := &api.PutRequest{}
 	defer func() {
 		elapsed := time.Since(start)
-		kvs.traceLogf("HTTP PUT %v took %v", pr, elapsed)
+		if _traceKV > 0 {
+			kvs.traceLogf("HTTP PUT %v took %v", pr, elapsed)
+		}
 	}()
 
 	if err := readRequestJSON(req, pr); err != nil {

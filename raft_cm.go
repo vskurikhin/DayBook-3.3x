@@ -1,3 +1,5 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
@@ -6,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/vskurikhin/raft/internal/tracelog"
 )
 
 // ConsensusModule (CM) реализует единый узел консенсуса Raft.
@@ -68,6 +72,33 @@ type ConsensusModule struct {
 	// Все поля имеют тип atomic.Int64, поэтому безопасны для чтения из любого контекста —
 	// в том числе одновременно с удержанной блокировкой cm.mu.
 	latency cmLatency
+
+	// disableStatsOutput — неизменяемый выбор вывода периодической
+	// статистики: зафиксирован конструктором до запуска первой горутины.
+	// При true снимок и сброс латентности выполняются на каждом тике,
+	// но сортировка, форматирование и запись трёх строк пропускаются.
+	disableStatsOutput bool
+
+	// statsStartedAt — момент создания CM; служит началом монотонного
+	// возраста в периодическом отчёте. После конструктора не изменяется.
+	statsStartedAt time.Time
+
+	// statsInstance — идентификатор экземпляра CM в ряду PersistV1:
+	// различает экземпляры в процессе и не повторяется после перезапуска
+	// процесса. После конструктора не изменяется.
+	statsInstance uint64
+
+	// statsSeq — номер попытки выпуска периодического отчёта. Растёт
+	// на каждую попытку при разрешённом выводе; при выключенном выводе
+	// попыток нет. Поле принадлежит горутине stats: отдельной
+	// синхронизации нет, в производстве его читает и пишет только stats,
+	// в тестах — прямой вызов публикации на CM без запущенной stats.
+	statsSeq uint64
+
+	// statsOutputErr — первая («липкая») ошибка вывода периодического
+	// отчёта. Принадлежит горутине stats; публикуется в следующей
+	// успешной строке PersistV1 и не очищается.
+	statsOutputErr error
 
 	// leaderLoopsAlive — число живых горутин цикла лидера на этом узле.
 	// Инвариант: значение не превышает 1. Увеличивается на входе в цикл
@@ -346,7 +377,9 @@ func (cm *ConsensusModule) Stop() {
 		cm.shutdownClosed = true
 		cm.mu.Unlock()
 
-		cm.traceLogf(_traceLevelKeyEvents, "CM.Stop called / becomes Dead")
+		if traceEnabled(_traceLevelKeyEvents) {
+			cm.traceLogf("CM.Stop called / becomes Dead")
+		}
 		close(cm.shutdownCh)
 		cm.wg.Wait()
 	})
@@ -400,11 +433,12 @@ func (cm *ConsensusModule) initTimerDefaults() {
 	cm.verifyRedispatchMinInterval = DefaultHeartbeatTimeout * 8 / 11
 }
 
-// setTimerConfig применяет временные параметры узла. Вызывается только
-// до close(ready) (единственный вызов в Server.Serve);
-// вызывающий обязан передать уже нормализованные значения (> 0), сеттер
-// пишет их как есть и пересчитывает зависимую величину verify-перерассылки.
-// Самостоятельно захватывает cm.mu и снимает её через defer.
+// setTimerConfig устанавливает временные параметры узла. Вызывается только
+// до закрытия канала готовности (close(ready)).
+// Требования:
+// - Вызывающий код должен передать нормализованные значения > 0.
+// - Метод принимает значения без изменений и пересчитывает зависимую величину.
+// Метод автоматически захватывает блокировку cm.mu и снимает её через defer.
 func (cm *ConsensusModule) setTimerConfig(tc TimerConfig) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -415,35 +449,77 @@ func (cm *ConsensusModule) setTimerConfig(tc TimerConfig) {
 	cm.verifyRedispatchMinInterval = tc.Heartbeat * 8 / 11
 }
 
-func (cm *ConsensusModule) stdoutTracePrintln(msg string) {
+// traceLogfLocked ставит отладочное сообщение в очередь писателя.
+// Форматирование префикса и тела выполняет писатель; скаляры состояния
+// снимаются здесь под уже удержанной cm.mu.
+// Требует удержания cm.mu и внешней проверки порога вызывающим
+// (traceEnabled с уровнем данного места); вызов без guard — нарушение
+// контракта.
+//
+//nolint:goprintffuncname // имя закреплено контрактом вывода, формат передаётся писателю.
+func (cm *ConsensusModule) traceLogfLocked(format string, args ...any) {
+	cm.enqueueTraceLocked(_traceWriter, format, args...)
+}
+
+// traceSprintfLocked ставит отладочное сообщение с телом, сформированным
+// синхронно. Применяется в местах со ссылочными аргументами:
+// форматирование под cm.mu исключает чтение изменяемых объектов
+// в асинхронном пути.
+// Требует удержания cm.mu и внешней проверки порога вызывающим
+// (traceEnabled с уровнем данного места); вызов без guard — нарушение
+// контракта.
+//
+//nolint:goprintffuncname // имя закреплено контрактом вывода, формат передаётся писателю.
+func (cm *ConsensusModule) traceSprintfLocked(format string, args ...any) {
+	cm.enqueueTraceSprintfLocked(_traceWriter, format, args...)
+}
+
+// traceLogf — потокобезопасная обёртка для вызовов БЕЗ удержания cm.mu:
+// безусловно захватывает блокировку и снимает её через defer, затем
+// ставит сообщение в очередь писателя непосредственно. Требует внешней
+// проверки порога вызывающим (traceEnabled с уровнем данного места);
+// вызов без guard — нарушение контракта. Для вызовов из кода, который
+// уже держит cm.mu, используйте traceLogfLocked — иначе будет deadlock.
+func (cm *ConsensusModule) traceLogf(format string, args ...any) {
 	cm.mu.Lock()
-	_, _ = fmt.Printf("[%c,N:%d,T:%03d] %s\n", stateLetter(cm.cmState.state), cm.id, cm.cmState.currentTerm, msg)
-	cm.mu.Unlock()
+	defer cm.mu.Unlock()
+	cm.enqueueTraceLocked(_traceWriter, format, args...)
 }
 
-// traceLockedLogf выводит отладочное сообщение, если _traceCM > level.
-// Ожидается, что cm.mu уже заблокирован вызывающим кодом, поэтому
-// состояние (cm.cmState.state, cm.id, cm.cmState.currentTerm) читается напрямую.
-func (cm *ConsensusModule) traceLockedLogf(level int, format string, args ...any) {
-	if level < _traceCM {
-		format = fmt.Sprintf("[%c,N:%d,T:%03d] ", stateLetter(cm.cmState.state), cm.id, cm.cmState.currentTerm) +
-			format
-		_traceLogger.Printf(format, args...)
-	}
+// enqueueTraceLocked добавляет сообщение с префиксными скалярными значениями в очередь
+// для записи: скалярные значения извлекаются с захваченной блокировкой cm.mu,
+// а тело сообщения форматируется модулем записи.
+//
+// Вызывающий код уже выполнил проверку порога и всех необходимых условий.
+// Метод требует, чтобы блокировка cm.mu была удержана на момент вызова.
+//
+//nolint:goprintffuncname // имя закреплено контрактом вывода, формат передаётся писателю.
+func (cm *ConsensusModule) enqueueTraceLocked(w *tracelog.Writer, format string, args ...any) {
+	w.Enqueue(tracelog.Prefix{
+		Letter: stateLetter(cm.cmState.state),
+		ID:     cm.id,
+		Term:   cm.cmState.currentTerm,
+	}, format, args...)
 }
 
-// traceLogf — потокобезопасная обёртка над traceLockedLogf для вызовов
-// БЕЗ удержания cm.mu: самостоятельно захватывает блокировку, чтобы
-// прочитать состояние без data race. Для вызовов из кода, который уже
-// держит cm.mu, используйте traceLockedLogf — иначе будет deadlock.
-func (cm *ConsensusModule) traceLogf(level int, format string, args ...any) {
-	if level < _traceCM {
-		cm.mu.Lock()
-		cm.traceLockedLogf(level, format, args...)
-		cm.mu.Unlock()
-	}
+// enqueueTraceSprintfLocked ставит сообщение с готовым телом: fmt.Sprintf
+// выполняется синхронно под блокировкой cm.mu — это защищает от чтения
+// ссылочных аргументов после снятия блокировки.
+// Порог и все требуемые проверки уже выполнены вызывающим кодом.
+// Требуется удержание блокировки cm.mu.
+//
+//nolint:goprintffuncname // имя закреплено контрактом вывода.
+func (cm *ConsensusModule) enqueueTraceSprintfLocked(w *tracelog.Writer, format string, args ...any) {
+	w.EnqueueText(tracelog.Prefix{
+		Letter: stateLetter(cm.cmState.state),
+		ID:     cm.id,
+		Term:   cm.cmState.currentTerm,
+	}, fmt.Sprintf(format, args...))
 }
 
+// stateLetter сопоставляет состоянию консенсус-модуля букву префикса
+// строки трассировки; состояния без собственной буквы печатаются как «?».
+// Вызывается только под cm.mu. Чистая функция без аллокаций.
 func stateLetter(s CMState) rune {
 	switch s {
 	case Follower:

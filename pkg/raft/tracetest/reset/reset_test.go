@@ -4,8 +4,10 @@ package reset_test
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -17,25 +19,76 @@ import (
 	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
 
-// buf — синхронизированный приёмник стандартного логгера: запись
-// ведётся из горутин CM через log.Default(), чтение — из теста.
-var buf syncBuffer
+// traceLinePattern — полная форма строки трассировки сцены: локальная
+// метка с шестью микросекундами и обязательный префикс состояния.
+var traceLinePattern = regexp.MustCompile(
+	`(?m)^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\.\d{6} \[[FLC?],N:\d+,T:\d{3,}\] `)
+
+// logBuffer — потокобезопасный приёмник стандартного логгера: запись
+// ведётся через log.Printf, чтение — из теста.
+type logBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+// Write принимает порцию вывода логгера.
+func (b *logBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.Write(p)
+}
+
+// String возвращает накопленный вывод.
+func (b *logBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.String()
+}
 
 // traceLevel — порог трассировки бинарника. Задаётся явно: эмиттер
 // сценария (cm.Stop) печатает на уровне 0 и виден только при Level > 0,
 // а TraceConfig{} означает выключенную трассировку.
 const traceLevel = 1
 
-// TestMain выполняет log.SetOutput ДО конфигурации (безопасно в
-// выделенном бинарнике) и единственную успешную конфигурацию
-// трассировки процесса: SetTrace с пустым LogFile.
+// traceTimeout — предельное время ожидания Flush/Shutdown в сценарии.
+const traceTimeout = 2 * time.Second
+
+// stderrPath — файл, которым на время процесса подменяется стандартный
+// поток ошибок. Писатель захватывает os.Stderr в момент SetTrace и пишет
+// в него напрямую, поэтому перехват выполняется до конфигурации.
+var stderrPath string
+
+// TestMain подменяет os.Stderr временным файлом до единственной успешной
+// конфигурации трассировки процесса (SetTrace с пустым LogFile), а после
+// прогона останавливает писателя и восстанавливает поток.
 func TestMain(m *testing.M) {
-	log.SetOutput(&buf)
-	if err := raft.SetTrace(raft.TraceConfig{Level: traceLevel}); err != nil {
-		_, _ = os.Stderr.WriteString("raft: trace configuration failed: " + err.Error() + "\n")
+	originalStderr := os.Stderr
+	f, err := os.CreateTemp("", "raft-trace-reset-*.log")
+	if err != nil {
+		_, _ = originalStderr.WriteString("raft: temp stderr: " + err.Error() + "\n")
 		os.Exit(1)
 	}
-	os.Exit(m.Run())
+	stderrPath = f.Name()
+	os.Stderr = f
+	if err := raft.SetTrace(raft.TraceConfig{Level: traceLevel}); err != nil {
+		_, _ = originalStderr.WriteString("raft: trace configuration failed: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+	code := m.Run()
+
+	ctx, cancel := context.WithTimeout(context.Background(), traceTimeout)
+	if err := raft.ShutdownTrace(ctx); err != nil {
+		_, _ = originalStderr.WriteString("raft: trace shutdown failed: " + err.Error() + "\n")
+		code = 1
+	}
+	cancel()
+	if err := f.Close(); err != nil {
+		_, _ = originalStderr.WriteString("raft: trace file close: " + err.Error() + "\n")
+		code = 1
+	}
+	os.Stderr = originalStderr
+	_ = os.Remove(stderrPath)
+	os.Exit(code)
 }
 
 func TestTraceReset(t *testing.T) {
@@ -67,35 +120,32 @@ func TestTraceReset(t *testing.T) {
 		<-readerDone
 	})
 
-	// Эмиттер трассировки — cm.Stop(); запись идёт в стандартный
-	// логгер (пустой LogFile), файл трассировки не создаётся.
+	// Эмиттер трассировки — cm.Stop(); запись идёт напрямую в захваченный
+	// os.Stderr, поэтому log.SetOutput на неё не влияет. Перенаправление
+	// стандартного логгера в буфер обязано остаться без следа трассировки.
+	var logBuf logBuffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(os.Stderr)
+
 	cm.Stop()
 
-	deadline := time.Now().Add(2 * time.Second)
-	for !strings.Contains(buf.String(), "CM.Stop called / becomes Dead") {
-		if time.Now().After(deadline) {
-			t.Fatalf("trace buffer does not contain the CM.Stop entry: %q", buf.String())
-		}
-		// poll-интервал condition-wait (не фиксированная пауза).
-		time.Sleep(5 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), traceTimeout)
+	defer cancel()
+	if err := raft.FlushTrace(ctx); err != nil {
+		t.Fatalf("FlushTrace: %v", err)
 	}
-}
-
-// syncBuffer — потокобезопасный буфер для перехвата вывода
-// стандартного логгера.
-type syncBuffer struct {
-	mu sync.Mutex
-	b  bytes.Buffer
-}
-
-func (s *syncBuffer) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.b.Write(p)
-}
-
-func (s *syncBuffer) String() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.b.String()
+	data, err := os.ReadFile(stderrPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(data), "CM.Stop called / becomes Dead") {
+		t.Fatalf("stderr trace %q does not contain the CM.Stop entry: %q", stderrPath, data)
+	}
+	// Метка события содержит микросекунды, префикс — состояние и терм.
+	if !traceLinePattern.MatchString(string(data)) {
+		t.Fatalf("строка трассировки не содержит микросекунд или обязательного префикса: %q", data)
+	}
+	if strings.Contains(logBuf.String(), "CM.Stop") {
+		t.Fatalf("log.SetOutput перенаправил трассировку: %q", logBuf.String())
+	}
 }

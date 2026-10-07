@@ -1,3 +1,5 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
@@ -33,6 +35,10 @@ type Server struct {
 	cm        *ConsensusModule
 	transport TransportManager
 
+	// disableStatsOutput — выбор вывода периодической статистики из Config;
+	// передаётся CM при создании и далее неизменен.
+	disableStatsOutput bool
+
 	peerIds  []int
 	serverID int
 
@@ -55,6 +61,12 @@ type Config struct {
 	// ApplyBatchInterval — интервал батча применения записей к FSM
 	// (0 = умолчание).
 	ApplyBatchInterval time.Duration
+
+	// DisableStatsOutput отключает вывод периодической статистики
+	// ConsensusModule (латентность, счётчики Raft, PersistV1), не прекращая
+	// сбор метрик. false (нулевое значение) сохраняет вывод для
+	// существующих конфигураций.
+	DisableStatsOutput bool
 
 	Fsm FSM
 
@@ -97,6 +109,7 @@ func New(cfg *Config, ready <-chan any) *Server {
 	}
 	s := &Server{
 		applyBatchInterval: cfg.ApplyBatchInterval,
+		disableStatsOutput: cfg.DisableStatsOutput,
 		fsm:                cfg.Fsm,
 		heartbeatTimeout:   cfg.HeartbeatTimeout,
 		peerIds:            cfg.PeerIds,
@@ -116,7 +129,10 @@ func New(cfg *Config, ready <-chan any) *Server {
 
 // Serve создаёт ConsensusModule поверх переданного транспорта.
 func (s *Server) Serve() {
-	s.cm = NewConsensusModule(s.serverID, s.peerIds, s.transport, s.storage, s.fsm, s.ready, s.snapshotStore)
+	s.cm = newConsensusModule(
+		cmConfig{disableStatsOutput: s.disableStatsOutput},
+		s.serverID, s.peerIds, s.transport, s.storage, s.fsm, s.ready, s.snapshotStore,
+	)
 
 	// Применение временных параметров из конфигурации сразу после создания
 	// CM и до закрытия ready — CM ещё не участвует в выборах. Нормализация

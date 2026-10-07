@@ -707,9 +707,15 @@ func TestVerifyRedispatch_AECounter(t *testing.T) {
 	if got := cm.counters.aeSentPerPeer[1]; got != 1 {
 		t.Fatalf("aeSentPerPeer[1] = %d, want 1", got)
 	}
-	rep := cm.countersReport()
+	// Строка счётчиков собирается из согласованного снимка: чтение
+	// защищённых полей под cm.mu, форматирование — вне блокировки.
+	// stats у этого CM не запущена, поэтому прямой снимок безопасен.
+	cm.mu.Lock()
+	snap := cm.countersSnapshotLocked()
+	cm.mu.Unlock()
+	rep := snap.report()
 	if !strings.Contains(rep, "AESent=1") {
-		t.Fatalf("countersReport не содержит AESent=1: %q", rep)
+		t.Fatalf("counters report не содержит AESent=1: %q", rep)
 	}
 }
 

@@ -56,7 +56,7 @@ MAIN_GO=./$(GOCMD)/main.go
 
 PKG?=./...
 TESTFLAGS?=
-RACE_PKGS := . ./pkg/...
+RACE_PKGS := . ./pkg/... ./internal/tracelog
 LINTFLAGS?=
 COUNT?=10
 

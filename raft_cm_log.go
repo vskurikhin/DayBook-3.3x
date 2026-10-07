@@ -1,3 +1,5 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
@@ -170,7 +172,9 @@ func (cm *ConsensusModule) dispatchLogs(applyLogs []*logFuture) {
 	savedCommitIndex := cm.cmState.commitIndex
 	newCommitIdx := cm.leaderState.commitmentTracker.getCommitIndex()
 	if newCommitIdx > cm.cmState.commitIndex {
-		cm.traceLockedLogf(_traceLevelProgress, "leader sets commitIndex := %d", newCommitIdx)
+		if traceEnabled(_traceLevelProgress) {
+			cm.traceLogfLocked("leader sets commitIndex := %d", newCommitIdx)
+		}
 		cm.cmState.commitIndex = newCommitIdx
 	}
 	newCommitIndex := cm.cmState.commitIndex

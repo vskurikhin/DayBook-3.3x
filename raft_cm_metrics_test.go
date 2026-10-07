@@ -257,25 +257,35 @@ func TestFailedAETraceReportsActualNextIndex(t *testing.T) {
 
 // TestRaftCountersReportFormat — тест 1 (новая строка отчёта):
 // счётчики и показатели по каждому соседу nextIndex/matchIndex форматируются
-// детерминированно (пиры — по возрастанию ID). Существующая строка
-// латентности защищена отдельно (TestLatencyReportFormat, /005).
+// детерминированно (пиры — по возрастанию ID). Строка собирается из
+// согласованного снимка: суммы карт уже сведены, сортировка выполняется
+// форматтером. Существующая строка латентности защищена отдельно
+// (TestLatencyReportFormat, /005).
 func TestRaftCountersReportFormat(t *testing.T) {
-	c := &raftCounters{
-		installSnapshotSent:         map[int]int64{2: 3, 1: 4},
-		installSnapshotSkippedStale: map[int]int64{1: 2},
-		appendEntriesRejected:       map[int]int64{1: 7},
-		nextIndexRejectionIgnored:   map[int]int64{1: 1},
+	cm := &ConsensusModule{
+		counters: raftCounters{
+			installSnapshotSent:         map[int]int64{2: 3, 1: 4},
+			installSnapshotSkippedStale: map[int]int64{1: 2},
+			appendEntriesRejected:       map[int]int64{1: 7},
+			nextIndexRejectionIgnored:   map[int]int64{1: 1},
+		},
+		leaderState: leaderState{
+			nextIndex:  map[int]int{2: 30, 1: 25},
+			matchIndex: map[int]int{2: 29, 1: 24},
+		},
+		cmState: cmState{lastLogIndex: 2, commitIndex: 0},
 	}
-	c.installSnapshotReceived.Add(5)
-	c.snapshotLogBoundaryViolation.Add(0)
-	c.snapshotIndexBehindDispatched.Add(3)
-	c.sendBatchEntrySkipped.Add(2)
-	ls := &leaderState{
-		nextIndex:  map[int]int{2: 30, 1: 25},
-		matchIndex: map[int]int{2: 29, 1: 24},
-	}
-	got := c.report(ls)
-	want := "ISsent=7 ISrecv=5 ISstale=2 AErej=7 NIrejIgn=1 BndViol=0 SnapLag=3 BatchSkip=2 VrfDone=0 VrfWtd=0 AESent=0 VrfRedisp=0 VrfRedispSupp=0 p1:ni=25/mi=24 p2:ni=30/mi=29"
+	cm.counters.installSnapshotReceived.Add(5)
+	cm.counters.snapshotLogBoundaryViolation.Add(0)
+	cm.counters.snapshotIndexBehindDispatched.Add(3)
+	cm.counters.sendBatchEntrySkipped.Add(2)
+
+	cm.mu.Lock()
+	snap := cm.countersSnapshotLocked()
+	cm.mu.Unlock()
+
+	got := snap.report()
+	want := "ISsent=7 ISrecv=5 ISstale=2 AErej=7 NIrejIgn=1 BndViol=0 SnapLag=3 BatchSkip=2 VrfDone=0 VrfWtd=0 AESent=0 VrfRedisp=0 VrfRedispSupp=0 p1:ni=25/mi=24 p2:ni=30/mi=29 SDterm=0 SDquorum=0 SDconfig=0 Uncommitted=2"
 	if got != want {
 		t.Fatalf("report = %q\nwant   = %q", got, want)
 	}

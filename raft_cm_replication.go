@@ -1,3 +1,5 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
@@ -70,9 +72,8 @@ func (cm *ConsensusModule) nextIndexArgsEntries(
 		// Defensive check: если позиция вне диапазона — логируем аномалию и возвращаем пустой срез.
 		if pos < len(cm.cmState.log) {
 			entries = append([]LogEntry{}, cm.cmState.log[pos:]...)
-		} else {
-			cm.traceLockedLogf(
-				_traceLevelLoops,
+		} else if traceEnabled(_traceLevelLoops) {
+			cm.traceLogfLocked(
 				"nextIndexArgsEntries: logPositionLocked(%d) out of range (len=%d)",
 				ni, len(cm.cmState.log),
 			)
@@ -232,7 +233,9 @@ func (cm *ConsensusModule) leaderSendAEsToPeer(peerID, savedCurrentTerm int, dis
 		cm.leaderSendSnapshot(peerID, savedCurrentTerm)
 		return
 	}
-	cm.traceLogf(_traceLevelReplication, "sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
+	if traceEnabled(_traceLevelReplication) {
+		cm.traceLogf("sending AppendEntries to %v: ni=%d, args=%+v", peerID, ni, args)
+	}
 	cm.recordAttemptIfLeader(peerID, savedCurrentTerm)
 	cm.countAEOutbound(peerID)
 
@@ -360,7 +363,9 @@ func (cm *ConsensusModule) handleAEReply(
 
 	cm.recordPeerReplyLocked(peerID, savedCurrentTerm)
 	if reply.Term > cm.cmState.currentTerm {
-		cm.traceLockedLogf(_traceLevelReplication, "term out of date in heartbeat reply")
+		if traceEnabled(_traceLevelReplication) {
+			cm.traceLogfLocked("term out of date in heartbeat reply")
+		}
 		cm.becomeFollowerLocked(reply.Term)
 		return
 	}
@@ -402,11 +407,13 @@ func (cm *ConsensusModule) applyAESuccessLocked(peerID, ni, sentEntries int) {
 	cm.leaderState.matchIndex[peerID] = cm.leaderState.nextIndex[peerID] - 1
 
 	cm.leaderState.commitmentTracker.setMatch(peerID, cm.leaderState.matchIndex[peerID], cm.lookupTermLocked)
-	cm.traceLockedLogf(
-		_traceLevelReplication,
-		"AppendEntries reply from %d success: nextIndex := %v, matchIndex := %v; commitIndex := %d",
-		peerID, cm.leaderState.nextIndex, cm.leaderState.matchIndex, cm.leaderState.commitmentTracker.getCommitIndex(),
-	)
+	if traceEnabled(_traceLevelReplication) {
+		cm.traceSprintfLocked(
+			"AppendEntries reply from %d success: nextIndex := %v, matchIndex := %v; commitIndex := %d",
+			peerID, cm.leaderState.nextIndex, cm.leaderState.matchIndex,
+			cm.leaderState.commitmentTracker.getCommitIndex(),
+		)
+	}
 }
 
 // countVerifyVotesLocked засчитывает подтверждение соседа peerID запросам
@@ -489,20 +496,23 @@ func (cm *ConsensusModule) handleFailedAEReplyLocked(peerID int, reply AppendEnt
 		cm.counters.nextIndexRejectionIgnored = incPeerCountLocked(
 			cm.counters.nextIndexRejectionIgnored, peerID,
 		)
-		cm.traceLockedLogf(
-			_traceLevelKeyEvents,
-			"AppendEntries reply from %d rejected (impossible):"+
-				" peer=%d term=%d ni=%d matchIndex=%d ConflictIndex=%d ConflictTerm=%d",
-			peerID, peerID, reply.Term, newNi, cm.leaderState.matchIndex[peerID],
-			reply.ConflictIndex, reply.ConflictTerm,
-		)
+		if traceEnabled(_traceLevelKeyEvents) {
+			cm.traceLogfLocked(
+				"AppendEntries reply from %d rejected (impossible):"+
+					" peer=%d term=%d ni=%d matchIndex=%d ConflictIndex=%d ConflictTerm=%d",
+				peerID, peerID, reply.Term, newNi, cm.leaderState.matchIndex[peerID],
+				reply.ConflictIndex, reply.ConflictTerm,
+			)
+		}
 		return
 	}
 	cm.leaderState.nextIndex[peerID] = newNi
-	cm.traceLockedLogf(_traceLevelReplication, "%s", failedAETrace(
-		peerID, cm.leaderState.nextIndex[peerID], cm.leaderState.matchIndex[peerID],
-		reply.ConflictIndex, reply.ConflictTerm,
-	))
+	if traceEnabled(_traceLevelReplication) {
+		cm.traceLogfLocked("%s", failedAETrace(
+			peerID, cm.leaderState.nextIndex[peerID], cm.leaderState.matchIndex[peerID],
+			reply.ConflictIndex, reply.ConflictTerm,
+		))
+	}
 }
 
 // leaderSendAEs отправляет AppendEntries всем peer, для которых
@@ -605,19 +615,27 @@ func (cm *ConsensusModule) newInstallSnapshotRequest(term int, meta *SnapshotMet
 // leaderSendSnapshot отправляет последний снимок отстающему follower.
 // Вызывается, когда лидер не может обслужить AppendEntries для текущего
 // nextIndex[follower] (предикат).
+//
+//nolint:funlen,gocognit // проверки уровня механически повышают метрики, логика не меняется
 func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 	start := time.Now()
 	defer func() {
 		elapsed := time.Since(start)
-		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot elapsed %s", elapsed)
+		if traceEnabled(_traceLevelPreVote) {
+			cm.traceLogf("leaderSendSnapshot elapsed %s", elapsed)
+		}
 	}()
-	cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot peer %d: term=%d", peerID, term)
+	if traceEnabled(_traceLevelPreVote) {
+		cm.traceLogf("leaderSendSnapshot peer %d: term=%d", peerID, term)
+	}
 
 	// Защита от nil-хранилища. Инвариант проверяется и в вызывающем коде
 	// (leaderSendAEsToPeer), но при рефакторинге он может нарушиться,
 	// а паника здесь упала бы в отдельной горутине без recover().
 	if IsNilInterface(cm.snapshotStore) {
-		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot: snapshotStore is nil, cannot send to %d", peerID)
+		if traceEnabled(_traceLevelPreVote) {
+			cm.traceLogf("leaderSendSnapshot: snapshotStore is nil, cannot send to %d", peerID)
+		}
 		return
 	}
 
@@ -626,11 +644,12 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 		// Пустой List у лидера с lastSnapshotIndex >= 0 — признак
 		// повреждения/удаления постоянного хранилища: диагностика
 		// и best-effort восстановление форсированием нового снимка.
-		cm.traceLogf(
-			_traceLevelKeyEvents,
-			"leaderSendSnapshot: cannot send snapshot to %d: err=%v, snapshots=%d",
-			peerID, err, len(snapshots),
-		)
+		if traceEnabled(_traceLevelKeyEvents) {
+			cm.traceLogf(
+				"leaderSendSnapshot: cannot send snapshot to %d: err=%v, snapshots=%d",
+				peerID, err, len(snapshots),
+			)
+		}
 		cm.mu.Lock()
 		lastSnapshotIndex := cm.cmState.lastSnapshotIndex
 		cm.mu.Unlock()
@@ -645,16 +664,25 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 	// List() может вернуть слайс с nil-элементом или пустым ID — оба
 	// случая приводят к панике или некорректной работе Open().
 	if snapshots[0] == nil {
-		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot: snapshots[0] is nil")
+		if traceEnabled(_traceLevelPreVote) {
+			cm.traceLogf("leaderSendSnapshot: snapshots[0] is nil")
+		}
 		return
 	}
 	if snapshots[0].ID == "" {
-		cm.traceLogf(_traceLevelPreVote, "leaderSendSnapshot: snapshots[0].ID is empty")
+		if traceEnabled(_traceLevelPreVote) {
+			cm.traceLogf("leaderSendSnapshot: snapshots[0].ID is empty")
+		}
 		return
 	}
 	meta, reader, err := cm.snapshotStore.Open(snapshots[0].ID)
 	if err != nil {
-		cm.traceLogf(_traceLevelKeyEvents, "leaderSendSnapshot: cannot open snapshot %s for peer %d: %v", snapshots[0].ID, peerID, err)
+		if traceEnabled(_traceLevelKeyEvents) {
+			cm.traceLogf(
+				"leaderSendSnapshot: cannot open snapshot %s for peer %d: %v",
+				snapshots[0].ID, peerID, err,
+			)
+		}
 		return
 	}
 	defer func() { _ = reader.Close() }()
@@ -717,8 +745,8 @@ func (cm *ConsensusModule) leaderSendSnapshot(peerID, term int) {
 // печатается фактически присвоенное значение
 // nextIndex (ранее ошибочно печаталось ni-1), а также matchIndex и поля
 // конфликта ответа — ровно тот набор, которого не хватило при разборе
-// обоих инцидентов. Выделена в чистую функцию: мутация _traceCM и
-// _traceLogger в тестах запрещена, формат проверяется
+// обоих инцидентов. Выделена в чистую функцию: мутация порога и
+// писателя трассировки в тестах запрещена, формат проверяется
 // unit-тестом функции.
 func failedAETrace(peerID, nextIndex, matchIndex, conflictIndex, conflictTerm int) string {
 	return fmt.Sprintf(

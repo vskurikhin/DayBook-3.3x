@@ -1,11 +1,18 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/vskurikhin/raft/internal/tracelog"
 )
 
 // latencyMetric — один агрегат латентности: сумма замеров в микросекундах и
@@ -79,13 +86,11 @@ func (l *cmLatency) snapshotAndReset() latencyReport {
 	}
 }
 
-// format форматирует снимок агрегатов в одну строку отчёта. Чистая функция:
-// не читает глобалей и полей CM, не логирует. Набор и порядок колонок,
-// а также формат %5.2fms сохраняются; имена колонок сокращены для
-// компактности (например TakeSnap вместо TakeSnapshot). Собственной метки
-// времени и префикса [state,N:id,T:term] нет — их добавляют логгер
-// трассировки и traceLogf. Приём только по указателю —
-// (88 B > порог gocritic:hugeParam).
+// format — строка отчёта со снимком агрегатов. Чистая функция: без доступа
+// к глобальным переменным, полям CM и логирования.
+// Колонки фиксированы (%5.2fms), имена сокращены (TakeSnap и т. п.).
+// Префикс и метку времени добавляют снаружи (логгер, traceLogf).
+// Аргумент — указатель (88 Б > порог gocritic:hugeParam).
 func (r *latencyReport) format() string {
 	return fmt.Sprintf(
 		"AE=%5.2fms, BatchingFSM=%5.2fms, Election=%5.2fms, FSMSnapSh=%5.2fms,"+
@@ -97,19 +102,111 @@ func (r *latencyReport) format() string {
 	)
 }
 
-// countersReport формирует строку счётчиков узла: события репликации
-// и снимков, показатели по каждому соседу, шаги лидера вниз по причинам
-// и размер незафиксированного хвоста журнала.
-// Самостоятельно захватывает и освобождает cm.mu.
-func (cm *ConsensusModule) countersReport() string {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
+// statsPeer — пара nextIndex/matchIndex одного соседа в снимке отчёта.
+// Значения скопированы из карт leaderState; срез пар принадлежит снимку.
+type statsPeer struct {
+	id         int
+	nextIndex  int
+	matchIndex int
+}
+
+// stepDownSnapshot — значения счётчиков шагов лидера вниз, снятые в снимок.
+type stepDownSnapshot struct {
+	higherTerm, checkQuorum, configExit int64
+}
+
+// report форматирует значения шагов вниз; чистая функция без доступа
+// к состоянию CM.
+func (s stepDownSnapshot) report() string {
 	return fmt.Sprintf(
-		"%s %s Uncommitted=%d",
-		cm.counters.report(&cm.leaderState),
-		cm.counters.stepDowns.report(),
-		cm.uncommittedLogLenLocked(),
+		"SDterm=%d SDquorum=%d SDconfig=%d",
+		s.higherTerm, s.checkQuorum, s.configExit,
 	)
+}
+
+// statsCountersSnapshot — согласованная копия счётчиков Raft, шагов вниз,
+// пар соседей и размера незафиксированного хвоста. Формируется под cm.mu
+// (countersSnapshotLocked); сортировка и форматирование выполняются после
+// освобождения мьютекса и не читают живое состояние CM: срез пар — копия,
+// суммы карт уже сведены в скаляры.
+type statsCountersSnapshot struct {
+	installSnapshotSent           int64
+	installSnapshotReceived       int64
+	installSnapshotSkippedStale   int64
+	appendEntriesRejected         int64
+	nextIndexRejectionIgnored     int64
+	snapshotLogBoundaryViolation  int64
+	snapshotIndexBehindDispatched int64
+	sendBatchEntrySkipped         int64
+	verifyCompleted               int64
+	verifyWaitedHeartbeat         int64
+	aeSentPerPeer                 int64
+	verifyRedispatched            int64
+	verifyRedispatchSuppressed    int64
+	stepDowns                     stepDownSnapshot
+	peers                         []statsPeer
+	uncommitted                   int
+}
+
+// countersSnapshotLocked снимает значения счётчиков и копирует пары соседей
+// в собственный срез снимка. Атомарные поля читаются через Load, суммы карт
+// вычисляются здесь же. Формирование строки выполняется после освобождения
+// мьютекса.
+// Требует удержания cm.mu — мьютекса владельца карт.
+func (cm *ConsensusModule) countersSnapshotLocked() statsCountersSnapshot {
+	return statsCountersSnapshot{
+		installSnapshotSent:           peerSumLocked(cm.counters.installSnapshotSent),
+		installSnapshotReceived:       cm.counters.installSnapshotReceived.Load(),
+		installSnapshotSkippedStale:   peerSumLocked(cm.counters.installSnapshotSkippedStale),
+		appendEntriesRejected:         peerSumLocked(cm.counters.appendEntriesRejected),
+		nextIndexRejectionIgnored:     peerSumLocked(cm.counters.nextIndexRejectionIgnored),
+		snapshotLogBoundaryViolation:  cm.counters.snapshotLogBoundaryViolation.Load(),
+		snapshotIndexBehindDispatched: cm.counters.snapshotIndexBehindDispatched.Load(),
+		sendBatchEntrySkipped:         cm.counters.sendBatchEntrySkipped.Load(),
+		verifyCompleted:               cm.counters.verifyCompleted,
+		verifyWaitedHeartbeat:         cm.counters.verifyWaitedHeartbeat,
+		aeSentPerPeer:                 peerSumLocked(cm.counters.aeSentPerPeer),
+		verifyRedispatched:            peerSumLocked(cm.counters.verifyRedispatched),
+		verifyRedispatchSuppressed:    peerSumLocked(cm.counters.verifyRedispatchSuppressed),
+		stepDowns:                     cm.counters.stepDowns.snapshot(),
+		peers:                         leaderPeersLocked(&cm.leaderState),
+		uncommitted:                   cm.uncommittedLogLenLocked(),
+	}
+}
+
+// leaderPeersLocked копирует пары ID/nextIndex/matchIndex лидера в срез
+// снимка. Порядок обхода карты не определён; сортировка по ID выполняется
+// форматтером после освобождения мьютекса.
+// Требует удержания cm.mu.
+func leaderPeersLocked(ls *leaderState) []statsPeer {
+	peers := make([]statsPeer, 0, len(ls.nextIndex))
+	for id, next := range ls.nextIndex {
+		peers = append(peers, statsPeer{id: id, nextIndex: next, matchIndex: ls.matchIndex[id]})
+	}
+	return peers
+}
+
+// report форматирует строку счётчиков из снимка: суммы, показатели
+// по каждому соседу (в порядке возрастания ID), шаги лидера вниз и размер
+// незафиксированного хвоста. Чистая функция: сортирует собственный срез пар
+// снимка, не обращается к живым картам и полям CM.
+func (s *statsCountersSnapshot) report() string {
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b,
+		"ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d "+
+			"BatchSkip=%d VrfDone=%d VrfWtd=%d AESent=%d "+
+			"VrfRedisp=%d VrfRedispSupp=%d",
+		s.installSnapshotSent, s.installSnapshotReceived, s.installSnapshotSkippedStale,
+		s.appendEntriesRejected, s.nextIndexRejectionIgnored, s.snapshotLogBoundaryViolation,
+		s.snapshotIndexBehindDispatched, s.sendBatchEntrySkipped,
+		s.verifyCompleted, s.verifyWaitedHeartbeat, s.aeSentPerPeer,
+		s.verifyRedispatched, s.verifyRedispatchSuppressed)
+	sort.Slice(s.peers, func(i, j int) bool { return s.peers[i].id < s.peers[j].id })
+	for _, p := range s.peers {
+		_, _ = fmt.Fprintf(&b, " p%d:ni=%d/mi=%d", p.id, p.nextIndex, p.matchIndex)
+	}
+	_, _ = fmt.Fprintf(&b, " %s Uncommitted=%d", s.stepDowns.report(), s.uncommitted)
+	return b.String()
 }
 
 // uncommittedLogLenLocked возвращает размер незафиксированного хвоста
@@ -121,6 +218,117 @@ func (cm *ConsensusModule) uncommittedLogLenLocked() int {
 	return cm.cmState.lastLogIndex - cm.cmState.commitIndex
 }
 
+// statsSnapshot — согласованный снимок состояния CM для одного выпуска
+// периодического отчёта. Все значения скопированы; ссылок на карты, журнал
+// и другие изменяемые коллекции CM нет: даже пары соседей лежат в counters.peers
+// собственной копией среза.
+type statsSnapshot struct {
+	at       time.Time     // момент снятия; несёт монотонные часы
+	age      time.Duration // монотонный возраст CM от создания
+	instance uint64        // идентификатор экземпляра CM для PersistV1
+	role     CMState
+	id       int
+	term     int
+	latency  latencyReport
+	counters statsCountersSnapshot
+}
+
+// takeStatsSnapshot снимает состояние отчёта за один захват cm.mu: роль,
+// терм и ID, защищённые счётчики с суммами карт, пары соседей, размер
+// незафиксированного хвоста и момент снятия. Здесь же ровно один раз
+// выполняется сброс агрегатов латентности — как при включённом, так и при
+// выключенном выводе. Атомарные поля читаются через Load.
+// Блокировка берётся и снимается в этой функции.
+func (cm *ConsensusModule) takeStatsSnapshot() statsSnapshot {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return statsSnapshot{
+		at:       time.Now(),
+		age:      time.Since(cm.statsStartedAt),
+		instance: cm.statsInstance,
+		role:     cm.cmState.state,
+		id:       cm.id,
+		term:     cm.cmState.currentTerm,
+		latency:  cm.latency.snapshotAndReset(),
+		counters: cm.countersSnapshotLocked(),
+	}
+}
+
+// publishStats выполняет один выпуск периодического отчёта: снимает
+// согласованный снимок и, если вывод разрешён, пишет три строки в out —
+// латентность, счётчики Raft, PersistV1 — уже без cm.mu. Порядок строк
+// фиксирован; префикс всех трёх строк взят из одного снимка.
+//
+// Первая неуспешная строка прекращает текущий выпуск; ошибка становится
+// липкой и публикуется в следующей успешной PersistV1. Одна диагностическая
+// попытка в diag выполняется на каждый неуспешный выпуск; ошибка самой
+// диагностики входит в липкую ошибку, пока та ещё не установлена. Raft
+// из-за ошибок стандартного вывода не останавливается — следующий тик
+// повторяет попытку.
+//
+// Владелец seq и липкой ошибки — этот путь; в производстве его вызывает
+// единственная горутина stats. Прямой вызов в тесте допустим только на CM
+// без запущенной stats.
+func (cm *ConsensusModule) publishStats(out, diag io.Writer) {
+	snap := cm.takeStatsSnapshot()
+	if cm.disableStatsOutput {
+		return
+	}
+	cm.statsSeq++
+	prefix := tracelog.FormatPrefix(tracelog.Prefix{
+		Letter: stateLetter(snap.role),
+		ID:     snap.id,
+		Term:   snap.term,
+	})
+	lines := []string{
+		prefix + snap.latency.format(),
+		prefix + snap.counters.report(),
+		prefix + snap.persistReport(cm.statsSeq, cm.statsOutputErr, _statsPersistLineLimit-len(prefix)),
+	}
+	for _, line := range lines {
+		if err := writeStatsLine(out, line); err != nil {
+			cm.recordStatsOutputError(err, diag)
+			return
+		}
+	}
+}
+
+// writeStatsLine пишет полную строку отчёта одним вызовом Write, добавляя
+// перевод строки. Короткая запись трактуется как ошибка (io.ErrShortWrite).
+// Нулевой приёмник возвращает ошибку вызывающему, а не паникует.
+func writeStatsLine(w io.Writer, line string) error {
+	if w == nil {
+		return errors.New("raft: periodic stats writer is nil")
+	}
+	line += "\n"
+	n, err := io.WriteString(w, line)
+	if err == nil && n < len(line) {
+		err = io.ErrShortWrite
+	}
+	return err
+}
+
+// recordStatsOutputError фиксирует неуспех выпуска: первая ошибка остается
+// липкой до конца жизни CM. Диагностическая запись выполняется один раз на
+// выпуск; её ошибка присоединяется к липкой, только если липкая ещё
+// не установлена — первая ошибка не заменяется.
+func (cm *ConsensusModule) recordStatsOutputError(err error, diag io.Writer) {
+	first := cm.statsOutputErr == nil
+	if first {
+		cm.statsOutputErr = err
+	}
+	if diag == nil {
+		return
+	}
+	diagErr := writeStatsLine(diag, "raft: stats output error: "+err.Error())
+	if first && diagErr != nil {
+		cm.statsOutputErr = errors.Join(err, diagErr)
+	}
+}
+
+// stats — секундный цикл периодического отчёта. Сбор выполняется на каждом
+// тике независимо от настройки вывода; seq и липкая ошибка принадлежат
+// этой горутине.
 func (cm *ConsensusModule) stats(shutdownCh chan struct{}) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -129,16 +337,7 @@ func (cm *ConsensusModule) stats(shutdownCh chan struct{}) {
 		case <-shutdownCh:
 			return
 		case <-ticker.C:
-			// Снятие агрегатов — безусловно, чтобы окно агрегации оставалось
-			// «за секунду» и при выключенном выводе.
-			rep := cm.latency.snapshotAndReset()
-			// Формирование строк и вывод — только при включённой трассировке
-			// в os.Stdout.
-			// Префикс [state,N:id,T:term] добавляет stdoutTracePrintln.
-			if traceEnabled(0) {
-				cm.stdoutTracePrintln(rep.format())
-				cm.stdoutTracePrintln(cm.countersReport())
-			}
+			cm.publishStats(os.Stdout, os.Stderr)
 		}
 	}
 }
@@ -235,12 +434,13 @@ type stepDownCounters struct {
 	higherTerm, checkQuorum, configExit atomic.Int64
 }
 
-// report форматирует счётчики шагов вниз в одну строку отчёта.
-func (c *stepDownCounters) report() string {
-	return fmt.Sprintf(
-		"SDterm=%d SDquorum=%d SDconfig=%d",
-		c.higherTerm.Load(), c.checkQuorum.Load(), c.configExit.Load(),
-	)
+// snapshot копирует значения счётчиков шагов вниз в снимок отчёта.
+func (c *stepDownCounters) snapshot() stepDownSnapshot {
+	return stepDownSnapshot{
+		higherTerm:  c.higherTerm.Load(),
+		checkQuorum: c.checkQuorum.Load(),
+		configExit:  c.configExit.Load(),
+	}
 }
 
 // incPeerCountLocked инкрементирует счётчик по каждому соседу, лениво
@@ -264,31 +464,4 @@ func peerSumLocked(m map[int]int64) int64 {
 		total += v
 	}
 	return total
-}
-
-// report форматирует периодическую строку счётчиков и показатели по каждому соседу
-// nextIndex/matchIndex лидера. Формат: суммарные
-// счётчики, затем для каждого пира (в порядке возрастания ID) пара
-// ni/mi. Вызывается только из stats под cm.mu.
-func (c *raftCounters) report(ls *leaderState) string {
-	var b strings.Builder
-	_, _ = fmt.Fprintf(&b,
-		"ISsent=%d ISrecv=%d ISstale=%d AErej=%d NIrejIgn=%d BndViol=%d SnapLag=%d "+
-			"BatchSkip=%d VrfDone=%d VrfWtd=%d AESent=%d "+
-			"VrfRedisp=%d VrfRedispSupp=%d",
-		peerSumLocked(c.installSnapshotSent), c.installSnapshotReceived.Load(),
-		peerSumLocked(c.installSnapshotSkippedStale), peerSumLocked(c.appendEntriesRejected),
-		peerSumLocked(c.nextIndexRejectionIgnored), c.snapshotLogBoundaryViolation.Load(),
-		c.snapshotIndexBehindDispatched.Load(), c.sendBatchEntrySkipped.Load(),
-		c.verifyCompleted, c.verifyWaitedHeartbeat, peerSumLocked(c.aeSentPerPeer),
-		peerSumLocked(c.verifyRedispatched), peerSumLocked(c.verifyRedispatchSuppressed))
-	peers := make([]int, 0, len(ls.nextIndex))
-	for p := range ls.nextIndex {
-		peers = append(peers, p)
-	}
-	sort.Ints(peers)
-	for _, p := range peers {
-		_, _ = fmt.Fprintf(&b, " p%d:ni=%d/mi=%d", p, ls.nextIndex[p], ls.matchIndex[p])
-	}
-	return b.String()
 }

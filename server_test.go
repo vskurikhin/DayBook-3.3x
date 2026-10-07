@@ -168,6 +168,66 @@ func TestDefaultSnapshotBarrier(t *testing.T) {
 	}
 }
 
+// TestServeStatsOutputConfig проверяет маршрут выбора вывода периодической
+// статистики: DisableStatsOutput из Config доезжает до CM при создании,
+// нулевое значение оставляет вывод включённым, а выбор зафиксирован
+// конструктором до запуска горутин (сеттера для него нет).
+func TestServeStatsOutputConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		disable bool
+	}{
+		{name: "default keeps output enabled", disable: false},
+		{name: "explicitly disabled", disable: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			commitChan := make(chan CommitEntry)
+			readerDone := make(chan any)
+			go func() {
+				defer close(readerDone)
+				for range commitChan {
+				}
+			}()
+
+			ready := make(chan any)
+			transport, err := transp.NewTCPTransport("127.0.0.1:0", transp.TCPTimeouts{}, 0)
+			if err != nil {
+				t.Fatalf("NewTCPTransport: %v", err)
+			}
+			s := New(&Config{
+				DisableStatsOutput: tc.disable,
+				Fsm:                NewCommitChannelFSM(commitChan),
+				PeerIds:            []int{},
+				ServerID:           1,
+				Storage:            store.NewMapStorage(),
+				Transport:          transport,
+			}, ready)
+			if s.disableStatsOutput != tc.disable {
+				t.Fatalf("Server.disableStatsOutput = %v, want %v", s.disableStatsOutput, tc.disable)
+			}
+
+			s.Serve()
+			close(ready)
+			t.Cleanup(func() {
+				s.Shutdown()
+				close(commitChan)
+				<-readerDone
+			})
+
+			if s.cm.disableStatsOutput != tc.disable {
+				t.Fatalf("CM.disableStatsOutput = %v, want %v", s.cm.disableStatsOutput, tc.disable)
+			}
+			if s.cm.statsInstance == 0 {
+				t.Error("CM.statsInstance = 0, идентификатор экземпляра обязан быть установлен")
+			}
+			if s.cm.statsStartedAt.IsZero() {
+				t.Error("CM.statsStartedAt не установлен: возраст отчёта не определён")
+			}
+		})
+	}
+}
+
 // TestServeSnapshotConfig проверяет маршрут параметров снимков (AC-2):
 // значения SnapshotInterval/SnapshotThreshold из конфигурации доезжают
 // до ConsensusModule через сеттер в Serve, а trailingLogs не изменяется

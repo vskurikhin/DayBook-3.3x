@@ -10,10 +10,13 @@ import (
 	"maps"
 	"net/http"
 	"net/http/pprof"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/vskurikhin/raft"
@@ -34,23 +37,48 @@ const (
 	_pprofReadHeaderTimeout = 5 * time.Second
 	// _pprofShutdownTimeout — предельное время остановки сервера профилирования.
 	_pprofShutdownTimeout = 5 * time.Second
+
+	// _traceShutdownTimeout — предельное время ожидания остановки
+	// писателя трассировки при завершении процесса.
+	_traceShutdownTimeout = 2 * time.Second
 )
 
 func main() {
+	// Остановка писателя идемпотентна: штатный возврат и panic в главной
+	// горутине используют один и тот же defer, ошибочный путь вызывает
+	// её явно до log.Fatal (os.Exit не выполняет defer).
+	defer shutdownTrace()
 	if err := run(); err != nil {
+		shutdownTrace()
+		//nolint:gocritic // остановка вызвана явно выше; defer остаётся для panic в главной горутине.
 		log.Fatal(err)
 	}
 }
 
-// run запускает узел с параметрами командной строки и блокируется
-// до завершения процесса.
+// run запускает узел с параметрами командной строки и блокируется до
+// получения сигнала завершения (SIGINT/SIGTERM) или ошибки запуска.
+// После сигнала выполняется существующая функция остановки узла.
 func run() error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 	stop, err := runWith(&_init.Values)
 	if err != nil {
 		return err
 	}
 	defer stop()
-	select {} // работа узла до завершения процесса
+	<-ctx.Done() // работа узла до сигнала завершения
+	return nil
+}
+
+// shutdownTrace останавливает писателя трассировки с отдельным предельным
+// временем. Контекст завершения независим от отменённого сигнального; при
+// выключенной трассировке вызов не выполняет работы.
+func shutdownTrace() {
+	ctx, cancel := context.WithTimeout(context.Background(), _traceShutdownTimeout)
+	defer cancel()
+	if err := raft.ShutdownTrace(ctx); err != nil {
+		log.Printf("warning: shutting down trace writer: %v", err)
+	}
 }
 
 var _wg sync.WaitGroup
@@ -89,6 +117,7 @@ func runWith(values *config.Values) (func(), error) {
 		HTTPAddress: values.HTTPAddress.String(),
 		Config: raft.Config{
 			ApplyBatchInterval: values.ApplyBatchInterval,
+			DisableStatsOutput: !values.StatsOutput,
 			HeartbeatTimeout:   values.HeartbeatTimeout,
 			PeerAddresses:      values.Peers,
 			PeerIds:            nums,

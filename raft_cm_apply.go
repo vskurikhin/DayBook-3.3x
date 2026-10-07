@@ -1,3 +1,5 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
@@ -185,11 +187,12 @@ func (cm *ConsensusModule) sendBatch(start, end int) {
 		}
 		pos := cm.logPositionLocked(idx)
 		if pos >= len(cm.cmState.log) {
-			cm.traceLockedLogf(
-				_traceLevelKeyEvents,
-				"sendBatch: logPositionLocked(%d) returned %d, len(log)=%d",
-				idx, pos, len(cm.cmState.log),
-			)
+			if traceEnabled(_traceLevelKeyEvents) {
+				cm.traceLogfLocked(
+					"sendBatch: logPositionLocked(%d) returned %d, len(log)=%d",
+					idx, pos, len(cm.cmState.log),
+				)
+			}
 			cm.counters.sendBatchEntrySkipped.Add(1)
 			continue
 		}
@@ -197,11 +200,12 @@ func (cm *ConsensusModule) sendBatch(start, end int) {
 		// журнала бинарный поиск возвращает позицию 0, но запись log[0]
 		// не соответствует idx и не должна применяться к FSM.
 		if cm.cmState.log[pos].Index != idx {
-			cm.traceLockedLogf(
-				_traceLevelKeyEvents,
-				"sendBatch: no log entry at index %d (entry=%d), skipping",
-				idx, cm.cmState.log[pos].Index,
-			)
+			if traceEnabled(_traceLevelKeyEvents) {
+				cm.traceLogfLocked(
+					"sendBatch: no log entry at index %d (entry=%d), skipping",
+					idx, cm.cmState.log[pos].Index,
+				)
+			}
 			cm.counters.sendBatchEntrySkipped.Add(1)
 			continue
 		}

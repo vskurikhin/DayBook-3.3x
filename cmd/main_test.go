@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"runtime"
 	"testing"
 	"time"
@@ -15,6 +17,25 @@ import (
 	"github.com/vskurikhin/raft/pkg/raft/store"
 	"github.com/vskurikhin/raft/pkg/raft/transp"
 )
+
+// traceShutdownTimeout — предельное время остановки писателя трассировки
+// при завершении тестового процесса.
+const traceShutdownTimeout = 2 * time.Second
+
+// TestMain останавливает процессного писателя после прогона: трассировка
+// консенсус-модуля сконфигурирована в internal/_init до тестов (уровень
+// по умолчанию положителен), поэтому иначе горутина писателя пережила бы
+// тестовый процесс.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	ctx, cancel := context.WithTimeout(context.Background(), traceShutdownTimeout)
+	if err := raft.ShutdownTrace(ctx); err != nil {
+		_, _ = os.Stderr.WriteString("raft: trace shutdown failed: " + err.Error() + "\n")
+		code = 1
+	}
+	cancel()
+	os.Exit(code)
+}
 
 // TestRunWithEmptyPeers запускает узел без соседей через runWith и
 // останавливает его как следствие:
@@ -53,6 +74,23 @@ func TestRunWithNonDefaultNodeFlags(t *testing.T) {
 	stop, err := runWith(&values)
 	if err != nil {
 		t.Fatalf("runWith with non-default node flags returned unexpectedly: %v", err)
+	}
+	t.Cleanup(stop)
+}
+
+// TestRunWithStatsOutputDisabled — маршрут Values.StatsOutput=false до узла:
+// узел стартует и останавливается штатно (leaktest чист), то есть настройка
+// вывода периодической статистики не мешает жизненному циклу.
+func TestRunWithStatsOutputDisabled(t *testing.T) {
+	t.Cleanup(leaktest.CheckTimeout(t, raft.LeaktestBudget))
+
+	values := newTestValues(t)
+	values.Peers = map[int]net.Addr{}
+	values.StatsOutput = false
+
+	stop, err := runWith(&values)
+	if err != nil {
+		t.Fatalf("runWith with stats output disabled returned unexpectedly: %v", err)
 	}
 	t.Cleanup(stop)
 }

@@ -1,3 +1,5 @@
+// Copyright 2026 Victor N. Skurikhin
+// SPDX-License-Identifier: Apache-2.0
 package raft
 
 import (
@@ -272,6 +274,72 @@ func (f *configurationChangeFuture) Index() int {
 	return f.index
 }
 
+// cmConfig — внутренние параметры создания ConsensusModule, не входящие
+// в публичную сигнатуру конструктора. Нулевое значение сохраняет прежнее
+// поведение.
+type cmConfig struct {
+	// disableStatsOutput отключает публикацию периодического отчёта,
+	// не прекращая секундный сбор метрик.
+	disableStatsOutput bool
+}
+
+// _statsProcessBase — базовое значение ряда экземпляров CM в процессе:
+// наносекунды старта процесса. Вместе с порядковым номером даёт
+// различающиеся Instance как в одном процессе, так и после перезапуска.
+var _statsProcessBase = uint64(time.Now().UnixNano())
+
+// _statsInstanceSeq — счётчик созданных в процессе экземпляров CM.
+var _statsInstanceSeq atomic.Uint64
+
+// nextStatsInstance возвращает идентификатор очередного экземпляра CM.
+func nextStatsInstance() uint64 {
+	return _statsProcessBase + _statsInstanceSeq.Add(1)
+}
+
+// markConsensusModuleCreated фиксирует факт создания CM для трассировки
+// (set-once) и кэширует переменную окружения хука форсирования выборов:
+// единственное чтение переменной выполняется при старте процесса.
+func markConsensusModuleCreated() {
+	_traceCMCreated.Store(true)
+	_forcedReelectionHook.Store(os.Getenv(forcedReelectionEnv) != "")
+}
+
+// initStatsConfig фиксирует выбор вывода периодической статистики и начало
+// ряда отчёта: выбор неизменяем после запуска первой горутины, момент
+// создания задаёт монотонный возраст, счётчик — идентификатор экземпляра.
+// Вызывается конструктором до первого goSpawn.
+func (cm *ConsensusModule) initStatsConfig(disableStatsOutput bool) {
+	cm.disableStatsOutput = disableStatsOutput
+	cm.statsStartedAt = time.Now()
+	cm.statsInstance = nextStatsInstance()
+}
+
+// snapshotFrom выбирает необязательное хранилище снимков: единственный
+// вариадический элемент, если он не nil.
+func snapshotFrom(snapshots []SnapshotStore) SnapshotStore {
+	if len(snapshots) == 0 {
+		return nil
+	}
+	return snapshots[0]
+}
+
+// initSnapshotConfig инициализирует поля снимков: границы снимка всегда
+// начинаются с -1, при наличии хранилища применяются умолчания конструктора.
+// Вызывается конструктором до запуска горутин.
+func (cm *ConsensusModule) initSnapshotConfig(snapshotStore SnapshotStore) {
+	cm.cmState.lastSnapshotIndex = -1
+	cm.cmState.lastSnapshotTerm = -1
+	if snapshotStore == nil {
+		return
+	}
+	cm.snapshotStore = snapshotStore
+	cm.snapshotThreshold = DefaultSnapshotThreshold
+	cm.snapshotInterval = DefaultSnapshotInterval
+	cm.trailingLogs = _defaultTrailingLogs
+	cm.snapshotCh = make(chan struct{}, 1)
+	cm.fsmSnapshotCh = make(chan *reqSnapshotFuture)
+}
+
 // NewConsensusModule создаёт новый экземпляр ConsensusModule.
 //
 // Предусловие: аргумент transport не должен быть nil.
@@ -279,7 +347,26 @@ func (f *configurationChangeFuture) Index() int {
 // Это единственная валидация, выполняемая до запуска горутин.
 // Проверка корректно обрабатывает все виды nil: как пустой интерфейс,
 // так и типизированный nil‑указатель.
+//
+// Существующие вызовы получают включённый вывод периодической статистики:
+// публичная сигнатура сохраняется, а выбор вывода приходит из Server.
 func NewConsensusModule(
+	id int,
+	peerIds []int,
+	transport Transport,
+	storage Storage,
+	fsm FSM,
+	ready <-chan any,
+	snapshots ...SnapshotStore,
+) *ConsensusModule {
+	return newConsensusModule(cmConfig{}, id, peerIds, transport, storage, fsm, ready, snapshots...)
+}
+
+// newConsensusModule — общая внутренняя реализация создания CM для
+// публичного конструктора и Server: выбор вывода фиксируется здесь,
+// до запуска первой горутины, и далее неизменен.
+func newConsensusModule(
+	cfg cmConfig,
 	id int,
 	peerIds []int,
 	transport Transport,
@@ -291,18 +378,16 @@ func NewConsensusModule(
 	if IsNilInterface(transport) {
 		log.Fatalln("raft: NewConsensusModule: transport is nil")
 	}
-	// Отмечаем факт создания CM для трассировки (set-once).
-	_traceCMCreated.Store(true)
-	// Единственное чтение переменной окружения хука форсирования выборов
-	// выполняется при старте: значение кэшируется в переменную пакета на
-	// весь процесс.
-	_forcedReelectionHook.Store(os.Getenv(forcedReelectionEnv) != "")
+	markConsensusModuleCreated()
 	cm := new(ConsensusModule)
 	cm.id = id
 	cm.peerIds = peerIds
 	cm.transport = transport
 	cm.storage = storage
 	cm.fsm = fsm
+	// Выбор вывода и начало ряда периодического отчёта фиксируются
+	// до первого goSpawn.
+	cm.initStatsConfig(cfg.disableStatsOutput)
 	// Канал для передачи зафиксированных записей в runFSM.
 	// Ёмкость _batchApplyBuffer обеспечивает устойчивость к всплескам:
 	// при массовой фиксации processLogs отправляет записи батчем без блокировки.
@@ -338,45 +423,24 @@ func NewConsensusModule(
 	cm.cmState.leaderID = -1
 	cm.leaderState.leadershipTransferCh = make(chan *leadershipTransferFuture, 1)
 	cm.cmState.logNeedsPersist = true
-
 	// Инициализация полей для снимков.
-	cm.cmState.lastSnapshotIndex = -1
-	cm.cmState.lastSnapshotTerm = -1
-	if len(snapshots) > 0 && snapshots[0] != nil {
-		cm.snapshotStore = snapshots[0]
-		cm.snapshotThreshold = DefaultSnapshotThreshold
-		cm.snapshotInterval = DefaultSnapshotInterval
-		cm.trailingLogs = _defaultTrailingLogs
-		cm.snapshotCh = make(chan struct{}, 1)
-		cm.fsmSnapshotCh = make(chan *reqSnapshotFuture)
-	}
+	cm.initSnapshotConfig(snapshotFrom(snapshots))
 
 	// Восстановление состояния из хранилища.
 	if cm.storage.HasData() {
-		cm.restoreFromStorage()
-		cm.cmState.logNeedsPersist = false
-		// Однопоточное восстановление FSM из снимка до запуска горутин.
-		// Стратегия немедленного отказа: при невосстановимом состоянии узел
-		// аварийно завершается с явной ошибкой, чтобы избежать молчаливой
-		// потери подтверждённых данных.
-		if err := cm.restoreFromSnapshotStore(); err != nil {
-			log.Fatalf("raft: startup snapshot restore failed: %v", err)
-		}
+		restoreData(cm)
 	}
-
 	// Установка начальной конфигурации, если она отсутствует
 	// (первый запуск либо хранилище не содержит конфигурации).
 	if len(cm.cmState.configurations.latest.ConfigServers) == 0 {
 		cm.setInitialConfiguration()
 	}
-
 	cm.goSpawn(cm.runFSM)
 	cm.goSpawn(cm.runRPCReader)
 
 	if cm.snapshotStore != nil {
 		cm.goSpawn(cm.runSnapshots)
 	}
-
 	cm.goSpawn(func() {
 		<-ready
 		cm.mu.Lock()
@@ -385,7 +449,20 @@ func NewConsensusModule(
 		cm.runElectionTimer()
 	})
 	cm.goSpawn(func() { cm.stats(cm.shutdownCh) })
+
 	return cm
+}
+
+func restoreData(cm *ConsensusModule) {
+	cm.restoreFromStorage()
+	cm.cmState.logNeedsPersist = false
+	// Однопоточное восстановление FSM из снимка до запуска горутин.
+	// Стратегия немедленного отказа: при невосстановимом состоянии узел
+	// аварийно завершается с явной ошибкой, чтобы избежать молчаливой
+	// потери подтверждённых данных.
+	if err := cm.restoreFromSnapshotStore(); err != nil {
+		log.Fatalf("raft: startup snapshot restore failed: %v", err)
+	}
 }
 
 // checkRPCHeader проверяет, что RPC-сообщение использует поддерживаемую

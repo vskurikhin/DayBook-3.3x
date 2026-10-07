@@ -415,12 +415,7 @@ func TestGenerateReleasesScheduledTicks(t *testing.T) {
 func TestOperationCountersCountEachOperationOnce(t *testing.T) {
 	resetMetrics()
 	setValues(t, config.Values{
-		// Одновременность 1: без чередования записей разных рабочих в один
-		// ключ перечитывание детерминировано — перекрытие значений между
-		// записью и проверкой исключено, _verifyBad обязан быть нулём.
-		// При concurrency > 1 гонка двух записей в один ключ законно даёт
-		// _verifyBad > 0 (см. комментарий у verify в main.go).
-		Concurrency:   1,
+		Concurrency:   4,
 		GetPercent:    50,
 		KeyCount:      8,
 		RequestRate:   500,
@@ -803,6 +798,12 @@ func TestWeakGetPercentSaturating(t *testing.T) {
 	}
 }
 
+// Эталонные строки run: и done: взяты дословно из исторического артефакта
+// .doc/TODO/2026-09-06.P-PERF-2/2026-09-06-P-PERF-2-base-consensus/trace/P-PERF-2-base-consensus_loadkv.out
+// (строки 60–61). Артефакт снят текущим форматом вывода генератора до правок
+// TASK-001, поэтому строки обязаны совпадать побайтово, включая двойные
+// пробелы (межверсионный гейт RISK-013). Литералы не собираются через
+// fmt.Sprintf с форматами main.go: источник — ссылка на артефакт.
 const (
 	goldenRunLine  = "run: concurrency=128 request-rate=500 value-size=128 duration=1m0s TRACE_LOG_LEVEL=не задан  mix: delete=0 weak-get=0 get=75 put=25 (эффективные)"
 	goldenDoneLine = "done: get=22485 put=7418 verify=0 weak-get=0 delete=0 delete-verify=0  GET ok=22485 fail=0  PUT ok=7418 fail=0  VERIFY ok=0 bad=0  WEAK GET ok=0 fail=0  DELETE ok=0 fail=0  DELETE-VERIFY ok=0 bad=0  _dropped=0 _latencyDropped=0"
@@ -993,8 +994,8 @@ func TestSummaryOutputGolden(t *testing.T) {
 	// переменную окружения, чтобы тест не зависел от окружения разработчика.
 	origTraceLevel, hadTraceLevel := os.LookupEnv(_traceLogLevelEnv)
 	if hadTraceLevel {
-		t.Cleanup(func() { _ = os.Setenv(_traceLogLevelEnv, origTraceLevel) })
-		_ = os.Unsetenv(_traceLogLevelEnv)
+		t.Cleanup(func() { os.Setenv(_traceLogLevelEnv, origTraceLevel) })
+		os.Unsetenv(_traceLogLevelEnv)
 	}
 
 	t.Run("artifact-lines", func(t *testing.T) {

@@ -35,7 +35,7 @@ type Values struct {
 	// ApplyBatchInterval — интервал батча применения записей к FSM.
 	// Ноль — защитное значение: применяется raft.DefaultApplyBatchInterval.
 	ApplyBatchInterval time.Duration
-	// DataDir — директория для persistent-хранилища узла;
+	// DataDir — директория для постоянного хранилища узла,
 	// пустая строка — вычисляется путь по умолчанию в cmd/main.go.
 	DataDir string
 	// HeartbeatTimeout — период пульса лидера. Ноль — защитное значение:
@@ -55,6 +55,11 @@ type Values struct {
 	// снимка, при котором создаётся новый снимок.
 	// Ноль — защитное значение: применяется дефолт конструктора.
 	SnapshotThreshold int
+	// StatsOutput — вывод периодической статистики узла. false отключает
+	// только публикацию (латентность, счётчики Raft, PersistV1), не прекращая
+	// секундный сбор метрик. Умолчание — true; настройка не связана
+	// с TraceLogLevel.
+	StatsOutput bool
 	// TCPConnectTimeout — тайм-аут установки TCP-соединения к соседям.
 	// Ноль — защитное значение: применяется дефолт транспорта
 	// (raft.ConnectionTCPRPCTimeout, 165 мс). Связь значения с окном
@@ -104,6 +109,7 @@ func ParseFlags() Values {
 	pprofAddressFlag := fs.String("pprof-addr", "", "Profiling HTTP server listen address (empty = disabled)")
 	rpcAddressFlag := fs.String("rpc-addr", ":9990", "RPC server listen address")
 	snapshotIntervalFlag, snapshotThresholdFlag := addSnapshotFlags(fs)
+	statsOutputFlag := addStatsOutputFlag(fs)
 	tcpConnectTimeoutFlag, tcpRPCTimeoutFlag, installSnapshotTimeoutFlag := addTransportFlags(fs)
 	traceCMLogFileFlag, traceKVLogFileFlag, traceLogLevelFlag := addTraceFlags(fs)
 
@@ -161,6 +167,7 @@ func ParseFlags() Values {
 		ReelectionTimeout:      *reelectionTimeoutFlag,
 		SnapshotInterval:       *snapshotIntervalFlag,
 		SnapshotThreshold:      *snapshotThresholdFlag,
+		StatsOutput:            *statsOutputFlag,
 		TCPConnectTimeout:      *tcpConnectTimeoutFlag,
 		TCPRPCTimeout:          *tcpRPCTimeoutFlag,
 		InstallSnapshotTimeout: *installSnapshotTimeoutFlag,
@@ -175,10 +182,8 @@ func ParseFlags() Values {
 	}
 }
 
-// validateTimingFlags — тонкая тестируемая обёртка над
-// raft.ValidateTiming: собирает временные параметры в TimerConfig и
-// делегирует проверку пакету raft (владельцу инвариантов). Возвращает
-// ошибку со всеми нарушениями сразу.
+// validateTimingFlags — валидирует временные флаги, собирая их в TimerConfig
+// и делегируя проверку пакету raft. Возвращает ошибку со всеми нарушениями сразу.
 func validateTimingFlags(heartbeat, ticker, reelection, applyBatch time.Duration) error {
 	return raft.ValidateTiming(raft.TimerConfig{
 		ApplyBatch: applyBatch,
@@ -188,22 +193,16 @@ func validateTimingFlags(heartbeat, ticker, reelection, applyBatch time.Duration
 	})
 }
 
-// checkTimingFlags выполняет раннюю отказку для недопустимых значений
-// временных флагов узла: индивидуальные границы и межпараметрические
-// соотношения проверяются выделенной тестируемой функцией, сообщение
-// содержит имя параметра, фактическое значение и требование.
+// checkTimingFlags — валидирует временные флаги узла через тестируемую функцию.
+// Возвращает ошибку со всеми нарушениями: параметр, значение, требование.
 func checkTimingFlags(heartbeat, ticker, reelection, applyBatch *time.Duration) {
 	if err := validateTimingFlags(*heartbeat, *ticker, *reelection, *applyBatch); err != nil {
 		log.Fatalf("invalid Raft timing flags: %v", err)
 	}
 }
 
-// validateTransportTimingFlags проверяет три флага тайм-аутов
-// TCP-транспорта: индивидуальные границы (положительное значение,
-// целое число миллисекунд) и жёсткие межпараметрические инварианты
-// (connect + rpc ≤ 2 × raft.TCPRPCTimeout). Функция чистая, без
-// побочных эффектов; все нарушения собираются в одну ошибку
-// (errors.Join).
+// validateTransportTimingFlags — проверка тайм‑аутов TCP: границы и инвариант
+// (connect + rpc ≤ 2 × raft.TCPRPCTimeout). Возвращает errors.Join всех ошибок.
 func validateTransportTimingFlags(connect, rpc, snapshot time.Duration) error {
 	var errs []error
 	check := func(ok bool, format string, args ...any) {
@@ -236,12 +235,9 @@ func validateTransportTimingFlags(connect, rpc, snapshot time.Duration) error {
 	return errors.Join(errs...)
 }
 
-// validateElectionQuorumInvariant проверяет инвариант: база
-// тайм-аута выборов строго больше фиксированного окна проверки
-// кворума 2 × raft.TCPRPCTimeout. Окно — константа компиляции и
-// флагом -tcp-rpc-timeout не масштабируется, поэтому инвариант
-// сравнивается с константой, а не с удвоенным флагом. Функция
-// чистая, без побочных эффектов.
+// validateElectionQuorumInvariant — инвариант: база тайм‑аута выборов > 2 × raft.TCPRPCTimeout.
+// Окно — константа, не масштабируется флагом -tcp-rpc-timeout.
+// Функция чистая, без побочных эффектов.
 func validateElectionQuorumInvariant(reelection time.Duration) error {
 	if reelection > 2*raft.TCPRPCTimeout {
 		return nil
@@ -260,6 +256,18 @@ func addSnapshotFlags(fs *flag.FlagSet) (snapshotIntervalFlag *time.Duration, sn
 			"snapshot-threshold", raft.DefaultSnapshotThreshold,
 			"Log entries since last snapshot to trigger a new one (default 1024)",
 		)
+}
+
+// addStatsOutputFlag регистрирует флаг вывода периодической статистики:
+// три строки в секунду (латентность, счётчики Raft, PersistV1). Отсутствие
+// флага эквивалентно true; настройка не связана с -trace-log-level.
+func addStatsOutputFlag(fs *flag.FlagSet) *bool {
+	return fs.Bool(
+		"stats-output", true,
+		"Periodic stats output: latency, raft counters and PersistV1 "+
+			"(default true); false keeps collecting but suppresses all three "+
+			"lines; independent of -trace-log-level",
+	)
 }
 
 // addTimingFlags регистрирует четыре временных флага узла и возвращает
