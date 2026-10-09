@@ -1,0 +1,88 @@
+# DayBook-3.3x isolated local Compose project (TASK-1001, ADR-004/013).
+#
+# This file is consumed only through the root Makefile / tools/run-workflow.sh
+# with explicit --file/--project/--env-file arguments. The legacy
+# docker/docker-compose.yaml stack is untouched and independent.
+#
+# Helper-owned initialization values (POSTGRES_INITDB_ARGS and
+# POSTGRES_HOST_AUTH_METHOD) are literal: they cannot be overridden through
+# the env file. They apply only while a volume is empty; an existing volume is
+# never retrofitted.
+
+services:
+  postgres-db:
+    image: 'pgvector/pgvector:pg18'
+    environment:
+      POSTGRES_USER: ${LOCAL_DB_USER:-dbuser}
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD}
+      POSTGRES_DB: ${LOCAL_DB_NAME:-db}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      PGDATA: /var/lib/postgresql/18/docker
+      PGTZ: Europe/Moscow
+      TZ: Europe/Moscow
+    ports:
+      - '127.0.0.1:${DB_PORT:-35432}:5432'
+    volumes:
+      - 'pgdata:/var/lib/postgresql'
+
+  golang-auth:
+    image: '${IMAGE_PREFIX:-daybook-local}/auth:${IMAGE_TAG:-dev}'
+    pull_policy: never
+    environment:
+      AUTH_SERVER_JWT_HS256_SIGN_KEY: ${LOCAL_TOKEN_KEY}
+      TZ: Europe/Moscow
+    depends_on:
+      - postgres-db
+    ports:
+      - '127.0.0.1:${AUTH_PORT:-38089}:8089'
+    volumes:
+      - '${DAYBOOK_AUTH_CONFIG:?DAYBOOK_AUTH_CONFIG must be set by the workflow helper}:/app/.auth-server.yaml:ro'
+
+  spring-3-5-core:
+    image: '${IMAGE_PREFIX:-daybook-local}/core:${IMAGE_TAG:-dev}'
+    pull_policy: never
+    environment:
+      CORE_SERVER_DB_URL: jdbc:postgresql://postgres-db:5432/${LOCAL_DB_NAME:-db}
+      CORE_SERVER_DB_USERNAME: ${LOCAL_DB_USER:-dbuser}
+      CORE_SERVER_DB_PASSWORD: ${LOCAL_DB_PASSWORD}
+      CORE_SERVER_TOKEN_SIGNING_KEY: ${CORE_SERVER_TOKEN_SIGNING_KEY}
+      TZ: Europe/Moscow
+    depends_on:
+      - postgres-db
+    ports:
+      - '127.0.0.1:${CORE_PORT:-38082}:8082'
+
+  quarkus-3-33-api:
+    image: '${IMAGE_PREFIX:-daybook-local}/api:${IMAGE_TAG:-dev}'
+    pull_policy: never
+    environment:
+      API_SERVER_AUTH_SERVER_ADDRESS: http://golang-auth:8089
+      API_SERVER_DB_REACTIVE_URL: vertx-reactive:postgresql://postgres-db:5432/${LOCAL_DB_NAME:-db}?application_name=api&currentSchema=api
+      API_SERVER_DB_USERNAME: ${LOCAL_DB_USER:-dbuser}
+      API_SERVER_DB_PASSWORD: ${LOCAL_DB_PASSWORD}
+      API_SERVER_CORE_SERVER_ADDRESS: http://spring-3-5-core:8082
+      API_SERVER_CORE_VERIFY_ISSUER: ${LOCAL_TOKEN_KEY}
+      API_SERVER_JWT_EXTERNAL_VERIFY_KEY_HMAC: ${LOCAL_TOKEN_KEY}
+      API_SERVER_HTTP_HOST: 0.0.0.0
+      TZ: Europe/Moscow
+    depends_on:
+      - postgres-db
+      - golang-auth
+      - spring-3-5-core
+    ports:
+      - '127.0.0.1:${API_PORT:-38081}:8081'
+
+  nginx-react-app:
+    image: '${IMAGE_PREFIX:-daybook-local}/app:${IMAGE_TAG:-dev}'
+    pull_policy: never
+    environment:
+      TZ: Europe/Moscow
+    depends_on:
+      - golang-auth
+      - quarkus-3-33-api
+    ports:
+      - '127.0.0.1:${APP_PORT:-30080}:80'
+
+volumes:
+  pgdata:

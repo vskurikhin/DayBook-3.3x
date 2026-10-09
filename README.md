@@ -235,6 +235,31 @@ cd core
 
 # Running the Project
 
+## Local Docker workflow (root Makefile)
+
+The repository-root `Makefile` is the documented entry point for building,
+testing and running the whole stack with Docker on a **linux/arm64** engine.
+See `tools/WORKFLOW.md` for the full contract (configuration, targets,
+first-start sequence, persistence, recovery and disposable verification).
+
+```bash
+make help                 # list all targets and prerequisites
+cp docker/local.env.example docker/local.env   # then edit the secrets
+make images               # auth -> api -> core -> app (linux/arm64)
+make db-migrate           # goose(auth) -> liquibase(core) -> liquibase(api)
+make db-seed              # first-time seed (empty tables, one transaction)
+make up                   # bounded readiness; http://127.0.0.1:30080
+make down                 # non-destructive stop (persistent data kept)
+make verify-docker        # disposable end-to-end verification
+```
+
+Configuration comes from exported environment variables or `docker/local.env`;
+never pass secrets as Make arguments. Daily start after a successful first
+start is just `make up`. For a changed schema revision: `make down`, rebuild
+images, `make db-migrate`, then `make up` (do not re-run the seed).
+
+## Manual service startup
+
 Start the services in the following order.
 
 ## 1. Authentication Service

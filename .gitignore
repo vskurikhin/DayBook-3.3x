@@ -86,7 +86,10 @@ bin/
 build/
 dist-ssr
 dist/
-docker/
+docker/*
+!/docker/compose.local.yaml
+!/docker/local.env.example
+!/docker/local-auth-config.json
 hs_err_pid*
 lerna-debug.log*HELP.md
 logs/
@@ -227,4 +230,8 @@ docs/TODO/
 .codex/
 .kimi-code/
 .opencode/
+.zcodeignore
 docs/
+
+# TASK-1001 workflow private state (locks, identity, runtime secrets, runs)
+.daybook-workflow/
