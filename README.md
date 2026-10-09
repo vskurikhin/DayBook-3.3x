@@ -235,28 +235,42 @@ cd core
 
 # Running the Project
 
-## Local Docker workflow (root Makefile)
+## Root Makefile: host build and test interface
 
-The repository-root `Makefile` is the documented entry point for building,
-testing and running the whole stack with Docker on a **linux/arm64** engine.
-See `tools/WORKFLOW.md` for the full contract (configuration, targets,
-first-start sequence, persistence, recovery and disposable verification).
+The repository-root `Makefile` is the documented entry point for building and
+testing the maintained components on the host. It does **not** yet provide the
+local Docker workflow (images, database initialization, `up`/`down`); that is a
+later approved increment and is intentionally not implemented here.
 
 ```bash
-make help                 # list all targets and prerequisites
-cp docker/local.env.example docker/local.env   # then edit the secrets
-make images               # auth -> api -> core -> app (linux/arm64)
-make db-migrate           # goose(auth) -> liquibase(core) -> liquibase(api)
-make db-seed              # first-time seed (empty tables, one transaction)
-make up                   # bounded readiness; http://127.0.0.1:30080
-make down                 # non-destructive stop (persistent data kept)
-make verify-docker        # disposable end-to-end verification
+make help                 # list all targets, prerequisites, outputs, gaps
+make build                # complete host build: Java -> auth -> app
+make build-java           # Gradle wrapper, root: ./gradlew build -x test
+make build-auth           # Go 1.26, in auth/: go build + host binary
+make build-app            # npm, in app/: npm ci && npm run build
+make test-java            # existing Gradle suites (mixed unit/integration)
+make test-auth            # Go, in auth/: go test ./...
+make test                 # aggregate; always nonzero (frontend tests absent)
+make verify-workflow      # inline orchestration assertions (no Docker)
 ```
 
-Configuration comes from exported environment variables or `docker/local.env`;
-never pass secrets as Make arguments. Daily start after a successful first
-start is just `make up`. For a changed schema revision: `make down`, rebuild
-images, `make db-migrate`, then `make up` (do not re-run the seed).
+Each public operation holds one checkout-wide operation lock under
+`.daybook-workflow/` (gitignored) so competing root invocations fail cleanly and
+`make -j` runs goals serially. Failed child steps stop dependents and return
+nonzero. The host `auth` binary is written to `.daybook-workflow/host/auth-server`
+(gitignored) and never overwrites a container binary; `npm run build` outputs to
+`app/dist` and never modifies the tracked `app/html` staging.
+
+Prerequisites: GNU Make >= 3.81 and POSIX `/bin/sh` utilities, JDK 21 plus the
+Gradle wrapper (Java), Go 1.26 (`auth`), Node/npm compatible with
+`app/package-lock.json` (`app`), and Docker for the Java test suites
+(Testcontainers).
+
+Capability gaps (honest reporting): frontend tests are not defined in
+`app/package.json`, so `make test-app` and aggregate `make test` fail nonzero.
+Java suites are existing mixed unit/integration suites, not certified unit-only
+coverage measurements. No Docker image/lifecycle targets exist in this
+increment.
 
 ## Manual service startup
 
