@@ -87,9 +87,15 @@ build/
 dist-ssr
 dist/
 docker/*
+!/docker/check-migration-histories.sql
+!/docker/check-migration-tables.sql
 !/docker/compose.local.yaml
+!/docker/init_other.sh
+!/docker/init_other.sql
+!/docker/local-auth-config.yaml
 !/docker/local.env.example
-!/docker/local-auth-config.json
+!/docker/schemas.sql
+!/docker/seed-guard.sql
 hs_err_pid*
 lerna-debug.log*HELP.md
 logs/
@@ -234,4 +240,4 @@ docs/TODO/
 docs/
 
 # TASK-1001 workflow private state (locks, identity, runtime secrets, runs)
-.daybook-workflow/
+.workflow/
