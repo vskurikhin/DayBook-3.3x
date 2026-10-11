@@ -14,7 +14,26 @@
 # Recipes are POSIX /bin/sh; the module tools (Gradle wrapper, Go, npm) own
 # their artifacts and working directories.
 
-SHELL := /bin/sh
+# Repository root and generated workflow state (gitignored).
+SHELL    := /bin/sh
+ROOT     := $(CURDIR)
+WORKFLOW := $(ROOT)/.daybook-workflow
+LOCK     := $(WORKFLOW)/lock
+HOSTDIR  := $(WORKFLOW)/host
+
+# Local Docker configuration file (ADR-005 / R3.4). May be overridden on the
+# command line to select a local config file; it is data only and is never
+# sourced, evaluated or Make-included. The two required secrets
+# (LOCAL_DB_PASSWORD, LOCAL_TOKEN_KEY) are read only from this file inside
+# recipes and never become Make variables.
+ENV_FILE ?= $(ROOT)/docker/local.env
+
+QUARKUS_NATIVE := -Dquarkus.native.container-runtime=docker \
+    -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false \
+    -Dquarkus.native.container-build=true -Dquarkus.container-image.build=false \
+    -Dquarkus.native.builder-image=quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-21
+
+include .env
 
 # This interface is intentionally serial: one checkout-wide lock per public
 # operation, and no parallel execution of goals inside a single invocation.
@@ -24,16 +43,11 @@ SHELL := /bin/sh
 # Paths and tooling
 # ---------------------------------------------------------------------------
 
-# Repository root and generated workflow state (gitignored).
-ROOT     := $(CURDIR)
-WORKFLOW := $(ROOT)/.daybook-workflow
-LOCK     := $(WORKFLOW)/lock
-HOSTDIR  := $(WORKFLOW)/host
-
 # Public build/test targets (also listed by help).
 PUBLIC_TARGETS := help build build-java build-api build-core build-lib \
 	build-spi-mapstruct build-auth build-app test test-java test-api \
-	test-core test-lib test-spi-mapstruct test-auth test-app verify-workflow
+	test-core test-lib test-spi-mapstruct test-auth test-app \
+	images image-auth image-core image-api image-app verify-workflow
 
 .PHONY: $(PUBLIC_TARGETS)
 
@@ -46,15 +60,19 @@ define check_tool
 { command -v $(1) >/dev/null 2>&1 || { echo "error: required tool '$(1)' not found in PATH" >&2; exit 1; }; }
 endef
 
+define build_app
+{ cd $(1)/app && rm -rf ./dist/assets/index-*.{css,js} && npm ci && npm run build ; }
+endef
+
 # Build fragments. The Gradle wrapper runs from the repository root; auth and
 # app run from their own module directories. Builds exclude tests.
-JAVA_ALL_BUILD := $(call check_tool,java) && ./gradlew build -x test
-API_BUILD      := $(call check_tool,java) && ./gradlew :api:build -x test
+JAVA_ALL_BUILD := $(call check_tool,java) && ./gradlew build -x test $(QUARKUS_NATIVE)
+API_BUILD      := $(call check_tool,java) && ./gradlew :api:build -x test $(QUARKUS_NATIVE)
 CORE_BUILD     := $(call check_tool,java) && ./gradlew :core:build -x test
 LIB_BUILD      := $(call check_tool,java) && ./gradlew :lib:build -x test
 SPI_BUILD      := $(call check_tool,java) && ./gradlew :spi-mapstruct:build -x test
-AUTH_BUILD     := $(call check_tool,go) && cd "$(ROOT)/auth" && go build ./... && mkdir -p ../.daybook-workflow/host && go build -o ../.daybook-workflow/host/auth-server ./cmd/server
-APP_BUILD      := $(call check_tool,node) && $(call check_tool,npm) && cd "$(ROOT)/app" && npm ci && npm run build
+AUTH_BUILD     := $(call check_tool,go) && GOOS=$(GOOS) GOARCH=$(GOARCH) $(MAKE) -C "$(CURDIR)/auth" build PROJECTNAME=auth
+APP_BUILD      := $(call check_tool,node) && $(call check_tool,npm) && $(call build_app,$(ROOT))
 
 # Test fragments. Java suites use Testcontainers and therefore also require a
 # working Docker runtime (F-VERIFY-004). They are existing mixed suites, not
@@ -66,36 +84,7 @@ LIB_TEST      := $(call check_tool,java) && ./gradlew :lib:test
 SPI_TEST      := $(call check_tool,java) && ./gradlew :spi-mapstruct:test
 AUTH_TEST     := $(call check_tool,go) && cd "$(ROOT)/auth" && go test ./...
 
-# ---------------------------------------------------------------------------
-# Operation lock (ADR-001 / architecture R3.6)
-# ---------------------------------------------------------------------------
-#
-# run_locked acquires one atomic checkout-wide lock, runs the given fragment,
-# and releases the lock only after the operation (and its children) completes.
-# On INT/TERM the lock is retained for manual diagnosis rather than released
-# while a child may still be writing. A competing root operation fails with a
-# non-secret diagnostic. Stale locks after SIGKILL must be removed manually
-# after confirming no owner process remains; this Makefile never auto-steals.
-#
-# Usage:  $(call run_locked,<fragment>)
-
-define run_locked
-@set -e; \
-mkdir -p "$(WORKFLOW)"; \
-lockdir="$(LOCK)"; \
-retain=0; \
-acquired=0; \
-trap 'rc=$$?; if [ "$$retain" -eq 0 ] && [ "$$acquired" -eq 1 ]; then rmdir "$$lockdir" 2>/dev/null || true; fi; exit $$rc' EXIT; \
-trap 'retain=1; echo "interrupted: operation lock retained at $(LOCK); remove it manually only after confirming no owner process remains" >&2; exit 130' INT TERM HUP; \
-if ! mkdir "$$lockdir" 2>/dev/null; then \
-  echo "error: operation lock is held: $(LOCK)" >&2; \
-  echo "another root Makefile operation is running, or a stale lock remains" >&2; \
-  echo "(remove it manually only after confirming no owner process remains)" >&2; \
-  exit 1; \
-fi; \
-acquired=1; \
-$(1)
-endef
+include Make-run-locked.mk
 
 # ---------------------------------------------------------------------------
 # Help (default target). Static: no tool probes, no config reads, no lock, no
@@ -124,29 +113,47 @@ help:
 	@echo '  test-spi-mapstruct   Gradle wrapper, root: ./gradlew :spi-mapstruct:test'
 	@echo '  test-auth            Go 1.26, dir auth/: go test ./...'
 	@echo '  test-app             reports unavailable frontend tests and fails'
-	@echo '  verify-workflow      inline orchestration assertions (no Docker)'
+	@echo '  images               build all four local images: auth -> core -> api -> app'
+	@echo '  image-auth           build auth image (linux/arm64, no baked config)'
+	@echo '  image-core           build core image (single executable bootJar)'
+	@echo '  image-api            build api image (Quarkus JVM fast-jar, Dockerfile.jvm)'
+	@echo '  image-app            build app image (complete app/dist + nginx.conf)'
+	@echo '  verify-workflow      inline orchestration + configuration assertions (no services)'
 	@echo ''
 	@echo 'Prerequisites:'
 	@echo '  GNU Make >= 3.81 and POSIX /bin/sh utilities'
 	@echo '  JDK 21 + Gradle wrapper (Java build/test); Docker for Java test suites'
 	@echo '  Go 1.26 (auth); Node/npm compatible with app/package-lock.json (app)'
 	@echo '  Network access for npm ci and Gradle/Go dependency resolution'
+	@echo '  Native ARM64 Docker engine + Compose plugin, base64 (image/config targets)'
+	@echo ''
+	@echo 'Configuration (image targets only):'
+	@echo '  docker/local.env (or ENV_FILE=...): strict allowlisted KEY=VALUE file'
+	@echo '  Required secrets: LOCAL_DB_PASSWORD, LOCAL_TOKEN_KEY (32-128 [A-Za-z0-9_-])'
+	@echo '  Allowed overrides: LOCAL_DB_NAME/USER, COMPOSE_PROJECT_NAME, IMAGE_PREFIX,'
+	@echo '    IMAGE_TAG, DOCKER_PLATFORM (linux/arm64 only), DB/AUTH/CORE/API/APP_PORT,'
+	@echo '    STARTUP_TIMEOUT. Non-secret keys may also be set on the make command line.'
+	@echo '  Secrets are rejected from the command line/environment; only linux/arm64 is'
+	@echo '  supported. See README "Local Docker image packaging" for details.'
 	@echo ''
 	@echo 'Output locations:'
 	@echo '  Gradle module build/ and app/dist/ (gitignored)'
-	@echo '  host auth binary: .daybook-workflow/host/auth-server (gitignored)'
+	@echo '  image contexts:   .daybook-workflow/images/<component> (gitignored)'
 	@echo '  operation lock:   .daybook-workflow/lock (gitignored)'
 	@echo ''
 	@echo 'Side effects:'
-	@echo '  build-app runs npm ci (installs app/node_modules) and npm run build'
-	@echo '  build/test do not start services, migrate/seed data, or touch tracked'
-	@echo '  app/html staging. Tracked Docker assets are not modified.'
+	@echo '  build-app/image-app run npm ci (installs app/node_modules) and npm run build'
+	@echo '  image targets pull base images (debian/temurin/nginx/pgvector) from the network'
+	@echo '  and create local images named <IMAGE_PREFIX>/<component>:<IMAGE_TAG> (default'
+	@echo '  daybook-local/*:dev). They do not start services, migrate/seed data, or touch'
+	@echo '  tracked app/html or docker/nginx/html staging.'
 	@echo ''
 	@echo 'Capability gaps (honest reporting, ADR-004):'
 	@echo '  Frontend tests are unavailable (F-VERIFY-001); test-app and "make test"'
 	@echo '  fail nonzero. Java suites are mixed unit/integration, not certified'
-	@echo '  unit-only coverage. Docker image/lifecycle targets are a later'
-	@echo '  approved increment and are not implemented here.'
+	@echo '  unit-only coverage. The local Docker lifecycle (db-up/db-migrate/db-seed/'
+	@echo '  up/down/status/logs) is a later approved increment (TASK-003/004) and is'
+	@echo '  not implemented here.'
 
 # ---------------------------------------------------------------------------
 # Build targets
@@ -214,124 +221,73 @@ test-app:
 	@echo "  'npm run build' only type-checks and bundles; it is not a test suite." >&2
 	@exit 1
 
+include Make-config.mk
+include Make-docker.mk
+include Make-image-frag.mk
+
 # ---------------------------------------------------------------------------
-# Inline orchestration verification (ADR-004 / architecture R3.7)
+# Image targets (ADR-002 / R3.3, TASK-002)
 # ---------------------------------------------------------------------------
 #
-# verify-workflow runs the orchestration assertions for dispatch, failure
-# propagation, locking, serialization and missing-tool handling. It coordinates
-# isolated sub-checks; each sub-check owns its own lock. No Docker, services or
-# databases are used. The Docker lifecycle (verify-docker) is a later approved
-# increment (TASK-004).
-#
-# Test seams (.verify-*) are internal; ordinary public targets never call them,
-# so public commands cannot bypass locks or preflight checks.
+# Each focused image target validates the configuration, checks the local
+# Docker endpoint/engine, builds only its own component into an isolated
+# context under .daybook-workflow/images/<component>, and produces the exact
+# Compose tag <IMAGE_PREFIX>/<component>:<IMAGE_TAG>. The aggregate `images`
+# runs auth -> core -> api -> app under one operation lock. These targets do
+# not publish the runtime snapshot and do not start services.
 
-verify-workflow:
-	@echo '=== verify: help is static (no lock, no state) and lists targets ==='
-	@tmp=$$(mktemp); \
-	lock_before=0; host_before=0; \
-	[ -e "$(LOCK)" ] && lock_before=1; \
-	[ -e "$(HOSTDIR)" ] && host_before=1; \
-	$(MAKE) -s help > "$$tmp"; \
-	ok=1; \
-	for t in $(PUBLIC_TARGETS); do grep -q "^  $$t" "$$tmp" || { echo "FAIL: help missing target $$t"; ok=0; }; done; \
-	rm -f "$$tmp"; \
-	[ $$ok -eq 1 ] || exit 1; \
-	lock_after=0; host_after=0; \
-	[ -e "$(LOCK)" ] && lock_after=1; \
-	[ -e "$(HOSTDIR)" ] && host_after=1; \
-	{ [ $$lock_before -eq $$lock_after ] && [ $$host_before -eq $$host_after ]; } \
-		|| { echo "FAIL: help created or removed workflow state"; exit 1; }
-	@echo 'PASS: help'
-	@echo '=== verify: test-app reports missing capability and fails ==='
-	@$(MAKE) -s test-app >/dev/null 2>&1; rc=$$?; \
-	test $$rc -ne 0 || { echo 'FAIL: test-app did not fail'; exit 1; }
-	@echo 'PASS: test-app capability gap'
-	@echo '=== verify: aggregate build includes all three component steps ==='
-	@grep -q '\$$(JAVA_ALL_BUILD) && \$$(AUTH_BUILD) && \$$(APP_BUILD)' "$(ROOT)/Makefile" \
-		|| { echo 'FAIL: aggregate build missing a component step (ordering/prerequisite)'; exit 1; }
-	@echo 'PASS: aggregate completeness'
-	@echo '=== verify: missing tool rejected (nonzero, non-secret) ==='
-	@$(MAKE) -s .verify-missing-tool
-	@echo 'PASS: missing tool'
-	@echo '=== verify: child failure stops dependents and releases lock ==='
-	@$(MAKE) -s .verify-fail-fast
-	@echo 'PASS: failure propagation'
-	@echo '=== verify: occupied lock rejects a competing operation ==='
-	@$(MAKE) -s .verify-competing
-	@echo 'PASS: competing rejection'
-	@echo '=== verify: make -j serializes protected operations ==='
-	@$(MAKE) -s .verify-j
-	@echo 'PASS: -j serialization'
-	@echo '=== verify: caught interruption retains the lock ==='
-	@$(MAKE) -s .verify-interrupt
-	@echo 'PASS: interruption retains lock'
-	@rm -f "$(HOSTDIR)/a" "$(HOSTDIR)/b"
-	@echo 'verify-workflow: ALL CHECKS PASSED'
+image-auth: build-auth
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(image_auth_frag))
 
-.PHONY: .verify-missing-tool .verify-fail-fast .verify-competing .verify-j .verify-interrupt .hold-lock-int
+image-core: build-core
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(image_core_frag))
 
-.verify-missing-tool:
-	@$(MAKE) -s .missing-tool-seam 2>/dev/null; rc=$$?; \
-	test $$rc -ne 0 || { echo 'FAIL: missing tool not rejected'; exit 1; }; \
-	rmdir "$(LOCK)" 2>/dev/null || true
+image-api: build-api
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(image_api_frag))
 
-.PHONY: .missing-tool-seam
-.missing-tool-seam:
-	$(call run_locked,$(call check_tool,no-such-tool-daybook-verify))
+image-app: build-app
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(image_app_frag))
 
-.verify-fail-fast:
-	@rm -f "$(WORKFLOW)/.sentinel"
-	@$(MAKE) -s .fail-fast-seam 2>/dev/null; rc=$$?; \
-	test $$rc -ne 0 || { echo 'FAIL: failing child reported success'; exit 1; }; \
-	{ [ ! -e "$(WORKFLOW)/.sentinel" ] && [ ! -e "$(LOCK)" ]; } || { echo 'FAIL: dependent ran or lock retained after failure'; exit 1; }
+images: image-auth image-app image-core image-api
 
-.PHONY: .fail-fast-seam
-.fail-fast-seam:
-	$(call run_locked,false && touch "$(WORKFLOW)/.sentinel")
+docker-compose-down:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down))
 
-# Simulate an occupied lock (as a separate competing process would leave it) and
-# confirm a public-style operation is rejected without modifying state.
-.verify-competing:
-	@rm -rf "$(LOCK)"; mkdir -p "$(WORKFLOW)"
-	@mkdir "$(LOCK)"   # occupy the lock, mimicking a running competitor
-	@$(MAKE) -s .competing-seam 2>/dev/null; rc=$$?; \
-	test $$rc -ne 0 || { echo 'FAIL: competing operation not rejected'; exit 1; }; \
-	rmdir "$(LOCK)"
+.PHONY: docker-compose-up-db docker-compose-up-auth docker-compose-up-api docker-compose-up-core docker-compose-up-app
 
-.PHONY: .competing-seam
-.competing-seam:
-	$(call run_locked,true)
+docker-compose-down-db:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,postgres-db))
 
-# Two protected goals under -j must run serially (no overlap) and leave the lock
-# released. .NOTPARALLEL guarantees serialization; the check confirms success and
-# release.
-.verify-j:
-	@$(MAKE) -s -j2 .j-seam-a .j-seam-b
-	@{ [ ! -e "$(LOCK)" ] && [ -e "$(HOSTDIR)/a" ] && [ -e "$(HOSTDIR)/b" ]; } \
-		|| { echo 'FAIL: -j serialization or lock release'; exit 1; }
+docker-compose-down-auth:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,golang-auth))
 
-.PHONY: .j-seam-a .j-seam-b
-.j-seam-a:
-	$(call run_locked,mkdir -p "$(HOSTDIR)" && touch "$(HOSTDIR)/a")
-.j-seam-b:
-	$(call run_locked,mkdir -p "$(HOSTDIR)" && touch "$(HOSTDIR)/b")
+docker-compose-down-api:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,quarkus-3-33-api))
 
-# A background holder acquires the lock and sleeps; INT must retain the lock for
-# manual diagnosis (never release while a child may still write). Bounded wait.
-.verify-interrupt:
-	@rm -rf "$(LOCK)" "$(WORKFLOW)/.int-done"
-	@$(MAKE) -s .hold-lock-int >/dev/null 2>&1 &
-	@pid=$$!; \
-	n=0; while [ ! -e "$(LOCK)" ] && [ $$n -lt 50 ]; do sleep 0.1; n=$$((n+1)); done; \
-	[ -e "$(LOCK)" ] || { echo 'FAIL: holder never acquired lock'; kill $$pid 2>/dev/null; exit 1; }; \
-	kill -INT $$pid 2>/dev/null || true; \
-	wait $$pid 2>/dev/null; \
-	{ [ -e "$(LOCK)" ] && [ ! -e "$(WORKFLOW)/.int-done" ]; } \
-		|| { echo 'FAIL: lock not retained after interruption'; exit 1; }; \
-	rmdir "$(LOCK)"
+docker-compose-down-core:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,spring-3-5-core))
 
-.PHONY: .hold-lock-int
-.hold-lock-int:
-	$(call run_locked,sleep 30 && touch "$(WORKFLOW)/.int-done")
+docker-compose-down-app:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,nginx-react-app))
+
+docker-compose-up:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up))
+
+.PHONY: docker-compose-up-db docker-compose-up-auth docker-compose-up-api docker-compose-up-core docker-compose-up-app
+
+docker-compose-up-db:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,postgres-db))
+
+docker-compose-up-auth:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,golang-auth))
+
+docker-compose-up-api:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,quarkus-3-33-api))
+
+docker-compose-up-core:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,spring-3-5-core))
+
+docker-compose-up-app:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,nginx-react-app))
+
+include Make-verify-workflow.mk
