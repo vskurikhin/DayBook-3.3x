@@ -18,16 +18,20 @@
 ###
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 
-RUN /bin/microdnf reinstall -y tzdata
-
 ENV TZ=Europe/Moscow
 
-RUN ln -sf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN rpm -e --nodeps tzdata \
+    && /bin/microdnf install -y tzdata \
+    && test -s /usr/share/zoneinfo/Europe/Moscow \
+    && /bin/microdnf clean all \
+    && ln -sf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone
 
 WORKDIR /work/
 RUN chown 1001 /work \
     && chmod "g+rwX" /work \
     && chown 1001:root /work
+
 COPY --chown=1001:root --chmod=0755 build/*-runner /work/application
 
 EXPOSE 8080

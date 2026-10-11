@@ -238,9 +238,9 @@ cd core
 ## Root Makefile: host build and test interface
 
 The repository-root `Makefile` is the documented entry point for building and
-testing the maintained components on the host. It does **not** yet provide the
-local Docker workflow (images, database initialization, `up`/`down`); that is a
-later approved increment and is intentionally not implemented here.
+testing the maintained components on the host. Local image and direct Compose
+targets are also available. Database initialization is described below; the
+full readiness/recovery interface (`up`, `down`, `status`, `logs`) is not yet implemented.
 
 ```bash
 make help                 # list all targets, prerequisites, outputs, gaps
@@ -269,8 +269,72 @@ Gradle wrapper (Java), Go 1.26 (`auth`), Node/npm compatible with
 Capability gaps (honest reporting): frontend tests are not defined in
 `app/package.json`, so `make test-app` and aggregate `make test` fail nonzero.
 Java suites are existing mixed unit/integration suites, not certified unit-only
-coverage measurements. No Docker image/lifecycle targets exist in this
-increment.
+coverage measurements. The complete readiness/recovery lifecycle remains a later increment.
+
+## Explicit local database initialization (TASK-003 attempt)
+
+Configure private `docker/local.env` from its example and select a unique
+`COMPOSE_PROJECT_NAME` per checkout. Requires native ARM64 Docker, standalone
+`docker-compose`, host PostgreSQL 18-compatible `psql`, JDK 21 and the Gradle
+wrapper. Images must already exist (`make images`); these database commands do
+not build application images or start application services.
+
+```bash
+make db-up       # start only PostgreSQL; authenticated host-TCP SELECT 1
+make db-migrate  # includes db-up; schemas -> auth Goose -> core -> API Liquibase
+make db-seed     # once only: initialize empty auth tables from docker/init.sql
+```
+
+For first use, run `images -> db-migrate -> db-seed`. For schema upgrades,
+stop application services and run `db-migrate` without reseeding. `db-migrate`
+can be repeated: Goose and Liquibase histories determine pending work. No
+history, checksum, existing baseline row or migration source is rewritten.
+A failed phase returns nonzero and prevents subsequent phases; successful
+prior service migrations are not rolled back as a group.
+
+Both migration and seed refuse running auth/core/API/nginx containers before
+publishing any configuration. The auth migration overrides the image entrypoint
+with `/app/auth-server`. Java migrations receive validated DBURL/DBUSER/DBPASS
+through the environment; committed default credentials are not used. Each
+operation owns one checkout lock for its entire sequence. Do not concurrently
+use direct Docker/SQL tools or share the same project from another checkout.
+Foreign container working-directory labels are refused. An existing volume
+without a saved owner or a matching project container is refused; importing
+or repairing legacy volumes is outside this attempt.
+
+Seed uses one psql process and one transaction, fixed-order exclusive locks,
+and an empty-state guard on all four auth seed tables. A repeated or partial
+seed is rejected; SQL failure rolls back all new inserts. Existing disabled
+root/ROOT semantics are preserved. Migration history and business-table
+presence are checked, but this is not a detector of all pending migrations.
+Seed requires an already running, initialized database; it does not migrate it.
+Lock acquisition for seed SQL is bounded to five seconds.
+
+Readiness polls actual authentication within STARTUP_TIMEOUT (libpq may round
+a one-second connection timeout up to two seconds). Other commands, including
+image startup and migrations, have no global timeout. `db-up` can probe a stack
+with running apps without republishing their mounted configuration. Changing a
+password in local.env does not rotate the password stored in an existing volume.
+
+Failures retain containers, volumes and private evidence under
+`.daybook-workflow/<project>/runtime/*.log`. These logs can contain tool-level
+secrets; do not publish them without redaction. The runtime directory is mode
+0700, files are created privately, and public errors do not dump log contents.
+Configuration publication uses two separate file renames, not an atomic pair.
+Only the new database operations guard publication against running apps;
+existing `docker-compose-*` commands retain their previous behavior. No normal
+operation added here deletes a volume, resets data or implements recovery.
+Inspect failures and retry the failed explicit phase. Do not remove a stale
+operation lock until its process and children have stopped.
+
+Focused verification (the second command creates and tears down only a newly
+reserved disposable `daybook-verify-*` project, never the normal local stack):
+
+```bash
+python3 tests/workflow/test_database.py -v
+DAYBOOK_DB_INTEGRATION=1 python3 tests/workflow/test_database_integration.py -v
+python3 tests/workflow/mutate_database.py
+```
 
 ## Manual service startup
 
