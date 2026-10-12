@@ -33,7 +33,7 @@ echo "==> image-api: building $$PREFIX/api:$$TAG ($$PLATFORM)"; \
   		-Dquarkus.container-image.build=true \
   		-Dquarkus.container-image.builder=docker \
   		-Dquarkus.container-image.image="$$PREFIX/api:$$TAG" \
-  		-Dquarkus.container-image.push=false &&
+  		-Dquarkus.container-image.push=false && \
   mkdir -p .daybook-workflow/images/ && \
   docker image inspect "$$PREFIX/api:$$TAG" > .daybook-workflow/images/Manifest-api.json )
 endef
