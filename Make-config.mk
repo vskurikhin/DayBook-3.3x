@@ -145,6 +145,7 @@ define config_publish
   [ -z "$$VERIFY_PUBLISH_FAIL" ] || exit 1; \
   mv -f "$$tmpdir/env" "$$runtimedir/env" || exit 1; \
   mv -f "$$tmpdir/auth-server.yaml" "$$runtimedir/auth-server.yaml" || exit 1; \
+  cp "$$runtimedir/auth-server.yaml" "docker/local.auth-server.yaml" || exit 1; \
   rmdir "$$tmpdir" 2>/dev/null || true \
 )
 endef

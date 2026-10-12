@@ -300,11 +300,10 @@ docker-compose-stop-db: docker-compose-stop-app docker-compose-stop-api docker-c
 
 docker-compose-up-db:
 	$(call run_locked,$(config_parse) \
-		&& $(docker_preflight) && $(config_publish) && $(call docker_compose_d,up,postgres-db) && $(db_prepare); \
+		&& $(docker_preflight) && $(config_publish) && $(db_prepare) && $(db_publish) && $(call docker_compose_d,up,postgres-db); \
         if [ "$$apps_running" -eq 1 ]; then \
           [ -d "$$runtime" ] || db_error 'running stack has no saved runtime configuration'; \
         fi; \
-        $(db_publish); \
         db_ready; )
 
 docker-compose-up-auth:
