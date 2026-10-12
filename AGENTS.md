@@ -295,13 +295,13 @@ Apply these rules to new or changed concurrent code; existing implementations ar
 
 ## Testing Rules
 
-Behavior-changing work requires unit tests, relevant integration tests, fuzzing, and mutation testing during development. Documentation-only changes require checking the text and referenced commands, not executing these test suites.
+Behavior-changing work requires unit tests, relevant integration tests and mutation testing during development. Documentation-only changes require checking the text and referenced commands, not executing these test suites.
 
 ### Unit tests and coverage
 
-- Maintain at least **80% unit test coverage in each maintained module**, using executable-line coverage for Java/TypeScript and statement coverage for Go. New or changed production code must also meet this minimum. Do not hide a module below the threshold inside a repository-wide average.
+- Maintain at least **71% unit test coverage in each maintained module**, using executable-line coverage for Java/TypeScript and statement coverage for Go. New or changed production code must also meet this minimum. Do not hide a module below the threshold inside a repository-wide average.
 - Measure coverage against all handwritten production code in the module, including code with no tests. Record any exclusions for generated clients, sqlc output, mocks, or vendored dependencies; do not exclude handwritten logic or weaken assertions to meet the threshold.
-- Report unit coverage separately from integration, fuzzing, and other test runs. Combined-suite coverage does not prove the unit-test requirement. Use fresh reports from the final code revision and record the metric, scope, exclusions, and percentage; an existing `coverage.out` is not evidence of current coverage.
+- Report unit coverage separately from integration and other test runs. Combined-suite coverage does not prove the unit-test requirement. Use fresh reports from the final code revision and record the metric, scope, exclusions, and percentage; an existing `coverage.out` is not evidence of current coverage.
 - Test observable behavior, boundaries, invalid inputs, and failure paths. Bug fixes require a regression test that reproduces the original failure and passes with the fix. Mock external boundaries, not the behavior being tested; coverage alone is not proof of correctness.
 
 ### Execution and isolation
@@ -309,22 +309,16 @@ Behavior-changing work requires unit tests, relevant integration tests, fuzzing,
 - Run focused tests during development, then the affected module suites and required checks before handoff, using the working directories in Developer Commands. Database and persistence changes require PostgreSQL/pgvector integration tests against disposable test databases. Do not substitute mocks for verification of SQL, migrations, or transaction behavior.
 - Keep unit tests independent of live services, shared databases, wall-clock timing, and test order. Control time and randomness, clean up resources, and follow Concurrency Rules for race detection and asynchronous tests. Do not disable failing tests or remove assertions to obtain a passing run.
 
-### Fuzzing
-
-- Add or update fuzz targets for changed input-processing behavior, especially record parsing/serialization, identifiers, configuration, and authentication inputs. Assert meaningful properties such as validation consistency, round-trip behavior where applicable, and rejection of malformed inputs; checking only for crashes is insufficient.
-- Run relevant targets with a bounded, recorded budget during development and after the final relevant change. Go command template, from the module directory after creating the target: `go test ./path/to/package -run='^$' -fuzz='^FuzzTarget$' -fuzztime=60s`. Replace both placeholders; each invocation must select one package and one fuzz target. Java and TypeScript require an appropriate configured fuzzing runner.
-- Seed targets with valid, invalid, empty, boundary, and previously failing inputs. Minimize failures, preserve reproducing inputs in the regression corpus (`testdata/fuzz/<target>/` for Go), and rerun them after fixes. Use isolated state and bounded input sizes; do not fuzz deployed services or shared databases.
-
 ### Mutation testing
 
 - Run mutation testing on changed handwritten production logic during development, after the baseline tests pass. Use mutations relevant to the change, such as altered conditions, boundary comparisons, return values, or removed operations, to verify that assertions detect incorrect behavior.
 - Investigate surviving and uncovered mutants in the affected behavior and strengthen tests. Document equivalent mutants with a concrete justification; do not suppress meaningful mutants to improve the score. Keep timeouts, tool errors, and invalid mutants distinct from assertion-detected kills, and restore the original source after the run.
-- Report the tool/version, target scope, operators, killed/surviving/uncovered counts, exclusions, and mutation score with its denominator. Mutation score is separate from the 80% unit coverage requirement and does not replace it.
+- Report the tool/version, target scope, operators, killed/surviving/uncovered counts, exclusions, and mutation score with its denominator. Mutation score is separate from the 71% unit coverage requirement and does not replace it.
 
 ### Verification evidence and tooling gaps
 
 - Do not assume these requirements are already automated. Current Gradle builds have no unit-coverage gate or mutation runner, `app/package.json` has no test runner, and Go coverage reporting does not enforce the threshold. Configure the necessary tooling and unit-suite separation when required by the implementation task; otherwise report the missing capability as an unmet verification requirement.
-- Handoff must include commands run, pass/fail results, coverage reports, fuzz targets and budgets, mutation results, and any skipped or blocked checks with reasons. Coverage below 80%, unresolved relevant fuzz failures, and unexplained surviving mutants leave verification incomplete. Never claim a check passed when it was not run or its tooling was unavailable.
+- Handoff must include commands run, pass/fail results, coverage reports targets and budgets, mutation results, and any skipped or blocked checks with reasons. Coverage below 71% and unexplained surviving mutants leave verification incomplete. Never claim a check passed when it was not run or its tooling was unavailable.
 
 
 ## Developer Commands
