@@ -336,5 +336,3 @@ stop:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop))
 
 docker-compose-up: db-up db-migrate db-seed up
-
-include Make-verify-workflow.mk
