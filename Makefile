@@ -47,7 +47,7 @@ include .env
 PUBLIC_TARGETS := help build build-java build-api build-core build-lib \
 	build-spi-mapstruct build-auth build-app test test-java test-api \
 	test-core test-lib test-spi-mapstruct test-auth test-app \
-	images image-auth image-core image-api image-app verify-workflow
+	images images-clean image-auth image-core image-api image-app verify-workflow
 
 .PHONY: $(PUBLIC_TARGETS)
 
@@ -129,6 +129,7 @@ help:
 	@echo '  test-auth            Go 1.26, dir auth/: go test ./...'
 	@echo '  test-app             reports unavailable frontend tests and fails'
 	@echo '  images               build all four local images: auth -> core -> api -> app'
+	@echo '  images-clean         remove configured auth/app/core/api image tags (no force/prune)'
 	@echo '  image-auth           build auth image (linux/arm64, no baked config)'
 	@echo '  image-core           build core image (single executable bootJar)'
 	@echo '  image-api            build api image (Quarkus JVM fast-jar, Dockerfile.jvm)'
@@ -268,6 +269,19 @@ image-app: build-app
 
 images: image-auth image-app image-core image-api
 
+images-clean:
+	$(call run_locked,$(config_parse); $(docker_preflight); \
+	  for component in auth app core api; do \
+	    image="$$PREFIX/$$component:$$TAG"; \
+	    image_id="$$(docker image ls --quiet --filter "reference=$$image")" || exit 1; \
+	    if [ -n "$$image_id" ]; then \
+	      echo "==> images-clean: removing $$image"; \
+	      docker image rm "$$image" || exit 1; \
+	    else \
+	      echo "==> images-clean: $$image is already absent"; \
+	    fi; \
+	  done)
+
 docker-compose-down:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,-v))
 
@@ -373,4 +387,4 @@ clean-app:
 clean-workflow:
 	@rm -rf ./.workflow/
 
-clean: docker-compose-down clean-java clean-auth clean-app clean-workflow
+clean: docker-compose-down images-clean clean-java clean-auth clean-app clean-workflow
