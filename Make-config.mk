@@ -135,11 +135,11 @@ define config_publish
   } > "$$tmpdir/env" || exit 1; \
   chmod 600 "$$tmpdir/env" || exit 1; \
   { \
-    printf 's/"dbname": ".*"/"dbname": "%s"/\n' "$$DB_NAME"; \
-    printf 's/"dbuser": ".*"/"dbuser": "%s"/\n' "$$DB_USER"; \
-    printf 's/"dbpassword": ".*"/"dbpassword": "%s"/\n' "$$LOCAL_DB_PASSWORD"; \
+    printf 's/^dbname: .*/dbname: %s/\n' "$$DB_NAME"; \
+    printf 's/^dbuser: .*/dbuser: %s/\n' "$$DB_USER"; \
+    printf 's/^dbpassword: .*/dbpassword: %s/\n' "$$LOCAL_DB_PASSWORD"; \
   } > "$$tmpdir/template.sed" || exit 1; \
-  sed -f "$$tmpdir/template.sed" "$(ROOT)/docker/local-auth-config.json" > "$$tmpdir/auth-server.yaml" || exit 1; \
+  sed -f "$$tmpdir/template.sed" "$(ROOT)/docker/local-auth-config.yaml" > "$$tmpdir/auth-server.yaml" || exit 1; \
   rm -f "$$tmpdir/template.sed" || exit 1; \
   chmod 600 "$$tmpdir/auth-server.yaml" || exit 1; \
   [ -z "$$VERIFY_PUBLISH_FAIL" ] || exit 1; \

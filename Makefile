@@ -17,7 +17,7 @@
 # Repository root and generated workflow state (gitignored).
 SHELL    := /bin/sh
 ROOT     := $(CURDIR)
-WORKFLOW := $(ROOT)/.daybook-workflow
+WORKFLOW := $(ROOT)/.workflow
 LOCK     := $(WORKFLOW)/lock
 HOSTDIR  := $(WORKFLOW)/host
 
@@ -64,6 +64,10 @@ define build_app
 { cd $(1)/app && rm -rf ./dist/assets/index-*.{css,js} && npm install && npm run build ; }
 endef
 
+define clean_app
+{ cd $(1)/app && rm -rf ./dist/assets/index-*.{css,js} ; }
+endef
+
 # Build fragments. The Gradle wrapper runs from the repository root; auth and
 # app run from their own module directories. Builds exclude tests.
 JAVA_ALL_BUILD := $(call check_tool,java) && ./gradlew build -x test $(QUARKUS_NATIVE)
@@ -83,6 +87,14 @@ CORE_TEST     := $(call check_tool,java) && $(call check_tool,docker) && ./gradl
 LIB_TEST      := $(call check_tool,java) && ./gradlew :lib:test
 SPI_TEST      := $(call check_tool,java) && ./gradlew :spi-mapstruct:test
 AUTH_TEST     := $(call check_tool,go) && cd "$(ROOT)/auth" && go test ./...
+
+JAVA_ALL_CLEAN := $(call check_tool,java) && ./gradlew clean $(QUARKUS_NATIVE)
+API_CLEAN      := $(call check_tool,java) && ./gradlew :api:clean $(QUARKUS_NATIVE)
+CORE_CLEAN     := $(call check_tool,java) && ./gradlew :core:clean
+LIB_CLEAN      := $(call check_tool,java) && ./gradlew :lib:clean
+SPI_CLEAN      := $(call check_tool,java) && ./gradlew :spi-mapstruct:clean -x test
+AUTH_CLEAN     := $(MAKE) -C "$(CURDIR)/auth" clean PROJECTNAME=auth
+APP_CLEAN      := $(call clean_app,$(ROOT))
 
 include Make-run-locked.mk
 
@@ -142,8 +154,8 @@ help:
 	@echo ''
 	@echo 'Output locations:'
 	@echo '  Gradle module build/ and app/dist/ (gitignored)'
-	@echo '  image contexts:   .daybook-workflow/images/<component> (gitignored)'
-	@echo '  operation lock:   .daybook-workflow/lock (gitignored)'
+	@echo '  image contexts:   .workflow/images/<component> (gitignored)'
+	@echo '  operation lock:   .workflow/lock (gitignored)'
 	@echo ''
 	@echo 'Side effects:'
 	@echo '  db-up starts PostgreSQL; db-migrate changes schemas; db-seed inserts auth seed.'
@@ -237,7 +249,7 @@ include Make-db.mk
 #
 # Each focused image target validates the configuration, checks the local
 # Docker endpoint/engine, builds only its own component into an isolated
-# context under .daybook-workflow/images/<component>, and produces the exact
+# context under .workflow/images/<component>, and produces the exact
 # Compose tag <IMAGE_PREFIX>/<component>:<IMAGE_TAG>. The aggregate `images`
 # runs auth -> core -> api -> app under one operation lock. These targets do
 # not publish the runtime snapshot and do not start services.
@@ -336,3 +348,29 @@ stop:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop))
 
 docker-compose-up: db-up db-migrate db-seed up
+
+clean-java:
+	$(call run_locked,$(JAVA_ALL_CLEAN))
+
+clean-api:
+	$(call run_locked,$(API_CLEAN))
+
+clean-core:
+	$(call run_locked,$(CORE_CLEAN))
+
+clean-lib:
+	$(call run_locked,$(LIB_CLEAN))
+
+clean-spi-mapstruct:
+	$(call run_locked,$(SPI_CLEAN))
+
+clean-auth:
+	$(call run_locked,$(AUTH_CLEAN))
+
+clean-app:
+	$(call run_locked,$(APP_CLEAN))
+
+clean-workflow:
+	@rm -rf ./.workflow/
+
+clean: docker-compose-down clean-java clean-auth clean-app clean-workflow

@@ -92,7 +92,7 @@ docker/*
 !/docker/compose.local.yaml
 !/docker/init_other.sh
 !/docker/init_other.sql
-!/docker/local-auth-config.json
+!/docker/local-auth-config.yaml
 !/docker/local.env.example
 !/docker/schemas.sql
 !/docker/seed-guard.sql
@@ -240,4 +240,4 @@ docs/TODO/
 docs/
 
 # TASK-1001 workflow private state (locks, identity, runtime secrets, runs)
-.daybook-workflow/
+.workflow/

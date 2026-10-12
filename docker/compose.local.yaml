@@ -5,7 +5,7 @@
 # stack is untouched and independent.
 #
 # The Makefile validates docker/local.env (or ENV_FILE) and generates a private
-# runtime env snapshot under .daybook-workflow/<project>/runtime that supplies
+# runtime env snapshot under .workflow/<project>/runtime that supplies
 # every interpolation value below, including DOCKER_PLATFORM and
 # DAYBOOK_AUTH_CONFIG (the host path of the mounted auth configuration).
 #

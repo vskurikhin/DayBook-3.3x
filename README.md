@@ -255,9 +255,9 @@ make verify-workflow      # inline orchestration assertions (no Docker)
 ```
 
 Each public operation holds one checkout-wide operation lock under
-`.daybook-workflow/` (gitignored) so competing root invocations fail cleanly and
+`.workflow/` (gitignored) so competing root invocations fail cleanly and
 `make -j` runs goals serially. Failed child steps stop dependents and return
-nonzero. The host `auth` binary is written to `.daybook-workflow/host/auth-server`
+nonzero. The host `auth` binary is written to `.workflow/host/auth-server`
 (gitignored) and never overwrites a container binary; `npm run build` outputs to
 `app/dist` and never modifies the tracked `app/html` staging.
 
@@ -317,7 +317,7 @@ with running apps without republishing their mounted configuration. Changing a
 password in local.env does not rotate the password stored in an existing volume.
 
 Failures retain containers, volumes and private evidence under
-`.daybook-workflow/<project>/runtime/*.log`. These logs can contain tool-level
+`.workflow/<project>/runtime/*.log`. These logs can contain tool-level
 secrets; do not publish them without redaction. The runtime directory is mode
 0700, files are created privately, and public errors do not dump log contents.
 Configuration publication uses two separate file renames, not an atomic pair.
