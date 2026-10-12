@@ -5,6 +5,17 @@ docker-compose \
   --env-file "$(WORKFLOW)/$$PROJECT/runtime/env" \
   --project-name "$$PROJECT" \
   -f compose.local.yaml \
+  $(1) $(2); \
+cd - )
+endef
+
+define docker_compose_d
+$(call check_tool,docker-compose) && ( \
+cd docker && \
+docker-compose \
+  --env-file "$(WORKFLOW)/$$PROJECT/runtime/env" \
+  --project-name "$$PROJECT" \
+  -f compose.local.yaml \
   $(1) -d $(2); \
 cd - )
 endef

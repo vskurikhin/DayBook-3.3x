@@ -277,13 +277,30 @@ docker-compose-down-app:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,nginx-react-app))
 
 docker-compose-up:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up))
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_d,up))
+
+.PHONY: docker-compose-stop-db docker-compose-stop-auth docker-compose-stop-api docker-compose-stop-core docker-compose-stop-app
+
+docker-compose-stop-core:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop,spring-3-5-core))
+
+docker-compose-stop-api: docker-compose-stop-core
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop,quarkus-3-33-api))
+
+docker-compose-stop-auth: docker-compose-stop-api docker-compose-stop-core
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop,golang-auth))
+
+docker-compose-stop-app: docker-compose-stop-api docker-compose-stop-core docker-compose-stop-auth
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop,nginx-react-app))
+
+docker-compose-stop-db: docker-compose-stop-app docker-compose-stop-api docker-compose-stop-core docker-compose-stop-auth
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop,postgres-db))
 
 .PHONY: docker-compose-up-db docker-compose-up-auth docker-compose-up-api docker-compose-up-core docker-compose-up-app
 
 docker-compose-up-db:
 	$(call run_locked,$(config_parse) \
-		&& $(docker_preflight) && $(config_publish) && $(call docker_compose,up,postgres-db) && $(db_prepare); \
+		&& $(docker_preflight) && $(config_publish) && $(call docker_compose_d,up,postgres-db) && $(db_prepare); \
         if [ "$$apps_running" -eq 1 ]; then \
           [ -d "$$runtime" ] || db_error 'running stack has no saved runtime configuration'; \
         fi; \
@@ -291,16 +308,16 @@ docker-compose-up-db:
         db_ready; )
 
 docker-compose-up-auth:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,golang-auth))
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_d,up,golang-auth))
 
 docker-compose-up-api:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,quarkus-3-33-api))
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_d,up,quarkus-3-33-api))
 
 docker-compose-up-core:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,spring-3-5-core))
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_d,up,spring-3-5-core))
 
 docker-compose-up-app:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,nginx-react-app))
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_d,up,nginx-react-app))
 
 .PHONY: db-migrate db-seed
 
@@ -316,8 +333,9 @@ db-seed:
 
 db-up: docker-compose-up-db
 
-up: db-up db-migrate db-seed docker-compose-up
+stop:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop))
 
-down: docker-compose-down
+up: db-up db-migrate db-seed docker-compose-up
 
 include Make-verify-workflow.mk

@@ -90,6 +90,10 @@ docker/*
 !/docker/compose.local.yaml
 !/docker/local.env.example
 !/docker/local-auth-config.json
+!/docker/check-migration-tables.sql
+!/docker/check-migration-histories.sql
+!/docker/schemas.sql
+!/docker/seed-guard.sql
 hs_err_pid*
 lerna-debug.log*HELP.md
 logs/

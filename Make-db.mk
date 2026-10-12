@@ -19,23 +19,29 @@ db_psql() { \
       --dbname="$$DB_NAME" --set=ON_ERROR_STOP=1 "$$@"; ); \
 }; \
 db_ownership() { \
-  ids="$$(docker ps -aq --filter "label=com.docker.compose.project=$$PROJECT")" || db_error 'cannot inspect project containers'; \
+  ids="$$(docker ps -aq --filter "label=com.docker.compose.project=$$PROJECT")" \
+  	|| db_error 'cannot inspect project containers'; \
   for id in $$ids; do \
-    owner="$$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$$id")" || db_error 'cannot inspect project owner'; \
+    owner="$$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$$id")" \
+    	|| db_error 'cannot inspect project owner'; \
     [ "$$owner" = "$(ROOT)/docker" ] || db_error 'Compose project belongs to another checkout'; \
   done; \
   if [ -f "$$runtime/owner" ]; then \
     [ "$$(cat "$$runtime/owner")" = "$(ROOT)" ] || db_error 'saved database state belongs to another checkout'; \
   else \
-    volumes="$$(docker volume ls -q --filter "label=com.docker.compose.project=$$PROJECT")" || db_error 'cannot inspect project volumes'; \
-    [ -z "$$volumes" ] || [ -n "$$ids" ] || db_error 'existing volume has no checkout ownership evidence; choose a new project'; \
+    volumes="$$(docker volume ls -q --filter "label=com.docker.compose.project=$$PROJECT")" \
+    	|| db_error 'cannot inspect project volumes'; \
+    [ -z "$$volumes" ] || [ -n "$$ids" ] \
+    	|| db_error 'existing volume has no checkout ownership evidence; choose a new project'; \
   fi; \
 }; \
 db_apps_stopped() { \
-  ids="$$(docker ps -q --filter "label=com.docker.compose.project=$$PROJECT")" || db_error 'cannot inspect running services'; \
+  ids="$$(docker ps -q --filter "label=com.docker.compose.project=$$PROJECT")" \
+  	|| db_error 'cannot inspect running services'; \
   apps_running=0; \
   for id in $$ids; do \
-    service="$$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$$id")" || db_error 'cannot inspect running service'; \
+    service="$$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$$id")" \
+    	|| db_error 'cannot inspect running service'; \
     case "$$service" in golang-auth|spring-3-5-core|quarkus-3-33-api|nginx-react-app) apps_running=1 ;; esac; \
   done; \
 }; \
@@ -43,7 +49,8 @@ db_ready() { \
   deadline=$$(( $$(date +%s) + STARTUP_TIMEOUT )); \
   while :; do \
     remaining=$$(( deadline - $$(date +%s) )); \
-    [ "$$remaining" -gt 0 ] || db_error 'database authentication/readiness timed out; check credentials and database state'; \
+    [ "$$remaining" -gt 0 ] \
+    	|| db_error 'database authentication/readiness timed out; check credentials and database state'; \
     connect_timeout=$$remaining; [ "$$connect_timeout" -le 5 ] || connect_timeout=5; \
     statement_timeout=$$(( remaining * 1000 )); \
     if db_psql -Atc 'SELECT 1' >"$$runtime/probe.log" 2>&1; then \
@@ -53,11 +60,11 @@ db_ready() { \
   done; \
 }; \
 db_migrated() { \
-  tables="$$(db_psql -Atc \
-  	"SELECT bool_and(to_regclass(name) IS NOT NULL) FROM (VALUES ('auth.goose_db_version'), ('core.databasechangelog'), ('api.databasechangelog'), ('auth.user_name'), ('auth.user_attrs'), ('auth.role'), ('auth.user_has_roles'), ('core.base_records'), ('api.post_records')) AS required(name)" 2>"$$runtime/seed.log")" \
-  	|| db_error 'cannot check migrations; run make db-migrate'; \
+  tables="$$(db_psql -Atf "$(ROOT)/docker/check-migration-tables.sql" 2>"$$runtime/seed.log")" \
+    || db_error 'cannot check migrations; run make db-migrate'; \
   [ "$$tables" = t ] || db_error 'required migration tables are missing; run make db-migrate'; \
-  histories="$$(db_psql -Atc 'SELECT EXISTS (SELECT 1 FROM auth.goose_db_version WHERE version_id > 0 AND is_applied) AND EXISTS (SELECT 1 FROM core.databasechangelog) AND EXISTS (SELECT 1 FROM api.databasechangelog)' 2>"$$runtime/seed.log")" || db_error 'cannot check migration histories; run make db-migrate'; \
+  histories="$$(db_psql -Atf "$(ROOT)/docker/check-migration-histories.sql" 2>"$$runtime/seed.log")" \
+    || db_error 'cannot check migration histories; run make db-migrate'; \
   [ "$$histories" = t ] || db_error 'migration histories are empty; run make db-migrate'; \
 }
 endef
@@ -88,8 +95,7 @@ endef
 
 define db_seed_transaction
 db_psql --single-transaction \
-  -c "SET LOCAL lock_timeout = '5s'; LOCK TABLE auth.user_name, auth.user_attrs, auth.role, auth.user_has_roles IN ACCESS EXCLUSIVE MODE;" \
-  -c "DO \$$\$$ BEGIN IF EXISTS (SELECT 1 FROM auth.user_name UNION ALL SELECT 1 FROM auth.user_attrs UNION ALL SELECT 1 FROM auth.role UNION ALL SELECT 1 FROM auth.user_has_roles) THEN RAISE EXCEPTION 'seed tables are not empty'; END IF; END \$$\$$;" \
+  -f "$(ROOT)/docker/seed-guard.sql" \
   -f "$(ROOT)/docker/init.sql" >"$$runtime/seed.log" 2>&1 \
   	|| db_error 'seed refused or failed; transaction rolled back; inspect private runtime/seed.log'
 endef
