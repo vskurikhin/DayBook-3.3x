@@ -305,21 +305,7 @@ docker-compose-up-app:
 .PHONY: db-migrate db-seed
 
 db-migrate: docker-compose-up-db
-	$(call run_locked,$(db_prepare); \
-	  [ "$$apps_running" -eq 0 ] || db_error 'stop application services before db-migrate'; \
-	  $(call check_tool,java); \
-	  [ -x "$(ROOT)/gradlew" ] || db_error 'Gradle wrapper is missing'; \
-	  docker image inspect "$$PREFIX/auth:$$TAG" >/dev/null 2>&1 || db_error 'auth image is missing; run make image-auth'; \
-	  $(db_publish); \
-	  db_psql --single-transaction -c 'CREATE SCHEMA IF NOT EXISTS auth; CREATE SCHEMA IF NOT EXISTS core; CREATE SCHEMA IF NOT EXISTS api;' >"$$runtime/schemas.log" 2>&1 || db_error 'schema preparation failed; inspect private runtime/schemas.log'; \
-	  db_compose run --rm --no-deps --entrypoint /app/auth-server golang-auth migrate --config /app/.auth-server.yaml \
-	  	>"$$runtime/auth-migrate.log" 2>&1 || db_error 'auth migration failed; inspect private runtime/auth-migrate.log'; \
-	  export DBURL="jdbc:postgresql://127.0.0.1:$$DB_PORT/$$DB_NAME" DBUSER="$$DB_USER" DBPASS="$$LOCAL_DB_PASSWORD"; \
-	  (cd "$(ROOT)" && ./gradlew --no-daemon :core:update) >"$$runtime/core-migrate.log" 2>&1 \
-	  	|| db_error 'core migration failed; inspect private runtime/core-migrate.log'; \
-	  (cd "$(ROOT)" && ./gradlew --no-daemon :api:update) >"$$runtime/api-migrate.log" 2>&1 \
-	  	|| db_error 'API migration failed; inspect private runtime/api-migrate.log'; \
-	  echo 'Migrations completed: auth -> core -> api.' )
+	$(call run_locked,$(db_prepare); $(db_migrate))
 
 db-seed:
 	$(call run_locked,$(db_prepare); \
@@ -331,5 +317,7 @@ db-seed:
 db-up: docker-compose-up-db
 
 up: db-up db-migrate db-seed docker-compose-up
+
+down: docker-compose-down
 
 include Make-verify-workflow.mk

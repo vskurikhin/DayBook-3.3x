@@ -53,7 +53,9 @@ db_ready() { \
   done; \
 }; \
 db_migrated() { \
-  tables="$$(db_psql -Atc "SELECT bool_and(to_regclass(name) IS NOT NULL) FROM (VALUES ('auth.goose_db_version'), ('core.databasechangelog'), ('api.databasechangelog'), ('auth.user_name'), ('auth.user_attrs'), ('auth.role'), ('auth.user_has_roles'), ('core.base_records'), ('api.post_records')) AS required(name)" 2>"$$runtime/seed.log")" || db_error 'cannot check migrations; run make db-migrate'; \
+  tables="$$(db_psql -Atc \
+  	"SELECT bool_and(to_regclass(name) IS NOT NULL) FROM (VALUES ('auth.goose_db_version'), ('core.databasechangelog'), ('api.databasechangelog'), ('auth.user_name'), ('auth.user_attrs'), ('auth.role'), ('auth.user_has_roles'), ('core.base_records'), ('api.post_records')) AS required(name)" 2>"$$runtime/seed.log")" \
+  	|| db_error 'cannot check migrations; run make db-migrate'; \
   [ "$$tables" = t ] || db_error 'required migration tables are missing; run make db-migrate'; \
   histories="$$(db_psql -Atc 'SELECT EXISTS (SELECT 1 FROM auth.goose_db_version WHERE version_id > 0 AND is_applied) AND EXISTS (SELECT 1 FROM core.databasechangelog) AND EXISTS (SELECT 1 FROM api.databasechangelog)' 2>"$$runtime/seed.log")" || db_error 'cannot check migration histories; run make db-migrate'; \
   [ "$$histories" = t ] || db_error 'migration histories are empty; run make db-migrate'; \
@@ -70,7 +72,8 @@ $(docker_preflight); \
 if [ -n "$${DOCKER_CONTEXT:-}" ] || [ -z "$${DOCKER_HOST:-}" ]; then \
   endpoint="$$(docker context inspect --format '{{.Endpoints.docker.Host}}')" || exit 1; \
 else endpoint="$$DOCKER_HOST"; fi; \
-case "$$endpoint" in unix:///*) ;; *) echo 'error: database workflow requires a local Unix-socket Docker endpoint' >&2; exit 1 ;; esac; \
+case "$$endpoint" in unix:///*) ;; *) \
+	echo 'error: database workflow requires a local Unix-socket Docker endpoint' >&2; exit 1 ;; esac; \
 umask 077; \
 runtime="$(WORKFLOW)/$$PROJECT/runtime"; \
 $(db_functions); \
@@ -87,5 +90,25 @@ define db_seed_transaction
 db_psql --single-transaction \
   -c "SET LOCAL lock_timeout = '5s'; LOCK TABLE auth.user_name, auth.user_attrs, auth.role, auth.user_has_roles IN ACCESS EXCLUSIVE MODE;" \
   -c "DO \$$\$$ BEGIN IF EXISTS (SELECT 1 FROM auth.user_name UNION ALL SELECT 1 FROM auth.user_attrs UNION ALL SELECT 1 FROM auth.role UNION ALL SELECT 1 FROM auth.user_has_roles) THEN RAISE EXCEPTION 'seed tables are not empty'; END IF; END \$$\$$;" \
-  -f "$(ROOT)/docker/init.sql" >"$$runtime/seed.log" 2>&1 || db_error 'seed refused or failed; transaction rolled back; inspect private runtime/seed.log'
+  -f "$(ROOT)/docker/init.sql" >"$$runtime/seed.log" 2>&1 \
+  	|| db_error 'seed refused or failed; transaction rolled back; inspect private runtime/seed.log'
+endef
+
+# Called after db_prepare, within the public target's operation lock.
+define db_migrate
+[ "$$apps_running" -eq 0 ] || db_error 'stop application services before db-migrate'; \
+$(call check_tool,java); \
+[ -x "$(ROOT)/gradlew" ] || db_error 'Gradle wrapper is missing'; \
+docker image inspect "$$PREFIX/auth:$$TAG" >/dev/null 2>&1 || db_error 'auth image is missing; run make image-auth'; \
+$(db_publish); \
+db_psql --single-transaction -f "$(ROOT)/docker/schemas.sql" >"$$runtime/schemas.log" 2>&1 \
+	|| db_error 'schema preparation failed; inspect private runtime/schemas.log'; \
+db_compose run --rm --no-deps --entrypoint /app/auth-server golang-auth migrate --config /app/.auth-server.yaml \
+	>"$$runtime/auth-migrate.log" 2>&1 || db_error 'auth migration failed; inspect private runtime/auth-migrate.log'; \
+export DBURL="jdbc:postgresql://127.0.0.1:$$DB_PORT/$$DB_NAME" DBUSER="$$DB_USER" DBPASS="$$LOCAL_DB_PASSWORD"; \
+(cd "$(ROOT)" && ./gradlew --no-daemon :core:update) >"$$runtime/core-migrate.log" 2>&1 \
+	|| db_error 'core migration failed; inspect private runtime/core-migrate.log'; \
+(cd "$(ROOT)" && ./gradlew --no-daemon :api:update) >"$$runtime/api-migrate.log" 2>&1 \
+	|| db_error 'API migration failed; inspect private runtime/api-migrate.log'; \
+echo 'Migrations completed: auth -> core -> api.'
 endef
