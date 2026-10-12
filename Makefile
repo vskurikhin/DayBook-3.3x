@@ -2,15 +2,15 @@
 #
 # TASK-001 (parent request TASK-1001): discoverable host build/test interface.
 # This is the first increment of the root workflow; the local Docker lifecycle
-# (images, db-up, db-migrate, db-seed, up, down, status, logs) is a later
-# approved increment and is intentionally not implemented here.
+# now includes image/Compose commands and explicit database initialization.
+# The complete up/down/status/logs readiness/recovery interface remains pending.
 #
 # Design references: architecture.md R3.2/R3.6/R3.7, decisions.md ADR-001/002/004
 # (revision 4), .ai/architect/tasks/TASK-001.md. Approved by Senior Architect
 # round 2 (APPROVED) covering TASK-001 at SHA-256 5f6bf1d1... on 2026-10-09.
 #
-# All orchestration and verification logic lives in this single file per
-# ADR-001 and the owner supplement (no standalone shell/Python/Go helpers).
+# Production orchestration lives in Makefile and included Make fragments
+# (no standalone shell/Python/Go workflow helpers).
 # Recipes are POSIX /bin/sh; the module tools (Gradle wrapper, Go, npm) own
 # their artifacts and working directories.
 
@@ -96,6 +96,9 @@ help:
 	@echo 'DayBook-3.3x root build/test interface'
 	@echo ''
 	@echo 'Targets:'
+	@echo '  db-up                start PostgreSQL and authenticate over host TCP'
+	@echo '  db-migrate           stopped apps: schemas -> auth Goose -> core/API Liquibase'
+	@echo '  db-seed              stopped apps: seed empty auth tables in one transaction'
 	@echo '  help                 (default) show this help; no tools/locks/files'
 	@echo '  build                complete host build: Java -> auth -> app'
 	@echo '  build-java           Gradle wrapper, root: ./gradlew build -x test'
@@ -125,11 +128,12 @@ help:
 	@echo '  JDK 21 + Gradle wrapper (Java build/test); Docker for Java test suites'
 	@echo '  Go 1.26 (auth); Node/npm compatible with app/package-lock.json (app)'
 	@echo '  Network access for npm ci and Gradle/Go dependency resolution'
-	@echo '  Native ARM64 Docker engine + Compose plugin, base64 (image/config targets)'
+	@echo '  Native ARM64 Docker engine, base64 (image/config targets)'
+	@echo '  Database targets: standalone docker-compose, PostgreSQL 18 psql; JDK 21 for migrations'
 	@echo ''
-	@echo 'Configuration (image targets only):'
+	@echo 'Configuration (images, Compose and database targets):'
 	@echo '  docker/local.env (or ENV_FILE=...): strict allowlisted KEY=VALUE file'
-	@echo '  Required secrets: LOCAL_DB_PASSWORD, LOCAL_TOKEN_KEY (32-128 [A-Za-z0-9_-])'
+	@echo '  Secrets: LOCAL_DB_PASSWORD (8-128), LOCAL_TOKEN_KEY (32-128), [A-Za-z0-9_-]'
 	@echo '  Allowed overrides: LOCAL_DB_NAME/USER, COMPOSE_PROJECT_NAME, IMAGE_PREFIX,'
 	@echo '    IMAGE_TAG, DOCKER_PLATFORM (linux/arm64 only), DB/AUTH/CORE/API/APP_PORT,'
 	@echo '    STARTUP_TIMEOUT. Non-secret keys may also be set on the make command line.'
@@ -142,6 +146,8 @@ help:
 	@echo '  operation lock:   .daybook-workflow/lock (gitignored)'
 	@echo ''
 	@echo 'Side effects:'
+	@echo '  db-up starts PostgreSQL; db-migrate changes schemas; db-seed inserts auth seed.'
+	@echo '  Database failures preserve volumes and private runtime logs; no automatic reset.'
 	@echo '  build-app/image-app run npm ci (installs app/node_modules) and npm run build'
 	@echo '  image targets pull base images (debian/temurin/nginx/pgvector) from the network'
 	@echo '  and create local images named <IMAGE_PREFIX>/<component>:<IMAGE_TAG> (default'
@@ -151,9 +157,8 @@ help:
 	@echo 'Capability gaps (honest reporting, ADR-004):'
 	@echo '  Frontend tests are unavailable (F-VERIFY-001); test-app and "make test"'
 	@echo '  fail nonzero. Java suites are mixed unit/integration, not certified'
-	@echo '  unit-only coverage. The local Docker lifecycle (db-up/db-migrate/db-seed/'
-	@echo '  up/down/status/logs) is a later approved increment (TASK-003/004) and is'
-	@echo '  not implemented here.'
+	@echo '  unit-only coverage. Full up/down/status/logs readiness and recovery'
+	@echo '  remain pending. Database targets do not implement the complete TASK-003.'
 
 # ---------------------------------------------------------------------------
 # Build targets
@@ -224,6 +229,7 @@ test-app:
 include Make-config.mk
 include Make-docker.mk
 include Make-image-frag.mk
+include Make-db.mk
 
 # ---------------------------------------------------------------------------
 # Image targets (ADR-002 / R3.3, TASK-002)
@@ -253,10 +259,10 @@ images: image-auth image-app image-core image-api
 docker-compose-down:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down))
 
-.PHONY: docker-compose-up-db docker-compose-up-auth docker-compose-up-api docker-compose-up-core docker-compose-up-app
+.PHONY: docker-compose-down-db docker-compose-down-auth docker-compose-down-api docker-compose-down-core docker-compose-down-app
 
 docker-compose-down-db:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,postgres-db))
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,-v,postgres-db))
 
 docker-compose-down-auth:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,golang-auth))
@@ -276,7 +282,13 @@ docker-compose-up:
 .PHONY: docker-compose-up-db docker-compose-up-auth docker-compose-up-api docker-compose-up-core docker-compose-up-app
 
 docker-compose-up-db:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,postgres-db))
+	$(call run_locked,$(config_parse) \
+		&& $(docker_preflight) && $(config_publish) && $(call docker_compose,up,postgres-db) && $(db_prepare); \
+        if [ "$$apps_running" -eq 1 ]; then \
+          [ -d "$$runtime" ] || db_error 'running stack has no saved runtime configuration'; \
+        fi; \
+        $(db_publish); \
+        db_ready; )
 
 docker-compose-up-auth:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,golang-auth))
@@ -289,5 +301,24 @@ docker-compose-up-core:
 
 docker-compose-up-app:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,nginx-react-app))
+
+db-migrate: docker-compose-up-db
+	$(call run_locked,$(db_prepare); \
+	  [ "$$apps_running" -eq 0 ] || db_error 'stop application services before db-migrate'; \
+	  $(call check_tool,java); \
+	  [ -x "$(ROOT)/gradlew" ] || db_error 'Gradle wrapper is missing'; \
+	  docker image inspect "$$PREFIX/auth:$$TAG" >/dev/null 2>&1 || db_error 'auth image is missing; run make image-auth'; \
+	  $(db_publish); \
+	  db_psql --single-transaction -c 'CREATE SCHEMA IF NOT EXISTS auth; CREATE SCHEMA IF NOT EXISTS core; CREATE SCHEMA IF NOT EXISTS api;' >"$$runtime/schemas.log" 2>&1 || db_error 'schema preparation failed; inspect private runtime/schemas.log'; \
+	  db_compose run --rm --no-deps --entrypoint /app/auth-server golang-auth migrate --config /app/.auth-server.yaml \
+	  	>"$$runtime/auth-migrate.log" 2>&1 || db_error 'auth migration failed; inspect private runtime/auth-migrate.log'; \
+	  export DBURL="jdbc:postgresql://127.0.0.1:$$DB_PORT/$$DB_NAME" DBUSER="$$DB_USER" DBPASS="$$LOCAL_DB_PASSWORD"; \
+	  (cd "$(ROOT)" && ./gradlew --no-daemon :core:update) >"$$runtime/core-migrate.log" 2>&1 \
+	  	|| db_error 'core migration failed; inspect private runtime/core-migrate.log'; \
+	  (cd "$(ROOT)" && ./gradlew --no-daemon :api:update) >"$$runtime/api-migrate.log" 2>&1 \
+	  	|| db_error 'API migration failed; inspect private runtime/api-migrate.log'; \
+	  echo 'Migrations completed: auth -> core -> api.' )
+
+db-up: docker-compose-up-db
 
 include Make-verify-workflow.mk

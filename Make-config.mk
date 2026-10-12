@@ -104,19 +104,15 @@ case "$$STARTUP_TIMEOUT" in ''|*[!0-9]*) echo "error: STARTUP_TIMEOUT must be an
 [ "$$STARTUP_TIMEOUT" -ge 1 ] && [ "$$STARTUP_TIMEOUT" -le 3600 ] || { echo "error: STARTUP_TIMEOUT must be 1-3600 seconds" >&2; exit 1; }
 endef
 
-# config_publish: materialize the private runtime snapshot under
-# .daybook-workflow/<project>/runtime (directory 0700, files 0600), deriving the
-# padded Base64 core key from the raw LOCAL_TOKEN_KEY bytes and building the auth
-# configuration JSON from the committed template's fields. Writes temp files
-# then atomically moves them into place while services are stopped, reusing the
-# existing snapshot on failure. Runs in a subshell so its traps never override
-# run_locked's lock traps. This fragment is prepared for the TASK-003 lifecycle
-# targets; it is not invoked by the image targets in this increment.
+# Write private runtime files. Callers must guard running services before
+# replacing mounted files. The two final renames are not a pair transaction.
+# Template secrets travel via a private sed script, never process arguments.
 define config_publish
 ( \
+  umask 077; \
   runtimedir="$(WORKFLOW)/$$PROJECT/runtime"; \
-  mkdir -p "$$runtimedir"; chmod 700 "$$runtimedir"; \
-  tmpdir="$$runtimedir/.tmp.$$$$"; rm -rf "$$tmpdir"; mkdir -p "$$tmpdir"; chmod 700 "$$tmpdir"; \
+  mkdir -p "$$runtimedir" && chmod 700 "$$runtimedir" || exit 1; \
+  tmpdir="$$runtimedir/.tmp.$$$$"; mkdir "$$tmpdir" && chmod 700 "$$tmpdir" || exit 1; \
   trap 'rm -rf "$$tmpdir" 2>/dev/null || true' EXIT HUP INT TERM; \
   corekey="$$(printf '%s' $$LOCAL_TOKEN_KEY | base64 | tr -d '\n')"; \
   { \
@@ -136,16 +132,19 @@ define config_publish
     printf 'STARTUP_TIMEOUT=%s\n' "$$STARTUP_TIMEOUT"; \
     printf 'CORE_SERVER_TOKEN_SIGNING_KEY=%s\n' "$$corekey"; \
     printf 'DAYBOOK_AUTH_CONFIG=%s\n' "$$runtimedir/auth-server.yaml"; \
-  } > "$$tmpdir/env"; \
-  chmod 600 "$$tmpdir/env"; \
-  sed -e 's/"dbname": ".*"/"dbname": "'"$$DB_NAME"'"/' \
-      -e 's/"dbuser": ".*"/"dbuser": "'"$$DB_USER"'"/' \
-      -e 's/"dbpassword": ".*"/"dbpassword": "'"$$LOCAL_DB_PASSWORD"'"/' \
-      "$(ROOT)/docker/local-auth-config.json" > "$$tmpdir/auth-server.yaml"; \
-  chmod 600 "$$tmpdir/auth-server.yaml"; \
+  } > "$$tmpdir/env" || exit 1; \
+  chmod 600 "$$tmpdir/env" || exit 1; \
+  { \
+    printf 's/"dbname": ".*"/"dbname": "%s"/\n' "$$DB_NAME"; \
+    printf 's/"dbuser": ".*"/"dbuser": "%s"/\n' "$$DB_USER"; \
+    printf 's/"dbpassword": ".*"/"dbpassword": "%s"/\n' "$$LOCAL_DB_PASSWORD"; \
+  } > "$$tmpdir/template.sed" || exit 1; \
+  sed -f "$$tmpdir/template.sed" "$(ROOT)/docker/local-auth-config.json" > "$$tmpdir/auth-server.yaml" || exit 1; \
+  rm -f "$$tmpdir/template.sed" || exit 1; \
+  chmod 600 "$$tmpdir/auth-server.yaml" || exit 1; \
   [ -z "$$VERIFY_PUBLISH_FAIL" ] || exit 1; \
-  mv -f "$$tmpdir/env" "$$runtimedir/env"; \
-  mv -f "$$tmpdir/auth-server.yaml" "$$runtimedir/auth-server.yaml"; \
+  mv -f "$$tmpdir/env" "$$runtimedir/env" || exit 1; \
+  mv -f "$$tmpdir/auth-server.yaml" "$$runtimedir/auth-server.yaml" || exit 1; \
   rmdir "$$tmpdir" 2>/dev/null || true \
 )
 endef
