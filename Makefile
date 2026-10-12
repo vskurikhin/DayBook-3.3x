@@ -302,6 +302,8 @@ docker-compose-up-core:
 docker-compose-up-app:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,up,nginx-react-app))
 
+.PHONY: db-migrate db-seed
+
 db-migrate: docker-compose-up-db
 	$(call run_locked,$(db_prepare); \
 	  [ "$$apps_running" -eq 0 ] || db_error 'stop application services before db-migrate'; \
@@ -319,6 +321,15 @@ db-migrate: docker-compose-up-db
 	  	|| db_error 'API migration failed; inspect private runtime/api-migrate.log'; \
 	  echo 'Migrations completed: auth -> core -> api.' )
 
+db-seed:
+	$(call run_locked,$(db_prepare); \
+	  [ "$$apps_running" -eq 0 ] || db_error 'stop application services before db-seed'; \
+	  $(db_publish); db_ready; db_migrated; \
+	  $(db_seed_transaction); \
+	  echo 'Auth seed committed.')
+
 db-up: docker-compose-up-db
+
+up: db-up db-migrate db-seed docker-compose-up
 
 include Make-verify-workflow.mk

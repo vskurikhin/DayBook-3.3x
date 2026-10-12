@@ -83,18 +83,9 @@ $(config_publish) || db_error 'cannot publish private database configuration'; \
 printf '%s\n' "$(ROOT)" >"$$runtime/owner" || db_error 'cannot record project ownership'
 endef
 
-.PHONY: db-seed
-
 define db_seed_transaction
 db_psql --single-transaction \
   -c "SET LOCAL lock_timeout = '5s'; LOCK TABLE auth.user_name, auth.user_attrs, auth.role, auth.user_has_roles IN ACCESS EXCLUSIVE MODE;" \
   -c "DO \$$\$$ BEGIN IF EXISTS (SELECT 1 FROM auth.user_name UNION ALL SELECT 1 FROM auth.user_attrs UNION ALL SELECT 1 FROM auth.role UNION ALL SELECT 1 FROM auth.user_has_roles) THEN RAISE EXCEPTION 'seed tables are not empty'; END IF; END \$$\$$;" \
   -f "$(ROOT)/docker/init.sql" >"$$runtime/seed.log" 2>&1 || db_error 'seed refused or failed; transaction rolled back; inspect private runtime/seed.log'
 endef
-
-db-seed:
-	$(call run_locked,$(db_prepare); \
-	  [ "$$apps_running" -eq 0 ] || db_error 'stop application services before db-seed'; \
-	  $(db_publish); db_ready; db_migrated; \
-	  $(db_seed_transaction); \
-	  echo 'Auth seed committed.')
