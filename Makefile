@@ -61,7 +61,7 @@ define check_tool
 endef
 
 define build_app
-{ cd $(1)/app && rm -rf ./dist/assets/index-*.{css,js} && npm ci && npm run build ; }
+{ cd $(1)/app && rm -rf ./dist/assets/index-*.{css,js} && npm install && npm run build ; }
 endef
 
 # Build fragments. The Gradle wrapper runs from the repository root; auth and
@@ -243,7 +243,7 @@ include Make-db.mk
 # not publish the runtime snapshot and do not start services.
 
 image-auth: build-auth
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(image_auth_frag))
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(image_auth_frag))
 
 image-core: build-core
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(image_core_frag))
@@ -257,26 +257,26 @@ image-app: build-app
 images: image-auth image-app image-core image-api
 
 docker-compose-down:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down))
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,-v))
 
 .PHONY: docker-compose-down-db docker-compose-down-auth docker-compose-down-api docker-compose-down-core docker-compose-down-app
-
-docker-compose-down-db:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,-v,postgres-db))
-
-docker-compose-down-auth:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,golang-auth))
-
-docker-compose-down-api:
-	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,quarkus-3-33-api))
 
 docker-compose-down-core:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,spring-3-5-core))
 
-docker-compose-down-app:
+docker-compose-down-api: docker-compose-down-core
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,quarkus-3-33-api))
+
+docker-compose-down-auth: docker-compose-down-api docker-compose-down-core
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,golang-auth))
+
+docker-compose-down-app: docker-compose-down-auth docker-compose-down-api docker-compose-down-core
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,nginx-react-app))
 
-docker-compose-up:
+docker-compose-down-db:
+	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_down,-v,postgres-db))
+
+up:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose_d,up))
 
 .PHONY: docker-compose-stop-db docker-compose-stop-auth docker-compose-stop-api docker-compose-stop-core docker-compose-stop-app
@@ -336,6 +336,6 @@ db-up: docker-compose-up-db
 stop:
 	$(call run_locked,$(config_parse) && $(docker_preflight) && $(config_publish) && $(call docker_compose,stop))
 
-up: db-up db-migrate db-seed docker-compose-up
+docker-compose-up: db-up db-migrate db-seed up
 
 include Make-verify-workflow.mk

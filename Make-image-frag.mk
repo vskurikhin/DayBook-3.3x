@@ -8,6 +8,7 @@ define image_auth_frag
 echo "==> image-auth: building $$PREFIX/auth:$$TAG ($$PLATFORM)"; \
 staging="$(ROOT)/auth"; \
 docker build --platform "$$PLATFORM" -t "$$PREFIX/auth:$$TAG" -f "$$staging/Dockerfile" "$$staging" && \
+mkdir -p .daybook-workflow/images/ && \
 docker image inspect "$$PREFIX/auth:$$TAG" > .daybook-workflow/images/Manifest-auth.json
 endef
 
@@ -15,6 +16,7 @@ define image_core_frag
 echo "==> image-core: building $$PREFIX/core:$$TAG ($$PLATFORM)"; \
 staging="$(ROOT)/core"; \
 docker build --platform "$$PLATFORM" -t "$$PREFIX/core:$$TAG" -f "$(ROOT)/core/src/main/resources/Dockerfile" "$$staging" && \
+mkdir -p .daybook-workflow/images/ && \
 docker image inspect "$$PREFIX/core:$$TAG" > .daybook-workflow/images/Manifest-core.json
 endef
 
@@ -31,7 +33,8 @@ echo "==> image-api: building $$PREFIX/api:$$TAG ($$PLATFORM)"; \
   		-Dquarkus.container-image.build=true \
   		-Dquarkus.container-image.builder=docker \
   		-Dquarkus.container-image.image="$$PREFIX/api:$$TAG" \
-  		-Dquarkus.container-image.push=false && \
+  		-Dquarkus.container-image.push=false &&
+  mkdir -p .daybook-workflow/images/ && \
   docker image inspect "$$PREFIX/api:$$TAG" > .daybook-workflow/images/Manifest-api.json )
 endef
 
@@ -45,5 +48,6 @@ rm -rf "$$staging/html"; mkdir -p "$$staging/html" && \
 cp -R "$(ROOT)/app/dist/." "$$staging/html/"; \
 cd - && \
 docker build --platform "$$PLATFORM" -t "$$PREFIX/app:$$TAG" -f "$$staging/Dockerfile" "$$staging" && \
+mkdir -p .daybook-workflow/images/ && \
 docker image inspect "$$PREFIX/app:$$TAG" > .daybook-workflow/images/Manifest-app.json
 endef
