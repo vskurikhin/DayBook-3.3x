@@ -327,15 +327,6 @@ operation added here deletes a volume, resets data or implements recovery.
 Inspect failures and retry the failed explicit phase. Do not remove a stale
 operation lock until its process and children have stopped.
 
-Focused verification (the second command creates and tears down only a newly
-reserved disposable `daybook-verify-*` project, never the normal local stack):
-
-```bash
-python3 tests/workflow/test_database.py -v
-DAYBOOK_DB_INTEGRATION=1 python3 tests/workflow/test_database_integration.py -v
-python3 tests/workflow/mutate_database.py
-```
-
 ## Manual service startup
 
 Start the services in the following order.

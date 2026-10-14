@@ -488,6 +488,56 @@ func (session *Session) Revoke() error {
 ```
 
 
+## Clean Code in Java Services
+
+These guidelines consolidate `docs/Clean-Code.md`, `docs/Clean-Code-Java.md`, `docs/Clean-Code-Java-Quarkus.md`, and `docs/Clean-Code-Java-Spring-Boot.md` for this repository. Apply them to new code and approved refactoring alongside Clean Architecture, Concurrency Rules, and Testing Rules. They do not authorize unrelated cleanup or changes to existing contracts.
+
+### Readability and design
+
+- **Name the responsibility precisely.** Use domain terms and distinguish concepts by their meaning, not arbitrary suffixes such as `A`, `B`, or `Info`. Avoid catch-all names such as `Manager`, `Helper`, and `Util` when a specific responsibility can be named. A name must not imply a collection type or behavior that the implementation does not provide.
+- **Keep related code together.** Declare variables near their first use and keep their scope narrow. Place small private helpers near the operations they support, with the main flow before the details.
+- **Prefer focused objects and composition.** Avoid inheritance introduced solely to share code and utility classes that collect unrelated operations. Treat long parameter lists, nested branches, and complex boolean expressions as reasons to simplify the affected code through small, tested steps.
+- **Make the code explain itself.** Improve names and structure before adding explanatory comments. Retain licensing notices, warnings, and explanations of non-obvious constraints; link workarounds to their rationale or issue where available. Investigate compiler and configured static-analysis warnings rather than suppressing them without explanation.
+
+### Java types, collections, and resources
+
+- **Follow Java naming conventions.** Use PascalCase nouns for classes and interfaces, camelCase verbs for methods, camelCase for fields and local variables, and UPPER_SNAKE_CASE for constants. Prefer positive boolean names that make conditions easy to read.
+- **Make absence explicit.** For new synchronous APIs, use `Optional<T>` when an individual result may be absent; avoid it in fields and parameters. Document nullability using conventions supported by the module. Prefer empty collections to null, while preserving existing serialization and caller contracts. Keep reactive absence semantics explicit rather than mechanically wrapping every result in `Optional`.
+- **Define collection ownership.** Expose collection interfaces and prefer immutable values where appropriate. Document whether inputs and results are copied, shared, or mutable. `List.of()` and `Map.of()` reject nulls, and an unmodifiable view is not a defensive copy; account for both before replacing an existing collection.
+- **Keep state encapsulated.** Prefer private fields and immutable values; add accessors only when callers need them. Records suit simple immutable DTOs, but their referenced objects may still be mutable. Do not treat records as a replacement for JPA entities. Use `final` where extension is not intended, subject to ORM and framework proxy requirements.
+- **Keep transformations readable.** Use streams when they clarify a transformation, and explicit loops when mutation is required. Extract substantial lambdas and complicated predicates into named methods. Prefer standard functional interfaces unless a domain-specific interface conveys an important contract.
+- **Handle exceptions at a clear boundary.** Use exceptions for exceptional conditions, preserve the cause when wrapping, and choose checked exceptions only when callers have a meaningful recovery contract. Never silently discard a failure. Give each failure a handling and logging owner to avoid duplicate logs as it propagates.
+- **Close resources according to ownership.** Use try-with-resources for locally owned `AutoCloseable` resources. Do not close injected clients, shared pools, or other lifecycle-managed resources at the end of an individual request. Avoid mutable static singletons; inject dependencies through the composition boundary.
+
+### Framework boundaries and configuration
+
+- **Prefer constructor injection.** Make required dependencies visible and allow objects to be created in unit tests without a container. Keep Spring and Quarkus annotations in framework integrations; wire framework-independent use cases through configuration or adapters rather than introducing framework dependencies into inner layers.
+- **Make configuration explicit.** Group related settings in typed configuration objects and validate them at startup. Pass plain immutable configuration values into business logic. Keep deployment URLs, paths, credentials, and tokens outside source code; obtain secrets from external configuration. Prefer separate implementations for genuine profile-dependent behavior to scattered profile checks, and document bean activation conditions.
+- **Separate input validation from business invariants.** Validate transport parameters and DTOs at the HTTP boundary with Bean Validation where appropriate. Continue enforcing business invariants in domain constructors and methods so that non-HTTP callers cannot bypass them.
+- **Keep persistence out of HTTP contracts.** Map entities to response DTOs while the required data is available within the owning session or transaction. Avoid accidental lazy loading during serialization and N+1 queries. Select the data needed and paginate at the database boundary without changing existing response envelopes, ordering, or pagination semantics.
+- **Bound external work.** Configure explicit timeouts and use the module's supported resilience mechanisms when needed. Retries require bounded attempts, a clear error owner, and an idempotency or duplicate-handling policy. Fallbacks must preserve the documented failure contract; an annotation alone does not establish safe retry behavior.
+- **Use consistent observability.** Preserve request and authorization context as required by Concurrency Rules. Use structured logs without credentials, tokens, or sensitive payloads; reserve `DEBUG` for diagnostic detail and `INFO` for meaningful lifecycle events. Prefer the configured metrics and tracing facilities to ad hoc counters and timers, and investigate relevant startup and health-check warnings.
+
+### Quarkus (`api/`)
+
+- **Choose CDI scope explicitly.** Use `@ApplicationScoped` for services intended to be shared across requests and `@RequestScoped` for genuinely request-bound state. Neither application scope nor `@Singleton` makes mutable state thread-safe. Keep initialization minimal; express dependencies explicitly rather than assuming bean creation order or treating `@PostConstruct` as a global ordering mechanism.
+- **Respect the reactive persistence model.** Use the Hibernate Reactive session and transaction mechanisms supported by the module, such as `@WithTransaction`, within the returned reactive chain. Do not substitute imperative `@Transactional` guidance for reactive transaction ownership. Follow the existing rules for event-loop safety, cancellation, and sequential session access.
+- **Keep HTTP failure translation centralized.** Use the module's Jakarta REST exception-mapping mechanisms to translate failures at the resource boundary. Preserve existing status codes and error bodies, including failures emitted asynchronously by a returned `Uni`.
+- **Treat native execution as a separate verification target when required.** Prefer type-safe calls to reflection and runtime code generation. Where reflection or serialization requires registration, use the facilities supported by the configured Quarkus version and verify the packaged native application. A passing JVM test does not prove native compatibility; do not copy obsolete native-test annotations from examples.
+- **Give scheduled work an explicit lifecycle.** Use the existing scheduler and Mutiny operators for periodic and asynchronous work, preserving admission guards, cancellation, and failure reporting. Do not replace those guarantees with additional scheduling or fault-tolerance annotations.
+- **Separate unit tests from framework tests.** Test plain business logic without Quarkus. Use `@QuarkusTest` and managed test resources for framework integration, and HTTP requests to the test application for endpoint contracts. Count these separately from unit coverage and follow the disposable-database requirements for persistence tests.
+
+### Spring Boot (`core/`)
+
+- **Keep bean registration deliberate.** Limit component scanning to intended packages and make conditional registration understandable. Shared service beans must not retain request-specific state. Use the appropriate Spring scope or an explicitly owned instance when state must have a shorter lifetime.
+- **Group and isolate configuration.** Prefer `@ConfigurationProperties` for related settings and validate them at startup. Use profiles and conditional beans only when they represent a real deployment variation. Keep test properties separate from production configuration and prevent state from leaking between cached test contexts.
+- **Keep controllers focused on transport.** Controllers translate and validate requests, invoke application operations, and translate results. Use controller advice for consistent exception translation while preserving the existing error contract. Framework service facades may coordinate transactions and delegation; business rules remain within the boundaries defined under Clean Architecture.
+- **Make transactions match business operations.** Place transaction boundaries at the appropriate service or adapter boundary, not in controllers. Prefer method-level declarations when methods have different requirements. Resolve required lazy data within the transaction rather than relying on an open session during response rendering. Keep Spring Data pagination types at framework boundaries and preserve the existing HTTP representation.
+- **Account for proxy interception.** Before relying on `@Transactional` or `@Async`, verify that the call passes through the configured proxy; private methods and self-invocation must not be assumed to trigger advice. Check proxy requirements before making classes or methods final. Asynchronous work needs a completion/error owner, bounded execution, and shutdown handling; avoid fire-and-forget work without an explicit failure handler.
+- **Choose the smallest useful test scope.** Use plain unit tests for domain logic and use cases, `@WebMvcTest` with `MockMvc` for MVC behavior, `@DataJpaTest` for persistence slices, and `@SpringBootTest` when full application integration is required. MockMvc exercises MVC without a real network server. Persistence slices still require the disposable PostgreSQL/pgvector setup specified in Testing Rules.
+- **Introduce reactive code only through an approved design.** The current core service uses Spring MVC and blocking JPA. If a change introduces WebFlux, define the boundary with blocking work, own subscriptions and cancellation, handle backpressure and timeouts, and verify reactive behavior with tools such as `StepVerifier`.
+
+
 ## Final Rule
 
 The goal is not to produce code as quickly as possible.
