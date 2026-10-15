@@ -51,7 +51,7 @@ class PostRecordDataSyncServiceTest {
         assertFalse(cancelled.get(), "Core DNS failure must not cancel pending local data");
         assertFalse(result.isDone());
         local.get().complete(expected);
-        assertSame(expected, result.join());
+        assertSame(expected, assertDoesNotThrow(result::join));
     }
 
     @Test
@@ -168,5 +168,17 @@ class PostRecordDataSyncServiceTest {
 
         verify(recordViewRepository)
                 .readRecord(id);
+    }
+    @Test
+    void pageArgumentsAndRemoteResultArePreserved() {
+        var expected = new Page<PostRecord>(List.of(), 8, 3, 7, 52);
+        when(postRecordRepository.readPage(3, (byte) 7)).thenReturn(Uni.createFrom().nothing());
+        when(recordViewRepository.readPage(3, (byte) 7)).thenReturn(Uni.createFrom().item(expected));
+        var result = service.readPage(3, (byte) 7).subscribeAsCompletionStage()
+                .orTimeout(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(result.isDone(), "Synchronous remote item must complete the page read");
+        assertSame(expected, assertDoesNotThrow(result::join));
+        verify(postRecordRepository).readPage(3, (byte) 7);
+        verify(recordViewRepository).readPage(3, (byte) 7);
     }
 }

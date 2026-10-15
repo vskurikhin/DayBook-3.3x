@@ -656,14 +656,29 @@ paths:
           type: integer
         style: form
       responses:
-        "201":
+        "200":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RecordDataPage"
-          description: Created
+          description: OK
         "500":
-          $ref: "#/components/responses/500Error"
+          description: >-
+            Local read failure together with a recoverable Core failure (including its deadline)
+            returns this generic error regardless of failure order. Also returned for other unhandled errors.
+            Response body: HTTP 500 Oops, something went wrong
+          content:
+            '*/*':
+              schema:
+                type: string
+        default:
+          description: >-
+            Other errors follow existing exception mappings. A terminal Core failure that wins
+            is mapped according to its exception type; the upstream HTTP status is not necessarily preserved.
+      description: >-
+        Reads local and Core pages concurrently and returns the first successful result unless
+        a terminal Core failure wins first. Recoverable Core failures allow the local read to continue.
+        Local data may be stale. The Core deadline does not guarantee a fixed whole-request deadline.
       summary: Get page with list of records
       tags:
       - Record Resource

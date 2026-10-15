@@ -56,4 +56,21 @@ class RemotePageFailureTest {
         first.initCause(second);
         assertFalse(RemotePageFailure.isRecoverable(first));
     }
+    @Test
+    void recognisesLeafAtNode64ButNotNode65() {
+        Throwable failure = new UnknownHostException();
+        for (int wrappers = 0; wrappers < 63; wrappers++) {
+            failure = new ProcessingException(failure);
+        }
+        assertTrue(RemotePageFailure.isRecoverable(failure));
+        assertFalse(RemotePageFailure.isRecoverable(new ProcessingException(failure)));
+    }
+
+    @Test
+    void exactIoFailureWinsBeforeItsCauseButUnknownSubtypeDoesNot() {
+        assertTrue(RemotePageFailure.isRecoverable(new IOException(new SSLHandshakeException("tls"))));
+        assertFalse(RemotePageFailure.isRecoverable(new java.io.EOFException("truncated")));
+        var absentResponse = org.mockito.Mockito.mock(WebApplicationException.class);
+        assertFalse(RemotePageFailure.isRecoverable(absentResponse));
+    }
 }

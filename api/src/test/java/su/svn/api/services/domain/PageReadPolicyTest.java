@@ -201,7 +201,7 @@ class PageReadPolicyTest {
 
     @Test
     void timeoutBoundsAreValidated() {
-        for (int invalid : new int[]{Integer.MIN_VALUE, -1, 0, 60001, Integer.MAX_VALUE}) {
+        for (int invalid : new int[]{Integer.MIN_VALUE, -1, 0, 9, 60001, Integer.MAX_VALUE}) {
             assertThrows(IllegalArgumentException.class, () -> new RecordsPageTimeout(invalid, scheduler));
         }
         assertDoesNotThrow(() -> new RecordsPageTimeout(10, scheduler));
