@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PostRecordDataSyncServiceTest {
@@ -34,6 +34,24 @@ class PostRecordDataSyncServiceTest {
         service.postRecordRepository = postRecordRepository;
         service.existingPostRecordMapper = mapper;
         service.recordViewRepository = recordViewRepository;
+        service.recordsPageTimeout = new RecordsPageTimeout(1000);
+    }
+
+    @Test
+    void dnsFailureMustKeepPendingLocalPageAlive() {
+        var local = new java.util.concurrent.atomic.AtomicReference<io.smallrye.mutiny.subscription.UniEmitter<? super Page<PostRecord>>>();
+        var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        var expected = new Page<PostRecord>(List.of(), 1, 0, 0, 0);
+        when(postRecordRepository.readPage(0, (byte) 10)).thenReturn(
+                Uni.createFrom().<Page<PostRecord>>emitter(local::set)
+                        .onCancellation().invoke(() -> cancelled.set(true)));
+        when(recordViewRepository.readPage(0, (byte) 10)).thenReturn(
+                Uni.createFrom().failure(new java.net.UnknownHostException("core.invalid")));
+        var result = service.readPage(0, (byte) 10).subscribeAsCompletionStage().orTimeout(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertFalse(cancelled.get(), "Core DNS failure must not cancel pending local data");
+        assertFalse(result.isDone());
+        local.get().complete(expected);
+        assertSame(expected, assertDoesNotThrow(result::join));
     }
 
     @Test
@@ -150,5 +168,17 @@ class PostRecordDataSyncServiceTest {
 
         verify(recordViewRepository)
                 .readRecord(id);
+    }
+    @Test
+    void pageArgumentsAndRemoteResultArePreserved() {
+        var expected = new Page<PostRecord>(List.of(), 8, 3, 7, 52);
+        when(postRecordRepository.readPage(3, (byte) 7)).thenReturn(Uni.createFrom().nothing());
+        when(recordViewRepository.readPage(3, (byte) 7)).thenReturn(Uni.createFrom().item(expected));
+        var result = service.readPage(3, (byte) 7).subscribeAsCompletionStage()
+                .orTimeout(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(result.isDone(), "Synchronous remote item must complete the page read");
+        assertSame(expected, assertDoesNotThrow(result::join));
+        verify(postRecordRepository).readPage(3, (byte) 7);
+        verify(recordViewRepository).readPage(3, (byte) 7);
     }
 }

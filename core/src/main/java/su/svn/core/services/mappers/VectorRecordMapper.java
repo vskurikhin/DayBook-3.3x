@@ -70,5 +70,7 @@ public interface VectorRecordMapper extends TagMapper {
     @Mapping(source = "tags", target = "baseRecord.tags")
     @Mapping(source = "title", target = "baseRecord.title")
     @Mapping(source = "aHref", target = "baseRecord.aHref")
+    @Mapping(source = "visible", target = "baseRecord.visible")
+    @Mapping(source = "visible", target = "visible")
     VectorRecord toEntity(ResourceVectorRecord record);
 }

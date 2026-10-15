@@ -55,5 +55,7 @@ public interface HtmlRecordMapper extends TagMapper {
     @Mapping(source = "title", target = "baseRecord.title")
     @Mapping(source = "aHref", target = "baseRecord.aHref")
     @Mapping(source = "html", target = "value")
+    @Mapping(source = "visible", target = "baseRecord.visible")
+    @Mapping(source = "visible", target = "visible")
     TextRecord toEntity(ResourceHtmlRecord record);
 }

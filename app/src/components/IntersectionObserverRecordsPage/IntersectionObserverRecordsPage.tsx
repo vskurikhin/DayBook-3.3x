@@ -7,6 +7,7 @@ interface RecordDto {
     id: string;
     title: string;
     markdown?: string;
+    visible?: boolean;
 }
 
 export default function RecordsPage() {
@@ -89,7 +90,9 @@ export default function RecordsPage() {
         <div className={styles.container}>
             <div key="root" className={styles.userContainerRoot}>
             </div>
-            {records.map(record => (
+            {records
+                .filter(record => record.visible !== false)
+                .map(record => (
                 <div key={record.id} className={styles.userContainer}>
                     <Record record={record}/>
                 </div>

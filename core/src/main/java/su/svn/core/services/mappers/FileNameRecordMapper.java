@@ -55,5 +55,7 @@ public interface FileNameRecordMapper extends TagMapper {
     @Mapping(source = "title", target = "baseRecord.title")
     @Mapping(source = "aHref", target = "baseRecord.aHref")
     @Mapping(source = "fileName", target = "value")
+    @Mapping(source = "visible", target = "baseRecord.visible")
+    @Mapping(source = "visible", target = "visible")
     TextRecord toEntity(ResourceFileNameRecord record);
 }

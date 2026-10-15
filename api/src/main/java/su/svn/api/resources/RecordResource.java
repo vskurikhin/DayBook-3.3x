@@ -140,8 +140,8 @@ public class RecordResource {
      * @see PostRecordDataSyncService#readPage(int, byte)
      */
     @APIResponse(
-            responseCode = "201",
-            description = "Created",
+            responseCode = "200",
+            description = "OK",
             content = @Content(
                     mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(
@@ -149,9 +149,25 @@ public class RecordResource {
                     )
             )
     )
-    @APIResponse(ref = "500Error")
+    @APIResponse(
+            responseCode = "500",
+            description = "Local read failure together with a recoverable Core failure (including its deadline) "
+                    + "returns this generic error regardless of failure order. Also returned for other unhandled errors. "
+                    + "Response body: HTTP 500 Oops, something went wrong",
+            content = @Content(mediaType = "*/*", schema = @Schema(implementation = String.class))
+    )
+    @APIResponse(
+            responseCode = "default",
+            description = "Other errors follow existing exception mappings. A terminal Core failure that wins "
+                    + "is mapped according to its exception type; the upstream HTTP status is not necessarily preserved."
+    )
     @PermitAll
-    @Operation(summary = "Get page with list of records")
+    @Operation(
+            summary = "Get page with list of records",
+            description = "Reads local and Core pages concurrently and returns the first successful result unless "
+                    + "a terminal Core failure wins first. Recoverable Core failures allow the local read to continue. "
+                    + "Local data may be stale. The Core deadline does not guarantee a fixed whole-request deadline."
+    )
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Uni<RecordDataPage> page(@QueryParam("page") int page, @QueryParam("size") byte size) {

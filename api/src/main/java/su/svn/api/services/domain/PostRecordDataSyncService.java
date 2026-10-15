@@ -1,5 +1,5 @@
 /*
- * This file was last modified at 2026.07.01 22:56 by Victor N. Skurikhin.
+ * This file was last modified at 2026.10.14 15:49 by Victor N. Skurikhin.
  * This is free and unencumbered software released into the public domain.
  * For more information, please refer to <http://unlicense.org>
  * PostRecordDataSyncService.java
@@ -72,6 +72,9 @@ public class PostRecordDataSyncService {
     @Inject
     RecordViewRepository recordViewRepository;
 
+    @Inject
+    RecordsPageTimeout recordsPageTimeout;
+
     /**
      * Reads a single post record by its unique identifier.
      *
@@ -102,7 +105,8 @@ public class PostRecordDataSyncService {
      * <p>
      * The method requests data from both the local repository
      * and the external record view repository simultaneously.
-     * The first successfully completed result is returned.
+     * The first page wins; Core availability failures leave local reads active.
+     * Other Core failures remain terminal. Only the Core branch has a deadline.
      * </p>
      *
      * @param pageIndex zero-based page index
@@ -110,9 +114,9 @@ public class PostRecordDataSyncService {
      * @return a {@link Uni} emitting a page of post records
      */
     public Uni<Page<PostRecord>> readPage(int pageIndex, byte size) {
-        return Uni.combine()
-                .any()
-                .of(postRecordRepository.readPage(pageIndex, size), recordViewRepository.readPage(pageIndex, size));
+        return PageReadPolicy.read(
+                () -> postRecordRepository.readPage(pageIndex, size),
+                () -> recordViewRepository.readPage(pageIndex, size), recordsPageTimeout);
     }
 
     /**
