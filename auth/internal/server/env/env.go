@@ -106,7 +106,7 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
-//go:generate mockgen -destination=env_mock_test.go -package=env github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env Environments
+//go:generate mockgen -destination=env_mock_test.go -package=env github.com/vskurikhin/DayBook3/auth/v2/internal/server/env Environments
 type Environments interface {
 	Values() Values
 }

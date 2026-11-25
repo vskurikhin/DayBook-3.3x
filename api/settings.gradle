@@ -12,4 +12,4 @@ include 'lib'
 project(':lib').projectDir = new File('../lib')
 include 'spi-mapstruct'
 project(':spi-mapstruct').projectDir = new File('../spi-mapstruct')
-rootProject.name = 'DayBook-3.3x'
+rootProject.name = 'DayBook3'

@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/db"
 )
 
 const ok = "ok"

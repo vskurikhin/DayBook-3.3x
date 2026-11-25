@@ -5,7 +5,7 @@ This file provides critical guidance for agents working on this repository. Ever
 
 ## Project overview
 
-DayBook-3.3x is a web application for managing records in Markdown, JSON, XML, blob, scalar-value, set, and vector formats, with user accounts and role-based access. The repository combines Java 21 services, a Go authentication service, and a React/TypeScript frontend.
+DayBook3 is a web application for managing records in Markdown, JSON, XML, blob, scalar-value, set, and vector formats, with user accounts and role-based access. The repository combines Java 21 services, a Go authentication service, and a React/TypeScript frontend.
 
 - `app/` contains the main React UI, built with Vite and PrimeReact. It calls `/api/v2` for records and `/auth/api/v2` for authentication and users. `api/src/main/webui/` is a separate Vite starter, not the main frontend.
 - `api/` is the Quarkus service exposing the frontend-facing record API. It forwards record writes to `core/` over REST and maintains a PostgreSQL `api.post_records` read model using Hibernate Reactive/Panache and scheduled synchronization.

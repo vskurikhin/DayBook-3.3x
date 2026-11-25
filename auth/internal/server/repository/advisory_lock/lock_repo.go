@@ -7,13 +7,13 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-//go:generate mockgen -destination=mock_pgx_conn_test.go -package=advisory_lock github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/advisory_lock PgxConn
+//go:generate mockgen -destination=mock_pgx_conn_test.go -package=advisory_lock github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/advisory_lock PgxConn
 type PgxConn interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
-//go:generate mockgen -destination=mock_row_test.go -package=advisory_lock github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/advisory_lock Row
+//go:generate mockgen -destination=mock_row_test.go -package=advisory_lock github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/advisory_lock Row
 type Row interface {
 	Scan(dest ...any) error
 }
