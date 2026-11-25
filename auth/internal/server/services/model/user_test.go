@@ -10,10 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_name"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/dto"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_attrs"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_name"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_view"
 )
 
 func TestCreateUser_ToModelParams(t *testing.T) {

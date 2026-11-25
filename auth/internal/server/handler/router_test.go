@@ -9,9 +9,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/mock/gomock"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/env"
+	"github.com/vskurikhin/DayBook3/auth/v2/pkg/tool"
 )
 
 //

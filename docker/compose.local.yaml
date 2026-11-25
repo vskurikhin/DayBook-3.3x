@@ -1,4 +1,4 @@
-# DayBook-3.3x isolated local Compose project (TASK-1001, ADR-002/003/005).
+# DayBook3 isolated local Compose project (TASK-1001, ADR-002/003/005).
 #
 # This file is consumed only through the root Makefile with explicit
 # --file/--project/--env-file arguments. The legacy docker/docker-compose.yaml

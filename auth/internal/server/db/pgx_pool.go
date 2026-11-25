@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-//go:generate mockgen -destination=pgx_pool_mock_test.go -package=db github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/db Pool
+//go:generate mockgen -destination=pgx_pool_mock_test.go -package=db github.com/vskurikhin/DayBook3/auth/v2/internal/server/db Pool
 type Pool interface {
 	Acquire(ctx context.Context) (c *pgxpool.Conn, err error)
 	Begin(ctx context.Context) (pgx.Tx, error)

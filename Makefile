@@ -1,13 +1,8 @@
-# DayBook-3.3x root Makefile
+# DayBook3 root Makefile
 #
-# TASK-001 (parent request TASK-1001): discoverable host build/test interface.
 # This is the first increment of the root workflow; the local Docker lifecycle
 # now includes image/Compose commands and explicit database initialization.
 # The complete up/down/status/logs readiness/recovery interface remains pending.
-#
-# Design references: architecture.md R3.2/R3.6/R3.7, decisions.md ADR-001/002/004
-# (revision 4), .ai/architect/tasks/TASK-001.md. Approved by Senior Architect
-# round 2 (APPROVED) covering TASK-001 at SHA-256 5f6bf1d1... on 2026-10-09.
 #
 # Production orchestration lives in Makefile and included Make fragments
 # (no standalone shell/Python/Go workflow helpers).
@@ -21,11 +16,11 @@ WORKFLOW := $(ROOT)/.workflow
 LOCK     := $(WORKFLOW)/lock
 HOSTDIR  := $(WORKFLOW)/host
 
-# Local Docker configuration file (ADR-005 / R3.4). May be overridden on the
-# command line to select a local config file; it is data only and is never
-# sourced, evaluated or Make-included. The two required secrets
-# (LOCAL_DB_PASSWORD, LOCAL_TOKEN_KEY) are read only from this file inside
-# recipes and never become Make variables.
+# Local Docker configuration file. May be overridden on the command line
+# to select a local config file; it is data only and is never
+# sourced, evaluated or Make-included.
+# The two required secrets (LOCAL_DB_PASSWORD, LOCAL_TOKEN_KEY)
+# are read only from this file inside recipes and never become Make variables.
 ENV_FILE ?= $(ROOT)/docker/local.env
 
 QUARKUS_NATIVE := -Dquarkus.native.container-runtime=docker \
@@ -79,8 +74,8 @@ AUTH_BUILD     := $(call check_tool,go) && GOOS=$(GOOS) GOARCH=$(GOARCH) $(MAKE)
 APP_BUILD      := $(call check_tool,node) && $(call check_tool,npm) && $(call build_app,$(ROOT))
 
 # Test fragments. Java suites use Testcontainers and therefore also require a
-# working Docker runtime (F-VERIFY-004). They are existing mixed suites, not
-# certified unit-only coverage measurements (ADR-004).
+# working Docker runtime.
+# They are existing mixed suites, not certified unit-only coverage measurements.
 JAVA_ALL_TEST := $(call check_tool,java) && $(call check_tool,docker) && ./gradlew test
 API_TEST      := $(call check_tool,java) && $(call check_tool,docker) && ./gradlew :api:test
 CORE_TEST     := $(call check_tool,java) && $(call check_tool,docker) && ./gradlew :core:test
@@ -105,7 +100,7 @@ include Make-run-locked.mk
 # ---------------------------------------------------------------------------
 
 help:
-	@echo 'DayBook-3.3x root build/test interface'
+	@echo 'DayBook3 root build/test interface'
 	@echo ''
 	@echo 'Targets:'
 	@echo '  db-up                start PostgreSQL and authenticate over host TCP'
@@ -167,11 +162,11 @@ help:
 	@echo '  daybook-local/*:dev). They do not start services, migrate/seed data, or touch'
 	@echo '  tracked app/html or docker/nginx/html staging.'
 	@echo ''
-	@echo 'Capability gaps (honest reporting, ADR-004):'
-	@echo '  Frontend tests are unavailable (F-VERIFY-001); test-app and "make test"'
-	@echo '  fail nonzero. Java suites are mixed unit/integration, not certified'
+	@echo 'Capability gaps (honest reporting):'
+	@echo '  Frontend tests are unavailable; test-app and "make test" fail nonzero.'
+	@echo '  Java suites are mixed unit/integration, not certified'
 	@echo '  unit-only coverage. Full up/down/status/logs readiness and recovery'
-	@echo '  remain pending. Database targets do not implement the complete TASK-003.'
+	@echo '  remain pending. Database targets do not implement the complete.'
 
 # ---------------------------------------------------------------------------
 # Build targets
@@ -207,11 +202,11 @@ build-app:
 
 # Aggregate test: warn about the frontend gap up front (so it is announced even
 # if an earlier suite fails), then run Java -> auth -> app. test-app always
-# fails, so this aggregate always exits nonzero (ADR-004 honesty).
+# fails, so this aggregate always exits nonzero.
 test:
-	@echo "warning: frontend (app) test capability is unavailable (F-VERIFY-001);" >&2
+	@echo "warning: frontend (app) test capability is unavailable;" >&2
 	@echo "  'make test' cannot report a complete passing test suite." >&2
-	$(call run_locked,$(JAVA_ALL_TEST) && $(AUTH_TEST) && echo "error: test-app: frontend tests unavailable (F-VERIFY-001)" >&2 && exit 1)
+	$(call run_locked,$(JAVA_ALL_TEST) && $(AUTH_TEST) && echo "error: test-app: frontend tests unavailable" >&2 && exit 1)
 
 test-java:
 	$(call run_locked,$(JAVA_ALL_TEST))
@@ -231,10 +226,11 @@ test-spi-mapstruct:
 test-auth:
 	$(call run_locked,$(AUTH_TEST))
 
-# Frontend tests are not defined in app/package.json (F-VERIFY-001). Compilation
-# (npm run build) is not a test suite; report the gap and fail nonzero.
+# Frontend tests are not defined in app/package.json.
+# Compilation (npm run build) is not a test suite;
+# report the gap and fail nonzero.
 test-app:
-	@echo "error: frontend (app) test capability is unavailable (F-VERIFY-001):" >&2
+	@echo "error: frontend (app) test capability is unavailable:" >&2
 	@echo "  app/package.json defines no test script; there is no root npm test." >&2
 	@echo "  'npm run build' only type-checks and bundles; it is not a test suite." >&2
 	@exit 1

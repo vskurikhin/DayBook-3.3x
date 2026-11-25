@@ -7,10 +7,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	jwx "github.com/lestrrat-go/jwx/v3/jwt"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_attrs"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_has_roles"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_name"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_attrs"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_has_roles"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_name"
 )
 
 func newTestJWXToken() jwx.Token {

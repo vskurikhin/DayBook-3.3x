@@ -9,11 +9,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/env"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/env"
 )
 
-//go:generate mockgen -destination=server_mock_test.go -package=mocks github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server Server
+//go:generate mockgen -destination=server_mock_test.go -package=mocks github.com/vskurikhin/DayBook3/auth/v2/internal/server Server
 type Server interface {
 	Run(ctx context.Context) error
 }

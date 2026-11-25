@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/pkg/tool"
+	"github.com/vskurikhin/DayBook3/auth/v2/pkg/tool"
 )
 
 func TestPool(t *testing.T) {

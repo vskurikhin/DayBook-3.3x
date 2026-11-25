@@ -13,15 +13,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/actions"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/config"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/dto"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/session"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_has_roles"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/repository/user_view"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/creds"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/services/model"
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/xerror"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/actions"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/config"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/dto"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/session"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_has_roles"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/repository/user_view"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/creds"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/services/model"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/xerror"
 )
 
 func TestAuthService_Auth(t *testing.T) {

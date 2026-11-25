@@ -3,7 +3,7 @@ package handler
 import (
 	"github.com/go-chi/chi/v5"
 
-	"github.com/vskurikhin/DayBook-3.3x/auth/v2/internal/server/resources"
+	"github.com/vskurikhin/DayBook3/auth/v2/internal/server/resources"
 )
 
 type ApiV1 interface {
